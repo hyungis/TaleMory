@@ -11,8 +11,8 @@ This project separates stateful infrastructure from stateless application servic
 Dockerfiles live with each app:
 
 - `app/backend/Dockerfile`
-- `app/frontend/Dockerfile`
 - `app/ai/Dockerfile`
+- `deploy/app/nginx/Dockerfile`
 
 The public entrypoint for the application stack is the dedicated Nginx proxy container.
 It serves the built frontend at `/`, proxies `/api` to the backend service, and proxies `/ai` to the AI service.
