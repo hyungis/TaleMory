@@ -7,7 +7,10 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-COPY . ./
+COPY index.html ./
+COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts eslint.config.js ./
+COPY public ./public
+COPY src ./src
 
 ARG VITE_API_BASE_URL=http://backend:8080
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
@@ -16,7 +19,7 @@ RUN pnpm build
 
 FROM nginx:1.29-alpine
 
-COPY deploy/app/nginx.conf /etc/nginx/conf.d/default.conf
+COPY app/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80

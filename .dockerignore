@@ -1,0 +1,9 @@
+**/node_modules/
+**/dist/
+**/build/
+**/.gradle/
+**/.venv/
+**/__pycache__/
+.git/
+.idea/
+.vscode/

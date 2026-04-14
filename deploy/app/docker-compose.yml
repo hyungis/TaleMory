@@ -7,21 +7,35 @@ services:
     restart: unless-stopped
     env_file:
       - ../.env
-    ports:
-      - "${SERVER_PORT:-8080}:8080"
+    expose:
+      - "8080"
     networks:
       - s210-network
 
-  frontend:
+  ai:
+    build:
+      context: ../../app/ai
+      dockerfile: Dockerfile
+    container_name: s210-ai
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    expose:
+      - "8000"
+    networks:
+      - s210-network
+
+  nginx:
     build:
       context: ../..
-      dockerfile: app/frontend/Dockerfile
+      dockerfile: deploy/app/nginx/Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://backend:8080}
-    container_name: s210-frontend
+        VITE_API_BASE_URL: /api
+    container_name: s210-nginx
     restart: unless-stopped
     depends_on:
       - backend
+      - ai
     env_file:
       - ../.env
     ports:
