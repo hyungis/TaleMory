@@ -6,6 +6,7 @@
 *.local
 *.secret
 *.secrets
+docs/plans/
 
 # Keep shareable examples tracked
 !.env.example
