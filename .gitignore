@@ -1,0 +1,31 @@
+# Secrets and local environment files
+.env
+.env.*
+**/.env
+**/.env.*
+*.local
+*.secret
+*.secrets
+
+# Keep shareable examples tracked
+!.env.example
+!**/.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# OS/editor noise at repo root
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python local artifacts
+**/.venv/
+**/__pycache__/
+*.pyc
+*.pyo
