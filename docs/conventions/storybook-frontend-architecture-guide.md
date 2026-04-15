@@ -825,7 +825,7 @@ storyboard-editor/
     confirmStoryboard.ts
   model/
     useStoryboardEditor.ts
-    storyboard-editor.store.ts
+    storyboardEditorStore.ts
   ui/
     StoryboardEditor.tsx
     StoryboardGrid.tsx
@@ -939,3 +939,256 @@ storyboard-editor/
 - 서버 상태와 UI 상태를 분리하고, 제작 플로우 상태는 `story-creation/model`에서 관리한다.
 - AI 비동기 작업은 공통 polling / pending / failed UX 패턴을 가진다.
 
+---
+
+# 18. 프로젝트 개발 세팅 / 코드 컨벤션
+
+이 섹션은 아키텍처 규칙과 함께 적용되는 **프로젝트 코드 작성 규칙**이다.  
+즉, 폴더 구조와 의존 규칙만 맞추는 것이 아니라, 실제 구현 시 아래 네이밍과 파일 규칙도 함께 따라야 한다.
+
+## 18.1 네이밍 규칙
+
+### 변수명
+- **카멜케이스**를 사용한다.
+
+예:
+- `storyId`
+- `currentPage`
+- `selectedVoiceProfile`
+
+금지 예:
+- `story_id`
+- `CurrentPage`
+
+---
+
+### 함수명
+- **동사형**
+- **카멜케이스**
+
+예:
+- `movePage`
+- `uploadPhoto`
+- `generateStoryboard`
+- `saveBookmark`
+
+금지 예:
+- `pageMove`
+- `storyboardGenerator`
+- `UploadPhoto`
+
+---
+
+### 컴포넌트명
+- **파스칼케이스**
+
+예:
+- `PhotoUploadSection`
+- `StoryboardEditor`
+- `ViewerToolbar`
+
+금지 예:
+- `photoUploadSection`
+- `storyboard-editor`
+
+---
+
+## 18.2 디렉토리 / 파일명 규칙
+
+### 디렉토리명
+- **케밥 케이스**
+
+예:
+```text
+story-creation
+photo-manager
+voice-clone
+word-dictionary
+```
+
+금지 예:
+```text
+storyCreation
+PhotoManager
+word_dictionary
+```
+
+---
+
+### 파일명
+- **컴포넌트 파일**: 파스칼케이스
+- **그 외 파일**: 카멜케이스
+
+예:
+```text
+PhotoUploadSection.tsx
+StoryboardGrid.tsx
+useStoryboardEditor.ts
+generateStoryboard.ts
+storyboardMapper.ts
+routeConfig.ts
+```
+
+금지 예:
+```text
+photo-upload-section.tsx
+GenerateStoryboard.ts
+storyboard_mapper.ts
+```
+
+---
+
+## 18.3 React Query 네이밍 규칙
+
+React Query 관련 함수 및 훅 이름은 HTTP 메서드 의도를 이름에서 드러내야 한다.
+
+### 조회(get)
+- 이름 끝에 `Query`를 붙인다.
+
+예:
+- `useStoryListQuery`
+- `useStoryboardPagesQuery`
+- `useVoiceProfilesQuery`
+
+---
+
+### 생성(post)
+- 이름 끝에 `Post`를 붙인다.
+
+예:
+- `useStoryPost`
+- `usePhotoUploadPost`
+- `useStoryboardGeneratePost`
+
+---
+
+### 삭제(delete)
+- 이름 끝에 `Delete`를 붙인다.
+
+예:
+- `useStoryDelete`
+- `useBookmarkDelete`
+
+---
+
+### 수정(put / patch 포함 프로젝트 규칙상 update 계열)
+- 이름 끝에 `Update`를 붙인다.
+
+예:
+- `useStoryStyleUpdate`
+- `useStoryProgressUpdate`
+- `usePhotoDescriptionUpdate`
+
+---
+
+## 18.4 권장 네이밍 적용 예시
+
+### feature 폴더 예시
+```text
+features/
+  story-creation/
+    photo-manager/
+      api/
+        uploadPhotoPost.ts
+        updatePhotoDescription.ts
+      model/
+        usePhotoUploadPost.ts
+        usePhotoListQuery.ts
+      ui/
+        PhotoUploadSection.tsx
+        PhotoList.tsx
+```
+
+### viewer 예시
+```text
+features/
+  viewer/
+    progress-bookmark/
+      api/
+        updateStoryProgress.ts
+      model/
+        useStoryProgressQuery.ts
+        useStoryProgressUpdate.ts
+      ui/
+        BookmarkButton.tsx
+```
+
+---
+
+## 18.5 이 아키텍처와 컨벤션을 함께 적용하는 방식
+
+이 프로젝트에서는 아래 두 가지를 항상 동시에 만족해야 한다.
+
+### 1. 구조 규칙
+- 기능/도메인 중심 폴더 구조를 사용한다.
+- `story-creation`, `bookshelf`, `viewer`, `auth`, `mypage` 중심으로 분리한다.
+- `shared`는 최소화한다.
+- 외부 import는 각 feature의 `index.ts`를 통해서만 수행한다.
+
+### 2. 코드 작성 규칙
+- 변수명과 함수명은 카멜케이스
+- 함수명은 동사형
+- 컴포넌트명은 파스칼케이스
+- 디렉토리명은 케밥 케이스
+- 컴포넌트 파일은 파스칼케이스
+- 나머지 파일은 카멜케이스
+- React Query 이름은 `Query / Post / Delete / Update` 규칙을 따른다
+
+즉, 올바른 예시는 다음과 같다.
+
+```text
+features/
+  story-creation/
+    final-preview/
+      ui/
+        FinalPreviewPanel.tsx
+      model/
+        useSceneListQuery.ts
+        useIllustrationRegeneratePost.ts
+        useBgmUpdate.ts
+      api/
+        getSceneList.ts
+        postIllustrationRegenerate.ts
+        updateBgm.ts
+```
+
+이런 조합은 허용된다.
+
+반대로 아래는 구조나 네이밍이 어긋난 예다.
+
+```text
+features/
+  storyCreation/
+    FinalPreview/
+      ui/
+        final-preview-panel.tsx
+      model/
+        SceneListQuery.ts
+```
+
+문제점:
+- 디렉토리명이 케밥 케이스가 아님
+- 컴포넌트 파일이 파스칼케이스가 아님
+- Query 파일명이 프로젝트 규칙과 맞지 않음
+- feature 네이밍이 통일되지 않음
+
+---
+
+## 18.6 다른 AI에게 전달할 때의 핵심 규칙
+
+다른 AI에게 이 프로젝트의 규칙을 전달할 때는 아래를 함께 전달해야 한다.
+
+- 아키텍처는 **기능/도메인 중심(feature-first)** 이다.
+- 최상위 도메인은 `story-creation`, `bookshelf`, `viewer`, `auth`, `mypage`다.
+- 디렉토리명은 **케밥 케이스**다.
+- 컴포넌트명과 컴포넌트 파일명은 **파스칼케이스**다.
+- 변수명과 함수명은 **카멜케이스**다.
+- 함수명은 **동사형**이다.
+- 일반 파일명은 **카멜케이스**다.
+- React Query 이름은 다음 규칙을 따른다.
+  - 조회: `Query`
+  - 생성: `Post`
+  - 삭제: `Delete`
+  - 수정: `Update`
+
+이 규칙은 아키텍처 규칙과 별개가 아니라, **같은 레벨의 프로젝트 규칙**으로 함께 적용한다.
