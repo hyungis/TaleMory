@@ -1,252 +1,258 @@
 # 로컬 개발 실행 가이드
 
-S210 인프라/앱 스택을 개발 PC에서 띄우는 순서. GitLab CI 없이 `docker compose` 직접 호출.
+S210 스택(mysql / redis / rabbitmq / backend / ai / nginx) 6개 컨테이너를 개발 PC에서 한 방에 띄우는 가이드.
 
-> CI 배포 서버는 `/tmp/env/`를 쓰지만 로컬은 `infra/env/`로 통일. `.gitignore` 덕분에 실 env 파일은 커밋되지 않음.
+**구조**: 로컬도 CI/운영과 똑같이 **app 스택**과 **infra 스택**이 분리된 두 compose 파일로 관리. 두 파일 모두 `name: s210-local`로 **같은 프로젝트**를 공유하며, 공유 기본 네트워크(`s210-local_default`)로 서비스명 DNS가 연결된다. **infra 먼저 → app 뒤에** 순서로 기동. 루트 `.env` 파일은 사용하지 않는다.
 
 ---
 
 ## 0. 전제 조건
 
-- **Docker Desktop** 실행 중 (`docker ps`에 에러 없이 헤더 나와야 함)
-- **Git Bash** 사용 (repo의 모든 bash 스크립트가 전제). PowerShell은 문법이 달라 비권장
-- repo 루트에서 명령 실행 (`C:/Users/SSAFY/gibeom/S210/S14P31S210`)
+- **Docker Desktop** 실행 중 (`docker ps` 헤더가 에러 없이 나와야 함)
+- **Git Bash** 또는 WSL2 (bash 명령 사용)
+- repo 루트에서 명령 실행
 
 ---
 
-## 1. env 파일 준비 (최초 1회)
+## 1. 최초 1회 셋업
 
-### 1-1. 예시 복사
+### 1-1. env 파일 2개 복사
 
 ```bash
-cd "$(git rev-parse --show-toplevel)"
-
-cp infra/env/infra.dev.env.example infra/env/infra.dev.env
-cp infra/env/app.dev.env.example   infra/env/app.dev.env
+cp infra/env/app.local.env.example   infra/env/app.local.env
+cp infra/env/infra.local.env.example infra/env/infra.local.env
 ```
 
-생성된 파일은 `.gitignore`에 의해 자동으로 커밋 대상에서 제외됩니다.
+두 파일 모두 `.gitignore`에 의해 자동으로 commit 제외됨. 루트 `.env`는 **만들지 않는다** — compose가 루트 `.env`를 자동 로드하면 의도치 않은 override가 생길 수 있으므로 없는 상태를 유지.
 
-### 1-2. `infra/env/infra.dev.env` 채우기
+### 1-2. env 값 검토 (필요 시 편집)
 
-`<secret>` 자리에 로컬 더미값 채움:
+- `infra/env/infra.local.env` — mysql/redis/rabbitmq 비밀번호. 기본 더미값 그대로 써도 로컬은 OK.
+- `infra/env/app.local.env` — backend/ai 비밀번호 + `OPENAI_API_KEY`. **infra.local.env의 비밀번호와 반드시 일치**해야 함 (`DB_PASSWORD=apppass`=`MYSQL_PASSWORD`, 등).
+- 포트 override / `VITE_API_BASE_URL` override는 실행 시점 shell env로 주입: `BACKEND_PORT=18081 docker compose -f ... up`.
 
-```dotenv
-COMPOSE_PROJECT_NAME=s210-infra-dev
+### 1-3. 기존 `dev-*` 스택 청소 (있다면)
 
-MYSQL_ROOT_PASSWORD=rootpass
-MYSQL_DATABASE=s210_dev
-MYSQL_USER=app
-MYSQL_PASSWORD=apppass
-MYSQL_PORT=3307
+이전 가이드를 따라 `infra/env/` 기반으로 `dev-*` 컨테이너를 올려 본 적이 있다면:
 
-REDIS_PORT=6380
-
-RABBITMQ_DEFAULT_USER=rabbit
-RABBITMQ_DEFAULT_PASS=rabbitpass
-RABBITMQ_PORT=5673
-RABBITMQ_MANAGEMENT_PORT=15673
+```bash
+docker compose -f infra/compose/docker-compose.infra-dev.yml -p s210-infra-dev down -v 2>/dev/null || true
+docker compose -f infra/compose/docker-compose.app-dev.yml -p s210-app-dev down -v 2>/dev/null || true
 ```
 
-### 1-3. `infra/env/app.dev.env` 채우기
+깨끗한 상태에서 로컬 스택 시작.
 
-⚠️ **중요**: `DB_USERNAME/DB_PASSWORD`와 `RABBITMQ_USERNAME/PASSWORD`는 `infra.dev.env`의 값과 반드시 일치.
+### 1-4. (선택) shell alias 등록
 
-```dotenv
-COMPOSE_PROJECT_NAME=s210-app-dev
+매번 긴 `-f ...` 붙이는 게 번거로우면:
 
-# Backend
-SPRING_PROFILES_ACTIVE=dev
-SERVER_PORT=8080
-DB_URL=jdbc:mysql://dev-mysql:3306/s210_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-DB_USERNAME=app
-DB_PASSWORD=apppass          # ← infra의 MYSQL_PASSWORD와 동일
+```bash
+# Git Bash ~/.bashrc or zsh ~/.zshrc
+alias dci='docker compose -f infra/compose/docker-compose.infra-local.yml'
+alias dca='docker compose -f infra/compose/docker-compose.app-local.yml'
+```
+
+이후 `dci up -d`, `dca up -d --build`, `dca logs -f backend` 식으로 단축.
+
+---
+
+## 2. 기동 (2단계)
+
+app이 infra에 의존하므로 반드시 순서대로:
+
+```bash
+# 1) infra 먼저
+dci up -d
+
+# 2) mysql이 healthy 될 때까지 대기 (20~30초)
+dci ps        # mysql이 "Up (healthy)" 확인
+
+# 3) app 기동 (첫 빌드만 5~10분)
+dca up -d --build
+```
+
+- 두 compose 모두 `name: s210-local`이라 **같은 프로젝트**. 기본 네트워크 `s210-local_default`를 공유 → backend가 호스트명 `mysql`, `redis`, `rabbitmq`로 접근.
+- `dci up -d`만 실행하면 MySQL/Redis/RabbitMQ만 올라감 (app 없이 infra 테스트 가능).
+- app이 먼저 올라가도 backend는 연결 실패 → 2단계 순서 필수.
+
+### 컨테이너 상태 확인
+
+```bash
+docker ps --filter "name=local-"
+# 또는
+dci ps && dca ps
+```
+
+기대 (STATUS):
+- `mysql` → `Up (healthy)` (20~30초 후 healthy 전환)
+- `redis`, `rabbitmq` → `Up`
+- `backend` → `Up` (MySQL healthy 후 기동)
+- `ai`, `nginx` → `Up`
+
+---
+
+## 3. 동작 확인
+
+```bash
+# Frontend (정적 + API 프록시)
+curl http://localhost:3001/              # → HTTP 200
+curl http://localhost:3001/api/          # → 401 (Spring Security 기본 응답; Tomcat alive 의미)
+curl http://localhost:3001/ai/           # → HTTP 200
+
+# Backend 직접
+curl http://localhost:8081/              # → 401
+
+# AI 직접
+curl http://localhost:8001/              # → HTTP 200
+
+# MySQL
+docker exec -it local-mysql mysql -uapp -papppass iportfolio
 
 # Redis
-REDIS_HOST=dev-redis
-REDIS_PORT=6379
+docker exec local-redis redis-cli -a redispass ping      # → PONG
 
-# RabbitMQ
-RABBITMQ_HOST=dev-rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME=rabbit        # ← infra의 RABBITMQ_DEFAULT_USER
-RABBITMQ_PASSWORD=rabbitpass    # ← infra의 RABBITMQ_DEFAULT_PASS
+# RabbitMQ 관리 UI
+# 브라우저: http://localhost:15673  (ID: rabbit / PW: rabbitpass)
+```
 
-# Frontend (nginx publish port)
-FRONTEND_PORT=3001
-VITE_API_BASE_URL=/api
+> 컨테이너 이름 = `local-<service>` (ex. `local-mysql`, `local-backend`). compose 내부 DNS는 **짧은 서비스명**(`mysql`, `backend`, `redis`)으로 접근.
 
-# AI
-OPENAI_API_KEY=sk-dummy-local
+---
+
+## 4. 자주 쓰는 명령
+
+상세는 [local-commands.md](./local-commands.md) 참고. 요약:
+
+```bash
+# alias dci/dca 사용 (1-4 참조)
+
+# 특정 서비스만 재빌드 (app 쪽)
+dca up -d --build backend
+
+# app만 종료 (infra 유지)
+dca down
+
+# 전체 종료 (app → infra 순)
+dca down && dci down
+
+# 전체 종료 + 볼륨 삭제 (DB 초기화 포함)
+dca down && dci down -v
+
+# 로그
+dca logs -f backend
+dci logs -f mysql
 ```
 
 ---
 
-## 2. 환경변수 헬퍼
+## 5. 포트 레이아웃 (로컬 기본값)
 
-로컬에선 compose가 `${ENV_DIR:-/tmp/env}/...`를 참조하므로 `ENV_DIR`을 `infra/env/`의 **Windows 절대경로**로 넘겨야 합니다. 매번 치기 귀찮으니 쉘 변수로:
+| 서비스 | 서비스명 (compose DNS) | 컨테이너명 | 호스트 포트 | 내부 포트 |
+|---|---|---|---|---|
+| frontend (nginx 외부 진입) | `nginx` | `local-nginx` | **3001** | 80 |
+| backend | `backend` | `local-backend` | 8081 | 8080 |
+| ai | `ai` | `local-ai` | 8001 | 8000 |
+| mysql | `mysql` | `local-mysql` | 3307 | 3306 |
+| redis | `redis` | `local-redis` | 6380 | 6379 |
+| rabbitmq (AMQP) | `rabbitmq` | `local-rabbitmq` | 5673 | 5672 |
+| rabbitmq (UI) | `rabbitmq` | `local-rabbitmq` | 15673 | 15672 |
 
-```bash
-export ENV_DIR="$(cygpath -w "$(pwd)/infra/env")"
-export COMPOSE_APP=infra/compose/docker-compose.app-dev.yml
-export COMPOSE_INFRA=infra/compose/docker-compose.infra-dev.yml
-```
-
-(새 터미널 열 때마다 다시 `export` 필요. `~/.bashrc`에 넣어두거나 아래 명령들에 인라인으로 박아도 됨.)
-
----
-
-## 3. Infra 스택 기동 (MySQL/Redis/RabbitMQ)
-
-App보다 **먼저** 떠 있어야 합니다 — app 쪽이 `dev-s210-infra-net`을 external로 참조하기 때문.
-
-```bash
-docker compose \
-  --env-file infra/env/infra.dev.env \
-  -f "$COMPOSE_INFRA" \
-  -p s210-infra-dev \
-  up -d
-```
-
-결과 확인:
-
-```bash
-docker ps --filter "name=dev-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-```
-
-기대 출력: `dev-mysql`, `dev-redis`, `dev-rabbitmq` 3개. MySQL은 `(health: starting)` → 15~30초 후 `(healthy)`로 바뀜.
+외부 진입점은 **`http://localhost:3001`** 하나. backend/ai는 nginx 경유 또는 직접.
 
 ---
 
-## 4. App 스택 기동 (nginx + backend + ai)
+## 6. 두 compose 파일 구조
 
-registry에 이미지가 없으므로 `--build` 필수:
-
-```bash
-docker compose \
-  --env-file infra/env/app.dev.env \
-  -f "$COMPOSE_APP" \
-  -p s210-app-dev \
-  up -d --build
+```
+infra/compose/
+  docker-compose.infra-local.yml    ← mysql / redis / rabbitmq (volumes 포함)
+  docker-compose.app-local.yml      ← backend / ai / nginx (build context 포함)
+  docker-compose.infra-dev.yml      ← CI 전용
+  docker-compose.infra-master.yml   ← CI 전용
+  docker-compose.app-dev.yml        ← CI 전용
+  docker-compose.app-master.yml     ← CI 전용
 ```
 
-⏱ **첫 빌드는 5~10분** 걸립니다:
+로컬/CI가 같은 네이밍 패턴(`<target>-local|dev|master`)을 유지. 파일 하나를 수정해도 다른 환경이 깨지지 않음.
 
-- frontend: `pnpm install` + `vite build` + nginx 이미지
-- backend: `./gradlew build`
-- ai: `pip install -r requirements.txt`
+### 왜 공유 프로젝트명(`name: s210-local`) 방식인가
 
-이후 소스 변경 시 해당 서비스만 다시 빌드:
+대안 비교:
 
-```bash
-docker compose --env-file infra/env/app.dev.env -f "$COMPOSE_APP" -p s210-app-dev \
-  up -d --build backend
-```
+1. **루트 `.env`의 `COMPOSE_FILE=A:B`** — 자동 merge되지만 `.env`를 강제로 유지해야 하고 `COMPOSE_PATH_SEPARATOR` 이슈 발생.
+2. **`include:` 지시자** — app-local이 infra-local을 include로 merge. 한 명령으로 전체 기동 가능하지만, app과 infra의 lifecycle이 묶여 **"infra만 먼저 기동"이 어색**하고 container_name 충돌 여지.
+3. **공유 프로젝트명 (현재 선택)** — 두 compose가 독립 파일이지만 같은 project/network를 공유. "app이 infra에 의존" 관계를 가장 명확히 표현.
+
+`depends_on`이 cross-file이 돼서 compose validation에 걸리므로 backend에서는 제거. 대신 **사람이 mysql healthy 확인 후 app 기동** 워크플로를 문서화. Spring Boot / Flyway의 connection 재시도가 일부 완충.
 
 ---
 
-## 5. 동작 확인
-
-### 5-1. 컨테이너 상태
-
-```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
-```
-
-기대: 6개 모두 Up (`dev-nginx`, `dev-backend`, `dev-ai`, `dev-mysql`, `dev-redis`, `dev-rabbitmq`).
-
-### 5-2. HTTP 엔드포인트
-
-```bash
-curl http://localhost:3001/              # frontend 정적 파일
-curl http://localhost:3001/api/health    # nginx → backend
-curl http://localhost:3001/ai/health     # nginx → ai
-
-# backend / ai 직접 (publish된 포트)
-curl http://localhost:8081/health        # dev-backend
-curl http://localhost:8001/health        # dev-ai
-```
-
-### 5-3. DB 접속
-
-```bash
-docker exec -it dev-mysql mysql -uapp -papppass s210_dev
-```
-
-### 5-4. RabbitMQ 관리 UI
-
-브라우저: http://localhost:15673 (ID: `rabbit` / PW: `rabbitpass`)
-
----
-
-## 6. 로그 보기
-
-```bash
-# 앱 쪽 전체
-docker compose --env-file infra/env/app.dev.env -f "$COMPOSE_APP" -p s210-app-dev logs -f
-
-# 특정 서비스
-docker compose --env-file infra/env/app.dev.env -f "$COMPOSE_APP" -p s210-app-dev logs -f backend
-```
-
----
-
-## 7. 정리
-
-### 7-1. 컨테이너만 내리기 (데이터 보존)
-
-```bash
-docker compose --env-file infra/env/app.dev.env   -f "$COMPOSE_APP"   -p s210-app-dev   down
-docker compose --env-file infra/env/infra.dev.env -f "$COMPOSE_INFRA" -p s210-infra-dev down
-```
-
-### 7-2. 볼륨까지 삭제 (MySQL/Redis/RabbitMQ 데이터 초기화)
-
-```bash
-docker compose --env-file infra/env/infra.dev.env -f "$COMPOSE_INFRA" -p s210-infra-dev down -v
-```
-
----
-
-## 8. 포트 요약 (로컬)
-
-| 서비스 | 컨테이너명 | 호스트 포트 | 내부 포트 |
-|---|---|---|---|
-| frontend (nginx) | `dev-nginx` | **3001** | 80 |
-| backend | `dev-backend` | 8081 | 8080 |
-| ai | `dev-ai` | 8001 | 8000 |
-| mysql | `dev-mysql` | 3307 | 3306 |
-| redis | `dev-redis` | 6380 | 6379 |
-| rabbitmq (AMQP) | `dev-rabbitmq` | 5673 | 5672 |
-| rabbitmq (UI) | `dev-rabbitmq` | 15673 | 15672 |
-
-외부 진입점은 **`http://localhost:3001`** 하나.
-
----
-
-## 9. 트러블슈팅
+## 7. 트러블슈팅
 
 | 증상 | 원인 / 조치 |
 |---|---|
-| `invalid reference format` | `REGISTRY` 비어있을 때 compose가 잘못된 태그 생성. compose 파일 이미 `${REGISTRY:+...}`로 수정됨. 최신 pull 확인 |
-| `env file ... not found` | `ENV_DIR` 미지정 또는 오타. `echo $ENV_DIR` 확인 후 `cygpath` 재실행 |
-| `network dev-s210-infra-net not found` | infra 스택이 안 떠 있음. 3번 먼저 실행 |
-| `port is already allocated` | 3001/8081/3307 등 호스트 포트 충돌. `docker ps` 로 점유 컨테이너 찾아서 내림 |
-| backend가 `Communications link failure` | MySQL healthy 전에 backend가 연결 시도. `restart: unless-stopped`라 곧 재시도 성공. 첫 기동 때만 보임 |
-| `pnpm install` 에러 | `app/frontend/pnpm-lock.yaml` 있는지 확인. 없으면 먼저 `cd app/frontend && pnpm install` 한 번 |
-| Flyway migration 실패 | `app/backend/src/main/resources/db/migration/Vn__*.sql` 확인. 이미 적용된 V 파일을 수정했으면 DB 초기화(`down -v`) 필요 |
-| 한 서비스만 다시 빌드 | `docker compose ... up -d --build <svc>` |
+| `env file ... not found` | `infra/env/app.local.env` 또는 `infra.local.env` 미생성. 1-1 단계 수행 |
+| `port is already allocated` | 3001/8081/3307 등이 다른 프로세스 점유. `netstat -ano \| findstr 3001`로 확인 후 내림 |
+| `invalid reference format` | Docker 빌드 캐시 꼬임. `docker builder prune -af` 후 재시도 |
+| `MYSQL_DATABASE` 변경이 안 반영 | MySQL 볼륨에 기존 DB 있어 초기화 스킵됨. `dci down -v` 후 재기동 |
+| backend `Flyway Communications link failure` | infra가 healthy 되기 전에 app을 기동. `dca restart backend` 또는 `dci ps`로 healthy 확인 후 재기동 |
+| backend `Unable to resolve host: mysql` | infra가 안 올라간 상태에서 app 기동. `dci up -d` 먼저 |
+| `Redis NOAUTH` | `application.yml`이 `${REDIS_PASSWORD}`를 참조하는지, `infra/env/app.local.env`에 값이 있는지 확인 |
+| `pnpm install` 실패 | `app/frontend/pnpm-lock.yaml` 없으면 `cd app/frontend && pnpm install` 1회 |
+| app만 down 했는데 infra도 죽음 | `--remove-orphans` 플래그가 있었을 가능성. 평소엔 그냥 `dca down`만 |
 
 ---
 
-## 10. 서버 배포(CI)와 다른 점
+## 8. CI와의 차이 한눈에
 
-| | 로컬 | 서버 (GitLab CI) |
+| 항목 | 로컬 | CI (GitLab) |
 |---|---|---|
-| env 위치 | `infra/env/*.env` | `/tmp/env/*.env` (generate-env.sh 생성) |
-| env 소스 | 직접 작성 | GitLab CI/CD Variables |
-| 이미지 | `docker compose --build` 로 로컬 빌드 | registry pull |
-| tag | `latest` | `$CI_COMMIT_SHORT_SHA` |
-| 실행 | `docker compose` 직접 | `infra/scripts/deploy-dev.sh` 경유 (rollback trap 포함) |
+| 사용 compose | `infra/compose/docker-compose.{app,infra}-local.yml` (`include:` merge) | `infra/compose/docker-compose.{app,infra}-{dev,master}.yml` (각자 `-f`) |
+| env 소스 | `infra/env/{app,infra}.local.env` (수동 편집) | GitLab CI/CD Variables → `generate-env.sh` → `/tmp/env/*.env` |
+| 이미지 | `docker compose --build` 로 로컬 빌드 | registry pull (`$CI_COMMIT_SHORT_SHA` 태그) |
+| 컨테이너명 | `local-*` | `dev-*` / `prod-*` |
+| DNS (compose 내부) | 짧은 서비스명 (`mysql`, `backend`) | 짧은 서비스명 동일 |
+| nginx conf | `nginx.local.conf` | `nginx.dev.conf` / `nginx.prod.conf` |
+| 자동 rollback | 없음 | `last_ok_tag_*` 기반 |
 
-로컬은 CI와 동일한 compose 파일을 쓰되 env 소스와 이미지 획득 방식만 다르다고 생각하면 됩니다.
+로컬과 CI는 compose 파일 구조(app/infra 분리)는 같고, env 소스와 이미지 획득 방식만 다름.
+
+---
+
+## 9. 자주 하는 질문
+
+### Q. 두 파일을 한 번에 올릴 수는 없나?
+
+A. 두 파일 모두 `name: s210-local`이므로 `-f -f`로 같이 지정 가능:
+
+```bash
+docker compose \
+  -f infra/compose/docker-compose.infra-local.yml \
+  -f infra/compose/docker-compose.app-local.yml \
+  up -d --build
+```
+
+하지만 이 경우 backend가 mysql healthy 전에 기동되어 Flyway 오류가 날 수 있어 **2단계 순서 권장**.
+
+### Q. app만 재시작하고 싶은데 infra가 영향받나?
+
+A. 안 받음. `dca down && dca up -d --build`는 backend/ai/nginx만 내렸다 올림. infra 컨테이너/볼륨은 그대로.
+
+### Q. 전체 초기화하려면?
+
+A. 역순으로 down:
+
+```bash
+dca down        # app 먼저
+dci down -v     # infra + 볼륨 모두
+```
+
+### Q. 새 환경변수 추가는?
+
+A. env-sync 스킬 사용:
+
+```
+/env-sync add <KEY> <service>
+```
+
+스킬이 `infra/env/*.local.env.example` + `infra/env/README.md` + `docs/gitlab-variables.md` 전부 자동 업데이트.

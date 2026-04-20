@@ -8,11 +8,9 @@
 *.secrets
 docs/plans/
 
-# Keep shareable examples tracked
-!.env.example
-!**/.env.example
-
-# infra/env/ runtime files (local/production values). Only *.example commits.
+# infra/env/ runtime files (local values). Only *.example commits.
+# (로컬 개발 진입점은 `docker compose -f infra/compose/docker-compose.app-local.yml ...`;
+#  루트 .env는 더 이상 사용하지 않음.)
 infra/env/*.env
 !infra/env/*.env.example
 
