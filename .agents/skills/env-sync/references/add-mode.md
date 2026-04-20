@@ -31,9 +31,14 @@ frontend 대상인데 키가 `VITE_` prefix가 아니면 경고 + rename 제안.
 ```
 
 placeholder 선정 기준:
-- secret 계열(password/token/key): 더미값(`changeme`, `sk-dummy-local` 등) — 팀원이 `*.local.env`에서 실값으로 교체
+- secret 계열(password/username/token/key/secret): 더미값(`changeme`, `sk-dummy-local` 등). `*.local.env.example`은 gitignored가 아니지만 **로컬 컨테이너 전용의 중요도 낮은 더미값**만 허용. 진짜 secret은 `infra/env/*.local.env`(gitignored)에만.
 - 숫자: 합리적 기본값 (`8080`, `30`)
 - 문자열: 실 사용 예시 (`local`, `/api`)
+
+**중요 — backend `application-example.yml`의 default 규칙**:
+- **secret 성격 키** (`*_PASSWORD`, `*_USERNAME`, `*_TOKEN`, `*_KEY`, `*_SECRET`): `${KEY}` 로만. 기본값 **금지** — tracked 파일에 더미라도 박히면 실수로 확장될 위험.
+- **non-secret** (host/port/URL/path): IDE 편의용 default 유지.
+- env 미주입 시 Spring이 `PlaceholderResolutionException`으로 **명시적 실패**하게 하는 게 silent wrong value보다 안전.
 
 compose 파일(`infra/compose/docker-compose.{app,infra}-local.yml`)도 필요 시 `${KEY}` 참조 추가:
 - infra 서비스의 `environment:` 블록에 compose-parse-time 치환이 필요하면 해당 서비스에 추가
@@ -62,15 +67,23 @@ compose 파일(`infra/compose/docker-compose.{app,infra}-local.yml`)도 필요 �
 
 **backend**
 - `app/backend/src/main/resources/application-example.yml` **하나만** 수정 (유일한 tracked source of truth).
+- secret 키면 **기본값 없이** `${KEY}`로만:
   ```yaml
   spring:
     data:
       redis:
-        password: ${REDIS_PASSWORD:redispass}
+        password: ${REDIS_PASSWORD}     # ← secret: 기본값 금지
+  ```
+- non-secret이면 IDE 편의용 default 유지 (localhost + compose 호스트 포트):
+  ```yaml
+  spring:
+    data:
+      redis:
+        port: ${REDIS_PORT:6380}        # ← non-secret: IDE용 default OK
   ```
 - `application.yml`은 Dockerfile이 build 시점에 **`cp -f` 로 항상 example에서 덮어쓰기** → 순수 derived artifact. 로컬에 커스텀 있어도 빌드 시 무시됨. 드리프트 원천 불가능.
-- default 값은 **IDE 로컬 실행 기준** (localhost + compose 호스트 포트). compose 안에서는 env_file이 override.
-- 또는 Kotlin `@Value("\${<KEY>}")`
+- compose 안에서는 env_file이 override하므로 default 무관.
+- 또는 Kotlin `@Value("\${<KEY>}")` — secret이면 `${KEY}` only, default 없이.
 
 **frontend**
 - Vite는 `VITE_` prefix만 빌드 주입. 키가 `VITE_`로 시작하지 않으면 rename 후:
