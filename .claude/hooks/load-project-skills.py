@@ -15,6 +15,7 @@ SKILL_MAP = [
     ("/app/backend/", "structuring-kotlin-ddd-code"),
     ("/app/frontend/", "frontend-storybook-architecture"),
     ("/.agents/skills/", "managing-skill-evolution"),
+    ("/infra/env/", "env-sync"),
 ]
 
 
