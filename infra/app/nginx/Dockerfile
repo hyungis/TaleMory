@@ -19,7 +19,7 @@ RUN pnpm build
 
 FROM nginx:1.29-alpine
 
-COPY deploy/app/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY infra/app/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80

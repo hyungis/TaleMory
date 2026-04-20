@@ -1,4 +1,4 @@
-# Deploy Layout
+# Infra Layout
 
 This project separates stateful infrastructure from stateless application services.
 
@@ -12,29 +12,29 @@ Dockerfiles live with each app:
 
 - `app/backend/Dockerfile`
 - `app/ai/Dockerfile`
-- `deploy/app/nginx/Dockerfile`
+- `infra/app/nginx/Dockerfile`
 
 The public entrypoint for the application stack is the dedicated Nginx proxy container.
 It serves the built frontend at `/`, proxies `/api` to the backend service, and proxies `/ai` to the AI service.
 
 ## Environment files
 
-Update `deploy/.env` before running.
+Update `infra/.env` before running.
 
-- `deploy/.env`
+- `infra/.env`
 
 ## Development
 
 Start the database stack first:
 
 ```bash
-docker compose -f deploy/db/docker-compose.yml --env-file deploy/.env up -d
+docker compose -f infra/db/docker-compose.yml --env-file infra/.env up -d
 ```
 
 Then start the application stack:
 
 ```bash
-docker compose -f deploy/app/docker-compose.yml --env-file deploy/.env up -d --build
+docker compose -f infra/app/docker-compose.yml --env-file infra/.env up -d --build
 ```
 
 Public access:
@@ -46,13 +46,13 @@ Public access:
 Stop only the application stack:
 
 ```bash
-docker compose -f deploy/app/docker-compose.yml --env-file deploy/.env down
+docker compose -f infra/app/docker-compose.yml --env-file infra/.env down
 ```
 
 Stop the database stack:
 
 ```bash
-docker compose -f deploy/db/docker-compose.yml --env-file deploy/.env down
+docker compose -f infra/db/docker-compose.yml --env-file infra/.env down
 ```
 
 ## Production
@@ -60,14 +60,14 @@ docker compose -f deploy/db/docker-compose.yml --env-file deploy/.env down
 Initial deployment:
 
 ```bash
-docker compose -f deploy/db/docker-compose.yml --env-file deploy/.env up -d
-docker compose -f deploy/app/docker-compose.yml --env-file deploy/.env up -d --build
+docker compose -f infra/db/docker-compose.yml --env-file infra/.env up -d
+docker compose -f infra/app/docker-compose.yml --env-file infra/.env up -d --build
 ```
 
 Application-only redeploy:
 
 ```bash
-docker compose -f deploy/app/docker-compose.yml --env-file deploy/.env up -d --build
+docker compose -f infra/app/docker-compose.yml --env-file infra/.env up -d --build
 ```
 
 ## Notes

@@ -28,7 +28,7 @@ services:
   nginx:
     build:
       context: ../..
-      dockerfile: deploy/app/nginx/Dockerfile
+      dockerfile: infra/app/nginx/Dockerfile
       args:
         VITE_API_BASE_URL: /api
     container_name: s210-nginx
