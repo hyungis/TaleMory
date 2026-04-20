@@ -1,0 +1,53 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: dev-mysql
+    restart: unless-stopped
+    env_file:
+      - ${ENV_DIR:-/tmp/env}/infra.dev.env
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - dev-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - dev-infra-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: dev-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - dev-redis-data:/data
+    networks:
+      - dev-infra-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: dev-rabbitmq
+    restart: unless-stopped
+    env_file:
+      - ${ENV_DIR:-/tmp/env}/infra.dev.env
+    ports:
+      - "${RABBITMQ_PORT:-5673}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
+    volumes:
+      - dev-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - dev-infra-net
+
+networks:
+  dev-infra-net:
+    name: dev-s210-infra-net
+
+volumes:
+  dev-mysql-data:
+  dev-redis-data:
+  dev-rabbitmq-data:

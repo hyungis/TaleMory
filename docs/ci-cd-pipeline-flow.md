@@ -1,6 +1,6 @@
 # CI/CD 파이프라인 흐름도
 
-> 팀 Git 컨벤션과 실제 프로젝트 구조(MySQL + RabbitMQ + Redis, 3개 앱 서비스)를 기준으로 작성된 설계 문서.
+> 팀 Git 컨벤션과 실제 프로젝트 구조(MySQL + RabbitMQ + Redis, 3개 앱 서비스)를 기준으로 작성된 설계 문서. 프로젝트명: `s210`.
 
 ---
 
@@ -10,12 +10,12 @@
 
 ```
 app/
-  frontend/   ← React/Vite. nginx 이미지에 빌드 결과 포함
+  frontend/   ← React/Vite. 빌드 산출물이 nginx 이미지에 박힘 (multi-stage)
   backend/    ← Spring Boot. 기동 시 Flyway migration 자동 실행
   ai/         ← Python 서비스
 ```
 
-- 프론트엔드는 **자체 컨테이너 없음** — 빌드 산출물이 nginx 이미지 안에 박힘
+- 프론트엔드는 **자체 컨테이너 없음** — dist가 nginx 이미지 안에 박힘
 - 외부 진입점은 nginx 하나
   - `/` → frontend 정적 파일
   - `/api` → backend
@@ -31,7 +31,7 @@ infra-common (수동 운영)
 ```
 
 - 앱 배포와 분리된 별도 compose로 관리
-- 환경별로 컨테이너명/포트/볼륨 분리 (dev-*, prod-*)
+- 환경별로 컨테이너명/포트/볼륨 분리 (`dev-*`, `prod-*`)
 
 ---
 
@@ -41,7 +41,7 @@ infra-common (수동 운영)
 |---|---|---|
 | `master` | 운영 배포 | — |
 | `dev` | 통합 검증 + 개발 서버 배포 | — |
-| `feature/*` | 기능 개발 | `feature/be/chat`, `feature/fe/login`, `feature/ai/rag`, `feature/chat` |
+| `feature/*` | 기능 개발 | `feature/be/chat`, `feature/fe/login`, `feature/ai/rag` |
 | `fix/*` | 버그 수정 | `fix/be/auth`, `fix/fe/modal` |
 
 - 소문자 + 케밥케이스
@@ -67,7 +67,7 @@ workflow:
 | dev → master로 merge | ✅ master 파이프라인 발동 (배포는 manual) |
 | `infra-common` 수동 배포 | 별도 manual job |
 
-> **주의**: MR 리뷰 단계에서 build 검증이 없음. merge 후 build 실패는 deploy 실패로 이어지지만 **롤백이 자동으로 걸려 dev 서버는 깨지지 않음**.
+> **주의**: MR 단계에서는 build 검증이 없음. merge 후 build 실패는 deploy 실패로 이어지지만 **자동 rollback이 걸려 dev 서버는 깨지지 않음**.
 
 ---
 
@@ -76,50 +76,50 @@ workflow:
 | 브랜치 | 성공 | 실패 |
 |---|---|---|
 | `feature/*`, `fix/*` | 조용 (파이프라인 자체가 없음) | 조용 |
-| `dev` | ✅ 초록 | ❌ 빨강 + 로그 경로 |
-| `master` | ✅ 초록 | ❌ 빨강 + 로그 경로 |
+| `dev` | ✅ 초록 embed | ❌ 빨강 embed + 로그 경로 |
+| `master` | ✅ 초록 embed | ❌ 빨강 embed + 로그 경로 |
 
 `.post` stage에 `notify_success` / `notify_failure` 두 job을 두고 `when: on_success` / `when: on_failure`로 배타 실행.
 
 ---
 
-## 5. 환경변수 관리 — GitLab Variables → `.env` 파일 생성
+## 5. 환경변수 관리 — GitLab Variables → env 파일 생성
 
 ### 변수 네이밍
 
 ```
-ENV_BASE_*              : 모든 환경 공통
-ENV_DEV_BACKEND_*       : dev 백엔드
-ENV_DEV_FRONTEND_*      : dev 프론트엔드 (빌드 시 주입)
-ENV_DEV_AI_*            : dev AI
-ENV_MASTER_BACKEND_*    : master 백엔드
-ENV_MASTER_FRONTEND_*   : master 프론트엔드
-ENV_MASTER_AI_*         : master AI
+ENV_BASE_*                 : 모든 env 파일에 공통 투입
+ENV_<TARGET>_BACKEND_*     : <target>의 backend 변수
+ENV_<TARGET>_FRONTEND_*    : <target>의 frontend 변수 (빌드 시 일부 주입)
+ENV_<TARGET>_AI_*          : <target>의 ai 변수
+ENV_<TARGET>_INFRA_*       : <target>의 MySQL/Redis/RabbitMQ 변수
 ```
+
+`<TARGET>` ∈ `DEV`, `MASTER`.
 
 ### 변환 규칙 (CI의 `generate_env` stage가 처리)
 
+prefix를 떼고 key만 env 파일에 씀:
+
 ```
-ENV_BASE_REDIS_HOST=redis        → dev-*.env, master-*.env 에 REDIS_HOST=redis
-ENV_DEV_BACKEND_DB_PASSWORD=...  → dev-backend.env 에 DB_PASSWORD=...
-ENV_DEV_FRONTEND_AUTH_USE_MOCK=true → dev-frontend.env 에 AUTH_USE_MOCK=true
+ENV_BASE_REDIS_HOST=redis              → REDIS_HOST=redis            (app.*.env + infra.*.env 양쪽)
+ENV_DEV_BACKEND_DB_PASSWORD=xxx        → DB_PASSWORD=xxx             (app.dev.env)
+ENV_DEV_INFRA_MYSQL_ROOT_PASSWORD=yyy  → MYSQL_ROOT_PASSWORD=yyy     (infra.dev.env)
 ```
 
-prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
-
-### 생성되는 파일
+### 생성되는 파일 (2개 × 2 env = 4개)
 
 ```
 /tmp/env/
-  dev-backend.env
-  dev-frontend.env
-  dev-ai.env
-  master-backend.env
-  master-frontend.env
-  master-ai.env
+  app.dev.env        ← backend + frontend + ai 변수를 합침 (+ BASE)
+  app.master.env
+  infra.dev.env      ← MySQL/Redis/RabbitMQ (+ BASE)
+  infra.master.env
 ```
 
-> `.env.example`만 수정하면 배포에 반영되지 않습니다. **반드시 GitLab Variables에 `ENV_<TARGET>_<KEY>` 규칙으로 추가**해야 반영됩니다.
+compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
+
+> `.env.example`만 수정하면 배포에 반영되지 않습니다. **GitLab Variables에 `ENV_<TARGET>_<SERVICE>_<KEY>` 규칙으로 추가**해야 반영됩니다.
 
 ---
 
@@ -131,7 +131,7 @@ prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
 - **규칙**:
   - 이미 적용된 migration 파일 **절대 수정 금지**
   - 변경 필요 시 **새 `Vn__*.sql` 추가**
-  - `infra-common` (MySQL 서버 + 계정/DB 생성)은 Flyway 대상 아님 — 수동 운영
+  - `infra-common`(MySQL 서버 + 계정/DB 생성)은 Flyway 대상 아님 — 수동 운영
   - 스키마 변경(테이블/인덱스/제약)만 migration에 포함
 
 ---
@@ -152,13 +152,11 @@ prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
 │                    │   │   (3개 병렬)       │   │   (3개 병렬)       │
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
-│                    │   │ deploy_dev_frontend│   │ deploy_master_*    │
-│                    │   │ deploy_dev_backend │   │  (manual 승인)     │
-│                    │   │ deploy_dev_ai      │   │                    │
-│                    │   │   (3개 병렬, auto) │   │                    │
+│                    │   │   deploy_dev       │   │   deploy_master    │
+│                    │   │   (auto rollback)  │   │   (manual 승인)    │
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
-│                    │   │   health_check_dev │   │   health_check_m   │
+│                    │   │   health_check     │   │   health_check     │
 │                    │   │         │          │   │         │          │
 │                    │   │     성공 시        │   │     성공 시        │
 │                    │   │  record_ok_tag     │   │  record_ok_tag     │
@@ -173,12 +171,12 @@ prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
                                     │
                                     ▼
                          ┌──────────────────────┐
-                         │  Discord 팀 채널      │
+                         │  Discord 팀 채널     │
                          └──────────────────────┘
 
   [별도] infra-common 관리 (수동, 상시 가동 인프라)
            ┌──────────────────────────────────────┐
-           │  deploy_base_manual (when: manual)   │
+           │  deploy_infra_<env>_manual           │
            │   mysql, redis, rabbitmq             │
            │   dev-*, prod-* 별개 컨테이너/볼륨   │
            └──────────────────────────────────────┘
@@ -190,27 +188,30 @@ prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
 
 ```
  ┌──── build_frontend ───────────────────────────────────────┐
- │  pnpm install & build  (→ dist)                           │
+ │  bash infra/scripts/build-frontend.sh                     │
  │  docker build                                             │
- │    -f infra/app/nginx/Dockerfile                          │
- │    -t $REGISTRY/talemory-frontend:$CI_COMMIT_SHORT_SHA .  │
+ │    -f infra/docker/frontend.Dockerfile                    │
+ │    -t $REGISTRY/s210-frontend:$CI_COMMIT_SHORT_SHA .      │
  │  docker push ...                                          │
- │                                                           │
- │  artifacts: when: always                                  │
+ │    Stage 1: node:24-alpine → pnpm build (dist)            │
+ │    Stage 2: nginx:1.29-alpine ← dist 복사                 │
  └───────────────────────────────────────────────────────────┘
 
  ┌──── build_backend ────────────────────────────────────────┐
- │  ./gradlew clean build -x test                            │
+ │  bash infra/scripts/build-backend.sh                      │
  │  docker build                                             │
  │    -f app/backend/Dockerfile                              │
- │    -t $REGISTRY/talemory-backend:$CI_COMMIT_SHORT_SHA .   │
+ │    -t $REGISTRY/s210-backend:$CI_COMMIT_SHORT_SHA         │
+ │    app/backend                                            │
  │  docker push ...                                          │
  └───────────────────────────────────────────────────────────┘
 
  ┌──── build_ai ─────────────────────────────────────────────┐
+ │  bash infra/scripts/build-ai.sh                           │
  │  docker build                                             │
  │    -f app/ai/Dockerfile                                   │
- │    -t $REGISTRY/talemory-ai:$CI_COMMIT_SHORT_SHA .        │
+ │    -t $REGISTRY/s210-ai:$CI_COMMIT_SHORT_SHA              │
+ │    app/ai                                                 │
  │  docker push ...                                          │
  └───────────────────────────────────────────────────────────┘
 
@@ -219,12 +220,12 @@ prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
           ┌────────────────────────────────────────────┐
           │   GitLab Container Registry                │
           │                                            │
-          │   talemory-frontend:a1b2c3d   ← 최신       │
-          │   talemory-frontend:9f8e7d6                │
-          │   talemory-backend:a1b2c3d                 │
-          │   talemory-backend:9f8e7d6                 │
-          │   talemory-ai:a1b2c3d                      │
-          │   talemory-ai:9f8e7d6                      │
+          │   s210-frontend:a1b2c3d   ← 최신           │
+          │   s210-frontend:9f8e7d6                    │
+          │   s210-backend:a1b2c3d                     │
+          │   s210-backend:9f8e7d6                     │
+          │   s210-ai:a1b2c3d                          │
+          │   s210-ai:9f8e7d6                          │
           │                                            │
           │   (cleanup policy로 오래된 태그 자동 삭제  │
           │    last_ok 태그는 보존)                    │
@@ -241,47 +242,53 @@ prefix가 벗겨지고 나머지만 실제 env 파일에 들어갑니다.
  GitLab CI job (generate_env)
      │
      ▼
+ bash infra/scripts/generate-env.sh <dev|master>
+     │
+     ▼
  환경변수 탐색:
-   ENV_BASE_*           → 공통
-   ENV_DEV_BACKEND_*    → dev 백엔드 (if branch == dev)
-   ENV_DEV_FRONTEND_*   → dev 프론트 (if branch == dev)
-   ENV_DEV_AI_*         → dev AI    (if branch == dev)
-   ENV_MASTER_*_*       → master (if branch == master)
+   ENV_BASE_*                     → 공통 (app + infra 양쪽)
+   ENV_<TARGET>_BACKEND_*         → app.<target>.env
+   ENV_<TARGET>_FRONTEND_*        → app.<target>.env
+   ENV_<TARGET>_AI_*              → app.<target>.env
+   ENV_<TARGET>_INFRA_*           → infra.<target>.env
      │
      ▼
  prefix 제거 후 파일로 쓰기:
-   ENV_BASE_REDIS_HOST=redis       → REDIS_HOST=redis
-   ENV_DEV_BACKEND_DB_PASSWORD=xxx → DB_PASSWORD=xxx
+   ENV_BASE_REDIS_HOST=redis         → REDIS_HOST=redis
+   ENV_DEV_BACKEND_DB_PASSWORD=xxx   → DB_PASSWORD=xxx
      │
      ▼
- 결과 파일:
-   /tmp/env/dev-backend.env
-   /tmp/env/dev-frontend.env
-   /tmp/env/dev-ai.env
+ 결과 파일 (Linux 서버 기준):
+   /tmp/env/app.dev.env
+   /tmp/env/infra.dev.env
      │
      ▼
- CI artifacts로 보관 (expire_in: 1 hour, build 및 deploy job에서 사용)
+ CI artifacts로 보관 (expire_in: 1 hour, deploy job에서 사용)
 ```
 
-### 구현 스케치
+### 구현 개요
 
 ```bash
-# infra/scripts/generate-env.sh (예시)
-TARGET=$1   # "dev" 또는 "master"
-OUT_DIR=${2:-/tmp/env}
-mkdir -p "$OUT_DIR"
+# infra/scripts/generate-env.sh
+TARGET="${1:?usage: $0 <dev|master>}"
+OUT_DIR="${OUT_DIR:-/tmp/env}"
+target_upper=$(echo "$TARGET" | tr '[:lower:]' '[:upper:]')
 
-for service in BACKEND FRONTEND AI; do
-  out="$OUT_DIR/${TARGET,,}-${service,,}.env"
-  : > "$out"
+append_prefix_match() {   # env에서 prefix로 시작하는 줄 추출 + prefix 제거
+  local prefix="$1"; local out="$2"
+  env | awk -v p="$prefix" 'index($0, p) == 1 { sub("^" p, ""); print }' >> "$out"
+}
 
-  # 공통
-  env | grep -E "^ENV_BASE_" | sed "s|^ENV_BASE_||" >> "$out"
+APP_OUT="$OUT_DIR/app.${TARGET}.env"
+INFRA_OUT="$OUT_DIR/infra.${TARGET}.env"
+: > "$APP_OUT"; : > "$INFRA_OUT"
 
-  # 타겟 + 서비스
-  env | grep -E "^ENV_${TARGET^^}_${service}_" \
-      | sed "s|^ENV_${TARGET^^}_${service}_||" >> "$out"
+append_prefix_match "ENV_BASE_" "$APP_OUT"
+append_prefix_match "ENV_BASE_" "$INFRA_OUT"
+for svc in BACKEND FRONTEND AI; do
+  append_prefix_match "ENV_${target_upper}_${svc}_" "$APP_OUT"
 done
+append_prefix_match "ENV_${target_upper}_INFRA_" "$INFRA_OUT"
 ```
 
 ---
@@ -289,36 +296,36 @@ done
 ## 10. Deploy stage 상세 — Rollback 포함
 
 ```
-deploy_dev_backend 시작  (deploy_dev_frontend, deploy_dev_ai 각각 병렬 동일 흐름)
+deploy_dev 시작  (master도 동일, manual gate만 추가)
      │
      ▼
- PREV=$(current_running_tag backend)   ← 현재 돌고 있는 서비스 태그 백업
+ PREV_<svc>=$(current_running_tag <svc>)   ← 현재 돌고 있는 태그 백업 (서비스별)
      │
      ▼
  trap ERR 설정 → 실패 시 자동:
-                 1) dump_failure_logs
-                 2) rollback_to_last_ok (해당 서비스만)
+                 1) dump_failure_logs → /srv/s210/<env>/logs/<ts>/
+                 2) read_last_ok_tag → compose up (해당 서비스)
                  3) FAILURE_LOG_DIR export
      │
      ▼
  export APP_IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+ docker compose --env-file /tmp/env/app.<env>.env \
+                -f infra/compose/docker-compose.app-<env>.yml \
+                pull
+ docker compose ... up -d
      │
      ▼
- docker compose pull backend
- docker compose up -d backend           (프론트/AI는 각자 job에서)
-     │
-     ▼
- health-check-dev.sh backend            (/api/health 등)
+ health-check-<env>.sh all                 (/, /api/health, /ai/health)
      │
  ┌───┴───┐
  성공    실패
  │       │
  ▼       ▼
- record_ok_tag(dev, backend, 새태그)   trap 발동
-                                       /srv/talemory/dev/logs/... dump
-                                       state/dev/last_ok_tag_backend 읽어서
-                                       docker compose up -d backend (직전태그)
-                                       exit 1
+ record_ok_tag(<env>, <svc>, 새태그)     trap 발동
+                                         /srv/s210/<env>/logs/... dump
+                                         state/last_ok_tag_<svc> 읽어서
+                                         docker compose up -d <svc> (직전태그)
+                                         exit 1
          │                         │
          └────── .post ────────────┘
                    │
@@ -353,15 +360,15 @@ deploy_dev_backend 시작  (deploy_dev_frontend, deploy_dev_ai 각각 병렬 동
            │
            ▼
  ┌──────────────────────────────────┐
- │  ✅ SUCCESS · deploy_dev_backend │
- │  talemory / dev @ a1b2c3d        │
- │  stage/triggered by/pipeline     │
+ │  ✅ SUCCESS · deploy_dev          │
+ │  s210 / dev @ a1b2c3d             │
+ │  stage/triggered by/pipeline      │
  └──────────────────────────────────┘
          또는
  ┌──────────────────────────────────┐
- │  ❌ FAILED · deploy_dev_backend  │
- │  ...                             │
- │  logs: /srv/talemory/dev/logs/.. │
+ │  ❌ FAILED · deploy_dev           │
+ │  ...                              │
+ │  logs: /srv/s210/dev/logs/...     │
  └──────────────────────────────────┘
 ```
 
@@ -373,31 +380,32 @@ deploy_dev_backend 시작  (deploy_dev_frontend, deploy_dev_ai 각각 병렬 동
 [개발자 PC]        [GitLab]                    [배포 서버 = project runner]
                                              ┌──────────────────────────┐
   git push ──►  ┌──────────┐   trigger       │  GitLab Runner            │
-   (feature,   │  Repo    │ ──────────────►  │   bash scripts (jq, docker,│
-    fix,       └──────────┘                  │    curl 사용)             │
+   (feature,    │  Repo    │ ──────────────► │   bash scripts (jq,       │
+    fix,        └──────────┘                 │    docker, curl 사용)     │
     dev,             │                       └────────────┬──────────────┘
     master)          ▼                                    │
             ┌────────────────┐ ◄───push──────────push─────┤
             │  Container     │                            │
             │  Registry      │ ◄───pull───────────────────┤
+            │  (s210-*)      │                            │
             └────────────────┘                            ▼
                                               ┌──────────────────────────┐
                                               │  Docker Engine            │
-                                              │   dev-nginx (frontend)    │
+                                              │   dev-nginx               │
                                               │   dev-backend             │
                                               │   dev-ai                  │
-                                              │   prod-nginx (frontend)   │
+                                              │   prod-nginx              │
                                               │   prod-backend            │
                                               │   prod-ai                 │
                                               │                           │
-                                              │   (상시 가동, infra-common)│
-                                              │   dev-mysql, prod-mysql   │
-                                              │   dev-redis, prod-redis   │
+                                              │   (상시 가동 infra-common)│
+                                              │   dev-mysql,  prod-mysql  │
+                                              │   dev-redis,  prod-redis  │
                                               │   dev-rabbitmq,           │
                                               │   prod-rabbitmq           │
                                               └──────────────────────────┘
 
-   /srv/talemory/
+   /srv/s210/
      dev/
        state/
          last_ok_tag_frontend          ← 롤백 소스 (서비스별)
@@ -463,23 +471,23 @@ MR 내용을 한 문장으로 요약해주세요.
 
  [feature/be/chat 작업 중]
    push push push        (아무 일 없음)
-   MR 생성 → dev로        (아무 일 없음)
-   리뷰 승인              (아무 일 없음)
-   MR merge               ──► dev pipeline 발동 ★
-                               build + deploy + health
-                               성공 → Discord ✅
+   MR 생성 → dev로       (아무 일 없음)
+   리뷰 승인             (아무 일 없음)
+   MR merge              ──► dev pipeline 발동 ★
+                              build + deploy + health
+                              성공 → Discord ✅
 
  [다음 commit이 dev에 들어옴]
-   build → deploy_dev_backend → health FAIL
-                               trap: dump logs
-                               rollback backend → 이전 태그
-                               state 변경 없음
-                               Discord ❌ + logs 경로
+   build → deploy_dev → health FAIL
+                        trap: dump logs
+                        rollback backend → 이전 태그
+                        state 변경 없음
+                        Discord ❌ + logs 경로
 
  [dev → master MR merge]
-   build 자동 실행 → deploy_master_* manual 대기
+   build 자동 실행 → deploy_master manual 대기
    팀원 manual 승인 클릭
-   deploy_master_* → health OK → Discord ✅
+   deploy_master → health OK → Discord ✅
 ```
 
 ---
@@ -488,14 +496,14 @@ MR 내용을 한 문장으로 요약해주세요.
 
 ```
 feature/*, fix/*   : CI 없음 (push/MR 시 조용)
-dev                : merge → build(3개 병렬) → deploy(3개 병렬) → health → 롤백 대응
+dev                : merge → build(3개 병렬) → deploy → health → 롤백 대응
                       └ 성공 → Discord 초록
                       └ 실패 → Discord 빨강 + 로그 경로 + 자동 rollback
 
 master             : merge → build → manual 승인 → deploy → health → 롤백 대응
                       └ 알림 정책 dev와 동일
 
-infra-common       : 수동 관리 (deploy_base_manual)
+infra-common       : 수동 관리 (deploy-infra-<env>.sh)
                      MySQL/Redis/RabbitMQ 변경 시에만 실행
                      Flyway migration은 backend 기동 시 자동
 ```
@@ -509,4 +517,4 @@ infra-common       : 수동 관리 (deploy_base_manual)
 ### 환경변수 원칙
 
 - `.env.example` 수정만으로는 배포에 반영되지 않음
-- **GitLab Variables에 `ENV_<TARGET>_<KEY>` 규칙으로 추가**해야 CI의 `generate_env`가 실제 env로 변환
+- **GitLab Variables에 `ENV_<TARGET>_<SERVICE>_<KEY>` 규칙으로 추가**해야 CI의 `generate_env`가 실제 env로 변환

@@ -12,6 +12,10 @@ docs/plans/
 !.env.example
 !**/.env.example
 
+# infra/env/ runtime files (local/production values). Only *.example commits.
+infra/env/*.env
+!infra/env/*.env.example
+
 # Private keys and certificates
 *.pem
 *.key
@@ -39,4 +43,5 @@ Thumbs.db
 *.pyc
 *.pyo
 
+.omc
 **/.omc
