@@ -67,7 +67,7 @@ workflow:
 | dev → master로 merge | ✅ master 파이프라인 발동 (배포는 manual) |
 | `infra-common` 수동 배포 | 별도 manual job |
 
-> **주의**: MR 단계에서는 build 검증이 없음. merge 후 build 실패는 deploy 실패로 이어지지만 **자동 rollback이 걸려 dev 서버는 깨지지 않음**.
+> **주의**: MR 단계에서는 build 검증이 없음. merge 후 build 실패 시 deploy는 `needs:` 때문에 skip되므로 **운영 중인 컨테이너는 그대로 유지**. deploy 자체가 실패한 경우 자동 복구 로직은 없으며 pipeline fail로 팀에 노출됨.
 
 ---
 
@@ -153,13 +153,13 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
 │                    │   │   deploy_dev       │   │   deploy_master    │
-│                    │   │   (auto rollback)  │   │   (manual 승인)    │
+│                    │   │   (pull + up)      │   │   (manual 승인)    │
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
 │                    │   │   health_check     │   │   health_check     │
 │                    │   │         │          │   │         │          │
-│                    │   │     성공 시        │   │     성공 시        │
-│                    │   │  record_ok_tag     │   │  record_ok_tag     │
+│                    │   │   실패 시 그대로   │   │   실패 시 그대로   │
+│                    │   │   pipeline fail    │   │   pipeline fail    │
 └────────────────────┘   └────────────────────┘   └────────────────────┘
                                     │                        │
                                     ▼                        ▼
@@ -227,12 +227,12 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
           │   s210-ai:a1b2c3d                          │
           │   s210-ai:9f8e7d6                          │
           │                                            │
-          │   (cleanup policy로 오래된 태그 자동 삭제  │
-          │    last_ok 태그는 보존)                    │
+          │   (cleanup policy: "최근 N개 유지" 권장.   │
+          │    긴급 복구용 과거 태그 여유 확보)        │
           └────────────────────────────────────────────┘
 ```
 
-> `$APP_IMAGE_TAG = $CI_COMMIT_SHORT_SHA` — commit마다 자동 새 값, **덮어쓰기 없음**. 롤백의 전제.
+> `$APP_IMAGE_TAG = $CI_COMMIT_SHORT_SHA` — commit마다 자동 새 값, **덮어쓰기 없음**. 긴급 복구(변수 override 재배포)의 전제.
 
 ---
 
@@ -293,26 +293,17 @@ append_prefix_match "ENV_${target_upper}_INFRA_" "$INFRA_OUT"
 
 ---
 
-## 10. Deploy stage 상세 — Rollback 포함
+## 10. Deploy stage 상세
 
 ```
 deploy_dev 시작  (master도 동일, manual gate만 추가)
-     │
-     ▼
- PREV_<svc>=$(current_running_tag <svc>)   ← 현재 돌고 있는 태그 백업 (서비스별)
-     │
-     ▼
- trap ERR 설정 → 실패 시 자동:
-                 1) dump_failure_logs → /srv/s210/<env>/logs/<ts>/
-                 2) read_last_ok_tag → compose up (해당 서비스)
-                 3) FAILURE_LOG_DIR export
      │
      ▼
  export APP_IMAGE_TAG=$CI_COMMIT_SHORT_SHA
  docker compose --env-file /tmp/env/app.<env>.env \
                 -f infra/compose/docker-compose.app-<env>.yml \
                 pull
- docker compose ... up -d
+ docker compose ... up -d --no-build
      │
      ▼
  health-check-<env>.sh all                 (/, /api/health, /ai/health)
@@ -321,11 +312,13 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
  성공    실패
  │       │
  ▼       ▼
- record_ok_tag(<env>, <svc>, 새태그)     trap 발동
-                                         /srv/s210/<env>/logs/... dump
-                                         state/last_ok_tag_<svc> 읽어서
-                                         docker compose up -d <svc> (직전태그)
-                                         exit 1
+ pipeline 정상 종료   pipeline fail (set -euo pipefail로 exit code 전파)
+                      ↓
+                      .post의 notify_failure가 Discord 알림
+                      ↓
+                      팀이 수동 복구:
+                        · git revert <bad_sha> + push (정방향, 권장)
+                        · 또는 GitLab pipeline 변수 APP_IMAGE_TAG=<prev_sha>로 deploy_* 재실행
          │                         │
          └────── .post ────────────┘
                    │
@@ -333,11 +326,16 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
            notify_success 또는 notify_failure
 ```
 
-### 롤백의 기본 3규칙 (서비스별로 독립)
+### 설계 결정 — 자동 rollback 미채택
 
-1. **이미지 태그 = `$CI_COMMIT_SHORT_SHA`** — `latest` 금지
-2. **`last_ok_tag_<service>`는 해당 서비스 health check 통과 시에만 갱신**
-3. **rollback은 state 파일을 소스로** — 현재 pipeline의 commit과 무관
+초기 설계에서 `trap ERR → read_last_ok_tag → 이전 태그 재배포` 로직을 두었으나 제거:
+
+1. **build 실패 케이스는 이미 안전** — `deploy_*.needs:[build_*]`로 인해 build 실패 시 deploy 자체가 skip. 운영 컨테이너는 영향 없음. rollback 불필요.
+2. **deploy 중 실패는 드물게 health check 실패** — 이 경우에도 근본 원인(env 누락, migration 버그 등)은 rollback으로 안 고쳐짐. 개발자가 원인 수정 + 재배포 필요.
+3. **이미지 보존 정책과 충돌** — rollback은 이전 이미지가 서버 디스크에 남아 있어야 동작. 공격적 cleanup이 불가능해지고 디스크 누적 문제 유발.
+4. **복잡성 감소** — `last_ok_tag_*` state 파일, trap 로직, `rollback-*.sh` 스크립트 전부 제거로 scripts 단순화.
+
+복구 경로는 단일화: **pipeline 실패는 팀에게 명시적으로 노출 → 원인 수정 → 정방향 재배포**. 긴급 시 GitLab 변수 override.
 
 ---
 
@@ -406,20 +404,8 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
                                               └──────────────────────────┘
 
    /srv/s210/
-     dev/
-       state/
-         last_ok_tag_frontend          ← 롤백 소스 (서비스별)
-         last_ok_tag_backend
-         last_ok_tag_ai
-         previous_ok_tag_*
-       logs/20260420-140233/           ← 실패 시 dump
+     dev/     (state 디렉토리 없음 — rollback 없으므로)
      master/
-       state/
-         last_ok_tag_frontend
-         last_ok_tag_backend
-         last_ok_tag_ai
-         previous_ok_tag_*
-       logs/...
                                          │ curl
                                          ▼
                                ┌──────────────────────┐
@@ -479,10 +465,10 @@ MR 내용을 한 문장으로 요약해주세요.
 
  [다음 commit이 dev에 들어옴]
    build → deploy_dev → health FAIL
-                        trap: dump logs
-                        rollback backend → 이전 태그
-                        state 변경 없음
-                        Discord ❌ + logs 경로
+                        pipeline fail (자동 복구 없음)
+                        Discord ❌
+                        팀: git revert → push 로 정방향 복구
+                             또는 GitLab pipeline 변수 override로 이전 SHA 재배포
 
  [dev → master MR merge]
    build 자동 실행 → deploy_master manual 대기
@@ -496,11 +482,11 @@ MR 내용을 한 문장으로 요약해주세요.
 
 ```
 feature/*, fix/*   : CI 없음 (push/MR 시 조용)
-dev                : merge → build(3개 병렬) → deploy → health → 롤백 대응
+dev                : merge → build(3개 병렬, 각자 push) → deploy → health
                       └ 성공 → Discord 초록
-                      └ 실패 → Discord 빨강 + 로그 경로 + 자동 rollback
+                      └ 실패 → Discord 빨강 + 로그 (자동 rollback 없음, 팀 수동 복구)
 
-master             : merge → build → manual 승인 → deploy → health → 롤백 대응
+master             : merge → build → manual 승인 → deploy → health
                       └ 알림 정책 dev와 동일
 
 infra-common       : 수동 관리 (deploy-infra-<env>.sh)
@@ -508,11 +494,11 @@ infra-common       : 수동 관리 (deploy-infra-<env>.sh)
                      Flyway migration은 backend 기동 시 자동
 ```
 
-### 불변성을 보장하는 3요소
+### 불변성 / 복구 원칙
 
-1. **이미지 태그는 `$CI_COMMIT_SHORT_SHA`** — `latest` 금지
-2. **`last_ok_tag_<service>`는 health 통과 시에만 갱신** — 서비스별 독립
-3. **rollback은 state 파일을 소스로** — pipeline commit과 무관하게 "마지막 확인된 정상"으로 복귀
+1. **이미지 태그는 `$CI_COMMIT_SHORT_SHA`** — `latest` 금지. 덮어쓰기 없음.
+2. **자동 rollback 없음** — deploy 실패는 pipeline fail로 표면화. 팀이 원인 수정 후 재배포.
+3. **긴급 복구 경로** — GitLab pipeline 재실행 시 `APP_IMAGE_TAG=<prev_sha>` 변수 override → 이전 태그 이미지로 재배포. registry에 이전 이미지가 유지돼야 가능 (cleanup policy는 최근 N개 보존 권장).
 
 ### 환경변수 원칙
 

@@ -213,7 +213,7 @@ infra/compose/
 | 컨테이너명 | `local-*` | `dev-*` / `prod-*` |
 | DNS (compose 내부) | 짧은 서비스명 (`mysql`, `backend`) | 짧은 서비스명 동일 |
 | nginx conf | `nginx.local.conf` | `nginx.dev.conf` / `nginx.prod.conf` |
-| 자동 rollback | 없음 | `last_ok_tag_*` 기반 |
+| 자동 rollback | 없음 | 없음 (실패는 pipeline fail로 표면화) |
 
 로컬과 CI는 compose 파일 구조(app/infra 분리)는 같고, env 소스와 이미지 획득 방식만 다름.
 

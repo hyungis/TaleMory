@@ -229,7 +229,7 @@ function dca { docker compose -f infra/compose/docker-compose.app-local.yml $arg
 |---|---|---|
 | infra 기동 | `dci up -d` | `bash infra/scripts/deploy-infra-dev.sh` |
 | app 기동 | `dca up -d --build` | `bash infra/scripts/deploy-dev.sh all` |
-| 롤백 | 수동 (이전 이미지 태그 필요) | `bash infra/scripts/rollback-dev.sh` |
+| 롤백 | 수동 (이전 이미지 태그 필요) | GitLab pipeline `APP_IMAGE_TAG=<prev_sha>` override 재실행 또는 `git revert`|
 | env 생성 | 없음 (수동 `infra/env/*.local.env`) | `bash infra/scripts/generate-env.sh dev` |
 
 로컬 compose(`*-local.yml`)와 CI compose(`*-dev.yml`/`*-master.yml`)는 별도 관리.

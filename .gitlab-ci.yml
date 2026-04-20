@@ -5,7 +5,6 @@ stages:
   - generate_env
   - build
   - deploy
-  - rollback          # manual
   - infra_manual      # manual
   - .post             # notify
 
@@ -93,27 +92,6 @@ deploy_master:
     - build_ai
   script:
     - bash infra/scripts/deploy-master.sh all
-
-# ─── manual: rollback (state/last_ok_tag_*로 재배포) ──────────
-rollback_dev:
-  extends: .docker_login
-  stage: rollback
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      when: manual
-  needs: []
-  script:
-    - bash infra/scripts/rollback-dev.sh all
-
-rollback_master:
-  extends: .docker_login
-  stage: rollback
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: manual
-  needs: []
-  script:
-    - bash infra/scripts/rollback-master.sh all
 
 # ─── manual: infra 스택(MySQL/Redis/RabbitMQ) ─────────────────
 deploy_infra_dev:

@@ -19,10 +19,8 @@ infra/
     nginx.prod.conf                   ← master용 upstream (prod-backend, prod-ai)
   env/
     README.md                         ← GitLab Variables → env 파일 변환 규칙
-    app.dev.env.example
-    app.master.env.example
-    infra.dev.env.example
-    infra.master.env.example
+    app.local.env.example             ← 로컬 app 스택
+    infra.local.env.example           ← 로컬 infra 스택
   scripts/
     README.md                         ← 스크립트 카탈로그
     common.sh
@@ -31,7 +29,6 @@ infra/
     deploy-dev.sh / deploy-master.sh
     deploy-infra-dev.sh / deploy-infra-master.sh
     health-check-dev.sh / health-check-master.sh
-    rollback-dev.sh / rollback-master.sh
     notify.sh
   README.md                           ← 이 파일
 ```
@@ -72,13 +69,13 @@ infra/
 ```
 dev 브랜치로 merge
   → generate-env.sh dev
-  → build-frontend / build-backend / build-ai       (3개 병렬)
-  → deploy-dev.sh                                   (자동 rollback 포함)
+  → build-frontend / build-backend / build-ai       (3개 병렬, 각자 registry push)
+  → deploy-dev.sh                                   (pull + up + health check)
   → health-check-dev.sh
   → notify.sh success/failure                       (Discord)
 ```
 
-master도 구조는 같지만 `deploy-master.sh`가 **manual 승인 후 실행**.
+master도 구조는 같지만 `deploy-master.sh`가 **manual 승인 후 실행**. 자동 rollback 없음 — 실패 시 pipeline이 fail로 끝나고 팀이 직접 복구 (`git revert` 또는 GitLab `APP_IMAGE_TAG` override 재실행).
 
 전체 흐름은 [docs/ci-cd-pipeline-flow.md](../docs/ci-cd-pipeline-flow.md) 참고.
 
@@ -93,16 +90,18 @@ bash infra/scripts/deploy-infra-master.sh     # master
 
 앱 배포와 **분리**되어 상시 상주. compose 변경 있을 때만 실행.
 
-### 수동 rollback
+### 장애 복구
 
-```bash
-bash infra/scripts/rollback-dev.sh backend    # dev backend만 직전 OK 태그로
-bash infra/scripts/rollback-master.sh all     # master 전체
-```
+자동 rollback 로직 없음. 실패 시 선택지:
+
+1. **정방향 복구** (원칙): `git revert <bad_sha>` → push → 새 pipeline이 이전 커밋으로 배포.
+2. **긴급 복구**: GitLab → CI/CD → Pipelines → 이전 SHA의 pipeline 재실행, 또는 Pipeline 변수로 `APP_IMAGE_TAG=<prev_short_sha>` 설정 후 `deploy_*` job만 재실행.
+
+두 방식 모두 **이전 이미지가 registry에 살아 있어야** 작동 → registry cleanup policy는 "최근 N개(예: 10) 유지"로 여유를 둘 것.
 
 ## 주의사항
 
 - Flyway migration은 backend 기동 시 자동 실행 (`app/backend/src/main/resources/db/migration/Vn__*.sql`)
 - 인프라 compose(mysql 등)는 Flyway 대상 아님 — 사용자/DB 생성만 담당
 - Cross-compose 순서: `infra-*` → `app-*` 순으로 올려야 함 (app은 `infra-*-net` external 참조)
-- 이미지 태그는 `$CI_COMMIT_SHORT_SHA` — 덮어쓰기 없음. rollback의 전제
+- 이미지 태그는 `$CI_COMMIT_SHORT_SHA` — 덮어쓰기 없음. 긴급 복구의 전제

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# master(운영) 환경 app 스택 배포. 실패 시 자동 롤백.
+# master(운영) 환경 app 스택 배포. 실패 시 자동 복구는 하지 않음.
+# 복구 경로: git revert → push → 새 pipeline, 또는 GitLab 변수 override로 이전 SHA 재실행.
 #
 # Usage:
 #   bash infra/scripts/deploy-master.sh [backend|frontend|ai|all]
@@ -32,26 +33,6 @@ resolve_services() {
   esac
 }
 
-FAILURE_LOG_DIR=""
-on_fail() {
-  local ec=$?
-  FAILURE_LOG_DIR="$(dump_failure_logs "$ENV_NAME" "$COMPOSE_FILE" "$COMPOSE_PROJECT")"
-  echo "[FAIL] logs: $FAILURE_LOG_DIR" >&2
-  for svc in $(resolve_services); do
-    if prev="$(read_last_ok_tag "$ENV_NAME" "$svc" 2>/dev/null)"; then
-      echo "rolling back $svc → $prev" >&2
-      APP_IMAGE_TAG="$prev" docker compose \
-        --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT" \
-        up -d --no-build "$svc" || true
-    else
-      echo "no last_ok_tag for $svc — leaving for inspection" >&2
-    fi
-  done
-  export FAILURE_LOG_DIR
-  exit "$ec"
-}
-trap on_fail ERR
-
 for svc in $(resolve_services); do
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT" \
     pull "$svc" || true
@@ -61,7 +42,4 @@ done
 
 bash "$SCRIPT_DIR/health-check-${ENV_NAME}.sh" "$SERVICE"
 
-for svc in $(resolve_services); do
-  record_ok_tag "$ENV_NAME" "$svc" "$TAG"
-done
 echo "deploy-${ENV_NAME} OK ($SERVICE = $TAG)"
