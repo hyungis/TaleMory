@@ -2,39 +2,45 @@
 
 ## 서비스 → 파일 / Prefix 매핑
 
-| 서비스 | env 예시 파일 | GitLab Variable prefix | 코드 스캔 경로 | 참조 패턴 |
-|---|---|---|---|---|
-| backend | `infra/env/app.<env>.env.example` | `ENV_<TARGET>_BACKEND_` | `app/backend/src/` | `${KEY}`, `@Value("\${KEY}")` |
-| frontend | `infra/env/app.<env>.env.example` | `ENV_<TARGET>_FRONTEND_` | `app/frontend/src/` | `import.meta.env.VITE_KEY` |
-| ai | `infra/env/app.<env>.env.example` | `ENV_<TARGET>_AI_` | `app/ai/` | `os.getenv("KEY")`, `os.environ["KEY"]` |
-| infra | `infra/env/infra.<env>.env.example` | `ENV_<TARGET>_INFRA_` | `infra/compose/` | compose yml의 `${KEY}` |
+| 서비스 | 선언 소스 (로컬) | 선언 소스 (CI) | GitLab Variable prefix | 코드 스캔 경로 | 참조 패턴 |
+|---|---|---|---|---|---|
+| backend | `infra/env/app.local.env.example` | `infra/env/README.md` 3-3 | `ENV_<TARGET>_BACKEND_` | `app/backend/src/` (`application*.yml` + Kotlin) | `${KEY}`, `@Value("\${KEY}")` (tracked 원본은 `application-example.yml`; `application.yml`은 Dockerfile이 build 시점에 auto-derive) |
+| frontend | `infra/env/app.local.env.example` | 3-4 | `ENV_<TARGET>_FRONTEND_` | `app/frontend/src/` | `import.meta.env.VITE_KEY` |
+| ai | `infra/env/app.local.env.example` | 3-5 | `ENV_<TARGET>_AI_` | `app/ai/` | `os.getenv("KEY")`, `os.environ["KEY"]` |
+| infra | `infra/env/infra.local.env.example` | 3-6 | `ENV_<TARGET>_INFRA_` | `infra/compose/docker-compose.{app,infra}-{local,dev,master}.yml` | compose yml의 `${KEY}` |
+
+루트 `.env` / `.env.example`는 **더 이상 존재하지 않는다**. compose 프로젝트명은 `docker-compose.app-local.yml` 상단의 `name: s210-local`로 고정되고, 두 compose 파일의 병합은 `include:` 지시자가 담당한다. 포트 override / `VITE_API_BASE_URL` 등은 필요 시 실행 시점 shell env로 주입한다.
 
 ## 환경 매핑
 
-| 환경 (파일명) | TARGET (GitLab Variable) |
+| 환경 (파일명/컨테이너 접두사) | TARGET (GitLab Variable prefix) |
 |---|---|
+| 로컬 | (환경 분리 없음, 단일 `.env`) |
 | `dev` | `DEV` |
 | `master` | `MASTER` |
 
-파일명 조합:
-- `app.dev.env`, `app.master.env`
-- `infra.dev.env`, `infra.master.env`
+CI 출력 파일:
+- `/tmp/env/app.dev.env`, `/tmp/env/app.master.env`
+- `/tmp/env/infra.dev.env`, `/tmp/env/infra.master.env`
+
+로컬 출력 파일:
+- `infra/env/app.local.env` (backend/frontend/ai)
+- `infra/env/infra.local.env` (mysql/redis/rabbitmq)
+- 루트 `.env` 없음
 
 ## compose에서의 참조 위치
 
-- `services.<svc>.env_file` — 파일째 주입 (가장 흔함, 키별 추가 참조 불필요)
-- `services.<svc>.environment` — 개별 키 주입
+- **`infra/compose/docker-compose.{app,infra}-local.yml`** (로컬): `env_file:` 로 `infra/env/*.local.env` 직접 주입. `docker-compose.app-local.yml` 상단의 `include:`로 infra-local.yml을 merge해서 기동. `${KEY}` 형태의 compose-parse-time 치환은 포트 override 같은 선택적 shell env에만 사용.
+- **`infra/compose/docker-compose.{app,infra}-{dev,master}.yml`** (CI): `env_file: ${ENV_DIR:-/tmp/env}/...` 로 파일째 주입 (prefix-stripped 출력)
 - `services.<svc>.ports` — `${KEY}:3306` 같은 포트 substitution
-- `services.<svc>.image` — 이미지 태그 조립: `${REGISTRY:+${REGISTRY}/}s210-<svc>:${APP_IMAGE_TAG:-latest}`
+- `services.<svc>.image` — 이미지 태그 조립
 
 ### compose 전용 변수 (앱 코드와 무관)
 
-- `REGISTRY` — `CI_REGISTRY_IMAGE` 기준
-- `APP_IMAGE_TAG` — `CI_COMMIT_SHORT_SHA`
-- `ENV_DIR` — 로컬/CI 경로 스위치
-- `COMPOSE_PROJECT_NAME` — 프로젝트 식별자
+`whitelist.md`의 Compose/CI 표준 섹션 참고:
 
-이 변수들은 orphan 검사에서 `whitelist.md`로 제외.
+- `REGISTRY`, `APP_IMAGE_TAG`, `ENV_DIR`, `COMPOSE_PROJECT_NAME`
+- `FRONTEND_PORT`, `BACKEND_PORT`, `AI_PORT`, `MYSQL_PORT`, `REDIS_PORT`, `RABBITMQ_PORT`, `RABBITMQ_MGMT_PORT`
 
 ## Vite prefix 규칙 (중요)
 
@@ -53,12 +59,6 @@ add 모드에서 frontend 대상이면 이 규칙을 사용자에게 확인 후 
 
 dev/master 공통값은 `ENV_BASE_*`로 넣으면 generate-env.sh가 양쪽 파일에 모두 주입. 하지만 실제로는 거의 다르므로 `ENV_BASE_*`는 드물게만 사용.
 
-## 참조 없는 compose-only 키의 예외 처리
-
-`COMPOSE_PROJECT_NAME`처럼 compose yml 안에서만 쓰이는 키는 코드 grep에 안 걸림. 하지만 compose config 검증 시 필요하므로 orphan으로 판정하면 안 됨.
-
-해결: `whitelist.md`에 "Compose 표준" 카테고리로 등록.
-
 ## 참고: generate-env.sh의 동작
 
 `infra/scripts/generate-env.sh <target>`이 GitLab Variables의 prefix를 벗겨 env 파일로 변환:
@@ -68,4 +68,20 @@ ENV_DEV_BACKEND_DB_PASSWORD=xxx   →   DB_PASSWORD=xxx   (in app.dev.env)
 ENV_DEV_INFRA_MYSQL_ROOT_PASSWORD=yyy   →   MYSQL_ROOT_PASSWORD=yyy   (in infra.dev.env)
 ```
 
-즉 `.env.example`에는 prefix 없는 최종 키 이름으로 적는다 (`DB_PASSWORD`, 아니고 `ENV_DEV_BACKEND_DB_PASSWORD` 아님).
+즉 `infra/env/README.md`의 테이블에는 **prefix 없는 최종 키 이름**으로 기재 (`DB_PASSWORD`, `ENV_DEV_BACKEND_DB_PASSWORD` 아님). prefix는 GitLab Variables 등록 시점에만 붙는 메타데이터.
+
+## 파일 위치 체크리스트
+
+스킬이 조회/수정하는 파일들 요약:
+
+| 파일 | 읽기 | 쓰기 (add 모드) | 쓰기 (gitlab-vars 모드) |
+|---|---|---|---|
+| `infra/env/app.local.env.example` | ✅ check | ✅ (backend/frontend/ai) | — |
+| `infra/env/infra.local.env.example` | ✅ check | ✅ (infra) | — |
+| `infra/env/README.md` | ✅ check | ✅ | — |
+| `docs/gitlab-variables.md` | ✅ (체크박스 보존용) | — | ✅ (재생성) |
+| `app/backend/src/**/*.{yml,kt}` (tracked 원본은 `application-example.yml`) | ✅ check | ❌ (힌트만, `application-example.yml`만 갱신) | — |
+| `app/frontend/src/**/*.{ts,tsx}` | ✅ check | ❌ | — |
+| `app/ai/**/*.py` | ✅ check | ❌ | — |
+| `infra/compose/docker-compose.{app,infra}-local.yml` | ✅ check | 선택적 (infra 서비스 `environment:` 추가 시) | — |
+| `infra/compose/docker-compose.{app,infra}-{dev,master}.yml` | ✅ check | 보통 불필요 | — |

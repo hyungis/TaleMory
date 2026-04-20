@@ -14,52 +14,62 @@ frontend 대상인데 키가 `VITE_` prefix가 아니면 경고 + rename 제안.
 
 모든 경로는 `$REPO`(=`git rev-parse --show-toplevel`) 기준.
 
-### 1. env 예시 파일 업데이트
+### 1. 로컬 env example 파일 업데이트 (로컬 개발용)
 
-서비스 ↔ 파일 매핑은 `service-mapping.md`. 간단 요약:
+대상 서비스에 따라 파일이 다르다:
 
-| 서비스 | 파일 |
+| 서비스 | 대상 파일 |
 |---|---|
-| backend / frontend / ai | `infra/env/app.<env>.env.example` |
-| infra | `infra/env/infra.<env>.env.example` |
+| backend / frontend / ai | `infra/env/app.local.env.example` |
+| infra (mysql/redis/rabbitmq) | `infra/env/infra.local.env.example` |
 
-대상 환경별로 해당 `.env.example` 파일에 카테고리 주석과 함께 키 추가:
+해당 파일에 키 추가. 기본값은 로컬 개발에서 쓰일 만한 실용값:
 
 ```dotenv
-# OpenAI
-OPENAI_MODEL=gpt-4o-mini
+# <카테고리 주석>
+<KEY>=<로컬 기본값>
 ```
 
 placeholder 선정 기준:
-- secret(password/token/key 포함) → `<secret>`
-- 숫자 → 합리적 기본값 (`8080`, `30`)
-- 문자열 → 실 사용 예시 (`dev`, `/api`, 모델명 등)
+- secret 계열(password/token/key): 더미값(`changeme`, `sk-dummy-local` 등) — 팀원이 `*.local.env`에서 실값으로 교체
+- 숫자: 합리적 기본값 (`8080`, `30`)
+- 문자열: 실 사용 예시 (`local`, `/api`)
 
-`dev`만 또는 `master`만 요청 시 다른 쪽은 건드리지 않는다.
+compose 파일(`infra/compose/docker-compose.{app,infra}-local.yml`)도 필요 시 `${KEY}` 참조 추가:
+- infra 서비스의 `environment:` 블록에 compose-parse-time 치환이 필요하면 해당 서비스에 추가
+- 단순히 컨테이너 runtime env로만 필요하면 `env_file`로 자동 주입되므로 compose 수정 불필요
 
-### 2. `infra/env/README.md` 업데이트
+### 2. `infra/env/README.md`의 해당 섹션 테이블 업데이트
 
-"필수 변수 (최소)" 섹션의 해당 서비스 소절에 한 줄 추가:
+섹션 위치:
+- backend/frontend/ai → `3-3`, `3-4`, `3-5` 섹션 (ENV_DEV_\*)
+- infra → `3-6` 섹션
+- master 환경은 `3-7` 섹션에서 "dev값과 master값이 다를 경우"만 명시
+
+테이블 행 형식:
 
 ```markdown
-### `ENV_<TARGET>_BACKEND_*`
-- ... (기존 항목 유지)
-- `<KEY>`   ← 새로 추가
+| `ENV_<TARGET>_<SVC>_<KEY>` | ✅ (secret이면) | 간단 설명 |
 ```
 
-섹션이 없으면 적절한 위치에 새로 만든다.
+### 3. `docs/gitlab-variables.md` 재생성
 
-### 3. 서비스 코드 수정 힌트 (편집 금지)
+`gitlab-vars` 모드 로직으로 바로 재생성. 체크박스 상태는 보존. 상세는 `gitlab-vars-mode.md`.
+
+### 4. 서비스 코드 수정 힌트 (편집 금지)
 
 서비스별 수정 위치만 안내:
 
 **backend**
-- `app/backend/src/main/resources/application.yml`의 적절한 섹션에 `${<KEY>}` 참조
+- `app/backend/src/main/resources/application-example.yml` **하나만** 수정 (유일한 tracked source of truth).
   ```yaml
   spring:
-    datasource:
-      url: ${DB_URL}
+    data:
+      redis:
+        password: ${REDIS_PASSWORD:redispass}
   ```
+- `application.yml`은 Dockerfile이 build 시점에 **`cp -f` 로 항상 example에서 덮어쓰기** → 순수 derived artifact. 로컬에 커스텀 있어도 빌드 시 무시됨. 드리프트 원천 불가능.
+- default 값은 **IDE 로컬 실행 기준** (localhost + compose 호스트 포트). compose 안에서는 env_file이 override.
 - 또는 Kotlin `@Value("\${<KEY>}")`
 
 **frontend**
@@ -76,12 +86,12 @@ placeholder 선정 기준:
   ```
 
 **infra**
-- compose `env_file:`로 자동 주입되므로 대부분 추가 작업 불필요
-- 포트/볼륨/네트워크 관련이면 compose yml에 `${<KEY>}` 참조 필요할 수 있음
+- `infra/compose/docker-compose.{infra,app}-*.yml`에서 해당 컨테이너에 필요 시 추가 (보통 `env_file` 자동 주입으로 끝)
+- compose image가 자동으로 인식하는 표준 키(`MYSQL_*`, `RABBITMQ_DEFAULT_*` 등)는 `env_file`만으로 충분
 
-### 4. GitLab Variables 체크리스트 출력
+### 5. GitLab Variables 등록 체크리스트 콘솔 출력
 
-다음 형식으로 출력:
+사용자 화면에 다음 형식으로 출력 (파일 갱신과 별개로):
 
 ```
 ### GitLab → Settings → CI/CD → Variables 등록 필요
@@ -91,24 +101,25 @@ placeholder 선정 기준:
   ENV_<TARGET>_<SERVICE>_<KEY>   Type=Variable  Masked=?  Protected=?
 ```
 
-권장 체크박스:
-- secret 성격(password/token/key/secret 포함) → **Masked ✅**
-- `master` 환경 → **Protected ✅**
+권장:
+- secret 키(password/token/key/secret/webhook/dsn 포함) → **Masked ✅**
+- `master` 환경 + Masked → **Protected ✅**
 
-### 5. 변경 요약
+### 6. 변경 요약
 
 마지막 출력:
 
 ```
 ✅ 수정된 파일:
-  - infra/env/app.dev.env.example (+1 line)
-  - infra/env/app.master.env.example (+1 line)
-  - infra/env/README.md (+1 line)
+  - infra/env/app.local.env.example (+1 line)      # 또는 infra.local.env.example
+  - infra/env/README.md (+1 row in section 3-X)
+  - docs/gitlab-variables.md (regenerated)
 
 다음 단계:
   1. GitLab Variables에 위 체크리스트대로 등록
   2. backend 담당자에게 application.yml 수정 요청 (`${OPENAI_MODEL}` 참조 추가)
-  3. PR 후 MR merge → dev pipeline 자동 실행 확인
+  3. 로컬 개발자는 `infra/env/app.local.env`에 새 키 수동 추가 (example은 템플릿일 뿐)
+  4. PR 후 MR merge → dev pipeline 자동 실행 확인
 ```
 
 ## 예시 실행
@@ -116,10 +127,11 @@ placeholder 선정 기준:
 사용자: "OPENAI_MODEL을 backend에 추가해줘 (기본값 gpt-4o-mini)"
 
 1. 서비스=`backend`, 환경=`both`(기본) 확인
-2. `app.dev.env.example`, `app.master.env.example` 둘 다에 `OPENAI_MODEL=gpt-4o-mini` 추가
-3. `infra/env/README.md`의 `ENV_DEV_BACKEND_*`, `ENV_MASTER_BACKEND_*` 항목에 `OPENAI_MODEL` 한 줄씩 추가
-4. backend 힌트 출력
-5. GitLab 체크리스트:
+2. `infra/env/app.local.env.example`에 `OPENAI_MODEL=gpt-4o-mini` 추가
+3. `infra/env/README.md` 3-3 섹션(`ENV_DEV_BACKEND_*`)에 행 추가. master 값이 dev와 같으면 3-7에 별도 표기 불필요.
+4. `docs/gitlab-variables.md` 재생성 (체크박스 보존)
+5. backend 힌트 출력
+6. GitLab 체크리스트:
    - `ENV_DEV_BACKEND_OPENAI_MODEL`
    - `ENV_MASTER_BACKEND_OPENAI_MODEL` (Protected)
-6. 요약
+7. 요약
