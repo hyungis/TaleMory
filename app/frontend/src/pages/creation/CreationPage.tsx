@@ -7,6 +7,8 @@ import {
   StoryboardEditorStep,
   StyleSelectorStep,
   VoiceCloneStep,
+  FinalPreviewStep,
+  PublishStoryStep,
   useStoryCreationFlow,
 } from '../../features/story-creation'
 import { ROUTES } from '../../shared/constants'
@@ -89,29 +91,16 @@ export function CreationPage() {
         <VoiceCloneStep onBack={handleBack} onNext={flow.handleNext} />
       )}
 
-      {flow.currentStep >= 7 && (
-        <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
-          <div className="max-w-md text-center text-[#f0e6c0] px-6">
-            <h2 className="text-2xl font-bold mb-3">STEP {flow.currentStep} 준비 중</h2>
-            <p className="text-[#b4c4a4] mb-6">이 단계는 다음 커밋(Task 8)에서 연결됩니다.</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                type="button"
-                onClick={flow.handlePrev}
-                className="bg-[#8b7a52] text-[#f0e6c0] px-6 py-2 rounded-full border border-[#d4b86a] font-bold hover:bg-[#a89664] transition-colors"
-              >
-                ← 이전
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(ROUTES.main)}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-6 py-2 rounded-full border border-[#b4dc8c]/40 font-bold hover:bg-[#3d6f34] transition-colors"
-              >
-                서점으로 나가기
-              </button>
-            </div>
-          </div>
-        </div>
+      {flow.currentStep === 7 && (
+        <FinalPreviewStep
+          projectData={flow.projectData}
+          onBack={handleBack}
+          onNext={flow.handleNext}
+        />
+      )}
+
+      {flow.currentStep === 8 && (
+        <PublishStoryStep onBack={handleBack} onExit={() => navigate(ROUTES.main)} />
       )}
     </div>
   )
