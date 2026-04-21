@@ -16,13 +16,13 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationException(e: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
         val message = e.bindingResult.fieldErrors.firstOrNull()?.defaultMessage
-            ?: ErrorCode.INVALID_INPUT.message
+            ?: CommonErrorCode.INVALID_INPUT.message
 
         return ResponseEntity
-            .status(ErrorCode.INVALID_INPUT.status)
+            .status(CommonErrorCode.INVALID_INPUT.status)
             .body(
                 ErrorResponse(
-                    code = ErrorCode.INVALID_INPUT.code,
+                    code = CommonErrorCode.INVALID_INPUT.code,
                     message = message
                 )
             )
@@ -30,7 +30,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception::class)
     fun handleException(e: Exception): ResponseEntity<ErrorResponse> {
-        return toResponse(ErrorCode.INTERNAL_SERVER_ERROR)
+        return toResponse(CommonErrorCode.INTERNAL_SERVER_ERROR)
     }
 
     private fun toResponse(errorCode: ErrorCode): ResponseEntity<ErrorResponse> {

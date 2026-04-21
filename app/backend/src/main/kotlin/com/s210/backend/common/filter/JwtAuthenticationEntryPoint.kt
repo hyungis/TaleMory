@@ -2,6 +2,7 @@ package com.s210.backend.common.filter
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.exception.ErrorCode
 import com.s210.backend.common.response.ApiErrorResponse
 import com.s210.backend.common.response.ErrorDetail
@@ -43,11 +44,11 @@ class JwtAuthenticationEntryPoint : AuthenticationEntryPoint {
         val cause = request.getAttribute(EXCEPTION_ATTRIBUTE)
         return when (cause) {
             is BusinessException -> cause.errorCode
-            else -> ErrorCode.INVALID_ACCESS_TOKEN
+            else -> CommonErrorCode.INVALID_ACCESS_TOKEN
         }
     }
 
     companion object {
-        private const val EXCEPTION_ATTRIBUTE = "exception"
+        const val EXCEPTION_ATTRIBUTE: String = "exception"
     }
 }

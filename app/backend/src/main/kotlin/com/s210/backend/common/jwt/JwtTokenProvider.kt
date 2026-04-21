@@ -1,7 +1,7 @@
 package com.s210.backend.common.jwt
 
 import com.s210.backend.common.exception.BusinessException
-import com.s210.backend.common.exception.ErrorCode
+import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.entity.TokenInfo
 import com.s210.backend.domain.auth.entity.CustomUser
 import io.jsonwebtoken.Claims
@@ -60,12 +60,12 @@ class JwtTokenProvider {
         val refreshClaims = try {
             getRefreshTokenClaims(refreshToken)
         } catch (e: Exception) {
-            throw BusinessException(ErrorCode.INVALID_REFRESH_TOKEN)
+            throw BusinessException(CommonErrorCode.INVALID_REFRESH_TOKEN)
         }
 
         val subject = refreshClaims.subject
         val authorities = refreshClaims["auth"] as? String
-            ?: throw BusinessException(ErrorCode.INVALID_REFRESH_TOKEN)
+            ?: throw BusinessException(CommonErrorCode.INVALID_REFRESH_TOKEN)
 
         val newAccessToken = createJwt(
             signingKey = accessKey,
@@ -87,7 +87,7 @@ class JwtTokenProvider {
     fun getAuthentication(token: String): Authentication {
         val claims = getAccessTokenClaims(token)
         val auth = claims["auth"] as? String
-            ?: throw BusinessException(ErrorCode.INVALID_ACCESS_TOKEN)
+            ?: throw BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN)
 
         val authorities: Collection<GrantedAuthority> = auth
             .split(",")
@@ -103,12 +103,12 @@ class JwtTokenProvider {
             getAccessTokenClaims(token)
         } catch (e: Exception) {
             when (e) {
-                is SecurityException -> throw BusinessException(ErrorCode.INVALID_ACCESS_TOKEN)
-                is MalformedJwtException -> throw BusinessException(ErrorCode.MALFORMED_ACCESS_TOKEN)
-                is ExpiredJwtException -> throw BusinessException(ErrorCode.EXPIRED_ACCESS_TOKEN)
-                is UnsupportedJwtException -> throw BusinessException(ErrorCode.UNSUPPORTED_ACCESS_TOKEN)
-                is IllegalArgumentException -> throw BusinessException(ErrorCode.EMPTY_ACCESS_TOKEN)
-                else -> throw BusinessException(ErrorCode.INTERNAL_SERVER_ERROR)
+                is SecurityException -> throw BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN)
+                is MalformedJwtException -> throw BusinessException(CommonErrorCode.MALFORMED_ACCESS_TOKEN)
+                is ExpiredJwtException -> throw BusinessException(CommonErrorCode.EXPIRED_ACCESS_TOKEN)
+                is UnsupportedJwtException -> throw BusinessException(CommonErrorCode.UNSUPPORTED_ACCESS_TOKEN)
+                is IllegalArgumentException -> throw BusinessException(CommonErrorCode.EMPTY_ACCESS_TOKEN)
+                else -> throw BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR)
             }
         }
     }

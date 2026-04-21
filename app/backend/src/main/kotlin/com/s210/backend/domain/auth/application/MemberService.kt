@@ -1,7 +1,7 @@
 package com.s210.backend.domain.auth.application
 
 import com.s210.backend.common.exception.BusinessException
-import com.s210.backend.common.exception.ErrorCode
+import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.dto.AuthResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
@@ -33,10 +33,10 @@ class MemberService(
     fun signUp(command: SignupCommand): ApiResponse<Unit> {
         // ID 중복 검사
         if (memberRepository.existsByLoginId(command.loginId)) {
-            throw BusinessException(ErrorCode.DUPLICATE_LOGIN_ID)
+            throw BusinessException(CommonErrorCode.DUPLICATE_LOGIN_ID)
         }
         if (memberRepository.existsByEmail(command.email)) {
-            throw BusinessException(ErrorCode.DUPLICATE_EMAIL)
+            throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
 
         val id = memberRepository.save(
@@ -71,7 +71,7 @@ class MemberService(
         refreshTokenInfoRepositoryRedis.save(command.loginId, tokenInfo.refreshToken)
 
         val user = memberRepository.findByLoginId(command.loginId) ?:
-        throw BusinessException(ErrorCode.USER_NOT_FOUND)
+        throw BusinessException(CommonErrorCode.USER_NOT_FOUND)
 
 
         return AuthResult(tokenInfo.grantType, tokenInfo.accessToken, tokenInfo.refreshToken, user)
@@ -90,7 +90,7 @@ class MemberService(
     fun validateRefreshTokenAndCreateToken(refreshToken: String): ApiResponse<AuthResponse> {
         // Redis에 refreshToken 유효 여부 확인
         refreshTokenInfoRepositoryRedis.findByRefreshToken(refreshToken)
-            ?: throw BusinessException(ErrorCode.INVALID_REFRESH_TOKEN)
+            ?: throw BusinessException(CommonErrorCode.INVALID_REFRESH_TOKEN)
 
         // 새로운 accessToken, refreshToken 발급
         val newTokenInfo: TokenInfo = jwtTokenProvider.validateRefreshTokenAndCreateToken(refreshToken)
