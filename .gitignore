@@ -30,3 +30,11 @@ Thumbs.db
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Claude Code local state (worktrees, cache, session state)
+.claude/
+**/.claude/
+
+# oh-my-claudecode (OMC) local data
+.omc/
+**/.omc/
