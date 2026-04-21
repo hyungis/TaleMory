@@ -7,11 +7,25 @@ Difficulty = Literal["BEGINNER", "INTERMEDIATE", "ADVANCED"]
 PageCountStrategy = Literal["AUTO"]
 StorybookMagicLevel = Literal["NONE", "GENTLE", "FANTASY"]
 VisionDetail = Literal["low", "high", "auto"]
+Gender = Literal["MALE", "FEMALE"]
+SentenceEmotion = Literal[
+    "NEUTRAL",
+    "HAPPY",
+    "SAD",
+    "EXCITED",
+    "CALM",
+    "CURIOUS",
+    "SURPRISED",
+    "WARM",
+    "TENDER",
+    "BRAVE",
+]
 
 
 class ChildInfo(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     age: int = Field(..., ge=1, le=18)
+    gender: Gender
 
 
 class TravelInfo(BaseModel):
@@ -59,6 +73,7 @@ class StorySentence(BaseModel):
     sentenceOrder: int
     englishText: str
     koreanText: str
+    emotion: SentenceEmotion
 
 
 class StoryboardPage(BaseModel):

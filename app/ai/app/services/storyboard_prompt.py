@@ -52,7 +52,11 @@ Core rules:
   or discovering what makes a memory shine.
 - Each page must become a meaningful step in that quest.
 - A page may combine multiple related photos when that makes the story more coherent.
-- A page may use no specific photo only when it is needed as a bridge, opening, or ending.
+- A page does NOT need a source photo. Bridge pages, opening pages, transition pages, emotional
+  beat pages, and ending pages may use no photo at all. For such pages, set sourcePhotoIds to an
+  empty list [].
+- Photos are optional scaffolding, not a hard constraint on page count. Never let the number of
+  photos cap the number of pages.
 - Include gentle tension. Examples: shyness before trying something new, worry about missing a moment,
   sadness that the day will end, or uncertainty in an unfamiliar place.
 - Resolve the tension warmly through family connection and the child's own small growth.
@@ -61,9 +65,19 @@ Core rules:
 - Reuse the same motif consistently instead of inventing a different magical detail on every page.
 - Keep character emotions consistent and let them gradually change across the story.
 - Use the youngest child's age to decide sentence length, vocabulary, and page text length.
-- Create between the provided min and max page count.
-- Choose the page count based on photo count, event density, and story flow.
-- Preserve the photo order.
+- pageCount is a HARD constraint. Create at least pageCountPolicy.min pages and at most
+  pageCountPolicy.max pages, regardless of how many photos were provided.
+- If the photo count is less than pageCountPolicy.min, you MUST invent additional storybook
+  pages to reach at least the minimum. These extra pages are story-driven: opening scenes,
+  emotional transitions, fairy-tale-device appearances, interior-monologue beats, or the ending.
+- Extra pages without a photo must still belong to the one unified story arc and must move the
+  child's quest or emotional change forward. They are not filler.
+- For any page that is not directly anchored to a photo, leave sourcePhotoIds as an empty list [].
+- Distribute photo-anchored pages evenly across the story so the added bridge pages form a
+  natural rhythm (opening → photo → bridge → photo → bridge → ... → ending).
+- Choose the final page count based on photo count, event density, and story flow, but always
+  inside [pageCountPolicy.min, pageCountPolicy.max].
+- Preserve the relative order of photos in the pages that do reference them.
 - Use important photos as source material.
 - Combine related photos into one page when appropriate.
 - Do not invent specific events, places, dates, or companions that are not provided.
@@ -97,15 +111,38 @@ Difficulty rules:
 - INTERMEDIATE: gentle descriptive vocabulary and varied sentences.
 - ADVANCED: richer emotions and more detailed descriptions.
 
+Character rules:
+- The children input includes gender. Use gender-consistent pronouns (he/him for MALE, she/her for FEMALE)
+  and keep pronouns consistent across the entire story.
+- Do not reveal or call out the child's gender as a plot point; use it only to inform natural pronouns.
+
+Sentence emotion rules:
+- Each sentence must include an emotion label for voice-cloning narration.
+- Allowed emotion values: NEUTRAL, HAPPY, SAD, EXCITED, CALM, CURIOUS, SURPRISED, WARM, TENDER, BRAVE.
+- Choose the emotion that best fits the sentence's feeling in the moment of the story.
+- Vary emotions across a page when the mood shifts; use NEUTRAL sparingly, only for plain narration.
+- Keep emotion continuity consistent with the three-act arc
+  (e.g., opening often CURIOUS or WARM, middle can include BRAVE/SURPRISED/SAD, ending often TENDER/HAPPY/WARM).
+
 Output rules:
 - Return only JSON matching the requested schema.
 - Each page must include sourcePhotoIds, sceneSummary, englishText, koreanText,
   imagePrompt, sentences, sentenceCount, and wordCount.
+- Each sentence must include sentenceOrder, englishText, koreanText, and emotion.
 - englishText must exactly match sentences[].englishText joined in order.
 - koreanText must exactly match sentences[].koreanText joined in order.
 - sceneSummary must describe the page's role in the overall story arc, not only the photo content.
 - sourcePhotoIds should list the photos that inspired the page, but pages are organized by story flow,
-  not by forcing one page per photo.
+  not by forcing one page per photo. For bridge/opening/ending/transition pages that are not
+  anchored to any specific photo, return sourcePhotoIds as [].
+- pageCount MUST equal the length of pages[]. Never report a pageCount different from len(pages).
+- pageCount must satisfy pageCountPolicy.min <= pageCount <= pageCountPolicy.max.
+- totalWordCount MUST equal the sum of every page's wordCount. Do not round or estimate.
+- Each page.sentenceCount MUST equal the length of that page's sentences[].
+- Each sentence.sentenceOrder MUST be a 1-based index matching its position inside sentences[].
+- pageNumber MUST be a 1-based index matching the page's position inside pages[].
+- wordCount for a page should reflect the actual words in englishText (simple whitespace split
+  after stripping punctuation is fine).
 - imagePrompt must preserve the same characters, setting, and recurring motifs where relevant.
 - The synopsis must name the moral theme, central thread, and emotional resolution.
 - The synopsis must also name the fairy-tale device or quest that ties the pages together.

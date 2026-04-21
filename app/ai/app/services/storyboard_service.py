@@ -54,6 +54,7 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
         raise ValueError(f"OpenAI storyboard generation failed: {exc}") from exc
 
     parsed = StoryboardGenerateResponse.model_validate_json(response.output_text)
+    _reconcile_derived_counts(parsed)
     token_usage = _extract_token_usage(response.usage)
     parsed.usage.model = settings.STORYBOARD_MODEL
     parsed.usage.inputTokens = token_usage["input_tokens"]
@@ -68,11 +69,23 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
 
 
 def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dict) -> list[dict[str, str]]:
+    photo_count = len(request.photos)
+    min_pages = request.pageCountPolicy.min
+    max_pages = request.pageCountPolicy.max
+    page_directive = (
+        f"Produce between {min_pages} and {max_pages} pages (inclusive). "
+        f"There are {photo_count} source photo(s). "
+        f"If {photo_count} is less than {min_pages}, you MUST add storybook bridge pages "
+        "(opening, emotional transitions, fairy-tale-device beats, ending) so pageCount reaches "
+        f"at least {min_pages}. Pages without a specific source photo must set sourcePhotoIds "
+        "to an empty list [] and still belong to the unified story arc."
+    )
     content: list[dict[str, str]] = [
+        {"type": "input_text", "text": page_directive},
         {
             "type": "input_text",
             "text": json.dumps(payload, ensure_ascii=False),
-        }
+        },
     ]
     if not request.useVision:
         return content
@@ -88,6 +101,26 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
             }
         )
     return content
+
+
+def _reconcile_derived_counts(parsed: StoryboardGenerateResponse) -> None:
+    for page_index, page in enumerate(parsed.pages, start=1):
+        page.pageNumber = page_index
+        for sentence_index, sentence in enumerate(page.sentences, start=1):
+            sentence.sentenceOrder = sentence_index
+        page.sentenceCount = len(page.sentences)
+        page.wordCount = _count_words(page.englishText)
+    parsed.pageCount = len(parsed.pages)
+    parsed.totalWordCount = sum(page.wordCount for page in parsed.pages)
+
+
+def _count_words(text: str) -> int:
+    if not text:
+        return 0
+    cleaned = text.replace('"', " ").replace("'", " ")
+    for ch in ".,!?;:()[]":
+        cleaned = cleaned.replace(ch, " ")
+    return len([token for token in cleaned.split() if token])
 
 
 def _to_openai_strict_json_schema(schema: dict) -> dict:
@@ -203,7 +236,7 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
         "A shy sunbeam seems to guide the family from one small brave step to the next, "
         "teaching that courage grows through kindness and love."
     )
-    return StoryboardGenerateResponse(
+    response = StoryboardGenerateResponse(
         title=title,
         synopsis=synopsis,
         moralTheme="Courage grows through small kind steps.",
@@ -226,6 +259,8 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
             promptTemplateVersion=STORYBOARD_PROMPT_TEMPLATE_VERSION,
         ),
     )
+    _reconcile_derived_counts(response)
+    return response
 
 
 def _reading_level_for_age(age: int) -> ReadingLevel:
@@ -318,6 +353,7 @@ def _sentences_for_page(
             "A shy sunbeam slipped beside the path, as if it had a secret to share.",
             f"{child_name} wondered where courage might hide in this new and shining place.",
         ]
+        emotions = ["WARM", "CURIOUS", "CURIOUS"]
     elif page_number == page_count:
         english = [
             f"At last, {child_name} understood what the trip had been teaching all along.",
@@ -329,6 +365,7 @@ def _sentences_for_page(
             "The shy sunbeam had not been pointing to a place, but to each kind and brave choice.",
             "Whenever the family opened this book, the little adventure could begin again.",
         ]
+        emotions = ["TENDER", "WARM", "HAPPY"]
     else:
         bridge = _bridge_sentence(page_number, page_count, child_name)
         english = [
@@ -343,10 +380,11 @@ def _sentences_for_page(
             _magic_sentence_ko(child_name, magic_level),
             f"The shy sunbeam seemed to wait, as if asking what brave or kind thing {child_name} would try next.",
         ]
+        emotions = ["BRAVE", "CURIOUS", "CALM", "CURIOUS"]
 
     return [
-        StorySentence(sentenceOrder=index, englishText=en, koreanText=ko)
-        for index, (en, ko) in enumerate(zip(english, korean), start=1)
+        StorySentence(sentenceOrder=index, englishText=en, koreanText=ko, emotion=emotion)
+        for index, (en, ko, emotion) in enumerate(zip(english, korean, emotions), start=1)
     ]
 
 

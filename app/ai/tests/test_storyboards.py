@@ -11,7 +11,7 @@ def test_generate_storyboard() -> None:
         "/internal/storyboards/generate",
         json={
             "storyId": 1,
-            "children": [{"name": "Haesol", "age": 7}],
+            "children": [{"name": "Haesol", "age": 7, "gender": "FEMALE"}],
             "companions": ["Mom", "Dad"],
             "travel": {
                 "place": "Waikiki",
@@ -32,7 +32,25 @@ def test_generate_storyboard() -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["pageCount"] == 10
-    assert len(body["pages"]) == 10
-    assert body["pages"][0]["sourcePhotoIds"] == [101]
+    assert 10 <= body["pageCount"] <= 20
+    assert len(body["pages"]) == body["pageCount"]
+    referenced_photo_ids = {
+        pid for page in body["pages"] for pid in page["sourcePhotoIds"]
+    }
+    assert referenced_photo_ids <= {101}
+    assert 101 in referenced_photo_ids
     assert body["usage"]["promptTemplateVersion"] == "storyboard_v1"
+    first_sentence = body["pages"][0]["sentences"][0]
+    assert "emotion" in first_sentence
+    assert first_sentence["emotion"] in {
+        "NEUTRAL",
+        "HAPPY",
+        "SAD",
+        "EXCITED",
+        "CALM",
+        "CURIOUS",
+        "SURPRISED",
+        "WARM",
+        "TENDER",
+        "BRAVE",
+    }
