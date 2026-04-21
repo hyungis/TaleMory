@@ -6,7 +6,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/stories/{storyId}")
+@RequestMapping("/api/stories/{storyId}")
 class SceneController {
 
     // 동화 씬(페이지) 목록 조회

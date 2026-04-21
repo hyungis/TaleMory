@@ -29,10 +29,11 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
                 it.requestMatchers(
-                    "/api/v1/auth/signup",
-                    "/api/v1/auth/login",
-                    "/api/v1/auth/refresh",
-                    "/api/v1/auth/oauth/**",
+                    "/api/health",
+                    "/api/auth/signup",
+                    "/api/auth/login",
+                    "/api/auth/refresh",
+                    "/api/auth/oauth/**",
                 ).permitAll()
                     .anyRequest().authenticated()
             }

@@ -7,7 +7,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/stories/{storyId}/storyboard")
+@RequestMapping("/api/stories/{storyId}/storyboard")
 class StoryboardController {
 
     // 스토리보드 생성 (AI)

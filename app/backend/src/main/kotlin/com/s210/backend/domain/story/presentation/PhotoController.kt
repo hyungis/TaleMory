@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
 @RestController
-@RequestMapping("/api/v1/stories/{storyId}/photos")
+@RequestMapping("/api/stories/{storyId}/photos")
 class PhotoController {
 
     // 사진 업로드
