@@ -4,18 +4,25 @@ import { useKidAnim } from '../model/useKidAnim'
 import { useHouseWalk } from '../model/useHouseWalk'
 import { WalkingKid } from './WalkingKid'
 
+interface ForestSceneProps {
+  /**
+   * 아이가 집 앞 도착 + 문 열림 후 호출. 상위에서 BookstoreScene 으로 전환 트리거.
+   */
+  onEnterBookstore?: () => void
+}
+
 /**
  * 로그인 직후 진입하는 숲 씬.
  * 배경 / 나무 / 집 / 빛줄기 / 비네팅 / 부유 파티클 / 걷는 아이 레이어 조합.
  *
  * 집 클릭 → `useHouseWalk` 가 RAF 로 아이를 문 앞까지 이동시키고, 도착 시 문이 열림(openhouse.png).
- * 도착 후 onArrive 훅은 Task 2(BookstoreScene) 에서 연결.
+ * 도착 + lingerMs(400ms) 후 `onEnterBookstore` 호출 → 상위 MainPage 가 씬 전환.
  */
-export function ForestScene() {
+export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
   const particles = useMemo(() => generateForestParticles(), [])
   const kidAnim = useKidAnim()
   const { isKidWalking, showBackView, kidRef, startWalking } = useHouseWalk({
-    // TODO(S14P31S210-76, Task 2): onArrive 에서 BookstoreScene 전환 트리거
+    onArrive: onEnterBookstore,
   })
 
   return (
