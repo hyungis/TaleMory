@@ -6,19 +6,17 @@ set -euo pipefail
 
 ROOT_DIR="${ROOT_DIR:-/srv/s210}"
 PROJECT_NAME="${PROJECT_NAME:-s210}"
-REGISTRY="${REGISTRY:-${CI_REGISTRY_IMAGE:-}}"
 
 require_file() {
   local f="$1"
   [[ -f "$f" ]] || { echo "required file not found: $f" >&2; exit 1; }
 }
 
+# 로컬 이미지 태그. 배포 서버 docker daemon 안에서만 유효.
+# 추후 registry 도입 시 이 함수에서 prefix 붙이고 build/deploy 스크립트에
+# docker push/pull + login 한 줄씩 추가하면 됨.
 image_ref() {
   local service="$1"
   local tag="$2"
-  if [[ -z "$REGISTRY" ]]; then
-    echo "REGISTRY is not set (expected CI_REGISTRY_IMAGE)" >&2
-    exit 1
-  fi
-  echo "${REGISTRY}/${PROJECT_NAME}-${service}:${tag}"
+  echo "${PROJECT_NAME}-${service}:${tag}"
 }

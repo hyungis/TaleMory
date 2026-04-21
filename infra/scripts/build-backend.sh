@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Backend(Spring Boot) 이미지 빌드 + push.
+# Backend(Spring Boot) 로컬 이미지 빌드.
 # Dockerfile은 소스 옆(app/backend/)에 있음 (Pattern A).
+# 배포 서버 docker daemon에 태그만 남김(registry 미사용).
 
 set -euo pipefail
 
@@ -15,5 +16,4 @@ docker build \
   -t "$IMG" \
   app/backend
 
-docker push "$IMG"
-echo "pushed: $IMG"
+echo "built: $IMG"

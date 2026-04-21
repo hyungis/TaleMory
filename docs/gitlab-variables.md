@@ -12,7 +12,7 @@
 
 ## 시스템 변수 (prefix 없음)
 
-- [ ] `DISCORD_WEBHOOK_URL` — Variable · **Masked ✅** · Protected 선택 — notify.sh Discord 웹후크
+- [x] `DISCORD_WEBHOOK_URL` — Variable · **Masked ✅** · Protected 선택 — notify.sh Discord 웹후크
 
 > `CI_REGISTRY_*`는 GitLab이 자동 주입 — 등록 불필요.
 
@@ -28,22 +28,22 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ### Backend — `ENV_DEV_BACKEND_*`
 
-- [ ] `ENV_DEV_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `dev`
-- [ ] `ENV_DEV_BACKEND_DB_URL` — Variable — `jdbc:mysql://dev-mysql:3306/iportfolio?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC`
-- [ ] `ENV_DEV_BACKEND_DB_USERNAME` — Variable — `app`
-- [ ] `ENV_DEV_BACKEND_DB_PASSWORD` — Variable · **Masked ✅** · INFRA_MYSQL_PASSWORD와 동일값
-- [ ] `ENV_DEV_BACKEND_REDIS_HOST` — Variable — `dev-redis`
-- [ ] `ENV_DEV_BACKEND_REDIS_PORT` — Variable — `6379`
-- [ ] `ENV_DEV_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅** · INFRA_REDIS_PASSWORD와 동일값
-- [ ] `ENV_DEV_BACKEND_RABBITMQ_HOST` — Variable — `dev-rabbitmq`
-- [ ] `ENV_DEV_BACKEND_RABBITMQ_PORT` — Variable — `5672`
-- [ ] `ENV_DEV_BACKEND_RABBITMQ_USERNAME` — Variable · INFRA_RABBITMQ_DEFAULT_USER와 동일값
-- [ ] `ENV_DEV_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · INFRA_RABBITMQ_DEFAULT_PASS와 동일값
+- [x] `ENV_DEV_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `dev`
+- [x] `ENV_DEV_BACKEND_DB_URL` — Variable — `jdbc:mysql://dev-mysql:3306/iportfolio?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC`
+- [x] `ENV_DEV_BACKEND_DB_USERNAME` — Variable — `app`
+- [x] `ENV_DEV_BACKEND_DB_PASSWORD` — Variable · **Masked ✅** · INFRA_MYSQL_PASSWORD와 동일값
+- [x] `ENV_DEV_BACKEND_REDIS_HOST` — Variable — `dev-redis`
+- [x] `ENV_DEV_BACKEND_REDIS_PORT` — Variable — `6379`
+- [x] `ENV_DEV_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅** · INFRA_REDIS_PASSWORD와 동일값
+- [x] `ENV_DEV_BACKEND_RABBITMQ_HOST` — Variable — `dev-rabbitmq`
+- [x] `ENV_DEV_BACKEND_RABBITMQ_PORT` — Variable — `5672`
+- [x] `ENV_DEV_BACKEND_RABBITMQ_USERNAME` — Variable · INFRA_RABBITMQ_DEFAULT_USER와 동일값
+- [x] `ENV_DEV_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · INFRA_RABBITMQ_DEFAULT_PASS와 동일값
 
 ### Frontend — `ENV_DEV_FRONTEND_*`
 
-- [ ] `ENV_DEV_FRONTEND_FRONTEND_PORT` — Variable — `3001`
-- [ ] `ENV_DEV_FRONTEND_VITE_API_BASE_URL` — Variable — `/api`
+- [x] `ENV_DEV_FRONTEND_FRONTEND_PORT` — Variable — `3001`
+- [x] `ENV_DEV_FRONTEND_VITE_API_BASE_URL` — Variable — `/api`
 
 ### AI — `ENV_DEV_AI_*`
 
@@ -51,17 +51,17 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ### Infra — `ENV_DEV_INFRA_*`
 
-- [ ] `ENV_DEV_INFRA_MYSQL_ROOT_PASSWORD` — Variable · **Masked ✅** · MySQL root 비밀번호
-- [ ] `ENV_DEV_INFRA_MYSQL_DATABASE` — Variable — `iportfolio`
-- [ ] `ENV_DEV_INFRA_MYSQL_USER` — Variable — `app`
-- [ ] `ENV_DEV_INFRA_MYSQL_PASSWORD` — Variable · **Masked ✅** · app 유저 비밀번호 (BACKEND_DB_PASSWORD와 동일)
-- [ ] `ENV_DEV_INFRA_MYSQL_PORT` — Variable — `3307` (호스트 publish)
-- [ ] `ENV_DEV_INFRA_REDIS_PASSWORD` — Variable · **Masked ✅** · redis requirepass (BACKEND_REDIS_PASSWORD와 동일)
-- [ ] `ENV_DEV_INFRA_REDIS_PORT` — Variable — `6380` (호스트 publish)
-- [ ] `ENV_DEV_INFRA_RABBITMQ_DEFAULT_USER` — Variable · BACKEND_RABBITMQ_USERNAME과 동일값
-- [ ] `ENV_DEV_INFRA_RABBITMQ_DEFAULT_PASS` — Variable · **Masked ✅** · BACKEND_RABBITMQ_PASSWORD와 동일값
-- [ ] `ENV_DEV_INFRA_RABBITMQ_PORT` — Variable — `5673`
-- [ ] `ENV_DEV_INFRA_RABBITMQ_MANAGEMENT_PORT` — Variable — `15673`
+- [x] `ENV_DEV_INFRA_MYSQL_ROOT_PASSWORD` — Variable · **Masked ✅** · MySQL root 비밀번호
+- [x] `ENV_DEV_INFRA_MYSQL_DATABASE` — Variable — `iportfolio`
+- [x] `ENV_DEV_INFRA_MYSQL_USER` — Variable — `app`
+- [x] `ENV_DEV_INFRA_MYSQL_PASSWORD` — Variable · **Masked ✅** · app 유저 비밀번호 (BACKEND_DB_PASSWORD와 동일)
+- [x] `ENV_DEV_INFRA_MYSQL_PORT` — Variable — `3307` (호스트 publish)
+- [x] `ENV_DEV_INFRA_REDIS_PASSWORD` — Variable · **Masked ✅** · redis requirepass (BACKEND_REDIS_PASSWORD와 동일)
+- [x] `ENV_DEV_INFRA_REDIS_PORT` — Variable — `6380` (호스트 publish)
+- [x] `ENV_DEV_INFRA_RABBITMQ_DEFAULT_USER` — Variable · BACKEND_RABBITMQ_USERNAME과 동일값
+- [x] `ENV_DEV_INFRA_RABBITMQ_DEFAULT_PASS` — Variable · **Masked ✅** · BACKEND_RABBITMQ_PASSWORD와 동일값
+- [x] `ENV_DEV_INFRA_RABBITMQ_PORT` — Variable — `5673`
+- [x] `ENV_DEV_INFRA_RABBITMQ_MANAGEMENT_PORT` — Variable — `15673`
 
 ---
 
@@ -71,22 +71,22 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ### Backend — `ENV_MASTER_BACKEND_*`
 
-- [ ] `ENV_MASTER_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `prod`
-- [ ] `ENV_MASTER_BACKEND_DB_URL` — Variable — `jdbc:mysql://prod-mysql:3306/<운영DB>?...`
-- [ ] `ENV_MASTER_BACKEND_DB_USERNAME` — Variable
-- [ ] `ENV_MASTER_BACKEND_DB_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
-- [ ] `ENV_MASTER_BACKEND_REDIS_HOST` — Variable — `prod-redis`
-- [ ] `ENV_MASTER_BACKEND_REDIS_PORT` — Variable — `6379`
-- [ ] `ENV_MASTER_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
-- [ ] `ENV_MASTER_BACKEND_RABBITMQ_HOST` — Variable — `prod-rabbitmq`
-- [ ] `ENV_MASTER_BACKEND_RABBITMQ_PORT` — Variable — `5672`
-- [ ] `ENV_MASTER_BACKEND_RABBITMQ_USERNAME` — Variable · **Protected ✅**
-- [ ] `ENV_MASTER_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `prod`
+- [x] `ENV_MASTER_BACKEND_DB_URL` — Variable — `jdbc:mysql://prod-mysql:3306/<운영DB>?...`
+- [x] `ENV_MASTER_BACKEND_DB_USERNAME` — Variable
+- [x] `ENV_MASTER_BACKEND_DB_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_BACKEND_REDIS_HOST` — Variable — `prod-redis`
+- [x] `ENV_MASTER_BACKEND_REDIS_PORT` — Variable — `6379`
+- [x] `ENV_MASTER_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_BACKEND_RABBITMQ_HOST` — Variable — `prod-rabbitmq`
+- [x] `ENV_MASTER_BACKEND_RABBITMQ_PORT` — Variable — `5672`
+- [x] `ENV_MASTER_BACKEND_RABBITMQ_USERNAME` — Variable · **Protected ✅**
+- [x] `ENV_MASTER_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
 
 ### Frontend — `ENV_MASTER_FRONTEND_*`
 
-- [ ] `ENV_MASTER_FRONTEND_FRONTEND_PORT` — Variable — `80`
-- [ ] `ENV_MASTER_FRONTEND_VITE_API_BASE_URL` — Variable — `/api`
+- [x] `ENV_MASTER_FRONTEND_FRONTEND_PORT` — Variable — `80`
+- [x] `ENV_MASTER_FRONTEND_VITE_API_BASE_URL` — Variable — `/api`
 
 ### AI — `ENV_MASTER_AI_*`
 
@@ -94,17 +94,17 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ### Infra — `ENV_MASTER_INFRA_*`
 
-- [ ] `ENV_MASTER_INFRA_MYSQL_ROOT_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
-- [ ] `ENV_MASTER_INFRA_MYSQL_DATABASE` — Variable — (운영 DB명)
-- [ ] `ENV_MASTER_INFRA_MYSQL_USER` — Variable
-- [ ] `ENV_MASTER_INFRA_MYSQL_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
-- [ ] `ENV_MASTER_INFRA_MYSQL_PORT` — Variable — `3306`
-- [ ] `ENV_MASTER_INFRA_REDIS_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
-- [ ] `ENV_MASTER_INFRA_REDIS_PORT` — Variable — `6379`
-- [ ] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_USER` — Variable · **Protected ✅**
-- [ ] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_PASS` — Variable · **Masked ✅** · **Protected ✅**
-- [ ] `ENV_MASTER_INFRA_RABBITMQ_PORT` — Variable — `5672`
-- [ ] `ENV_MASTER_INFRA_RABBITMQ_MANAGEMENT_PORT` — Variable — `15672`
+- [x] `ENV_MASTER_INFRA_MYSQL_ROOT_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_MYSQL_DATABASE` — Variable — (운영 DB명)
+- [x] `ENV_MASTER_INFRA_MYSQL_USER` — Variable
+- [x] `ENV_MASTER_INFRA_MYSQL_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_MYSQL_PORT` — Variable — `3306`
+- [x] `ENV_MASTER_INFRA_REDIS_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_REDIS_PORT` — Variable — `6379`
+- [x] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_USER` — Variable · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_PASS` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_RABBITMQ_PORT` — Variable — `5672`
+- [x] `ENV_MASTER_INFRA_RABBITMQ_MANAGEMENT_PORT` — Variable — `15672`
 
 ---
 

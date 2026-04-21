@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# AI(FastAPI) 이미지 빌드 + push.
+# AI(FastAPI) 로컬 이미지 빌드.
 # Dockerfile은 소스 옆(app/ai/)에 있음 (Pattern A).
+# 배포 서버 docker daemon에 태그만 남김(registry 미사용).
 
 set -euo pipefail
 
@@ -15,5 +16,4 @@ docker build \
   -t "$IMG" \
   app/ai
 
-docker push "$IMG"
-echo "pushed: $IMG"
+echo "built: $IMG"
