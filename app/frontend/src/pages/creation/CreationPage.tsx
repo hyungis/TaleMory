@@ -6,6 +6,7 @@ import {
   StoryTextStep,
   StoryboardEditorStep,
   StyleSelectorStep,
+  VoiceCloneStep,
   useStoryCreationFlow,
 } from '../../features/story-creation'
 import { ROUTES } from '../../shared/constants'
@@ -84,15 +85,15 @@ export function CreationPage() {
         />
       )}
 
-      {flow.currentStep >= 6 && (
+      {flow.currentStep === 6 && (
+        <VoiceCloneStep onBack={handleBack} onNext={flow.handleNext} />
+      )}
+
+      {flow.currentStep >= 7 && (
         <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
           <div className="max-w-md text-center text-[#f0e6c0] px-6">
             <h2 className="text-2xl font-bold mb-3">STEP {flow.currentStep} 준비 중</h2>
-            <p className="text-[#b4c4a4] mb-6">
-              이 단계는 후속 커밋(Task {
-                flow.currentStep === 6 ? '7 voice-clone' :
-                '8 final-preview / publish'}) 에서 연결됩니다.
-            </p>
+            <p className="text-[#b4c4a4] mb-6">이 단계는 다음 커밋(Task 8)에서 연결됩니다.</p>
             <div className="flex gap-3 justify-center">
               <button
                 type="button"
