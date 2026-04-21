@@ -5,10 +5,13 @@ export const ROUTES = {
   home: '/',
   main: '/main',
   creation: '/creation',
-  // TODO(S14P31S210-76): 후속 Task 에서 추가
-  // viewer: '/viewer/:storyId',
-  // mypage: '/mypage',
-  // oauthCallback: '/auth/oauth/callback',
+  viewer: '/viewer/:storyId',
+  // TODO: mypage, oauthCallback
 } as const
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES]
+
+/** viewer 경로 조립 헬퍼 (:storyId 치환). */
+export function buildViewerPath(storyId: number | string): string {
+  return `/viewer/${storyId}`
+}

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BookshelfModal } from '../../../features/bookshelf'
 import type { Story } from '../../../entities/story'
-import { ROUTES } from '../../../shared/constants'
+import { ROUTES, buildViewerPath } from '../../../shared/constants'
 
 interface BookstoreSceneProps {
   onBackToForest: () => void
@@ -34,10 +34,13 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
     navigate(ROUTES.creation)
   }, [navigate])
 
-  const handleReadStory = useCallback((story: Story) => {
-    // TODO(S14P31S210-76, Task 9): viewer 오픈
-    alert(`"${story.title}" 뷰어는 Task 9 에서 연결됩니다.`)
-  }, [])
+  const handleReadStory = useCallback(
+    (story: Story) => {
+      setIsLibraryOpen(false)
+      navigate(buildViewerPath(story.id))
+    },
+    [navigate],
+  )
 
   return (
     <>
