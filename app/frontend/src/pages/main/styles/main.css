@@ -87,6 +87,32 @@
   filter: drop-shadow(0 30px 60px rgba(180, 220, 140, 0.4));
 }
 
+/* ===== 숲속 아이 캐릭터 (집 클릭 시 문 앞까지 걸어감) =====
+   걷기 애니메이션은 JS(requestAnimationFrame) 로 inline transform 을 직접 적용.
+   CSS 키프레임은 사용하지 않음. */
+.kid-character {
+  position: absolute;
+  left: 18%;
+  bottom: 6vh;
+  width: 220px;
+  height: 220px;
+  z-index: 5;
+  pointer-events: none;
+  transform-origin: center bottom;
+  transform: translate(0, 0) scale(0.9);
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.35));
+  will-change: transform;
+}
+
+/* 문 앞 도착 후 보여지는 뒷모습 PNG */
+.kid-back-view {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ===== Vignette Effect ===== */
 .vignette {
   position: absolute;
