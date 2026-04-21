@@ -12,7 +12,7 @@
 
 ## 시스템 변수 (prefix 없음)
 
-- [x] `DISCORD_WEBHOOK_URL` — Variable · **Masked ✅** · Protected 선택 — notify.sh Discord 웹후크
+- [x] `DISCORD_WEBHOOK_URL` — Variable · **Masked ✅** — notify.sh Discord 웹후크
 
 > `CI_REGISTRY_*`는 GitLab이 자동 주입 — 등록 불필요.
 
@@ -69,23 +69,23 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ## ENV_MASTER_*
 
-모든 **Masked 키는 Protected ✅** 추가. 값은 운영용으로 별도 관리.
+값은 운영용으로 별도 관리.
 
 ### Backend — `ENV_MASTER_BACKEND_*`
 
 - [x] `ENV_MASTER_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `prod`
 - [x] `ENV_MASTER_BACKEND_DB_URL` — Variable — `jdbc:mysql://prod-mysql:3306/<운영DB>?...`
 - [x] `ENV_MASTER_BACKEND_DB_USERNAME` — Variable
-- [x] `ENV_MASTER_BACKEND_DB_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_BACKEND_DB_PASSWORD` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_BACKEND_REDIS_HOST` — Variable — `prod-redis`
 - [x] `ENV_MASTER_BACKEND_REDIS_PORT` — Variable — `6379`
-- [x] `ENV_MASTER_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_BACKEND_RABBITMQ_HOST` — Variable — `prod-rabbitmq`
 - [x] `ENV_MASTER_BACKEND_RABBITMQ_PORT` — Variable — `5672`
-- [x] `ENV_MASTER_BACKEND_RABBITMQ_USERNAME` — Variable · **Protected ✅**
-- [x] `ENV_MASTER_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
-- [x] `ENV_MASTER_BACKEND_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · **Protected ✅** · dev와 반드시 다른 값
-- [x] `ENV_MASTER_BACKEND_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · **Protected ✅** · dev와 반드시 다른 값
+- [x] `ENV_MASTER_BACKEND_RABBITMQ_USERNAME` — Variable
+- [x] `ENV_MASTER_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅**
+- [x] `ENV_MASTER_BACKEND_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
+- [x] `ENV_MASTER_BACKEND_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
 
 ### Frontend — `ENV_MASTER_FRONTEND_*`
 
@@ -94,19 +94,19 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ### AI — `ENV_MASTER_AI_*`
 
-- [ ] `ENV_MASTER_AI_OPENAI_API_KEY` — Variable · **Masked ✅** · **Protected ✅**
+- [ ] `ENV_MASTER_AI_OPENAI_API_KEY` — Variable · **Masked ✅**
 
 ### Infra — `ENV_MASTER_INFRA_*`
 
-- [x] `ENV_MASTER_INFRA_MYSQL_ROOT_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_MYSQL_ROOT_PASSWORD` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_INFRA_MYSQL_DATABASE` — Variable — (운영 DB명)
 - [x] `ENV_MASTER_INFRA_MYSQL_USER` — Variable
-- [x] `ENV_MASTER_INFRA_MYSQL_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_MYSQL_PASSWORD` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_INFRA_MYSQL_PORT` — Variable — `3306`
-- [x] `ENV_MASTER_INFRA_REDIS_PASSWORD` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_REDIS_PASSWORD` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_INFRA_REDIS_PORT` — Variable — `6379`
-- [x] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_USER` — Variable · **Protected ✅**
-- [x] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_PASS` — Variable · **Masked ✅** · **Protected ✅**
+- [x] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_USER` — Variable
+- [x] `ENV_MASTER_INFRA_RABBITMQ_DEFAULT_PASS` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_INFRA_RABBITMQ_PORT` — Variable — `5672`
 - [x] `ENV_MASTER_INFRA_RABBITMQ_MANAGEMENT_PORT` — Variable — `15672`
 
@@ -115,14 +115,12 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 ## 자동 분류 규칙
 
 - 키 끝이 `_PASSWORD`, `_PASS`, `_TOKEN`, `_KEY`, `_SECRET`, `_WEBHOOK_URL`, `_DSN` 패턴 매칭 → **Masked ✅**
-- `ENV_MASTER_*` + (Masked OR 인증 관련 식별자) → **Protected ✅**
 - 그 외 → plain Variable
 
 ## 진행 팁
 
 1. **Masked**: GitLab에서 Masked 체크 시 **8자 이상 + Base64-safe 문자만** 제약. 특수문자 포함된 비밀번호는 Masked 체크 불가 (에러 뜸) → 비밀번호 생성 시 주의.
-2. **Protected**: 해당 변수는 Protected 브랜치(`master`)에서만 노출. dev pipeline에선 사용 불가.
-3. **값 중복 확인**: backend와 infra의 DB/Redis/RabbitMQ 비밀번호는 **반드시 동일값**이어야 연결됨. 2곳에 같은 값을 넣는 작업이 실수의 주요 원인.
+2. **값 중복 확인**: backend와 infra의 DB/Redis/RabbitMQ 비밀번호는 **반드시 동일값**이어야 연결됨. 2곳에 같은 값을 넣는 작업이 실수의 주요 원인.
 
 ## 업데이트
 
