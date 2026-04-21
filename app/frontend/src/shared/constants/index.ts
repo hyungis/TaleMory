@@ -1,2 +1,2 @@
-// 라우트 경로, 피처 플래그, 공용 상수.
-export {}
+export { ROUTES } from './routes'
+export type { RoutePath } from './routes'
