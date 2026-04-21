@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BookshelfModal } from '../../../features/bookshelf'
 import type { Story } from '../../../entities/story'
+import { ROUTES } from '../../../shared/constants'
 
 interface BookstoreSceneProps {
   onBackToForest: () => void
@@ -25,11 +27,12 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
     setIsLibraryOpen(false)
   }, [])
 
+  const navigate = useNavigate()
+
   const handleCreateStory = useCallback(() => {
-    // TODO(S14P31S210-76, Task 4): story-creation step 1 페이지로 이동
     setIsLibraryOpen(false)
-    alert('새 동화책 만들기 플로우는 Task 4 에서 연결됩니다.')
-  }, [])
+    navigate(ROUTES.creation)
+  }, [navigate])
 
   const handleReadStory = useCallback((story: Story) => {
     // TODO(S14P31S210-76, Task 9): viewer 오픈

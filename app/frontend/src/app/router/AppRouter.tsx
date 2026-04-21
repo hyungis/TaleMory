@@ -1,29 +1,26 @@
 import { Route, Routes } from 'react-router-dom'
 import { HomePage } from '../../pages/home'
 import { MainPage } from '../../pages/main'
+import { CreationPage } from '../../pages/creation'
 import { ROUTES } from '../../shared/constants'
 
 /**
  * 앱 라우팅 루트.
  *
  * 현재 라우트:
- * - /     → HomePage (랜딩)
- * - /main → MainPage (숲 씬)
+ * - /         → HomePage (랜딩)
+ * - /main     → MainPage (숲/서점 씬)
+ * - /creation → CreationPage (제작 워크스페이스, step 1~8 내부 state)
  *
- * Task 2+ 에서 bookshelf / creation / viewer / mypage 를 AppLayout 중첩 라우트로 추가.
+ * Task 9+ 에서 viewer, mypage 추가 예정.
  */
 export function AppRouter() {
   return (
     <Routes>
       <Route path={ROUTES.home} element={<HomePage />} />
       <Route path={ROUTES.main} element={<MainPage />} />
-      {/* TODO(S14P31S210-76): AppLayout 기반 중첩 라우트 */}
-      {/* <Route element={<AppLayout />}>
-        <Route path="/bookshelf" element={<BookshelfPage />} />
-        <Route path="/creation" element={<CreationPage />} />
-        <Route path="/viewer/:storyId" element={<ViewerPage />} />
-        <Route path="/mypage" element={<MyPage />} />
-      </Route> */}
+      <Route path={ROUTES.creation} element={<CreationPage />} />
+      {/* TODO(S14P31S210-76): viewer, mypage */}
     </Routes>
   )
 }

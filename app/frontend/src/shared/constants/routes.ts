@@ -4,9 +4,8 @@
 export const ROUTES = {
   home: '/',
   main: '/main',
+  creation: '/creation',
   // TODO(S14P31S210-76): 후속 Task 에서 추가
-  // bookshelf: '/bookshelf',
-  // creation: '/creation',
   // viewer: '/viewer/:storyId',
   // mypage: '/mypage',
   // oauthCallback: '/auth/oauth/callback',
