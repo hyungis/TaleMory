@@ -1,0 +1,183 @@
+/* ==========================================================================
+   MainPage (숲 씬) 전용 스타일.
+   App.css 원본(story-forest)에서 추출, feature-local 로 이관.
+   ========================================================================== */
+
+/* ===== Main Scene Container ===== */
+.scene {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  cursor: default;
+  background: var(--color-dark);
+}
+
+/* ===== Parallax Layers ===== */
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform, opacity, filter;
+  transition: transform 0.15s ease-out;
+  backface-visibility: hidden;
+}
+
+.layer--background {
+  z-index: 1;
+}
+
+.layer--background img {
+  width: 110%;
+  height: 110%;
+  object-fit: cover;
+  position: absolute;
+  top: -5%;
+  left: -5%;
+}
+
+.layer--tree {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.layer--tree img {
+  width: 120%;
+  height: 120%;
+  object-fit: cover;
+  position: absolute;
+  top: -12%;
+  left: -12%;
+  animation: sway 10s ease-in-out infinite;
+}
+
+.layer--house {
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+  /* 부모는 클릭 무시, 실제 <img> 만 클릭 허용 */
+}
+
+.house-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  animation: bobbing 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.house-img {
+  height: 110vh;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  margin-bottom: -5vh;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+  transition: transform 0.3s ease-out, filter 0.3s ease-out;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.house-img:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 30px 60px rgba(180, 220, 140, 0.4));
+}
+
+/* ===== Vignette Effect ===== */
+.vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(10, 26, 10, 0.5) 100%);
+}
+
+/* ===== Light Rays ===== */
+.light-rays {
+  position: absolute;
+  top: -20%;
+  left: 30%;
+  width: 40%;
+  height: 120%;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(200, 230, 160, 0.08) 0%, transparent 60%);
+  transform: rotate(-15deg);
+  animation: rayPulse 6s ease-in-out infinite;
+}
+
+/* ===== Floating Particles ===== */
+.particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(circle, rgba(200, 230, 160, 0.8), transparent);
+  border-radius: 50%;
+  animation: floatUp var(--duration) var(--delay) ease-in-out infinite;
+}
+
+/* ===== Keyframes ===== */
+@keyframes rayPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(0.5%);
+  }
+}
+
+@keyframes bobbing {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(100vh) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-20vh) translateX(calc(var(--drift)));
+    opacity: 0;
+  }
+}

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AuthModal, useAuthModal } from '../../features/auth'
+import { ROUTES } from '../../shared/constants'
 import { ButterflySwarm } from './ui/ButterflySwarm'
 import { useButterflyAnim } from './model/useButterflyAnim'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
@@ -12,13 +14,15 @@ import './styles/landing.css'
  * 1. 배경 영상 + TaleMory 타이틀 + "시작하기" 버튼
  * 2. 시작하기 클릭 → `AuthModal` open (login/register 탭)
  * 3. 로그인 성공 → 모달 닫힘 + 나비 떼 확산 + 원형 디졸브 exit 애니메이션
- * 4. TODO(S14P31S210-76): exit 완료 후 다음 뷰(숲+집 main scene) 로 전환 — 라우터/layout 은 step 6.
+ * 4. exit 애니메이션 타이밍(4.1s) 에 맞춰 `/main` 으로 라우트 전환
+ *    (원본 App.jsx 의 setTimeout(() => setView('main'), 4100) 이관)
  */
 export function HomePage() {
   const [isExiting, setIsExiting] = useState(false)
   const butterflyAnim = useButterflyAnim()
   const particles = useMemo(() => generateSwarmParticles(), [])
   const auth = useAuthModal('login')
+  const navigate = useNavigate()
 
   const handleStart = useCallback(() => {
     if (isExiting) return
@@ -28,8 +32,9 @@ export function HomePage() {
   const handleAuthSuccess = useCallback(() => {
     auth.close()
     setIsExiting(true)
-    // TODO(S14P31S210-76): setTimeout(() => navigate('/main'), 4100) — 라우터 도입 후.
-  }, [auth])
+    // 원본 App.jsx 와 동일 타이밍 — exit 애니메이션(나비 확산 + 원형 디졸브 마스크) 완료 직전에 라우트 전환
+    setTimeout(() => navigate(ROUTES.main), 4100)
+  }, [auth, navigate])
 
   return (
     <>
