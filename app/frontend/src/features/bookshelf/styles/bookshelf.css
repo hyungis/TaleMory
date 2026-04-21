@@ -134,6 +134,20 @@
   }
 }
 
+/* ===== Step(STEP 01~08) 전체 화면 모드 =====
+   /creation 라우트에서 BasicInfoStep 등 step 컴포넌트가 이 modifier 를 사용.
+   기본 .bookshelf-modal(95% x 92% + max-width 1400px) 을 덮어쓰고 부모 가득. */
+.bookshelf-modal.step-forest-modal {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+  z-index: 40;
+}
+
 /* ===== 필터 칩 active 상태 ===== */
 .bookshelf-modal .filter-btn.active {
   background-color: #2d5a27 !important;
