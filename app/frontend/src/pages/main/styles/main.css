@@ -32,6 +32,8 @@
 .layer--background img {
   width: 110%;
   height: 110%;
+  max-width: none;
+  /* Tailwind preflight 가 img { max-width: 100% } 를 걸기 때문에 명시 해제 */
   object-fit: cover;
   position: absolute;
   top: -5%;
@@ -46,6 +48,8 @@
 .layer--tree img {
   width: 120%;
   height: 120%;
+  max-width: none;
+  /* Tailwind preflight 의 img { max-width: 100% } 해제 필수 */
   object-fit: cover;
   position: absolute;
   top: -12%;
