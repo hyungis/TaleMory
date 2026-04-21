@@ -56,9 +56,9 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 
 ### 3-1. 시스템 (prefix 없음 — 그대로 등록)
 
-| Key | Type | Masked | Protected | 설명 |
-|---|---|---|---|---|
-| `DISCORD_WEBHOOK_URL` | Variable | ✅ | 선택 | notify.sh가 쓸 Discord 웹후크 |
+| Key | Type | Masked | 설명 |
+|---|---|---|---|
+| `DISCORD_WEBHOOK_URL` | Variable | ✅ | notify.sh가 쓸 Discord 웹후크 |
 
 > Container Registry 미사용이라 `CI_REGISTRY_*` 관련 변수는 쓰지 않음. 추후 registry 도입 시 GitLab이 자동 주입하는 값을 그대로 사용 가능.
 
@@ -116,7 +116,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 
 ### 3-7. ENV_MASTER_*
 
-위 `ENV_DEV_*` 전부를 **이름만 `MASTER`로** 바꾸고 **값은 운영용으로** 교체. **Masked 키 전체에 Protected ✅** 추가 체크.
+위 `ENV_DEV_*` 전부를 **이름만 `MASTER`로** 바꾸고 **값은 운영용으로** 교체.
 
 주요 값 차이:
 
