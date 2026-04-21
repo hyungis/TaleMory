@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-project-skills.py\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-project-skills.js\"",
             "shell": "bash"
           }
         ]
