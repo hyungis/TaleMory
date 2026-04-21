@@ -1,6 +1,10 @@
 import { Library, PlusCircle } from 'lucide-react'
 import { DUMMY_STORIES, type Story } from '../../../entities/story'
 import { StoryGrid } from '../story-list'
+import { StoryFilter } from '../story-filter'
+import { StorySort } from '../story-sort'
+import { useBookshelf } from '../model/useBookshelf'
+import { BookshelfPagination } from './BookshelfPagination'
 import '../styles/bookshelf.css'
 
 interface BookshelfModalProps {
@@ -17,13 +21,10 @@ interface BookshelfModalProps {
 /**
  * "우리가족 책장" 모달.
  *
- * 현재 (Task 3a) 범위:
- *  - Forest Library 테마 overlay + 모달 껍데기
- *  - 타이틀 + 새 동화책 만들기 버튼 (stub)
- *  - 책 그리드 + 각 row 마다 나무 선반 장식
- *  - 읽기/공유/삭제 버튼은 props 콜백만 호출 (아직 실제 동작 없음)
+ * Task 3a: overlay + 테마 shell + 책 그리드 + 선반 장식
+ * Task 3b: level 필터 (다중) + 정렬 (최신/오래된/가나다) + 페이지네이션 (8/page)
  *
- * Task 3b 에서 필터/정렬/페이지네이션 추가.
+ * 필터/정렬/페이지 상태는 `useBookshelf` 훅으로 캡슐화.
  */
 export function BookshelfModal({
   isOpen,
@@ -32,6 +33,9 @@ export function BookshelfModal({
   onReadStory,
   stories = DUMMY_STORIES,
 }: BookshelfModalProps) {
+  const { paged, filtered, activeFilters, toggleFilter, sort, updateSort, page, setPage, totalPages } =
+    useBookshelf(stories)
+
   if (!isOpen) return null
 
   return (
@@ -63,12 +67,27 @@ export function BookshelfModal({
                 </button>
               </div>
 
-              {/* TODO(S14P31S210-76, Task 3b): 필터/정렬 바 (초급/중급/고급 + 최신순/오래된순/가나다순) */}
+              {/* 필터/정렬 바 */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-[#4a3a24] gap-4 bookshelf-fade-in relative z-20">
+                <StoryFilter
+                  activeFilters={activeFilters}
+                  onToggle={toggleFilter}
+                  totalCount={filtered.length}
+                />
+                <StorySort value={sort} onChange={updateSort} />
+              </div>
 
-              {/* 책 그리드 */}
-              <StoryGrid stories={stories} onRead={onReadStory} />
+              {/* 책 그리드 (현재 페이지만) */}
+              <StoryGrid stories={paged} onRead={onReadStory} />
 
-              {/* TODO(S14P31S210-76, Task 3b): 페이지네이션 (ITEMS_PER_PAGE=8 기준) */}
+              {/* 페이지네이션 (1페이지 초과시만) */}
+              {totalPages > 1 && (
+                <BookshelfPagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                />
+              )}
             </div>
           </main>
         </div>

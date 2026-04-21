@@ -1,0 +1,62 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+
+interface BookshelfPaginationProps {
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
+}
+
+/**
+ * 책장 페이지네이션 컨트롤 (이전 / 페이지 숫자 / 다음).
+ * totalPages <= 1 인 경우 렌더되지 않음 (BookshelfModal 에서 가드).
+ */
+export function BookshelfPagination({ currentPage, totalPages, onPageChange }: BookshelfPaginationProps) {
+  const canPrev = currentPage > 1
+  const canNext = currentPage < totalPages
+
+  return (
+    <div className="flex justify-center items-center gap-2 mt-20 relative z-20">
+      <button
+        type="button"
+        onClick={() => canPrev && onPageChange(currentPage - 1)}
+        disabled={!canPrev}
+        aria-label="이전 페이지"
+        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 transition-colors shadow-sm ${
+          canPrev ? 'hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] cursor-pointer' : 'opacity-40 cursor-not-allowed'
+        }`}
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+        const isCurrent = page === currentPage
+        return (
+          <button
+            key={page}
+            type="button"
+            onClick={() => onPageChange(page)}
+            className={
+              isCurrent
+                ? 'w-10 h-10 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] font-bold shadow-[0_0_14px_rgba(180,220,140,0.4)] border border-[#b4dc8c]/50'
+                : 'w-10 h-10 rounded-full flex items-center justify-center border border-[#4a3a24] bg-[#2a1b12]/70 text-[#d6c78e] hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors cursor-pointer shadow-sm'
+            }
+          >
+            {page}
+          </button>
+        )
+      })}
+
+      <button
+        type="button"
+        onClick={() => canNext && onPageChange(currentPage + 1)}
+        disabled={!canNext}
+        aria-label="다음 페이지"
+        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 transition-colors shadow-sm ${
+          canNext ? 'hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] cursor-pointer' : 'opacity-40 cursor-not-allowed'
+        }`}
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
+    </div>
+  )
+}

@@ -134,6 +134,14 @@
   }
 }
 
+/* ===== 필터 칩 active 상태 ===== */
+.bookshelf-modal .filter-btn.active {
+  background-color: #2d5a27 !important;
+  color: #f0e6c0 !important;
+  border-color: #b4dc8c !important;
+  box-shadow: 0 0 14px rgba(180, 220, 140, 0.35);
+}
+
 /* ===== 나무 텍스처 (선반 상판/앞면) ===== */
 .bookshelf-modal .wood-texture {
   background-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
