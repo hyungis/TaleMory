@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ChildInfo, ProjectData } from './types'
 import { MAX_STEP } from './types'
+import { DEFAULT_STORY_TEXT, DEFAULT_STORYBOARD_PAGES } from '../storyboard-editor/lib/defaults'
 
 const STORAGE_KEY_STEP = 'talemory_draft_step'
 const STORAGE_KEY_DATA = 'talemory_draft_project'
@@ -14,8 +15,8 @@ const DEFAULT_DATA: ProjectData = {
     location: '',
   },
   step2: { photos: [], prompt: '' },
-  step3: { story: '' },
-  step4: { pages: [] },
+  step3: { story: DEFAULT_STORY_TEXT },
+  step4: { pages: DEFAULT_STORYBOARD_PAGES },
   step5: { style: 'watercolor' },
   step6: { voiceModel: null },
 }
@@ -61,6 +62,7 @@ export interface UseStoryCreationFlowResult {
   handlePrev: () => void
   updateStep1: <K extends keyof ProjectData['step1']>(key: K, value: ProjectData['step1'][K]) => void
   updateStep2: <K extends keyof ProjectData['step2']>(key: K, value: ProjectData['step2'][K]) => void
+  updateStoryText: (story: string) => void
   updateChildAt: (index: number, patch: Partial<ChildInfo>) => void
   addChild: () => void
   removeChildAt: (index: number) => void
@@ -108,6 +110,10 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     [],
   )
 
+  const updateStoryText = useCallback((story: string) => {
+    setProjectData(prev => ({ ...prev, step3: { story } }))
+  }, [])
+
   const updateChildAt = useCallback((index: number, patch: Partial<ChildInfo>) => {
     setProjectData(prev => {
       const children = [...prev.step1.children]
@@ -147,6 +153,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     handlePrev,
     updateStep1,
     updateStep2,
+    updateStoryText,
     updateChildAt,
     addChild,
     removeChildAt,

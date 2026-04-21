@@ -11,5 +11,6 @@ export type {
 export { MAX_STEP } from './model/types'
 export { BasicInfoStep } from './basic-info'
 export { PhotoManagerStep } from './photo-manager'
+export { StoryTextStep, StoryboardEditorStep } from './storyboard-editor'
 export { StepHeader } from './ui/StepHeader'
 export { NextButton } from './ui/NextButton'
