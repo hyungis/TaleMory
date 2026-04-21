@@ -81,6 +81,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_BACKEND_RABBITMQ_PORT` | — | `5672` |
 | `ENV_DEV_BACKEND_RABBITMQ_USERNAME` | ✅ | INFRA_RABBITMQ_DEFAULT_USER와 동일값 |
 | `ENV_DEV_BACKEND_RABBITMQ_PASSWORD` | ✅ | INFRA_RABBITMQ_DEFAULT_PASS와 동일값 |
+| `ENV_DEV_BACKEND_JWT_ACCESS_SECRET` | ✅ | JWT access token 서명 키. `openssl rand -base64 48`로 생성 권장 |
+| `ENV_DEV_BACKEND_JWT_REFRESH_SECRET` | ✅ | JWT refresh token 서명 키. access와 **다른 값** 사용 |
 
 ### 3-4. ENV_DEV_FRONTEND_*
 
@@ -127,11 +129,19 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `DB_URL` DB명 | `iportfolio` | (운영 DB명으로 교체 — 팀 결정) |
 | `REDIS_HOST` | `dev-redis` | `prod-redis` |
 | `RABBITMQ_HOST` | `dev-rabbitmq` | `prod-rabbitmq` |
+| `JWT_ACCESS_SECRET` | (dev 전용 값) | (master 전용 값, **절대 dev와 공유 금지**) |
+| `JWT_REFRESH_SECRET` | (dev 전용 값) | (master 전용 값, **access와도 다르게**) |
 | `FRONTEND_PORT` | `3001` | `80` |
 | `MYSQL_PORT` | `3307` | `3306` |
 | `REDIS_PORT` | `6380` | `6379` |
 | `RABBITMQ_PORT` | `5673` | `5672` |
 | `RABBITMQ_MANAGEMENT_PORT` | `15673` | `15672` |
+
+JWT secret 생성 (로컬에서, 4개 전부 각자):
+```bash
+openssl rand -base64 64 | tr -d '\n'
+```
+출력은 대화/채팅/이메일에 붙이지 말고 GitLab Variables에 직접 입력.
 
 ---
 
