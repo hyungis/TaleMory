@@ -15,6 +15,7 @@ This skill currently manages:
 
 - `frontend-storybook-architecture`
 - `structuring-kotlin-ddd-code`
+- `env-sync`
 
 If a new skill appears under `.agents/skills`, read it and ask whether it should be added to managed scope before treating it as a maintained skill.
 
@@ -79,6 +80,7 @@ When asking the user to choose or confirm a skill, show the current managed skil
 Default list:
 - `frontend-storybook-architecture`
 - `structuring-kotlin-ddd-code`
+- `env-sync`
 
 If new skills exist under `.agents/skills`, mention them as additional candidates only after reading their `SKILL.md` and relevant references.
 

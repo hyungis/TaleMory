@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Bash(chmod +x .claude/hooks/load-project-skills.sh)",
+      "Bash(bash .claude/hooks/load-project-skills.sh)",
+      "Bash(echo '{\"session_id\":\"test1\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\Users\\\\\\\\SSAFY\\\\\\\\gibeom\\\\\\\\S210\\\\\\\\S14P31S210\\\\\\\\app\\\\\\\\frontend\\\\\\\\src\\\\\\\\App.tsx\"}}')",
+      "Bash(echo \"exit=$?\")",
+      "Bash(python .claude/hooks/load-project-skills.py)",
+      "Bash(echo '{\"session_id\":\"test2\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\Users\\\\\\\\SSAFY\\\\\\\\gibeom\\\\\\\\S210\\\\\\\\S14P31S210\\\\\\\\app\\\\\\\\frontend\\\\\\\\src\\\\\\\\App.tsx\"}}')",
+      "Bash(python -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('path=',repr\\(p['tool_input']['file_path']\\)\\)\")",
+      "Bash(echo '{\"session_id\":\"test2\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\SSAFY\\\\\\\\\\\\\\\\gibeom\\\\\\\\\\\\\\\\S210\\\\\\\\\\\\\\\\S14P31S210\\\\\\\\\\\\\\\\app\\\\\\\\\\\\\\\\frontend\\\\\\\\\\\\\\\\src\\\\\\\\\\\\\\\\App.tsx\"}}')",
+      "Bash(python *)",
+      "Bash(echo \"---EXIT=$?---\")"
+    ]
+  }
+}
