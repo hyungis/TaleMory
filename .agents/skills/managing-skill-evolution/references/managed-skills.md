@@ -5,7 +5,14 @@
 These skills are currently under active maintenance:
 
 - `frontend-storybook-architecture`
+  - path: `.agents/skills/frontend-storybook-architecture/SKILL.md`
+  - history: `docs/skill-history/frontend-storybook-architecture.md`
 - `structuring-kotlin-ddd-code`
+  - path: `.agents/skills/structuring-kotlin-ddd-code/SKILL.md`
+  - history: `docs/skill-history/structuring-kotlin-ddd-code.md`
+- `env-sync`
+  - path: `.agents/skills/env-sync/SKILL.md`
+  - history: `docs/skill-history/env-sync.md`
 
 ## Scope Rule
 

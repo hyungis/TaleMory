@@ -1,0 +1,145 @@
+# S210 CI/CD — project runner + shell executor 전제.
+# 전체 흐름/규칙은 docs/ci-cd-pipeline-flow.md 참고.
+
+stages:
+  - generate_env
+  - build
+  - deploy
+  - infra_manual      # manual
+  - .post             # notify
+
+variables:
+  APP_IMAGE_TAG: $CI_COMMIT_SHORT_SHA   # 덮어쓰기 없는 immutable 태그
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - when: never
+
+default:
+  tags:
+    - s210-runner       # ← 배포 서버의 project runner tag로 교체
+
+.docker_login:
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+# ─── generate_env ─────────────────────────────────────────────
+generate_env_dev:
+  stage: generate_env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+  script:
+    - bash infra/scripts/generate-env.sh dev
+
+generate_env_master:
+  stage: generate_env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  script:
+    - bash infra/scripts/generate-env.sh master
+
+# ─── build (3개 병렬) ─────────────────────────────────────────
+build_frontend:
+  extends: .docker_login
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - bash infra/scripts/build-frontend.sh
+
+build_backend:
+  extends: .docker_login
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - bash infra/scripts/build-backend.sh
+
+build_ai:
+  extends: .docker_login
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - bash infra/scripts/build-ai.sh
+
+# ─── deploy ───────────────────────────────────────────────────
+deploy_dev:
+  extends: .docker_login
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+  needs:
+    - generate_env_dev
+    - build_frontend
+    - build_backend
+    - build_ai
+  script:
+    - bash infra/scripts/deploy-dev.sh all
+
+deploy_master:
+  extends: .docker_login
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual       # master는 승인 후 배포
+  needs:
+    - generate_env_master
+    - build_frontend
+    - build_backend
+    - build_ai
+  script:
+    - bash infra/scripts/deploy-master.sh all
+
+# ─── manual: infra 스택(MySQL/Redis/RabbitMQ) ─────────────────
+deploy_infra_dev:
+  stage: infra_manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - infra/compose/docker-compose.infra-dev.yml
+        - infra/scripts/deploy-infra-dev.sh
+        - infra/scripts/common.sh
+        - infra/env/infra.dev.env.example
+      when: manual
+    - when: never
+  needs: []
+  script:
+    - bash infra/scripts/generate-env.sh dev
+    - bash infra/scripts/deploy-infra-dev.sh
+
+deploy_infra_master:
+  stage: infra_manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - infra/compose/docker-compose.infra-master.yml
+        - infra/scripts/deploy-infra-master.sh
+        - infra/scripts/common.sh
+        - infra/env/infra.master.env.example
+      when: manual
+    - when: never
+  needs: []
+  script:
+    - bash infra/scripts/generate-env.sh master
+    - bash infra/scripts/deploy-infra-master.sh
+
+# ─── .post: Discord 알림 ──────────────────────────────────────
+# jq 필요. 서버에 `sudo apt install -y jq` 한 번 실행해두기.
+notify_success:
+  stage: .post
+  when: on_success
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - CI_JOB_STATUS=success bash infra/scripts/notify.sh
+
+notify_failure:
+  stage: .post
+  when: on_failure
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - CI_JOB_STATUS=failed bash infra/scripts/notify.sh
