@@ -35,6 +35,10 @@ Thumbs.db
 .claude/worktrees/
 **/.claude/worktrees/
 
+# Claude Code per-developer overrides (permissions/allowlist은 개인별)
+.claude/settings.local.json
+**/.claude/settings.local.json
+
 # Python local artifacts
 **/.venv/
 **/__pycache__/
