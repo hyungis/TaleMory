@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: ${REGISTRY:+${REGISTRY}/}${PROJECT_NAME:-s210}-frontend:${APP_IMAGE_TAG:-latest}
+    image: ${PROJECT_NAME:-s210}-frontend:${APP_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/frontend.Dockerfile
@@ -23,7 +23,7 @@ services:
       - dev-infra-net
 
   backend:
-    image: ${REGISTRY:+${REGISTRY}/}${PROJECT_NAME:-s210}-backend:${APP_IMAGE_TAG:-latest}
+    image: ${PROJECT_NAME:-s210}-backend:${APP_IMAGE_TAG:-latest}
     build:
       context: ../../app/backend
       dockerfile: Dockerfile
@@ -38,7 +38,7 @@ services:
       - dev-infra-net
 
   ai:
-    image: ${REGISTRY:+${REGISTRY}/}${PROJECT_NAME:-s210}-ai:${APP_IMAGE_TAG:-latest}
+    image: ${PROJECT_NAME:-s210}-ai:${APP_IMAGE_TAG:-latest}
     build:
       context: ../../app/ai
       dockerfile: Dockerfile

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Frontend(=nginx 이미지) 빌드 + registry push.
-# multi-stage Dockerfile이라 React 빌드가 이미지 빌드 과정 안에서 일어남.
+# Frontend(=nginx 이미지) 로컬 빌드.
+# multi-stage Dockerfile: React 빌드 → nginx 이미지에 dist 복사.
+# 배포 서버 docker daemon에 태그만 남김(registry 미사용).
 
 set -euo pipefail
 
@@ -16,5 +17,4 @@ docker build \
   -t "$IMG" \
   .
 
-docker push "$IMG"
-echo "pushed: $IMG"
+echo "built: $IMG"

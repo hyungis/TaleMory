@@ -60,7 +60,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 |---|---|---|---|---|
 | `DISCORD_WEBHOOK_URL` | Variable | ✅ | 선택 | notify.sh가 쓸 Discord 웹후크 |
 
-`CI_REGISTRY_USER`, `CI_REGISTRY_PASSWORD`, `CI_REGISTRY` 등은 GitLab이 자동 주입 — 등록 불필요.
+> Container Registry 미사용이라 `CI_REGISTRY_*` 관련 변수는 쓰지 않음. 추후 registry 도입 시 GitLab이 자동 주입하는 값을 그대로 사용 가능.
 
 ### 3-2. ENV_BASE_* (dev/master 공통)
 

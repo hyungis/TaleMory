@@ -39,8 +39,7 @@ resolve_services() {
 }
 
 for svc in $(resolve_services); do
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT" \
-    pull "$svc" || true
+  # build 단계에서 이미 로컬 docker daemon에 s210-<svc>:<tag> 태그가 있음.
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT" \
     up -d --no-build "$svc"
 done

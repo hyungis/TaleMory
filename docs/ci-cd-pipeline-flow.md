@@ -146,6 +146,18 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
 │                    │   │   generate_env     │   │   generate_env     │
 │                    │   │         │          │   │         │          │
 │   (파이프라인 없음)│   │         ▼          │   │         ▼          │
+│                    │   │ deploy_infra_*     │   │ deploy_infra_*     │
+│                    │   │ (infra 파일 변경   │   │ (infra 파일 변경   │
+│                    │   │  시 auto, 아니면   │   │  시 auto, 아니면   │
+│                    │   │  manual-optional)  │   │  manual-optional)  │
+│                    │   │         │          │   │         │          │
+│                    │   │         ▼          │   │         ▼          │
+│                    │   │  verify_infra_*    │   │  verify_infra_*    │
+│                    │   │ (mysql/redis/mq    │   │ (mysql/redis/mq    │
+│                    │   │  실접속 + creds    │   │  실접속 + creds    │
+│                    │   │  정렬 검증)        │   │  정렬 검증)        │
+│                    │   │         │          │   │         │          │
+│                    │   │         ▼          │   │         ▼          │
 │                    │   │   build_frontend   │   │   build_frontend   │
 │                    │   │   build_backend    │   │   build_backend    │
 │                    │   │   build_ai         │   │   build_ai         │
@@ -153,7 +165,7 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
 │                    │   │   deploy_dev       │   │   deploy_master    │
-│                    │   │   (pull + up)      │   │   (manual 승인)    │
+│                    │   │   (local up)       │   │   (manual 승인)    │
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
 │                    │   │   health_check     │   │   health_check     │
@@ -186,13 +198,14 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
 
 ## 8. Build stage 상세 — 서비스별 이미지 태깅
 
+SSAFY GitLab은 Container Registry가 비활성이라 **push 없이 project runner(=배포 서버)의 docker daemon에 직접 태그만 생성**. 추후 registry 도입 시 `image_ref`에 prefix 붙이고 build/deploy 스크립트에 push/pull 한 줄씩 추가하면 확장됨.
+
 ```
  ┌──── build_frontend ───────────────────────────────────────┐
  │  bash infra/scripts/build-frontend.sh                     │
  │  docker build                                             │
  │    -f infra/docker/frontend.Dockerfile                    │
- │    -t $REGISTRY/s210-frontend:$CI_COMMIT_SHORT_SHA .      │
- │  docker push ...                                          │
+ │    -t s210-frontend:$CI_COMMIT_SHORT_SHA .                │
  │    Stage 1: node:24-alpine → pnpm build (dist)            │
  │    Stage 2: nginx:1.29-alpine ← dist 복사                 │
  └───────────────────────────────────────────────────────────┘
@@ -201,24 +214,22 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
  │  bash infra/scripts/build-backend.sh                      │
  │  docker build                                             │
  │    -f app/backend/Dockerfile                              │
- │    -t $REGISTRY/s210-backend:$CI_COMMIT_SHORT_SHA         │
+ │    -t s210-backend:$CI_COMMIT_SHORT_SHA                   │
  │    app/backend                                            │
- │  docker push ...                                          │
  └───────────────────────────────────────────────────────────┘
 
  ┌──── build_ai ─────────────────────────────────────────────┐
  │  bash infra/scripts/build-ai.sh                           │
  │  docker build                                             │
  │    -f app/ai/Dockerfile                                   │
- │    -t $REGISTRY/s210-ai:$CI_COMMIT_SHORT_SHA              │
+ │    -t s210-ai:$CI_COMMIT_SHORT_SHA                        │
  │    app/ai                                                 │
- │  docker push ...                                          │
  └───────────────────────────────────────────────────────────┘
 
-                              │  push
+                              │  local tag
                               ▼
           ┌────────────────────────────────────────────┐
-          │   GitLab Container Registry                │
+          │   배포 서버 docker daemon (유일 저장소)    │
           │                                            │
           │   s210-frontend:a1b2c3d   ← 최신           │
           │   s210-frontend:9f8e7d6                    │
@@ -227,8 +238,8 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
           │   s210-ai:a1b2c3d                          │
           │   s210-ai:9f8e7d6                          │
           │                                            │
-          │   (cleanup policy: "최근 N개 유지" 권장.   │
-          │    긴급 복구용 과거 태그 여유 확보)        │
+          │   (docker image prune cron으로 정리.       │
+          │    긴급 복구용 최근 20개 이상 보존 권장)   │
           └────────────────────────────────────────────┘
 ```
 
@@ -300,10 +311,10 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
      │
      ▼
  export APP_IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+ # build 단계에서 로컬 daemon에 이미 s210-<svc>:<tag> 태그 존재
  docker compose --env-file /tmp/env/app.<env>.env \
                 -f infra/compose/docker-compose.app-<env>.yml \
-                pull
- docker compose ... up -d --no-build
+                up -d --no-build
      │
      ▼
  health-check-<env>.sh all                 (/, /api/health, /ai/health)
@@ -378,17 +389,15 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
 [개발자 PC]        [GitLab]                    [배포 서버 = project runner]
                                              ┌──────────────────────────┐
   git push ──►  ┌──────────┐   trigger       │  GitLab Runner            │
-   (feature,    │  Repo    │ ──────────────► │   bash scripts (jq,       │
-    fix,        └──────────┘                 │    docker, curl 사용)     │
-    dev,             │                       └────────────┬──────────────┘
-    master)          ▼                                    │
-            ┌────────────────┐ ◄───push──────────push─────┤
-            │  Container     │                            │
-            │  Registry      │ ◄───pull───────────────────┤
-            │  (s210-*)      │                            │
-            └────────────────┘                            ▼
-                                              ┌──────────────────────────┐
-                                              │  Docker Engine            │
+   (feature,    │  Repo    │ ──────────────► │   bash scripts             │
+    fix,        └──────────┘                 │   (docker, curl, jq 사용) │
+    dev,                                     │           │                │
+    master)                                  │           ▼ build          │
+                                             │  Docker daemon (local tag) │
+  (Container Registry 미사용 —               │           │                │
+   이미지는 이 서버에만 존재)                │           ▼ up             │
+                                             ├──────────────────────────┤
+                                             │  Docker Engine            │
                                               │   dev-nginx               │
                                               │   dev-backend             │
                                               │   dev-ai                  │
@@ -482,7 +491,7 @@ MR 내용을 한 문장으로 요약해주세요.
 
 ```
 feature/*, fix/*   : CI 없음 (push/MR 시 조용)
-dev                : merge → build(3개 병렬, 각자 push) → deploy → health
+dev                : merge → generate_env → (deploy_infra 조건부) → verify_infra → build(3개 병렬) → deploy → health
                       └ 성공 → Discord 초록
                       └ 실패 → Discord 빨강 + 로그 (자동 rollback 없음, 팀 수동 복구)
 
@@ -498,7 +507,7 @@ infra-common       : 수동 관리 (deploy-infra-<env>.sh)
 
 1. **이미지 태그는 `$CI_COMMIT_SHORT_SHA`** — `latest` 금지. 덮어쓰기 없음.
 2. **자동 rollback 없음** — deploy 실패는 pipeline fail로 표면화. 팀이 원인 수정 후 재배포.
-3. **긴급 복구 경로** — GitLab pipeline 재실행 시 `APP_IMAGE_TAG=<prev_sha>` 변수 override → 이전 태그 이미지로 재배포. registry에 이전 이미지가 유지돼야 가능 (cleanup policy는 최근 N개 보존 권장).
+3. **긴급 복구 경로** — GitLab pipeline 재실행 시 `APP_IMAGE_TAG=<prev_sha>` 변수 override → 이전 태그 이미지로 재배포. 배포 서버 docker daemon에 이전 SHA 이미지가 남아 있어야 가능 (`docker image prune` 너무 공격적으로 잡지 말 것, 최근 20개 이상 권장).
 
 ### 환경변수 원칙
 

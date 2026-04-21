@@ -3,9 +3,10 @@
 
 stages:
   - generate_env
+  - infra_deploy      # infra 파일 변경 시 auto, 아니면 manual-optional
+  - verify            # infra 접속/creds 검증 (build 앞)
   - build
   - deploy
-  - infra_manual      # manual
   - .post             # notify
 
 variables:
@@ -21,9 +22,8 @@ default:
   tags:
     - s210-runner       # ← 배포 서버의 project runner tag로 교체
 
-.docker_login:
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+# Registry 미사용(SSAFY GitLab에 Container Registry 비활성) — 로컬 빌드된 이미지를
+# daemon에서 바로 compose가 씀. docker login 불필요.
 
 # ─── generate_env ─────────────────────────────────────────────
 generate_env_dev:
@@ -40,39 +40,123 @@ generate_env_master:
   script:
     - bash infra/scripts/generate-env.sh master
 
-# ─── build (3개 병렬) ─────────────────────────────────────────
+# ─── infra 배포 (조건부) ──────────────────────────────────────
+# infra 파일이 바뀌면 자동 실행 (첫 배포/인프라 변경 시 자동 대응).
+# 안 바뀌어도 manual 버튼은 상시 노출 — bootstrap, creds rotate, 재부팅 후 수동 복구용.
+# 후자 케이스는 allow_failure:true로 blocking 하지 않음.
+deploy_infra_dev:
+  stage: infra_deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - infra/compose/docker-compose.infra-dev.yml
+        - infra/scripts/deploy-infra-dev.sh
+        - infra/scripts/common.sh
+        - infra/scripts/health-check-infra.sh
+        - infra/env/infra.dev.env.example
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      when: manual
+      allow_failure: true
+    - when: never
+  needs:
+    - generate_env_dev
+  script:
+    - bash infra/scripts/deploy-infra-dev.sh
+    - bash infra/scripts/health-check-infra.sh dev
+
+deploy_infra_master:
+  stage: infra_deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - infra/compose/docker-compose.infra-master.yml
+        - infra/scripts/deploy-infra-master.sh
+        - infra/scripts/common.sh
+        - infra/scripts/health-check-infra.sh
+        - infra/env/infra.master.env.example
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
+      allow_failure: true
+    - when: never
+  needs:
+    - generate_env_master
+  script:
+    - bash infra/scripts/deploy-infra-master.sh
+    - bash infra/scripts/health-check-infra.sh master
+
+# ─── verify infra 연결 (build 앞에서 사전 검증) ───────────────
+# mysql/redis/rabbitmq 실 접속 + GitLab Variables 정렬 검증.
+# deploy_infra_<env>가 pipeline에 있으면 그 뒤에 실행 (needs:optional).
+# 없거나 skip되면 현재 running 상태 그대로 검증.
+verify_infra_dev:
+  stage: verify
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+  needs:
+    - generate_env_dev
+    - job: deploy_infra_dev
+      optional: true
+  script:
+    - bash infra/scripts/health-check-infra.sh dev
+
+verify_infra_master:
+  stage: verify
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  needs:
+    - generate_env_master
+    - job: deploy_infra_master
+      optional: true
+  script:
+    - bash infra/scripts/health-check-infra.sh master
+
+# ─── build (3개 병렬, verify 통과 후) ─────────────────────────
 build_frontend:
-  extends: .docker_login
   stage: build
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      needs:
+        - verify_infra_dev
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      needs:
+        - verify_infra_master
   script:
     - bash infra/scripts/build-frontend.sh
 
 build_backend:
-  extends: .docker_login
   stage: build
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      needs:
+        - verify_infra_dev
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      needs:
+        - verify_infra_master
   script:
     - bash infra/scripts/build-backend.sh
 
 build_ai:
-  extends: .docker_login
   stage: build
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      needs:
+        - verify_infra_dev
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      needs:
+        - verify_infra_master
   script:
     - bash infra/scripts/build-ai.sh
 
 # ─── deploy ───────────────────────────────────────────────────
 deploy_dev:
-  extends: .docker_login
   stage: deploy
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
   needs:
     - generate_env_dev
+    - verify_infra_dev
     - build_frontend
     - build_backend
     - build_ai
@@ -80,51 +164,18 @@ deploy_dev:
     - bash infra/scripts/deploy-dev.sh all
 
 deploy_master:
-  extends: .docker_login
   stage: deploy
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: manual       # master는 승인 후 배포
   needs:
     - generate_env_master
+    - verify_infra_master
     - build_frontend
     - build_backend
     - build_ai
   script:
     - bash infra/scripts/deploy-master.sh all
-
-# ─── manual: infra 스택(MySQL/Redis/RabbitMQ) ─────────────────
-deploy_infra_dev:
-  stage: infra_manual
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - infra/compose/docker-compose.infra-dev.yml
-        - infra/scripts/deploy-infra-dev.sh
-        - infra/scripts/common.sh
-        - infra/env/infra.dev.env.example
-      when: manual
-    - when: never
-  needs: []
-  script:
-    - bash infra/scripts/generate-env.sh dev
-    - bash infra/scripts/deploy-infra-dev.sh
-
-deploy_infra_master:
-  stage: infra_manual
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      changes:
-        - infra/compose/docker-compose.infra-master.yml
-        - infra/scripts/deploy-infra-master.sh
-        - infra/scripts/common.sh
-        - infra/env/infra.master.env.example
-      when: manual
-    - when: never
-  needs: []
-  script:
-    - bash infra/scripts/generate-env.sh master
-    - bash infra/scripts/deploy-infra-master.sh
 
 # ─── .post: Discord 알림 ──────────────────────────────────────
 # jq 필요. 서버에 `sudo apt install -y jq` 한 번 실행해두기.
@@ -143,3 +194,28 @@ notify_failure:
     - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "master"'
   script:
     - CI_JOB_STATUS=failed bash infra/scripts/notify.sh
+
+# ─── .post: 이미지 정리 (notify 이후, 성공 pipeline만) ──────────
+# 실패 pipeline에서는 실행되지 않아 디버깅용 이미지/상태 보존.
+# s210-* prefix만 대상 — healthcheck용 public 이미지 캐시는 건드리지 않음.
+cleanup_dev:
+  stage: .post
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      when: on_success
+    - when: never
+  needs:
+    - notify_success
+  script:
+    - bash infra/scripts/cleanup-images.sh
+
+cleanup_master:
+  stage: .post
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - when: never
+  needs:
+    - notify_success
+  script:
+    - bash infra/scripts/cleanup-images.sh
