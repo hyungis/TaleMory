@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { AuthModal, useAuthModal } from '../../features/auth'
 import { ButterflySwarm } from './ui/ButterflySwarm'
 import { useButterflyAnim } from './model/useButterflyAnim'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
@@ -7,24 +8,28 @@ import './styles/landing.css'
 /**
  * TaleMory 랜딩 페이지.
  *
- * - 배경 영상 + TaleMory 타이틀 + "시작하기" 버튼
- * - 버튼 클릭 시 나비 떼 확산 + 원형 디졸브 exit 애니메이션
- *
- * 현재 subtask(S14P31S210-75) 는 랜딩 UI 만 이관.
- * Auth 모달 연동은 다음 커밋(step 5) 에서 HomePage 내부로 주입.
- * 그때 `handleStart` 는 먼저 AuthModal 을 열고, 로그인 성공 콜백에서 `setIsExiting(true)` 를 호출하도록 변경.
+ * 플로우:
+ * 1. 배경 영상 + TaleMory 타이틀 + "시작하기" 버튼
+ * 2. 시작하기 클릭 → `AuthModal` open (login/register 탭)
+ * 3. 로그인 성공 → 모달 닫힘 + 나비 떼 확산 + 원형 디졸브 exit 애니메이션
+ * 4. TODO(S14P31S210-76): exit 완료 후 다음 뷰(숲+집 main scene) 로 전환 — 라우터/layout 은 step 6.
  */
 export function HomePage() {
   const [isExiting, setIsExiting] = useState(false)
   const butterflyAnim = useButterflyAnim()
   const particles = useMemo(() => generateSwarmParticles(), [])
+  const auth = useAuthModal('login')
 
   const handleStart = useCallback(() => {
     if (isExiting) return
-    // TODO(S14P31S210-75, step 5): Auth 모달 열기 → 로그인 성공 시 setIsExiting(true)
-    // 현재는 exit 애니메이션 단독 검증용으로 즉시 재생.
+    auth.open('login')
+  }, [isExiting, auth])
+
+  const handleAuthSuccess = useCallback(() => {
+    auth.close()
     setIsExiting(true)
-  }, [isExiting])
+    // TODO(S14P31S210-76): setTimeout(() => navigate('/main'), 4100) — 라우터 도입 후.
+  }, [auth])
 
   return (
     <>
@@ -53,6 +58,14 @@ export function HomePage() {
           </button>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={auth.isOpen}
+        mode={auth.mode}
+        onClose={auth.close}
+        onSwitchMode={auth.switchMode}
+        onSuccess={handleAuthSuccess}
+      />
 
       {isExiting && <ButterflySwarm animationData={butterflyAnim} particles={particles} />}
     </>
