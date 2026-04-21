@@ -1,5 +1,7 @@
 package com.s210.backend.domain.auth.application
 
+import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.exception.ErrorCode
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.dto.AuthResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
@@ -8,6 +10,7 @@ import com.s210.backend.common.entity.TokenInfo
 import com.s210.backend.common.jwt.JwtTokenProvider
 import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
+import com.s210.backend.domain.auth.presentation.response.AuthResponse
 import com.s210.backend.domain.user.entity.User
 import jakarta.transaction.Transactional
 import org.springframework.security.authentication.AuthenticationManager
@@ -30,18 +33,10 @@ class MemberService(
     fun signUp(command: SignupCommand): ApiResponse<Unit> {
         // ID 중복 검사
         if (memberRepository.existsByLoginId(command.loginId)) {
-            return ApiResponse(
-                success = false,
-                data = null,
-                message = "이미 등록된 id 입니다.",
-            )
+            throw BusinessException(ErrorCode.DUPLICATE_LOGIN_ID)
         }
         if (memberRepository.existsByEmail(command.email)) {
-            return ApiResponse(
-                success = false,
-                data = null,
-                message = "이미 등록된 이메일 입니다.",
-            )
+            throw BusinessException(ErrorCode.DUPLICATE_EMAIL)
         }
 
         val id = memberRepository.save(
@@ -75,11 +70,12 @@ class MemberService(
 
         refreshTokenInfoRepositoryRedis.save(command.loginId, tokenInfo.refreshToken)
 
-        val user = memberRepository.findByLoginId(command.loginId) ?:throw RuntimeException("사용자를 찾을 수 없습니다")
+        val user = memberRepository.findByLoginId(command.loginId) ?:
+        throw BusinessException(ErrorCode.USER_NOT_FOUND)
 
 
         return AuthResult(tokenInfo.grantType, tokenInfo.accessToken, tokenInfo.refreshToken, user)
-    }
+    }//컨트롤 어드바이스로
 
     /**
      * 유저의 모든 Refresh 토큰 삭제
@@ -91,10 +87,10 @@ class MemberService(
     /**
      * Refresh 토큰 검증 후 토큰 재발급
      */
-    fun validateRefreshTokenAndCreateToken(refreshToken: String): String {
+    fun validateRefreshTokenAndCreateToken(refreshToken: String): ApiResponse<AuthResponse> {
         // Redis에 refreshToken 유효 여부 확인
         refreshTokenInfoRepositoryRedis.findByRefreshToken(refreshToken)
-            ?: throw IllegalArgumentException("만료되거나 찾을 수 없는 Refresh 토큰입니다. 재로그인이 필요합니다.")
+            ?: throw BusinessException(ErrorCode.INVALID_REFRESH_TOKEN)
 
         // 새로운 accessToken, refreshToken 발급
         val newTokenInfo: TokenInfo = jwtTokenProvider.validateRefreshTokenAndCreateToken(refreshToken)
@@ -104,7 +100,10 @@ class MemberService(
 
         // 새로운 refreshToken Redis에 추가
         refreshTokenInfoRepositoryRedis.save(newTokenInfo.userId, newTokenInfo.refreshToken)
-
-        return newTokenInfo.accessToken
+        return ApiResponse(
+            success = true,
+            data = null,
+            message = newTokenInfo.accessToken,
+        )
     }
 }

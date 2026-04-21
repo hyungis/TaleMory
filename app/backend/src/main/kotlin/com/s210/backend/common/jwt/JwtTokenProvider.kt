@@ -1,7 +1,9 @@
 package com.s210.backend.common.jwt
 
-import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.exception.ErrorCode
 import com.s210.backend.common.entity.TokenInfo
+import com.s210.backend.domain.auth.entity.CustomUser
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Jwts
@@ -16,10 +18,11 @@ import org.springframework.security.core.Authentication
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.stereotype.Component
+import java.security.Key
 import java.util.Date
 
-const val ACCESS_EXPIRATION_MILLISECONDS: Long = 1000L * 60 * 30 // 1시간
-const val REFRESH_EXPIRATION_MILLISECONDS: Long = 1000L * 60 * 60 * 24 * 30 // 30일
+const val ACCESS_EXPIRATION_MILLISECONDS: Long = 1000L * 60 * 30
+const val REFRESH_EXPIRATION_MILLISECONDS: Long = 1000L * 60 * 60 * 24 * 30
 
 @Component
 class JwtTokenProvider {
@@ -32,115 +35,115 @@ class JwtTokenProvider {
     private val accessKey by lazy { Keys.hmacShaKeyFor(Decoders.BASE64.decode(accessSecretKey)) }
     private val refreshKey by lazy { Keys.hmacShaKeyFor(Decoders.BASE64.decode(refreshSecretKey)) }
 
-    /**
-     * Token 생성
-     */
     fun createToken(authentication: Authentication): TokenInfo {
-        val authorities = authentication.authorities
-            .mapNotNull { it.authority }
-            .joinToString(",")
+        val subject = authentication.name
+        val authorities = authentication.authorities.toAuthorityString()
 
-        val now = Date()
-        val accessExpiration = Date(now.time + ACCESS_EXPIRATION_MILLISECONDS)
-        val refreshExpiration = Date(now.time + REFRESH_EXPIRATION_MILLISECONDS)
+        val accessToken = createJwt(
+            signingKey = accessKey,
+            subject = subject,
+            authorities = authorities,
+            expirationMillis = ACCESS_EXPIRATION_MILLISECONDS,
+        )
 
-        // Access Token
-        val accessToken = Jwts
-            .builder()
-            .setSubject(authentication.name) // 토큰 제목
-            .claim("auth", authorities) // 권한
-            .setIssuedAt(now) // 토큰 발급시간
-            .setExpiration(accessExpiration) // 토큰 만료시간
-            .signWith(accessKey, SignatureAlgorithm.HS256) // 키, 알고리즘
-            .compact()
+        val refreshToken = createJwt(
+            signingKey = refreshKey,
+            subject = subject,
+            authorities = authorities,
+            expirationMillis = REFRESH_EXPIRATION_MILLISECONDS,
+        )
 
-        // Refresh Token
-        val refreshToken = Jwts
-            .builder()
-            .setSubject(authentication.name)
-            .claim("auth", authorities)
-            .setIssuedAt(now)
-            .setExpiration(refreshExpiration)
-            .signWith(refreshKey, SignatureAlgorithm.HS256)
-            .compact()
-
-        return TokenInfo(authentication.name, "Bearer", accessToken, refreshToken)
+        return TokenInfo(subject, "Bearer", accessToken, refreshToken)
     }
 
-    /**
-     * Token 정보 추출
-     */
-    fun getAuthentication(token: String): Authentication {
-        val claims: Claims = getAccessTokenClaims(token)
-        val auth = claims["auth"] ?: throw RuntimeException("잘못된 토큰입니다.")
+    fun validateRefreshTokenAndCreateToken(refreshToken: String): TokenInfo {
+        val refreshClaims = try {
+            getRefreshTokenClaims(refreshToken)
+        } catch (e: Exception) {
+            throw BusinessException(ErrorCode.INVALID_REFRESH_TOKEN)
+        }
 
-        // 권한 정보 추출
-        val authorities: Collection<GrantedAuthority> = (auth as String)
+        val subject = refreshClaims.subject
+        val authorities = refreshClaims["auth"] as? String
+            ?: throw BusinessException(ErrorCode.INVALID_REFRESH_TOKEN)
+
+        val newAccessToken = createJwt(
+            signingKey = accessKey,
+            subject = subject,
+            authorities = authorities,
+            expirationMillis = ACCESS_EXPIRATION_MILLISECONDS,
+        )
+
+        val newRefreshToken = createJwt(
+            signingKey = refreshKey,
+            subject = subject,
+            authorities = authorities,
+            expirationMillis = REFRESH_EXPIRATION_MILLISECONDS,
+        )
+
+        return TokenInfo(subject, "Bearer", newAccessToken, newRefreshToken)
+    }
+
+    fun getAuthentication(token: String): Authentication {
+        val claims = getAccessTokenClaims(token)
+        val auth = claims["auth"] as? String
+            ?: throw BusinessException(ErrorCode.INVALID_ACCESS_TOKEN)
+
+        val authorities: Collection<GrantedAuthority> = auth
             .split(",")
+            .filter { it.isNotBlank() }
             .map { SimpleGrantedAuthority(it) }
 
         val principal = CustomUser(claims.subject, "", authorities)
         return UsernamePasswordAuthenticationToken(principal, "", authorities)
     }
 
-    fun validateRefreshTokenAndCreateToken(refreshToken: String): TokenInfo {
-        try {
-            val refreshClaims: Claims = getRefreshTokenClaims(refreshToken)
-            val now = Date()
-
-            // 새로운 access 토큰 발급
-            val newAccessToken: String = Jwts
-                .builder()
-                .setSubject(refreshClaims.subject)
-                .claim("auth", refreshClaims["auth"])
-                .setIssuedAt(now)
-                .setExpiration(Date(now.time + ACCESS_EXPIRATION_MILLISECONDS))
-                .signWith(accessKey, SignatureAlgorithm.HS256)
-                .compact()
-
-            // 새로운 refresh 토큰 발급
-            val newRefreshToken: String = Jwts
-                .builder()
-                .setSubject(refreshClaims.subject)
-                .claim("auth", refreshClaims["auth"])
-                .setIssuedAt(now)
-                .setExpiration(Date(now.time + REFRESH_EXPIRATION_MILLISECONDS))
-                .signWith(refreshKey, SignatureAlgorithm.HS256)
-                .compact()
-
-            return TokenInfo(refreshClaims.subject, "Bearer", newAccessToken, newRefreshToken)
-        } catch (e: Exception) {
-            throw e
-        }
-    }
-
-    fun validateAccessTokenForFilter(token: String): Boolean {
+    fun validateAccessTokenForFilter(token: String) {
         try {
             getAccessTokenClaims(token)
-            return true
         } catch (e: Exception) {
             when (e) {
-                is SecurityException -> {}  // Invalid JWT Token
-                is MalformedJwtException -> {}  // Invalid JWT Token
-                is ExpiredJwtException -> {}    // Expired JWT Token
-                is UnsupportedJwtException -> {}    // Unsupported JWT Token
-                is IllegalArgumentException -> {}   // JWT claims string is empty
-                else -> {}  // else
+                is SecurityException -> throw BusinessException(ErrorCode.INVALID_ACCESS_TOKEN)
+                is MalformedJwtException -> throw BusinessException(ErrorCode.MALFORMED_ACCESS_TOKEN)
+                is ExpiredJwtException -> throw BusinessException(ErrorCode.EXPIRED_ACCESS_TOKEN)
+                is UnsupportedJwtException -> throw BusinessException(ErrorCode.UNSUPPORTED_ACCESS_TOKEN)
+                is IllegalArgumentException -> throw BusinessException(ErrorCode.EMPTY_ACCESS_TOKEN)
+                else -> throw BusinessException(ErrorCode.INTERNAL_SERVER_ERROR)
             }
-            throw e
         }
     }
 
+    private fun createJwt(
+        signingKey: Key,
+        subject: String,
+        authorities: String,
+        expirationMillis: Long,
+    ): String {
+        val now = Date()
+        val expiration = Date(now.time + expirationMillis)
+
+        return Jwts.builder()
+            .setSubject(subject)
+            .claim("auth", authorities)
+            .setIssuedAt(now)
+            .setExpiration(expiration)
+            .signWith(signingKey, SignatureAlgorithm.HS256)
+            .compact()
+    }
+
+    private fun Collection<GrantedAuthority>.toAuthorityString(): String =
+        mapNotNull { it.authority }
+            .joinToString(",")
+
     private fun getAccessTokenClaims(token: String): Claims =
-        Jwts.parserBuilder()
-            .setSigningKey(accessKey)
-            .build()
-            .parseClaimsJws(token)
-            .body
+        parseClaims(token, accessKey)
 
     private fun getRefreshTokenClaims(token: String): Claims =
+        parseClaims(token, refreshKey)
+
+    private fun parseClaims(token: String, signingKey: Key): Claims =
         Jwts.parserBuilder()
-            .setSigningKey(refreshKey)
+            .setSigningKey(signingKey)
             .build()
             .parseClaimsJws(token)
             .body

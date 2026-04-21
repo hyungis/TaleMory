@@ -29,30 +29,14 @@ class AuthController(
     fun authSignup(@RequestBody request: SignupRequest): ResponseEntity<ApiResponse<Unit>> {
 
         return ResponseEntity.ok(
-            memberService.signUp(
-                    SignupCommand(
-                        loginId = request.loginId,
-                        password = request.password,
-                        email = request.email,
-                        name = request.name,
-                        nickname = request.nickname,
-                        phone = request.phone,
-                        agreeSms = request.agreeSms,
-                        agreeMarketing = request.agreeMarketing,
-                    )
-                )
+            memberService.signUp(request.toCommand())
         )
     }
 
     // 로그인
     @PostMapping("/login")
     fun authLogin(@RequestBody request: LoginRequest): ResponseEntity<ApiResponse<AuthResponse>> {
-        val result = memberService.login(
-            LoginCommand(
-                loginId = request.loginId,
-                password = request.password,
-            )
-        )
+        val result = memberService.login(request.toCommand())
         return ResponseEntity.ok(
             ApiResponse(
                 success = true,
@@ -67,7 +51,7 @@ class AuthController(
 
     // 토큰 갱신
     @PostMapping("/refresh")
-    fun authRefresh(@RequestBody request: TokenRefreshRequest): ResponseEntity<String> {
+    fun authRefresh(@RequestBody request: TokenRefreshRequest): ResponseEntity<ApiResponse<AuthResponse>> {
         val result = memberService.validateRefreshTokenAndCreateToken(request.refreshToken)
         return ResponseEntity.ok(result )
     }
