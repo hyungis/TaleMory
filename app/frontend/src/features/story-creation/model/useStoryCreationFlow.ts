@@ -63,6 +63,7 @@ export interface UseStoryCreationFlowResult {
   updateStep1: <K extends keyof ProjectData['step1']>(key: K, value: ProjectData['step1'][K]) => void
   updateStep2: <K extends keyof ProjectData['step2']>(key: K, value: ProjectData['step2'][K]) => void
   updateStoryText: (story: string) => void
+  updateStyle: (style: ProjectData['step5']['style']) => void
   updateChildAt: (index: number, patch: Partial<ChildInfo>) => void
   addChild: () => void
   removeChildAt: (index: number) => void
@@ -114,6 +115,10 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     setProjectData(prev => ({ ...prev, step3: { story } }))
   }, [])
 
+  const updateStyle = useCallback((style: ProjectData['step5']['style']) => {
+    setProjectData(prev => ({ ...prev, step5: { style } }))
+  }, [])
+
   const updateChildAt = useCallback((index: number, patch: Partial<ChildInfo>) => {
     setProjectData(prev => {
       const children = [...prev.step1.children]
@@ -154,6 +159,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     updateStep1,
     updateStep2,
     updateStoryText,
+    updateStyle,
     updateChildAt,
     addChild,
     removeChildAt,
