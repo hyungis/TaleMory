@@ -1,7 +1,7 @@
 package com.s210.backend.domain.auth.presentation
 
 import com.s210.backend.common.response.ApiResponse
-import com.s210.backend.domain.auth.application.dto.CustomUser
+import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.auth.application.MemberService
 import com.s210.backend.domain.auth.application.dto.LoginCommand
 import com.s210.backend.domain.auth.application.dto.SignupCommand

@@ -1,7 +1,7 @@
-package com.s210.backend.domain.auth.infrastructure.config
+package com.s210.backend.common.config
 
-import com.s210.backend.domain.auth.infrastructure.filter.JwtAuthenticationFilter
-import com.s210.backend.domain.auth.infrastructure.JwtTokenProvider
+import com.s210.backend.common.filter.JwtAuthenticationFilter
+import com.s210.backend.common.jwt.JwtTokenProvider
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

@@ -1,6 +1,6 @@
 package com.s210.backend.domain.auth.application
 
-import com.s210.backend.domain.auth.application.dto.CustomUser
+import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.user.entity.User
 import org.springframework.security.core.authority.SimpleGrantedAuthority

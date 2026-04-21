@@ -1,7 +1,7 @@
-package com.s210.backend.domain.auth.infrastructure
+package com.s210.backend.common.jwt
 
-import com.s210.backend.domain.auth.application.dto.CustomUser
-import com.s210.backend.domain.auth.application.dto.TokenInfo
+import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.common.entity.TokenInfo
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Jwts

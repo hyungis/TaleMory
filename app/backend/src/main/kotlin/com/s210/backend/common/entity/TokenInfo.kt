@@ -1,4 +1,4 @@
-package com.s210.backend.domain.auth.application.dto
+package com.s210.backend.common.entity
 
 data class TokenInfo(
     val userId: String,

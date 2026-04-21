@@ -1,4 +1,4 @@
-package com.s210.backend.domain.auth.application.dto
+package com.s210.backend.domain.auth.entity
 
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.userdetails.User

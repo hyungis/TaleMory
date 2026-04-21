@@ -1,4 +1,4 @@
-package com.s210.backend.domain.auth.infrastructure
+package com.s210.backend.common.jwt
 
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository

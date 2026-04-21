@@ -4,9 +4,8 @@ import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.dto.AuthResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
 import com.s210.backend.domain.auth.application.dto.SignupCommand
-import com.s210.backend.domain.auth.application.dto.TokenInfo
-import com.s210.backend.domain.auth.infrastructure.JwtTokenProvider
-import com.s210.backend.domain.auth.infrastructure.RefreshTokenInfoRepositoryRedis
+import com.s210.backend.common.entity.TokenInfo
+import com.s210.backend.common.jwt.JwtTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.user.entity.User
 import jakarta.transaction.Transactional

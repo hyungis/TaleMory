@@ -1,6 +1,6 @@
-package com.s210.backend.domain.auth.infrastructure.filter
+package com.s210.backend.common.filter
 
-import com.s210.backend.domain.auth.infrastructure.JwtTokenProvider
+import com.s210.backend.common.jwt.JwtTokenProvider
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
