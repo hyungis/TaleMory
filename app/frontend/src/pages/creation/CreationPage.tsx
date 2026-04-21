@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BasicInfoStep, useStoryCreationFlow } from '../../features/story-creation'
+import { BasicInfoStep, PhotoManagerStep, useStoryCreationFlow } from '../../features/story-creation'
 import { ROUTES } from '../../shared/constants'
 // bookshelf 모달과 동일 테마(step-forest-modal / bookshelf-scroll / bookshelf-fade-in)를 재사용하므로
 // 해당 CSS 가 import 되어야 한다.
@@ -42,13 +42,21 @@ export function CreationPage() {
         />
       )}
 
-      {flow.currentStep >= 2 && (
+      {flow.currentStep === 2 && (
+        <PhotoManagerStep
+          data={flow.projectData.step2}
+          onUpdate={flow.updateStep2}
+          onBack={handleBack}
+          onNext={flow.handleNext}
+        />
+      )}
+
+      {flow.currentStep >= 3 && (
         <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
           <div className="max-w-md text-center text-[#f0e6c0] px-6">
             <h2 className="text-2xl font-bold mb-3">STEP {flow.currentStep} 준비 중</h2>
             <p className="text-[#b4c4a4] mb-6">
-              이 단계(Task {flow.currentStep === 2 ? '4b (photo-manager)' :
-                flow.currentStep === 3 || flow.currentStep === 4 ? '5 (storyboard-editor)' :
+              이 단계(Task {flow.currentStep === 3 || flow.currentStep === 4 ? '5 (storyboard-editor)' :
                 flow.currentStep === 5 ? '6 (style-selector)' :
                 flow.currentStep === 6 ? '7 (voice-clone)' :
                 '8 (final-preview / publish-story)'}) 은 후속 커밋에서 연결됩니다.
