@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { AuthModal, useAuthModal } from '../../features/auth'
+import { AuthModal, useAuthModal, useAuthSession } from '../../features/auth'
 import { MainPage } from '../main'
-import { ButterflySwarm } from './ui/ButterflySwarm'
-import { useButterflyAnim } from './model/useButterflyAnim'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
+import { useButterflyAnim } from './model/useButterflyAnim'
 import './styles/landing.css'
+import { ButterflySwarm } from './ui/ButterflySwarm'
 
 /** 랜딩 exit 애니메이션 총 길이 (mask 5.5s + 0.4s delay ≒ 5.9s) 에 약간의 버퍼 */
 const LANDING_EXIT_DURATION_MS = 6000
@@ -34,26 +34,37 @@ export function HomePage() {
    * 돌아오면 이미 인증된 유저이므로 랜딩 영상·나비 떼·디졸브 마스크를 전부 생략하고
    * 바로 MainPage(책장 씬)를 보여준다.
    */
-  const skipLanding =
-    (location.state as { skipLanding?: boolean } | null)?.skipLanding === true
+  const skipLanding = (location.state as { skipLanding?: boolean } | null)?.skipLanding === true
   const [isExiting, setIsExiting] = useState(skipLanding)
   const [isLandingDone, setIsLandingDone] = useState(skipLanding)
   const butterflyAnim = useButterflyAnim()
   const particles = useMemo(() => generateSwarmParticles(), [])
   const auth = useAuthModal('login')
+  const { isAuthenticated } = useAuthSession()
+
+  const startLandingExit = useCallback(() => {
+    auth.close()
+    setIsExiting(true)
+    setTimeout(() => setIsLandingDone(true), LANDING_EXIT_DURATION_MS)
+  }, [auth])
 
   const handleStart = useCallback(() => {
     if (isExiting) return
+
+    // 이미 로그인된 사용자는 모달을 다시 열지 않고 바로 랜딩 연출만 종료한다.
+    if (isAuthenticated) {
+      startLandingExit()
+      return
+    }
+
     auth.open('login')
-  }, [isExiting, auth])
+  }, [auth, isAuthenticated, isExiting, startLandingExit])
 
   const handleAuthSuccess = useCallback(() => {
-    auth.close()
-    setIsExiting(true)
     // 랜딩 exit 애니메이션 완료 뒤 landing DOM 제거.
     // 안 하면 position:fixed + z-index:9999 로 MainPage 의 모든 포인터 이벤트 차단.
-    setTimeout(() => setIsLandingDone(true), LANDING_EXIT_DURATION_MS)
-  }, [auth])
+    startLandingExit()
+  }, [startLandingExit])
 
   return (
     <>
@@ -71,11 +82,13 @@ export function HomePage() {
             playsInline
             preload="auto"
           />
+
           <div className="landing-overlay">
             <div className="landing-text-block">
               <h1 className="landing-title">TaleMory</h1>
-              <p className="landing-subtitle">가족의 추억으로 만드는 영어동화책</p>
+              <p className="landing-subtitle">가족의 추억으로 만드는 영어 동화책</p>
             </div>
+
             <button
               type="button"
               className="landing-start-btn"
