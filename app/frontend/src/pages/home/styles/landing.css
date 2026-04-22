@@ -109,6 +109,12 @@
 
 .landing-screen.exiting {
   background: transparent;
+  /*
+   * 6s 짜리 원형 디졸브 애니메이션이 진행되는 동안 landing DOM 이 viewport 전체를 덮어
+   * 뒤의 MainPage(ForestScene — 집 클릭) 포인터 이벤트를 차단하던 문제 해결.
+   * 시각 애니메이션은 그대로 두고, 클릭만 뒤로 통과시킨다.
+   */
+  pointer-events: none;
   -webkit-mask-image: radial-gradient(
     circle at 50% calc(100vh - 10vh - 30px),
     transparent 0,
