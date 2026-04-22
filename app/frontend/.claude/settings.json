@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-skill.py\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-skill.js\"",
             "shell": "bash"
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-skill.py\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-skill.js\"",
             "shell": "bash"
           }
         ]
