@@ -1,0 +1,342 @@
+/* ==========================================================================
+   MainPage (숲 씬) 전용 스타일.
+   App.css 원본(story-forest)에서 추출, feature-local 로 이관.
+   ========================================================================== */
+
+/* ===== Main Scene Container ===== */
+.scene {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  cursor: default;
+  background: var(--color-dark);
+}
+
+/* ===== Parallax Layers ===== */
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform, opacity, filter;
+  transition: transform 0.15s ease-out;
+  backface-visibility: hidden;
+}
+
+.layer--background {
+  z-index: 1;
+}
+
+.layer--background img {
+  width: 110%;
+  height: 110%;
+  max-width: none;
+  /* Tailwind preflight 가 img { max-width: 100% } 를 걸기 때문에 명시 해제 */
+  object-fit: cover;
+  position: absolute;
+  top: -5%;
+  left: -5%;
+}
+
+.layer--tree {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.layer--tree img {
+  width: 120%;
+  height: 120%;
+  max-width: none;
+  /* Tailwind preflight 의 img { max-width: 100% } 해제 필수 */
+  object-fit: cover;
+  position: absolute;
+  top: -12%;
+  left: -12%;
+  animation: sway 10s ease-in-out infinite;
+}
+
+.layer--house {
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+  /* 부모는 클릭 무시, 실제 <img> 만 클릭 허용 */
+}
+
+.house-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  animation: bobbing 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.house-img {
+  height: 110vh;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  margin-bottom: -5vh;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+  transition: transform 0.3s ease-out, filter 0.3s ease-out;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.house-img:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 30px 60px rgba(180, 220, 140, 0.4));
+}
+
+/* ===== 숲속 아이 캐릭터 (집 클릭 시 문 앞까지 걸어감) =====
+   걷기 애니메이션은 JS(requestAnimationFrame) 로 inline transform 을 직접 적용.
+   CSS 키프레임은 사용하지 않음. */
+.kid-character {
+  position: absolute;
+  left: 18%;
+  bottom: 6vh;
+  width: 220px;
+  height: 220px;
+  z-index: 5;
+  pointer-events: none;
+  transform-origin: center bottom;
+  transform: translate(0, 0) scale(0.9);
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.35));
+  will-change: transform;
+}
+
+/* 문 앞 도착 후 보여지는 뒷모습 PNG */
+.kid-back-view {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ===== Vignette Effect ===== */
+.vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(10, 26, 10, 0.5) 100%);
+}
+
+/* ===== Light Rays ===== */
+.light-rays {
+  position: absolute;
+  top: -20%;
+  left: 30%;
+  width: 40%;
+  height: 120%;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(200, 230, 160, 0.08) 0%, transparent 60%);
+  transform: rotate(-15deg);
+  animation: rayPulse 6s ease-in-out infinite;
+}
+
+/* ===== Floating Particles ===== */
+.particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(circle, rgba(200, 230, 160, 0.8), transparent);
+  border-radius: 50%;
+  animation: floatUp var(--duration) var(--delay) ease-in-out infinite;
+}
+
+/* ===== Keyframes ===== */
+@keyframes rayPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(0.5%);
+  }
+}
+
+@keyframes bobbing {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(100vh) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-20vh) translateX(calc(var(--drift)));
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   Scene Management (forest ↔ bookstore crossfade)
+   ========================================================================== */
+.scene-container,
+.bookstore-scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.scene-container.active,
+.bookstore-scene.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.scene-container.inactive,
+.bookstore-scene.inactive {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ==========================================================================
+   Bookstore Scene
+   ========================================================================== */
+.bookstore-scene {
+  background: #0a100a;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.bookstore-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  animation: bookstoreEntry 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s forwards;
+}
+
+/* 좌상단: 숲으로 돌아가기 */
+.back-to-forest-btn {
+  position: absolute;
+  top: 30px;
+  left: 30px;
+  z-index: 50;
+  background: rgba(253, 250, 240, 0.85);
+  border: 2px solid #b4dc8c;
+  color: #2a1b12;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+}
+
+.back-to-forest-btn:hover {
+  background: #b4dc8c;
+  color: #0a150a;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 25px rgba(180, 220, 140, 0.5);
+}
+
+.back-to-forest-btn .icon {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+/* 우상단: 우리 가족 책장 열기 */
+.open-library-btn {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+  z-index: 50;
+  background: rgba(253, 250, 240, 0.85);
+  border: 2px solid #b4dc8c;
+  color: #2a1b12;
+  padding: 12px 22px;
+  border-radius: 30px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+}
+
+.open-library-btn:hover {
+  background: #b4dc8c;
+  color: #0a150a;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 25px rgba(180, 220, 140, 0.5);
+}
+
+.open-library-btn .icon {
+  font-size: 1.2rem;
+}
+
+@keyframes bookstoreEntry {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
