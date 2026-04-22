@@ -1,6 +1,7 @@
-import { BookOpen, BookOpenText, Mic, Music, Play, Share2, Trash2 } from 'lucide-react'
+import { BookOpen, Mic, Music, Play, Share2, Sparkles, Trash2 } from 'lucide-react'
 import type { Story } from '../../../../entities/story'
 import { getLevelColor } from '../lib/levelColor'
+import { IllustrationMockup } from '../../../../shared/ui'
 
 interface StoryCardProps {
   story: Story
@@ -16,8 +17,14 @@ interface StoryCardProps {
 
 /**
  * 빈티지 가죽 장정 스타일의 책 카드.
- * - 상단: 그라디언트 배경 vintage-cover + badge + level 칩 + hover 시 play 오버레이
- * - 하단: 제목 + 날짜 + 스타일 + 읽기/공유/삭제 버튼
+ *
+ * 표지 목업:
+ *  - bgClass 그라디언트(실제 책 느낌의 색감)
+ *  - 장식용 풍경 SVG (별/산/나무 실루엣)
+ *  - 상단 제목 일부 표시
+ *  - Sparkles 글로우 효과
+ *  - 좌상단: mic/music 배지, 우상단: 페이지 수, 우하단: 난이도 칩
+ *  - hover 시 재생 아이콘 오버레이
  */
 export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs = 0 }: StoryCardProps) {
   const BadgeIcon = story.badgeType === 'mic' ? Mic : Music
@@ -30,26 +37,43 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
       style={{ animationDelay: `${animationDelayMs}ms` }}
     >
       <div
-        className={`aspect-[3/4] bg-gradient-to-br ${story.bgClass} vintage-cover relative overflow-hidden flex items-center justify-center border-b border-[#8b7a52]/30`}
+        className={`aspect-[3/4] bg-gradient-to-br ${story.bgClass} vintage-cover relative overflow-hidden flex flex-col items-center justify-end border-b border-[#8b7a52]/30 text-[#f0e6c0]/80`}
       >
-        <BookOpenText className="w-16 h-16 text-[#d4b86a]/50 book-cover-img transition-transform duration-500" />
+        {/* 풍경 SVG 목업 — 표지 절반 하단 */}
+        <IllustrationMockup
+          variant="scenery"
+          className="absolute inset-x-0 bottom-0 w-full h-[70%] text-[#f0e6c0]"
+        />
 
-        <div className="absolute top-3 left-3 bg-[#2d5a27]/95 backdrop-blur-sm text-[#f0e6c0] text-[11px] px-2 py-1 rounded-md font-sans font-bold flex items-center gap-1 shadow-sm">
+        {/* 상단 장식: 큰 Sparkles glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <Sparkles className="w-10 h-10 text-[#f0e6c0]/80 book-cover-img transition-transform duration-500" />
+        </div>
+
+        {/* 표지 제목 미리보기 */}
+        <div className="relative z-10 mb-4 px-4 text-center">
+          <p className="text-[11px] uppercase tracking-widest text-[#f0e6c0]/60 mb-1 font-sans">
+            TaleMory
+          </p>
+          <p className="text-sm font-bold leading-tight line-clamp-2 text-[#f0e6c0]">{story.title}</p>
+        </div>
+
+        {/* 뱃지들 */}
+        <div className="absolute top-3 left-3 bg-[#2d5a27]/95 backdrop-blur-sm text-[#f0e6c0] text-[11px] px-2 py-1 rounded-md font-sans font-bold flex items-center gap-1 shadow-sm z-10">
           <BadgeIcon className="w-3 h-3" />
           {story.badgeText}
         </div>
-
-        <div className="absolute top-3 right-3 bg-black/50 text-[#f0e6c0] text-[10px] px-2 py-1 rounded-md font-sans backdrop-blur-sm flex items-center gap-1">
+        <div className="absolute top-3 right-3 bg-black/50 text-[#f0e6c0] text-[10px] px-2 py-1 rounded-md font-sans backdrop-blur-sm flex items-center gap-1 z-10">
           {story.pages} Pages
         </div>
-
         <div
-          className={`absolute bottom-3 right-3 ${levelColor} text-[10px] px-2 py-0.5 rounded font-sans font-bold shadow-sm`}
+          className={`absolute bottom-3 right-3 ${levelColor} text-[10px] px-2 py-0.5 rounded font-sans font-bold shadow-sm z-10`}
         >
           {story.level}
         </div>
 
-        <div className="book-cover-overlay absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 transition-opacity duration-300 flex items-center justify-center">
+        {/* hover 오버레이 */}
+        <div className="book-cover-overlay absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 transition-opacity duration-300 flex items-center justify-center z-20">
           <div className="bg-[#f0e6c0] text-[#2d5a27] p-4 rounded-full shadow-lg transform hover:scale-110 transition-transform">
             <Play className="w-8 h-8 ml-1" />
           </div>
@@ -57,7 +81,9 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
       </div>
 
       <div className="p-5 flex flex-col flex-1 bg-[#f0e6c0] border-b-[5px] border-[#8b7a52]/50">
-        <h3 className="text-xl text-[#2d5a27] mb-1 leading-tight line-clamp-2 font-bold">{story.title}</h3>
+        <h3 className="text-xl text-[#2d5a27] mb-1 leading-tight line-clamp-2 font-bold">
+          {story.title}
+        </h3>
         <p className="text-[#8b7a52] text-xs font-sans mb-4 flex-1">
           {prettyDate} • {story.style}
         </p>
