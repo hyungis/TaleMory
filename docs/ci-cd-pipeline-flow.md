@@ -65,9 +65,44 @@ workflow:
 | MR 오픈/업데이트 | 없음 |
 | MR 승인 → dev로 merge | ✅ dev 파이프라인 발동 |
 | dev → master로 merge | ✅ master 파이프라인 발동 (배포는 manual) |
-| `infra-common` 수동 배포 | 별도 manual job |
+| `infra-common` 수동 재배포 | UI "Run pipeline" + `DEPLOY_INFRA=true` 변수 |
 
 > **주의**: MR 단계에서는 build 검증이 없음. merge 후 build 실패 시 deploy는 `needs:` 때문에 skip되므로 **운영 중인 컨테이너는 그대로 유지**. deploy 자체가 실패한 경우 자동 복구 로직은 없으며 pipeline fail로 팀에 노출됨.
+
+---
+
+## 3-1. 파이프라인 파일 구조
+
+```
+.gitlab-ci.yml                       ← 엔트리: stages / workflow / default / include
+.gitlab/ci/
+  ├─ app.gitlab-ci.yml               ← 항상 로드
+  │   generate_env_* / verify_infra_* / build_* / deploy_* / notify_* / cleanup_*
+  └─ infra.gitlab-ci.yml             ← 조건부 로드
+      deploy_infra_*
+```
+
+### `infra.gitlab-ci.yml` 로드 조건
+
+엔트리의 `include: rules:` 에서 3가지 중 하나라도 매칭되면 로드:
+
+1. dev 브랜치 push 에서 infra 관련 파일 변경
+   - `infra/compose/docker-compose.infra-dev.yml`
+   - `infra/scripts/deploy-infra-dev.sh`
+   - `infra/scripts/common.sh`
+   - `infra/scripts/health-check-infra.sh`
+   - `infra/env/infra.dev.env.example`
+2. master 브랜치 push 에서 대응되는 master 파일 변경
+3. GitLab UI "Run pipeline" 에서 `DEPLOY_INFRA=true` 변수 전달
+
+위 조건이 모두 빗나가면 **`deploy_infra_*` job 자체가 파이프라인에 존재하지 않음**.
+→ `verify_infra_*`의 `needs: { job: deploy_infra_*, optional: true }` 가 자동 스킵 → build/deploy 흐름이 막히지 않음.
+
+### 장점
+
+- 평소 app-only push 에서 infra job 이 manual 상태로 걸려 뒤 stage 가 대기하는 문제 원천 제거
+- infra 담당/app 담당이 리뷰할 diff 범위가 물리적으로 분리
+- infra 로드된 경우 job 안에서는 **manual 클릭 없이 자동 실행** ("infra 를 올리기로 한 파이프라인은 무조건 올린다")
 
 ---
 
@@ -148,8 +183,8 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
 │   (파이프라인 없음)│   │         ▼          │   │         ▼          │
 │                    │   │ deploy_infra_*     │   │ deploy_infra_*     │
 │                    │   │ (infra 파일 변경   │   │ (infra 파일 변경   │
-│                    │   │  시 auto, 아니면   │   │  시 auto, 아니면   │
-│                    │   │  manual-optional)  │   │  manual-optional)  │
+│                    │   │  또는 DEPLOY_INFRA │   │  또는 DEPLOY_INFRA │
+│                    │   │  =true 시 생성)    │   │  =true 시 생성)    │
 │                    │   │         │          │   │         │          │
 │                    │   │         ▼          │   │         ▼          │
 │                    │   │  verify_infra_*    │   │  verify_infra_*    │
@@ -186,9 +221,11 @@ compose의 `env_file`은 `${ENV_DIR:-/tmp/env}/<file>` 형식.
                          │  Discord 팀 채널     │
                          └──────────────────────┘
 
-  [별도] infra-common 관리 (수동, 상시 가동 인프라)
+  [별도 파일] infra-common 파이프라인 (조건부 로드)
            ┌──────────────────────────────────────┐
-           │  deploy_infra_<env>_manual           │
+           │  .gitlab/ci/infra.gitlab-ci.yml      │
+           │   - infra 파일 변경 push 시 자동     │
+           │   - DEPLOY_INFRA=true 시 수동        │
            │   mysql, redis, rabbitmq             │
            │   dev-*, prod-* 별개 컨테이너/볼륨   │
            └──────────────────────────────────────┘
