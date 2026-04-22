@@ -2,14 +2,19 @@ package com.s210.backend.domain.story.presentation
 
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.common.response.PageResponse
+import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.story.application.StoryViewerService
 import com.s210.backend.domain.story.presentation.request.CreateStoryRequest
 import com.s210.backend.domain.story.presentation.response.*
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/stories")
-class StoryController {
+class StoryController(
+    private val storyViewerService: StoryViewerService,
+) {
 
     // 동화 목록 조회
     @GetMapping
@@ -33,6 +38,16 @@ class StoryController {
     fun storyDetails(@PathVariable storyId: Long): ResponseEntity<ApiResponse<StoryDetailResponse>> {
         // TODO: StoryService.findStory(storyId)
         TODO("Not yet implemented")
+    }
+
+    // 뷰어 화면 통합 조회 (메타 + scenes + outro)
+    @GetMapping("/{storyId}/view")
+    fun storyViewDetails(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<StoryViewResponse>> {
+        val result = storyViewerService.findStoryView(user.username, storyId)
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 
     // 동화 삭제
