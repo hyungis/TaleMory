@@ -17,7 +17,10 @@ export interface PhotoItem {
   id: string
   url: string
   name: string
-  tags: string[]
+  /** 사용자가 붙이는 한 줄 설명 (선택). 원본 App.jsx 스키마 맞춤. */
+  description: string
+  /** 해시태그 자유 텍스트. 예: "#제주도 #여름휴가 #해솔이첫바다". 배열 아님. */
+  tags: string
 }
 
 export interface StoryboardPageDraft {

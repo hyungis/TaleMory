@@ -43,7 +43,29 @@ function loadInitialData(): ProjectData {
           ? (parsed.step1?.children as ChildInfo[])
           : DEFAULT_DATA.step1.children,
       },
-      step2: { ...DEFAULT_DATA.step2, ...(parsed.step2 ?? {}) },
+      step2: {
+        ...DEFAULT_DATA.step2,
+        ...(parsed.step2 ?? {}),
+        // 이전 스키마 호환: photos[].tags 가 배열이었을 수 있고, description 이 없을 수 있음.
+        photos: Array.isArray(parsed.step2?.photos)
+          ? (parsed.step2!.photos as unknown[]).map(raw => {
+              const p = raw as Record<string, unknown>
+              const tagsRaw = p.tags
+              return {
+                id: String(p.id ?? `photo-${Math.random().toString(36).slice(2, 8)}`),
+                url: String(p.url ?? ''),
+                name: String(p.name ?? ''),
+                description: String(p.description ?? ''),
+                tags:
+                  typeof tagsRaw === 'string'
+                    ? tagsRaw
+                    : Array.isArray(tagsRaw)
+                      ? tagsRaw.map(String).join(' ')
+                      : '',
+              }
+            })
+          : [],
+      },
       step3: { ...DEFAULT_DATA.step3, ...(parsed.step3 ?? {}) },
       step4: { ...DEFAULT_DATA.step4, ...(parsed.step4 ?? {}) },
       step5: { ...DEFAULT_DATA.step5, ...(parsed.step5 ?? {}) },

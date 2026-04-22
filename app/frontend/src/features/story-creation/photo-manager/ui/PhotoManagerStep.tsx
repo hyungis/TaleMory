@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
-import { Camera } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Image as ImageIcon, Wand2 } from 'lucide-react'
 import type { ProjectData } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
-import { NextButton } from '../../ui/NextButton'
-import { usePhotoManager } from '../model/usePhotoManager'
+import { usePhotoManager, MAX_PHOTOS } from '../model/usePhotoManager'
 import { PhotoUploadZone } from './PhotoUploadZone'
 import { PhotoItem } from './PhotoItem'
+import { EmptyPhotoState } from './EmptyPhotoState'
+import { StoryPromptModal } from './StoryPromptModal'
 
 interface PhotoManagerStepProps {
   data: ProjectData['step2']
@@ -14,16 +15,19 @@ interface PhotoManagerStepProps {
   onNext: () => void
 }
 
-const QUICK_TAGS = ['바다에서 놀기', '가족 사진', '맛있는 음식', '처음 본 풍경']
-
 /**
- * STEP 02 — 사진 업로드 + 스토리 방향 프롬프트.
+ * STEP 02 — 추억 사진 선택 & 태깅.
  *
- * 현재는 photos state 를 로컬 훅(usePhotoManager)으로 관리. onUpdate 로 동기화.
- * 실제 S3 업로드 / prompt AI 전달은 후속 API 연동 커밋에서.
+ * 구조:
+ *  1. 업로드 존 (드래그앤드롭 + 클릭)
+ *  2. 업로드된 사진 리스트 (썸네일 + 사진 설명(선택) + 태그(선택))
+ *     · 사진 없을 때 EmptyPhotoState 로 대체
+ *  3. 하단 액션 바: "이전 단계" / "스토리보드 만들기 ✨" (→ StoryPromptModal 오픈)
+ *  4. StoryPromptModal: 장르/분위기 prompt + 3개 빠른 태그 + "마법 주문 적용!" → onNext()
  */
 export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManagerStepProps) {
   const pm = usePhotoManager(data.photos)
+  const [isPromptOpen, setIsPromptOpen] = useState(false)
 
   // photos 변경 시 상위 projectData.step2.photos 로 동기화
   useEffect(() => {
@@ -32,81 +36,86 @@ export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pm.photos])
 
-  const appendPromptTag = (tag: string) => {
-    const current = data.prompt.trim()
-    const next = current ? `${current} ${tag}` : tag
-    onUpdate('prompt', next)
-  }
+  const handleOpenPrompt = useCallback(() => setIsPromptOpen(true), [])
+  const handleClosePrompt = useCallback(() => setIsPromptOpen(false), [])
+  const handleApplyPrompt = useCallback(() => {
+    setIsPromptOpen(false)
+    onNext()
+  }, [onNext])
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={2} stepTitle="사진 업로드 & 스토리 방향" onBack={onBack} />
+      <StepHeader stepNumber={2} stepTitle="추억 사진 선택 & 태깅" onBack={onBack} />
 
       <div className="bookshelf-scroll">
         <main className="py-12 px-6 bookshelf-fade-in">
-          <div className="max-w-4xl mx-auto bg-[#f0e6c0] p-8 md:p-12 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-2 border-[#2a1b12]">
+          <div className="max-w-4xl mx-auto pb-12">
+            {/* 타이틀 영역 */}
             <div className="text-center mb-10">
               <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <Camera className="w-8 h-8 text-[#f0e6c0]" />
+                <ImageIcon className="w-8 h-8 text-[#f0e6c0]" />
               </div>
-              <h2 className="text-3xl text-[#2d5a27] font-bold">여행 사진과 느낀 점을 알려주세요</h2>
-              <p className="text-[#8b7a52] mt-2">AI 가 사진을 바탕으로 동화의 장면을 만들어요.</p>
+              <h2 className="text-3xl text-[#f0e6c0] font-bold">추억이 담긴 사진에 이야기를 달아주세요</h2>
+              <p className="text-[#b4c4a4] mt-2">
+                사진에 남긴 짧은 설명과 태그들이 모여 멋진 동화책의 뼈대가 됩니다.
+              </p>
             </div>
 
-            <div className="space-y-8">
-              {/* 업로드 존 */}
-              <PhotoUploadZone currentCount={pm.photos.length} onFiles={pm.addFiles} />
+            {/* 업로드 영역 */}
+            <PhotoUploadZone onFiles={pm.addFiles} />
 
-              {/* 업로드된 사진 그리드 */}
-              {pm.photos.length > 0 && (
-                <div>
-                  <h3 className="text-[#2d5a27] text-lg mb-3 font-bold">
-                    업로드한 사진 ({pm.photos.length}장)
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {pm.photos.map(photo => (
-                      <PhotoItem
-                        key={photo.id}
-                        photo={photo}
-                        onRemove={() => pm.removePhoto(photo.id)}
-                        onTagsChange={tags => pm.updatePhoto(photo.id, { tags })}
-                      />
-                    ))}
-                  </div>
-                </div>
+            {/* 업로드된 사진 리스트 */}
+            <div className="space-y-4 mb-8">
+              <h3 className="text-xl text-[#f0e6c0] border-b border-[#4a3a24] pb-2 font-bold flex justify-between items-center">
+                <span>업로드된 사진</span>
+                <span className="bg-[#2a1b12]/70 text-[#b4dc8c] px-3 py-1 rounded-full text-sm border border-[#b4dc8c]/50 font-sans shadow-sm">
+                  {pm.photos.length} / {MAX_PHOTOS} 장
+                </span>
+              </h3>
+
+              {pm.photos.length === 0 ? (
+                <EmptyPhotoState />
+              ) : (
+                pm.photos.map(photo => (
+                  <PhotoItem
+                    key={photo.id}
+                    photo={photo}
+                    onRemove={() => pm.removePhoto(photo.id)}
+                    onUpdate={patch => pm.updatePhoto(photo.id, patch)}
+                  />
+                ))
               )}
-
-              {/* 프롬프트 */}
-              <div>
-                <label className="block text-[#2d5a27] text-lg mb-2 font-bold">
-                  어떤 이야기로 만들고 싶어요? (선택)
-                </label>
-                <textarea
-                  value={data.prompt}
-                  onChange={e => onUpdate('prompt', e.target.value)}
-                  placeholder="예: 아이가 처음으로 바다를 본 설렘을 담고 싶어요"
-                  rows={4}
-                  className="w-full p-4 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-lg text-[#2d5a27] placeholder-[#8b7a52]/60 resize-none"
-                />
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {QUICK_TAGS.map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => appendPromptTag(tag)}
-                      className="px-3 py-1.5 bg-[#e8ddb4] border border-[#8b7a52]/50 rounded-full text-sm text-[#2d5a27] hover:bg-[#2d5a27] hover:text-[#f0e6c0] hover:border-[#2d5a27] transition-colors"
-                    >
-                      + {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            <NextButton onClick={onNext}>스토리 만들러 가기</NextButton>
+            {/* 하단 액션 바 */}
+            <div className="flex justify-between items-center pt-6 border-t border-[#4a3a24]">
+              <button
+                type="button"
+                onClick={onBack}
+                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors"
+              >
+                이전 단계
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenPrompt}
+                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+              >
+                스토리보드 만들기 <Wand2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </main>
       </div>
+
+      {/* 스토리보드 마법 주문 모달 */}
+      <StoryPromptModal
+        isOpen={isPromptOpen}
+        prompt={data.prompt}
+        onPromptChange={value => onUpdate('prompt', value)}
+        onClose={handleClosePrompt}
+        onApply={handleApplyPrompt}
+      />
     </div>
   )
 }

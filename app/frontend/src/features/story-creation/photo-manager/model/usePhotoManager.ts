@@ -7,7 +7,7 @@ export interface UsePhotoManagerResult {
   photos: PhotoItem[]
   addFiles: (files: FileList | File[]) => void
   removePhoto: (id: string) => void
-  updatePhoto: (id: string, patch: Partial<Pick<PhotoItem, 'name' | 'tags'>>) => void
+  updatePhoto: (id: string, patch: Partial<Pick<PhotoItem, 'name' | 'description' | 'tags'>>) => void
   canAddMore: boolean
 }
 
@@ -30,7 +30,8 @@ export function usePhotoManager(initial: PhotoItem[] = []): UsePhotoManagerResul
           id: `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           url: URL.createObjectURL(file),
           name: file.name,
-          tags: [],
+          description: '',
+          tags: '',
         }))
       return [...prev, ...accepted]
     })
@@ -45,7 +46,7 @@ export function usePhotoManager(initial: PhotoItem[] = []): UsePhotoManagerResul
   }, [])
 
   const updatePhoto = useCallback(
-    (id: string, patch: Partial<Pick<PhotoItem, 'name' | 'tags'>>) => {
+    (id: string, patch: Partial<Pick<PhotoItem, 'name' | 'description' | 'tags'>>) => {
       setPhotos(prev => prev.map(p => (p.id === id ? { ...p, ...patch } : p)))
     },
     [],
