@@ -90,7 +90,11 @@ export function CreationPage() {
       )}
 
       {flow.currentStep === 6 && (
-        <VoiceCloneStep onBack={handleBack} onNext={flow.handleNext} />
+        <VoiceCloneStep
+          onBack={handleBack}
+          onNext={flow.handleNext}
+          onVoiceSaved={flow.updateVoiceModel}
+        />
       )}
 
       {flow.currentStep === 7 && (

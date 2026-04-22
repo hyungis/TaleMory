@@ -54,7 +54,8 @@ export interface ProjectData {
     style: StylePreset
   }
   step6: {
-    voiceModel: unknown
+    /** 저장된 보이스 프로필 식별명 (사용자가 "엄마 제주 동화 목소리" 등으로 지정). null = 아직 저장 안 됨. */
+    voiceModel: string | null
   }
 }
 

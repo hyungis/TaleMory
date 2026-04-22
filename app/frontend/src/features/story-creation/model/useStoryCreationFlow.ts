@@ -87,6 +87,7 @@ export interface UseStoryCreationFlowResult {
   updateStoryText: (story: string) => void
   updateStoryboardPage: (idx: number, patch: Partial<StoryboardPageDraft>) => void
   updateStyle: (style: ProjectData['step5']['style']) => void
+  updateVoiceModel: (voiceModel: string | null) => void
   updateChildAt: (index: number, patch: Partial<ChildInfo>) => void
   addChild: () => void
   removeChildAt: (index: number) => void
@@ -151,6 +152,10 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     setProjectData(prev => ({ ...prev, step5: { style } }))
   }, [])
 
+  const updateVoiceModel = useCallback((voiceModel: string | null) => {
+    setProjectData(prev => ({ ...prev, step6: { voiceModel } }))
+  }, [])
+
   const updateChildAt = useCallback((index: number, patch: Partial<ChildInfo>) => {
     setProjectData(prev => {
       const children = [...prev.step1.children]
@@ -193,6 +198,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     updateStoryText,
     updateStoryboardPage,
     updateStyle,
+    updateVoiceModel,
     updateChildAt,
     addChild,
     removeChildAt,
