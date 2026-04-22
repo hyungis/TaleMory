@@ -7,6 +7,7 @@ from app.schemas.storyboard import (
     StoryboardGenerateRequest,
     StoryboardGenerateResponse,
     StoryboardPage,
+    StoryboardRegenerateRequest,
     StorySentence,
     UsageInfo,
 )
@@ -20,6 +21,12 @@ def generate_storyboard(request: StoryboardGenerateRequest) -> StoryboardGenerat
     if settings.OPENAI_API_KEY:
         return _generate_with_openai(request)
     return _generate_locally(request)
+
+
+def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+    if settings.OPENAI_API_KEY:
+        return _regenerate_with_openai(request)
+    return _generate_locally(_build_regenerate_fallback_request(request))
 
 
 def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
@@ -52,6 +59,51 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
         )
     except OpenAIError as exc:
         raise ValueError(f"OpenAI storyboard generation failed: {exc}") from exc
+
+    parsed = StoryboardGenerateResponse.model_validate_json(response.output_text)
+    _reconcile_derived_counts(parsed)
+    token_usage = _extract_token_usage(response.usage)
+    parsed.usage.model = settings.STORYBOARD_MODEL
+    parsed.usage.inputTokens = token_usage["input_tokens"]
+    parsed.usage.outputTokens = token_usage["output_tokens"]
+    parsed.usage.totalTokens = token_usage["total_tokens"]
+    parsed.usage.costUsd = _estimate_cost_usd(
+        input_tokens=token_usage["input_tokens"],
+        output_tokens=token_usage["output_tokens"],
+    )
+    parsed.usage.promptTemplateVersion = STORYBOARD_PROMPT_TEMPLATE_VERSION
+    return parsed
+
+
+def _regenerate_with_openai(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+    try:
+        from openai import OpenAI
+        from openai import OpenAIError
+    except ImportError as exc:
+        raise RuntimeError("openai package is not installed") from exc
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    schema = _to_openai_strict_json_schema(StoryboardGenerateResponse.model_json_schema())
+    input_content = _build_openai_regenerate_input_content(request)
+
+    try:
+        response = client.responses.create(
+            model=settings.STORYBOARD_MODEL,
+            input=[
+                {"role": "system", "content": STORYBOARD_SYSTEM_PROMPT},
+                {"role": "user", "content": input_content},
+            ],
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "storyboard_regeneration_response",
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+        )
+    except OpenAIError as exc:
+        raise ValueError(f"OpenAI storyboard regeneration failed: {exc}") from exc
 
     parsed = StoryboardGenerateResponse.model_validate_json(response.output_text)
     _reconcile_derived_counts(parsed)
@@ -101,6 +153,78 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
             }
         )
     return content
+
+
+def _build_openai_regenerate_input_content(
+    request: StoryboardRegenerateRequest,
+) -> list[dict[str, str]]:
+    original_request = request.originalRequest.model_copy(deep=True)
+    if request.storyId is not None:
+        original_request.storyId = request.storyId
+
+    payload = original_request.model_dump(mode="json")
+    page_directive = _page_directive_for_request(original_request)
+    regenerate_instruction = (
+        "Regenerate the storyboard using the original request, the current storyboard, and the "
+        "user's feedback. Keep the same output schema as storyboard generation. Improve the story "
+        "according to the feedback instead of lightly paraphrasing the current storyboard."
+    )
+    feedback_instruction = (
+        "USER FEEDBACK - HIGH PRIORITY:\n"
+        f"{request.feedbackInstruction.strip()}\n\n"
+        "You must prioritize this explicit user feedback over the current storyboard's existing tone, "
+        "motif, and wording. Treat the current storyboard as something to revise, not something to preserve.\n"
+        "If the feedback conflicts with soft stylistic preferences, previous story choices, or the prior draft's "
+        "structure, follow the user's feedback.\n"
+        "If the feedback conflicts with hard safety constraints or strict output-schema requirements, keep those "
+        "hard constraints, but still satisfy the user's intent as closely as possible.\n"
+        "If the feedback asks for stronger fantasy or a new story element, do not ignore it. Reflect it as strongly "
+        "as possible within the allowed storybook tone."
+    )
+    content: list[dict[str, str]] = [
+        {"type": "input_text", "text": page_directive},
+        {"type": "input_text", "text": regenerate_instruction},
+        {"type": "input_text", "text": feedback_instruction},
+        {
+            "type": "input_text",
+            "text": json.dumps(
+                {
+                    "originalRequest": payload,
+                    "currentStoryboard": request.currentStoryboard.model_dump(mode="json"),
+                    "feedbackInstruction": request.feedbackInstruction,
+                },
+                ensure_ascii=False,
+            ),
+        },
+    ]
+    if not original_request.useVision:
+        return content
+
+    for photo in sorted(original_request.photos, key=lambda item: item.displayOrder):
+        if not photo.imageUrl:
+            continue
+        content.append(
+            {
+                "type": "input_image",
+                "image_url": photo.imageUrl,
+                "detail": original_request.visionDetail,
+            }
+        )
+    return content
+
+
+def _page_directive_for_request(request: StoryboardGenerateRequest) -> str:
+    photo_count = len(request.photos)
+    min_pages = request.pageCountPolicy.min
+    max_pages = request.pageCountPolicy.max
+    return (
+        f"Produce between {min_pages} and {max_pages} pages (inclusive). "
+        f"There are {photo_count} source photo(s). "
+        f"If {photo_count} is less than {min_pages}, you MUST add storybook bridge pages "
+        "(opening, emotional transitions, fairy-tale-device beats, ending) so pageCount reaches "
+        f"at least {min_pages}. Pages without a specific source photo must set sourcePhotoIds "
+        "to an empty list [] and still belong to the unified story arc."
+    )
 
 
 def _reconcile_derived_counts(parsed: StoryboardGenerateResponse) -> None:
@@ -261,6 +385,19 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
     )
     _reconcile_derived_counts(response)
     return response
+
+
+def _build_regenerate_fallback_request(
+    request: StoryboardRegenerateRequest,
+) -> StoryboardGenerateRequest:
+    original_request = request.originalRequest.model_copy(deep=True)
+    if request.storyId is not None:
+        original_request.storyId = request.storyId
+    if request.feedbackInstruction:
+        existing = (original_request.additionalInstruction or "").strip()
+        extra = f"Regeneration feedback: {request.feedbackInstruction.strip()}"
+        original_request.additionalInstruction = f"{existing}\n{extra}".strip() if existing else extra
+    return original_request
 
 
 def _reading_level_for_age(age: int) -> ReadingLevel:

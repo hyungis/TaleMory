@@ -109,3 +109,10 @@ class StoryboardGenerateResponse(BaseModel):
     totalWordCount: int
     pages: list[StoryboardPage]
     usage: UsageInfo
+
+
+class StoryboardRegenerateRequest(BaseModel):
+    storyId: int | None = Field(default=None, ge=1)
+    originalRequest: StoryboardGenerateRequest
+    currentStoryboard: StoryboardGenerateResponse
+    feedbackInstruction: str = Field(..., min_length=1, max_length=2000)
