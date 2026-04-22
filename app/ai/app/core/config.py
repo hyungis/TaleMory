@@ -29,6 +29,33 @@ class Settings(BaseModel):
     STORYBOARD_MODEL: str = getenv("STORYBOARD_MODEL", "gpt-4o-mini")
     STORYBOARD_INPUT_COST_PER_1M: float = float(getenv("STORYBOARD_INPUT_COST_PER_1M", "0.15"))
     STORYBOARD_OUTPUT_COST_PER_1M: float = float(getenv("STORYBOARD_OUTPUT_COST_PER_1M", "0.60"))
+    RABBITMQ_HOST: str = getenv("RABBITMQ_HOST", "localhost")
+    RABBITMQ_PORT: int = int(getenv("RABBITMQ_PORT", "5672"))
+    RABBITMQ_USER: str = getenv("RABBITMQ_USER", "guest")
+    RABBITMQ_PASSWORD: str = getenv("RABBITMQ_PASSWORD", "guest")
+    RABBITMQ_VHOST: str = getenv("RABBITMQ_VHOST", "/")
+    RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "storyboard.request")
+    RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "storyboard.result")
+    RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "storyboard.generate.request")
+    RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "storyboard.regenerate.request")
+    RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "storyboard.generate")
+    RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "storyboard.regenerate")
+    RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY",
+        "storyboard.generate.completed",
+    )
+    RABBITMQ_GENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_GENERATE_FAILED_ROUTING_KEY",
+        "storyboard.generate.failed",
+    )
+    RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY",
+        "storyboard.regenerate.completed",
+    )
+    RABBITMQ_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_REGENERATE_FAILED_ROUTING_KEY",
+        "storyboard.regenerate.failed",
+    )
 
 
 @lru_cache
