@@ -1,11 +1,11 @@
 import { ChevronDown, Minus, Plus } from 'lucide-react'
-import type { ChildInfo, Gender } from '../../model/types'
+import type { StoryChild, Gender } from '../../model/types'
 
 const GENDERS: readonly Gender[] = ['남자', '여자'] as const
 
 interface ChildrenListProps {
-  children: ChildInfo[]
-  onChildUpdate: (index: number, patch: Partial<ChildInfo>) => void
+  children: StoryChild[]
+  onChildUpdate: (index: number, patch: Partial<StoryChild>) => void
   onChildAdd: () => void
   onChildRemove: (index: number) => void
 }

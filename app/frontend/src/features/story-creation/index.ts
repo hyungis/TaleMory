@@ -1,12 +1,12 @@
 export { useStoryCreationFlow } from './model/useStoryCreationFlow'
 export type {
-  ProjectData,
-  ChildInfo,
+  StoryProject,
+  StoryChild,
   Gender,
   Level,
-  PhotoItem,
+  DraftPhoto,
   StoryboardPageDraft,
-  StylePreset,
+  StylePresetCode,
 } from './model/types'
 export { MAX_STEP } from './model/types'
 export { BasicInfoStep } from './basic-info'

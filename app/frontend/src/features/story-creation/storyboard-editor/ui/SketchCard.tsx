@@ -1,5 +1,5 @@
 import type { StoryboardPageDraft } from '../../model/types'
-import { getPageIcon } from '../lib/pageIcons'
+import { getPageIcon } from '../../../../shared/lib'
 import { IllustrationMockup } from '../../../../shared/ui'
 
 interface SketchCardProps {

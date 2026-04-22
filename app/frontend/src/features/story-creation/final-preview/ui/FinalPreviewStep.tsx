@@ -8,11 +8,11 @@ import {
   Maximize,
   Share2,
 } from 'lucide-react'
-import type { ProjectData } from '../../model/types'
+import type { StoryProject } from '../../model/types'
 import { BookSpread } from './BookSpread'
 
 interface FinalPreviewStepProps {
-  projectData: ProjectData
+  projectData: StoryProject
   onBack: () => void
   /** "내 책장 보관하기" — 제작 플로우 종료 후 메인(서점) 으로 복귀. */
   onSaveToBookshelf: () => void

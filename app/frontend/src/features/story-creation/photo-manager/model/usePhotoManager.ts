@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react'
-import type { PhotoItem } from '../../model/types'
+import type { DraftPhoto } from '../../model/types'
 
 export const MAX_PHOTOS = 30
 
 export interface UsePhotoManagerResult {
-  photos: PhotoItem[]
+  photos: DraftPhoto[]
   addFiles: (files: FileList | File[]) => void
   removePhoto: (id: string) => void
-  updatePhoto: (id: string, patch: Partial<Pick<PhotoItem, 'name' | 'description' | 'tags'>>) => void
+  updatePhoto: (id: string, patch: Partial<Pick<DraftPhoto, 'name' | 'description' | 'tags'>>) => void
   canAddMore: boolean
 }
 
@@ -16,8 +16,8 @@ export interface UsePhotoManagerResult {
  * 현재 URL 은 `URL.createObjectURL` 로 브라우저 메모리 blob url — 새로고침 시 휘발.
  * 실제 S3 업로드는 후속 API 연동 커밋에서 추가.
  */
-export function usePhotoManager(initial: PhotoItem[] = []): UsePhotoManagerResult {
-  const [photos, setPhotos] = useState<PhotoItem[]>(initial)
+export function usePhotoManager(initial: DraftPhoto[] = []): UsePhotoManagerResult {
+  const [photos, setPhotos] = useState<DraftPhoto[]>(initial)
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const list = Array.from(files)
@@ -26,7 +26,7 @@ export function usePhotoManager(initial: PhotoItem[] = []): UsePhotoManagerResul
       const accepted = list
         .filter(f => f.type.startsWith('image/'))
         .slice(0, Math.max(0, remaining))
-        .map<PhotoItem>(file => ({
+        .map<DraftPhoto>(file => ({
           id: `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           url: URL.createObjectURL(file),
           name: file.name,
@@ -46,7 +46,7 @@ export function usePhotoManager(initial: PhotoItem[] = []): UsePhotoManagerResul
   }, [])
 
   const updatePhoto = useCallback(
-    (id: string, patch: Partial<Pick<PhotoItem, 'name' | 'description' | 'tags'>>) => {
+    (id: string, patch: Partial<Pick<DraftPhoto, 'name' | 'description' | 'tags'>>) => {
       setPhotos(prev => prev.map(p => (p.id === id ? { ...p, ...patch } : p)))
     },
     [],

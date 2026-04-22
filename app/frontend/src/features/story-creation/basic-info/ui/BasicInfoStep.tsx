@@ -1,14 +1,14 @@
 import { User } from 'lucide-react'
-import type { ProjectData } from '../../model/types'
+import type { StoryProject } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
 import { NextButton } from '../../ui/NextButton'
 import { LevelPicker } from './LevelPicker'
 import { ChildrenList } from './ChildrenList'
 
 interface BasicInfoStepProps {
-  data: ProjectData['step1']
-  onUpdate: <K extends keyof ProjectData['step1']>(key: K, value: ProjectData['step1'][K]) => void
-  onChildUpdate: (index: number, patch: Partial<ProjectData['step1']['children'][number]>) => void
+  data: StoryProject['step1']
+  onUpdate: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
+  onChildUpdate: (index: number, patch: Partial<StoryProject['step1']['children'][number]>) => void
   onChildAdd: () => void
   onChildRemove: (index: number) => void
   onBack: () => void

@@ -1,13 +1,13 @@
 import { Palette, Check } from 'lucide-react'
-import type { ProjectData, StylePreset } from '../../model/types'
+import type { StoryProject, StylePresetCode } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
 import { NextButton } from '../../ui/NextButton'
 import { STYLE_OPTIONS } from '../lib/styleOptions'
 import { IllustrationMockup } from '../../../../shared/ui'
 
 interface StyleSelectorStepProps {
-  data: ProjectData['step5']
-  onStyleChange: (style: StylePreset) => void
+  data: StoryProject['step5']
+  onStyleChange: (style: StylePresetCode) => void
   onBack: () => void
   onNext: () => void
 }
@@ -17,7 +17,7 @@ interface StyleSelectorStepProps {
  * 각 스타일의 시각 정체성(watercolor vs digital vs crayon …)을 대충이라도 보여주기 위함.
  */
 const STYLE_PREVIEW: Record<
-  StylePreset,
+  StylePresetCode,
   { textColor: string; bg: string; accent: string }
 > = {
   watercolor: { textColor: 'text-[#2d5a27]', bg: 'bg-[#fff9dd]', accent: 'text-[#2d5a27]' },

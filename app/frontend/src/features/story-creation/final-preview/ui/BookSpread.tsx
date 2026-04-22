@@ -1,6 +1,6 @@
 import { Quote } from 'lucide-react'
 import type { StoryboardPageDraft } from '../../model/types'
-import { getPageIcon } from '../../storyboard-editor/lib/pageIcons'
+import { getPageIcon } from '../../../../shared/lib'
 import { IllustrationMockup } from '../../../../shared/ui'
 import { VoicePlayerMock } from './VoicePlayerMock'
 

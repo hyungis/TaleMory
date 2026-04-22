@@ -1,10 +1,10 @@
 import { Trash2, Image as ImageIcon } from 'lucide-react'
-import type { PhotoItem as PhotoItemType } from '../../model/types'
+import type { DraftPhoto } from '../../model/types'
 
 interface PhotoItemProps {
-  photo: PhotoItemType
+  photo: DraftPhoto
   onRemove: () => void
-  onUpdate: (patch: Partial<Pick<PhotoItemType, 'description' | 'tags'>>) => void
+  onUpdate: (patch: Partial<Pick<DraftPhoto, 'description' | 'tags'>>) => void
 }
 
 /**

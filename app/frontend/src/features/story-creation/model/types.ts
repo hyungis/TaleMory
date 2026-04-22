@@ -2,18 +2,28 @@
  * 동화 제작 워크스페이스 전역 상태 타입.
  * 원본 App.jsx 의 `projectData` 스키마와 호환 (localStorage 마이그레이션 용이).
  * 추후 백엔드 연동 시 id, storyId 등 필드 확장 예정.
+ *
+ * 네이밍 규칙(FE 컨벤션 14.4):
+ *  - `Info / Item / Data / Page` 금지 접미사 회피.
+ *  - 도메인 공용 어휘인 `StoryboardPageDraft`, `StylePresetCode` 는 `entities/` 에서 재사용.
  */
+
+import type { StoryboardPageDraft, StylePresetCode } from '../../../entities'
+
+export type { StoryboardPageDraft, StylePresetCode }
 
 export type Gender = '남자' | '여자'
 export type Level = '초급' | '중급' | '고급'
 
-export interface ChildInfo {
+/** 제작 플로우에서 다루는 아이(캐릭터) 기본 정보. */
+export interface StoryChild {
   name: string
   gender: Gender
   age: string
 }
 
-export interface PhotoItem {
+/** 사진 업로드 단계에서 클라이언트가 쥐고 있는 draft 사진 (서버 `Photo` 와 별개). */
+export interface DraftPhoto {
   id: string
   url: string
   name: string
@@ -23,25 +33,17 @@ export interface PhotoItem {
   tags: string
 }
 
-export interface StoryboardPageDraft {
-  icon: string
-  sketch: string
-  en: string
-  ko: string
-}
-
-export type StylePreset = 'watercolor' | 'digital' | 'crayon' | 'line' | 'collage'
-
-export interface ProjectData {
+/** 제작 워크스페이스 전역 state. 8개 step 의 작성 중 값을 모두 가진다. */
+export interface StoryProject {
   step1: {
-    children: ChildInfo[]
+    children: StoryChild[]
     companions: string
     level: Level
     travelDates: string[]
     location: string
   }
   step2: {
-    photos: PhotoItem[]
+    photos: DraftPhoto[]
     prompt: string
   }
   step3: {
@@ -51,7 +53,7 @@ export interface ProjectData {
     pages: StoryboardPageDraft[]
   }
   step5: {
-    style: StylePreset
+    style: StylePresetCode
   }
   step6: {
     /** 저장된 보이스 프로필 식별명 (사용자가 "엄마 제주 동화 목소리" 등으로 지정). null = 아직 저장 안 됨. */

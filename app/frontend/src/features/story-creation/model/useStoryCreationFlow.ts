@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ChildInfo, ProjectData, StoryboardPageDraft } from './types'
+import type { StoryChild, StoryProject, StoryboardPageDraft } from './types'
 import { MAX_STEP } from './types'
 import { DEFAULT_STORY_TEXT, DEFAULT_STORYBOARD_PAGES } from '../storyboard-editor/lib/defaults'
 
-const STORAGE_KEY_STEP = 'talemory_draft_step'
-const STORAGE_KEY_DATA = 'talemory_draft_project'
+// 레거시 저장 키 (목업 전환 이전 버전에서 localStorage 에 남아있을 수 있어 한 번 정리해준다).
+const LEGACY_STORAGE_KEY_STEP = 'talemory_draft_step'
+const LEGACY_STORAGE_KEY_DATA = 'talemory_draft_project'
 
-const DEFAULT_DATA: ProjectData = {
+const DEFAULT_DATA: StoryProject = {
   step1: {
     children: [{ name: '', gender: '남자', age: '' }],
     companions: '',
@@ -21,93 +22,40 @@ const DEFAULT_DATA: ProjectData = {
   step6: { voiceModel: null },
 }
 
-function loadInitialStep(): number {
-  if (typeof window === 'undefined') return 1
-  const saved = window.localStorage.getItem(STORAGE_KEY_STEP)
-  const parsed = saved ? parseInt(saved, 10) : NaN
-  // 신규 제작 플로우는 step 1 부터 시작 (step 0 = 책장 대시보드는 bookstore 씬에서 처리)
-  return Number.isFinite(parsed) && parsed >= 1 && parsed <= MAX_STEP ? parsed : 1
-}
-
-function loadInitialData(): ProjectData {
-  if (typeof window === 'undefined') return DEFAULT_DATA
-  const saved = window.localStorage.getItem(STORAGE_KEY_DATA)
-  if (!saved) return DEFAULT_DATA
-  try {
-    const parsed = JSON.parse(saved) as Partial<ProjectData>
-    return {
-      step1: {
-        ...DEFAULT_DATA.step1,
-        ...(parsed.step1 ?? {}),
-        children: Array.isArray(parsed.step1?.children)
-          ? (parsed.step1?.children as ChildInfo[])
-          : DEFAULT_DATA.step1.children,
-      },
-      step2: {
-        ...DEFAULT_DATA.step2,
-        ...(parsed.step2 ?? {}),
-        // 이전 스키마 호환: photos[].tags 가 배열이었을 수 있고, description 이 없을 수 있음.
-        photos: Array.isArray(parsed.step2?.photos)
-          ? (parsed.step2!.photos as unknown[]).map(raw => {
-              const p = raw as Record<string, unknown>
-              const tagsRaw = p.tags
-              return {
-                id: String(p.id ?? `photo-${Math.random().toString(36).slice(2, 8)}`),
-                url: String(p.url ?? ''),
-                name: String(p.name ?? ''),
-                description: String(p.description ?? ''),
-                tags:
-                  typeof tagsRaw === 'string'
-                    ? tagsRaw
-                    : Array.isArray(tagsRaw)
-                      ? tagsRaw.map(String).join(' ')
-                      : '',
-              }
-            })
-          : [],
-      },
-      step3: { ...DEFAULT_DATA.step3, ...(parsed.step3 ?? {}) },
-      step4: { ...DEFAULT_DATA.step4, ...(parsed.step4 ?? {}) },
-      step5: { ...DEFAULT_DATA.step5, ...(parsed.step5 ?? {}) },
-      step6: { ...DEFAULT_DATA.step6, ...(parsed.step6 ?? {}) },
-    }
-  } catch {
-    return DEFAULT_DATA
-  }
-}
-
 export interface UseStoryCreationFlowResult {
   currentStep: number
-  projectData: ProjectData
+  projectData: StoryProject
   setCurrentStep: (step: number) => void
   handleNext: () => void
   handlePrev: () => void
-  updateStep1: <K extends keyof ProjectData['step1']>(key: K, value: ProjectData['step1'][K]) => void
-  updateStep2: <K extends keyof ProjectData['step2']>(key: K, value: ProjectData['step2'][K]) => void
+  updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
+  updateStep2: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   updateStoryText: (story: string) => void
   updateStoryboardPage: (idx: number, patch: Partial<StoryboardPageDraft>) => void
-  updateStyle: (style: ProjectData['step5']['style']) => void
+  updateStyle: (style: StoryProject['step5']['style']) => void
   updateVoiceModel: (voiceModel: string | null) => void
-  updateChildAt: (index: number, patch: Partial<ChildInfo>) => void
+  updateChildAt: (index: number, patch: Partial<StoryChild>) => void
   addChild: () => void
   removeChildAt: (index: number) => void
 }
 
 /**
  * 스토리 제작 워크스페이스의 현재 step + projectData 를 한 묶음으로 관리.
- * localStorage 에 자동 저장 (원본 App.jsx 동작 유지). 페이지 새로고침 후에도 draft 복원.
+ *
+ * NOTE: 프론트 목업 단계에서는 persistence 가 오히려 버그(이전 세션의 stale step 으로 진입)를
+ * 유발해서 제거한다. 마운트 시 항상 step 1 + DEFAULT_DATA 로 시작하며,
+ * 레거시 localStorage key 가 남아있다면 한 번 정리해준다.
  */
 export function useStoryCreationFlow(): UseStoryCreationFlowResult {
-  const [currentStep, setCurrentStepState] = useState<number>(() => loadInitialStep())
-  const [projectData, setProjectData] = useState<ProjectData>(() => loadInitialData())
+  const [currentStep, setCurrentStepState] = useState<number>(1)
+  const [projectData, setStoryProject] = useState<StoryProject>(DEFAULT_DATA)
 
+  // 레거시 키 정리 (과거 빌드에서 남겼을 수 있는 stale draft 삭제).
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY_STEP, String(currentStep))
-  }, [currentStep])
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(projectData))
-  }, [projectData])
+    if (typeof window === 'undefined') return
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY_STEP)
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY_DATA)
+  }, [])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))
@@ -122,25 +70,25 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
   }, [])
 
   const updateStep1 = useCallback(
-    <K extends keyof ProjectData['step1']>(key: K, value: ProjectData['step1'][K]) => {
-      setProjectData(prev => ({ ...prev, step1: { ...prev.step1, [key]: value } }))
+    <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => {
+      setStoryProject(prev => ({ ...prev, step1: { ...prev.step1, [key]: value } }))
     },
     [],
   )
 
   const updateStep2 = useCallback(
-    <K extends keyof ProjectData['step2']>(key: K, value: ProjectData['step2'][K]) => {
-      setProjectData(prev => ({ ...prev, step2: { ...prev.step2, [key]: value } }))
+    <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => {
+      setStoryProject(prev => ({ ...prev, step2: { ...prev.step2, [key]: value } }))
     },
     [],
   )
 
   const updateStoryText = useCallback((story: string) => {
-    setProjectData(prev => ({ ...prev, step3: { story } }))
+    setStoryProject(prev => ({ ...prev, step3: { story } }))
   }, [])
 
   const updateStoryboardPage = useCallback((idx: number, patch: Partial<StoryboardPageDraft>) => {
-    setProjectData(prev => {
+    setStoryProject(prev => {
       const pages = [...prev.step4.pages]
       if (!pages[idx]) return prev
       pages[idx] = { ...pages[idx], ...patch }
@@ -148,16 +96,16 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     })
   }, [])
 
-  const updateStyle = useCallback((style: ProjectData['step5']['style']) => {
-    setProjectData(prev => ({ ...prev, step5: { style } }))
+  const updateStyle = useCallback((style: StoryProject['step5']['style']) => {
+    setStoryProject(prev => ({ ...prev, step5: { style } }))
   }, [])
 
   const updateVoiceModel = useCallback((voiceModel: string | null) => {
-    setProjectData(prev => ({ ...prev, step6: { voiceModel } }))
+    setStoryProject(prev => ({ ...prev, step6: { voiceModel } }))
   }, [])
 
-  const updateChildAt = useCallback((index: number, patch: Partial<ChildInfo>) => {
-    setProjectData(prev => {
+  const updateChildAt = useCallback((index: number, patch: Partial<StoryChild>) => {
+    setStoryProject(prev => {
       const children = [...prev.step1.children]
       children[index] = { ...children[index], ...patch }
       return { ...prev, step1: { ...prev.step1, children } }
@@ -165,7 +113,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
   }, [])
 
   const addChild = useCallback(() => {
-    setProjectData(prev => ({
+    setStoryProject(prev => ({
       ...prev,
       step1: {
         ...prev.step1,
@@ -175,7 +123,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
   }, [])
 
   const removeChildAt = useCallback((index: number) => {
-    setProjectData(prev => {
+    setStoryProject(prev => {
       const children = prev.step1.children.filter((_, i) => i !== index)
       return {
         ...prev,

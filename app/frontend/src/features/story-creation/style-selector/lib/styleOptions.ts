@@ -1,7 +1,7 @@
-import type { StylePreset } from '../../model/types'
+import type { StylePresetCode } from '../../model/types'
 
 export interface StyleOptionDef {
-  id: StylePreset
+  id: StylePresetCode
   name: string
   desc: string
   recommended?: boolean

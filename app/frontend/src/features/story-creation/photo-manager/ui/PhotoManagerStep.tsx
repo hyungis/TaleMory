@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Image as ImageIcon, Wand2 } from 'lucide-react'
-import type { ProjectData } from '../../model/types'
+import type { StoryProject } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
 import { usePhotoManager, MAX_PHOTOS } from '../model/usePhotoManager'
 import { PhotoUploadZone } from './PhotoUploadZone'
@@ -9,8 +9,8 @@ import { EmptyPhotoState } from './EmptyPhotoState'
 import { StoryPromptModal } from './StoryPromptModal'
 
 interface PhotoManagerStepProps {
-  data: ProjectData['step2']
-  onUpdate: <K extends keyof ProjectData['step2']>(key: K, value: ProjectData['step2'][K]) => void
+  data: StoryProject['step2']
+  onUpdate: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   onBack: () => void
   onNext: () => void
 }

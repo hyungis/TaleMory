@@ -1,10 +1,10 @@
 import { useCallback, useState, type KeyboardEvent } from 'react'
 import { ArrowLeft, ArrowRight, BookOpenCheck, Info, Send, Sparkles, Wand2 } from 'lucide-react'
-import type { ProjectData } from '../../model/types'
+import type { StoryProject } from '../../model/types'
 import { REFINE_QUICK_TAGS } from '../lib/defaults'
 
 interface StoryTextStepProps {
-  data: ProjectData['step3']
+  data: StoryProject['step3']
   onStoryChange: (story: string) => void
   onBack: () => void
   onNext: () => void

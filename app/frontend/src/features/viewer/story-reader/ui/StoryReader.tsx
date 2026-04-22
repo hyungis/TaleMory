@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import { BookOpenText, Sparkles } from 'lucide-react'
-import type { StoryboardPageDraft } from '../../../story-creation/model/types'
-import { getPageIcon } from '../../../story-creation/storyboard-editor/lib/pageIcons'
+import type { StoryboardPageDraft } from '../../../../entities'
+import { getPageIcon } from '../../../../shared/lib'
 import { IllustrationMockup } from '../../../../shared/ui'
 import { StoryPage } from './StoryPage'
 
