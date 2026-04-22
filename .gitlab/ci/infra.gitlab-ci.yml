@@ -1,0 +1,31 @@
+# Infra pipeline — 조건부 로드.
+#
+# 엔트리(.gitlab-ci.yml)의 include rules 에 의해 다음 경우에만 로드됨:
+#   1) dev/master 브랜치 push 에서 infra 관련 파일이 변경된 경우
+#      (compose/docker-compose.infra-*.yml, scripts/deploy-infra-*.sh,
+#       scripts/common.sh, scripts/health-check-infra.sh, env/infra.*.env.example)
+#   2) GitLab UI "Run pipeline" 에서 DEPLOY_INFRA=true 변수를 전달한 경우
+#      (bootstrap / creds rotate / 서버 재부팅 후 수동 복구)
+#
+# 로드된 이상 job 안에서는 manual 클릭 없이 자동 실행 — 깨끗한 흐름을 위해 rules 에
+# when: manual 을 두지 않음. "infra 를 올리기로 한 파이프라인은 무조건 올린다" 원칙.
+
+deploy_infra_dev:
+  stage: infra_deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+  needs:
+    - generate_env_dev
+  script:
+    - bash infra/scripts/deploy-infra-dev.sh
+    - bash infra/scripts/health-check-infra.sh dev
+
+deploy_infra_master:
+  stage: infra_deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  needs:
+    - generate_env_master
+  script:
+    - bash infra/scripts/deploy-infra-master.sh
+    - bash infra/scripts/health-check-infra.sh master

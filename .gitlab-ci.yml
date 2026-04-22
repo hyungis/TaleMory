@@ -1,0 +1,62 @@
+# S210 CI/CD — project runner + shell executor 전제.
+# 전체 흐름/규칙은 docs/ci-cd-pipeline-flow.md 참고.
+#
+# 파이프라인은 두 파일로 분리됨:
+#   - .gitlab/ci/app.gitlab-ci.yml    : 항상 로드
+#                                        (generate_env, verify, build, deploy, notify, cleanup)
+#   - .gitlab/ci/infra.gitlab-ci.yml  : 조건부 로드
+#                                        (deploy_infra_*)
+#
+# infra 가 로드되지 않으면 deploy_infra_* job 자체가 파이프라인에 존재하지 않음.
+# verify_infra_*의 needs:optional:true 가 정상 동작 → 뒤 stage(build/deploy)가 막히지 않음.
+
+stages:
+  - generate_env
+  - infra_deploy      # infra.gitlab-ci.yml 이 로드될 때만 실제 job 존재
+  - verify            # infra 접속/creds 검증 (build 앞)
+  - build
+  - deploy
+  - .post             # notify, cleanup
+
+variables:
+  APP_IMAGE_TAG: $CI_COMMIT_SHORT_SHA   # 덮어쓰기 없는 immutable 태그
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - when: never
+
+default:
+  tags:
+    - s210-runner       # 배포 서버의 project runner tag
+
+# Registry 미사용(SSAFY GitLab 에 Container Registry 비활성) — 로컬 빌드된 이미지를
+# daemon 에서 바로 compose 가 씀. docker login 불필요.
+
+include:
+  # ── app 파이프라인: 항상 로드 ─────────────────────────────
+  - local: '.gitlab/ci/app.gitlab-ci.yml'
+
+  # ── infra 파이프라인: 조건부 로드 ─────────────────────────
+  # 1) dev 브랜치 push 에서 infra 파일 변경 시 자동
+  # 2) master 브랜치 push 에서 infra 파일 변경 시 자동
+  # 3) GitLab UI "Run pipeline" 에서 DEPLOY_INFRA=true 변수 전달 시
+  #    (bootstrap / creds rotate / 서버 재부팅 복구용)
+  - local: '.gitlab/ci/infra.gitlab-ci.yml'
+    rules:
+      - if: '$CI_COMMIT_BRANCH == "dev"'
+        changes:
+          - infra/compose/docker-compose.infra-dev.yml
+          - infra/scripts/deploy-infra-dev.sh
+          - infra/scripts/common.sh
+          - infra/scripts/health-check-infra.sh
+          - infra/env/infra.dev.env.example
+      - if: '$CI_COMMIT_BRANCH == "master"'
+        changes:
+          - infra/compose/docker-compose.infra-master.yml
+          - infra/scripts/deploy-infra-master.sh
+          - infra/scripts/common.sh
+          - infra/scripts/health-check-infra.sh
+          - infra/env/infra.master.env.example
+      - if: '$DEPLOY_INFRA == "true"'

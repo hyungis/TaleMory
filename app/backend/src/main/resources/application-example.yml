@@ -1,6 +1,32 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://localhost:3306/iportf}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    url: ${DB_URL:jdbc:mysql://localhost:3307/iportfolio?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5673}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
+  jwt:
+    access_secret: ${JWT_ACCESS_SECRET}
+    refresh_secret: ${JWT_REFRESH_SECRET}

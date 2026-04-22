@@ -1,0 +1,260 @@
+/* ==========================================================================
+   HomePage (랜딩) 전용 스타일.
+   App.css 원본(story-forest)에서 추출, feature-local 으로 이관.
+   Tailwind 유틸로 치환 가능한 부분(단순 spacing/color)도 있으나,
+   clamp() 기반 타이포 + mask-image 기반 원형 디졸브 전환은 CSS 유지가 자연스러워 원본 그대로 이관.
+   ========================================================================== */
+
+/* ===== Landing Screen (autoplay hero video) ===== */
+.landing-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  z-index: 9999;
+}
+
+.landing-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  filter: brightness(0.55) saturate(0.95);
+}
+
+.landing-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8vh 0 10vh;
+  color: #fff;
+  text-align: center;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 0.35) 30%,
+    rgba(0, 0, 0, 0.25) 60%,
+    rgba(0, 0, 0, 0.65) 100%
+  );
+  animation: landingFadeIn 1.2s ease-out 0.2s both;
+}
+
+.landing-text-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing-title {
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  margin: 0 0 0.6rem;
+  letter-spacing: 0.05em;
+  color: #3ca55c;
+  text-shadow:
+    0 0 18px rgba(60, 165, 92, 0.5),
+    0 4px 24px rgba(0, 0, 0, 0.75);
+  font-weight: 700;
+}
+
+.landing-subtitle {
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  margin: 0 0 2.5rem;
+  opacity: 0.92;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.landing-start-btn {
+  padding: 0.95rem 2.8rem;
+  font-size: 1.1rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition:
+    transform 0.3s ease,
+    background 0.3s ease,
+    border-color 0.3s ease;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+.landing-start-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: #fff;
+  transform: translateY(-2px);
+}
+
+.landing-start-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* === 나비 떼 퍼짐 + 원형 디졸브 전환 (검은 화면 없이) === */
+@property --reveal-radius {
+  syntax: '<length>';
+  initial-value: 0px;
+  inherits: false;
+}
+
+.landing-screen.exiting {
+  background: transparent;
+  /*
+   * 6s 짜리 원형 디졸브 애니메이션이 진행되는 동안 landing DOM 이 viewport 전체를 덮어
+   * 뒤의 MainPage(ForestScene — 집 클릭) 포인터 이벤트를 차단하던 문제 해결.
+   * 시각 애니메이션은 그대로 두고, 클릭만 뒤로 통과시킨다.
+   */
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% calc(100vh - 10vh - 30px),
+    transparent 0,
+    transparent var(--reveal-radius),
+    rgba(0, 0, 0, 0.35) calc(var(--reveal-radius) + 140px),
+    #000 calc(var(--reveal-radius) + 440px)
+  );
+  mask-image: radial-gradient(
+    circle at 50% calc(100vh - 10vh - 30px),
+    transparent 0,
+    transparent var(--reveal-radius),
+    rgba(0, 0, 0, 0.35) calc(var(--reveal-radius) + 140px),
+    #000 calc(var(--reveal-radius) + 440px)
+  );
+  animation:
+    landingRevealMask 5.5s cubic-bezier(0.3, 0.1, 0.3, 1) 0.4s forwards,
+    landingScreenFade 4s ease-out 1.5s forwards;
+}
+
+.landing-screen.exiting .landing-video {
+  animation: landingContentFade 1.8s ease-out 0.8s forwards;
+}
+
+.landing-screen.exiting .landing-overlay {
+  animation: landingContentFade 1.6s ease-out 0.8s forwards;
+}
+
+.landing-screen.exiting .landing-start-btn {
+  pointer-events: none;
+  animation: btnBurst 0.5s cubic-bezier(0.3, 0.1, 0.2, 1) 0s forwards;
+}
+
+@keyframes landingScreenFade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.butterfly-swarm {
+  position: fixed;
+  top: calc(100vh - 10vh - 30px);
+  left: 50%;
+  width: 0;
+  height: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.butterfly {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 120px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  filter: drop-shadow(0 5px 14px rgba(0, 0, 0, 0.4));
+  animation: butterflyFly var(--duration, 2s) cubic-bezier(0.22, 0.6, 0.36, 1) var(--delay, 0s) forwards;
+}
+
+.butterfly > div {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes landingRevealMask {
+  from { --reveal-radius: 0px; }
+  to { --reveal-radius: 160vmax; }
+}
+
+@keyframes btnBurst {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+    background: rgba(255, 255, 255, 0.12);
+  }
+  30% {
+    opacity: 0.9;
+    transform: scale(1.18);
+    filter: brightness(1.8);
+    background: rgba(255, 240, 180, 0.55);
+    border-color: rgba(255, 255, 220, 0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.55);
+    filter: brightness(2.4);
+    background: rgba(255, 220, 120, 0);
+    border-color: rgba(255, 255, 220, 0);
+  }
+}
+
+@keyframes butterflyFly {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(0.25) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(calc(var(--tx) * 0.1), calc(var(--ty) * 0.1)) scale(var(--scale)) rotate(6deg);
+  }
+  38% {
+    transform: translate(-50%, -50%) translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4 - 18px)) scale(var(--scale)) rotate(-7deg);
+  }
+  68% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(calc(var(--tx) * 0.72), calc(var(--ty) * 0.74 - 8px)) scale(var(--scale)) rotate(5deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(calc(var(--scale) * 0.85)) rotate(-3deg);
+  }
+}
+
+@keyframes landingContentFade {
+  to { opacity: 0; }
+}
+
+@keyframes landingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-video {
+    filter: brightness(0.55) saturate(0.95) contrast(1);
+  }
+  .landing-overlay {
+    animation: none;
+  }
+  .landing-screen.exiting,
+  .landing-screen.exiting .landing-video,
+  .landing-screen.exiting .landing-overlay,
+  .landing-screen.exiting .landing-start-btn {
+    animation: none;
+  }
+}
