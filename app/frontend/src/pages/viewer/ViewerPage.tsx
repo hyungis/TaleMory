@@ -29,13 +29,32 @@ export function ViewerPage() {
   }
 
   const openBookMode = () => {
-    setSearchParams({ mode: 'book' })
+    // 주소창/탭바 없는 전용 뷰어 창으로 띄움 — e-book 리더 몰입감.
+    const url = `${window.location.pathname}?mode=book`
+    const w = Math.min(1280, window.screen.availWidth - 100)
+    const h = Math.min(860, window.screen.availHeight - 100)
+    const left = Math.round((window.screen.availWidth - w) / 2)
+    const top = Math.round((window.screen.availHeight - h) / 2)
+    const popup = window.open(
+      url,
+      `TaleMoryViewer-${storyId}`,
+      `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
+    )
+    if (!popup) {
+      // 브라우저가 팝업 차단 시 같은 탭에서 전환 fallback
+      setSearchParams({ mode: 'book' })
+    }
   }
   const openWebtoonMode = () => {
     setShowWebtoonNotice(true)
   }
   const closeViewer = () => {
-    setSearchParams({})
+    // 팝업으로 열린 창이면 닫고, 직접 URL 진입이면 청첩장으로 복귀
+    if (window.opener) {
+      window.close()
+    } else {
+      setSearchParams({})
+    }
   }
 
   if (mode === 'book') {
