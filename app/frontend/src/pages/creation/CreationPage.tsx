@@ -72,7 +72,9 @@ export function CreationPage() {
 
       {flow.currentStep === 4 && (
         <StoryboardEditorStep
-          data={flow.projectData.step4}
+          storySummary={flow.projectData.step3.story}
+          pages={flow.projectData.step4.pages}
+          onPageUpdate={flow.updateStoryboardPage}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
