@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/stories")
+@RequestMapping("/api/stories")
 class StoryController {
 
     // 동화 목록 조회

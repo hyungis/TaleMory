@@ -8,9 +8,11 @@
 *.secrets
 docs/plans/
 
-# Keep shareable examples tracked
-!.env.example
-!**/.env.example
+# infra/env/ runtime files (local values). Only *.example commits.
+# (로컬 개발 진입점은 `docker compose -f infra/compose/docker-compose.app-local.yml ...`;
+#  루트 .env는 더 이상 사용하지 않음.)
+infra/env/*.env
+!infra/env/*.env.example
 
 # Private keys and certificates
 *.pem
@@ -25,16 +27,23 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Claude Code per-session cache
+.claude/cache/
+**/.claude/cache/
+
+# Claude Code worktrees (local, ephemeral)
+.claude/worktrees/
+**/.claude/worktrees/
+
+# Claude Code per-developer overrides (permissions/allowlist은 개인별)
+.claude/settings.local.json
+**/.claude/settings.local.json
+
 # Python local artifacts
 **/.venv/
 **/__pycache__/
 *.pyc
 *.pyo
 
-# Claude Code local state (worktrees, cache, session state)
-.claude/
-**/.claude/
-
-# oh-my-claudecode (OMC) local data
-.omc/
-**/.omc/
+.omc
+**/.omc

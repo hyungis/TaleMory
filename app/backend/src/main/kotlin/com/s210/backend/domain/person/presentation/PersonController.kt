@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/persons")
+@RequestMapping("/api/persons")
 class PersonController {
 
     // 인물 목록 조회 (query: role=child/companion)

@@ -1,0 +1,48 @@
+name: s210-local
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: local-mysql
+    restart: unless-stopped
+    env_file:
+      - ../env/infra.local.env
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: local-redis
+    restart: unless-stopped
+    env_file:
+      - ../env/infra.local.env
+    command: ["sh", "-c", "redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: local-rabbitmq
+    restart: unless-stopped
+    env_file:
+      - ../env/infra.local.env
+    ports:
+      - "${RABBITMQ_PORT:-5673}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15673}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:

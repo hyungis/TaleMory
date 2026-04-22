@@ -106,6 +106,29 @@ In that case:
 
 Only write a skill update and version history when the user confirms that the change should guide future similar work.
 
+## Hook Wiring Propagation
+
+When a skill update changes auto-load hook behavior (adding or removing a trigger token, renaming a skill, etc.), up to four scripts share the same map and must stay in sync:
+
+- `.claude/hooks/load-project-skills.py` — `SKILL_MAP` (repo root CWD, path-based matching on `Edit|Write`)
+- `app/backend/.claude/hooks/load-skill.py` — `EXTRA_MAP` (backend CWD, matches on `Edit|Write`; `NATIVE_SKILL` loaded on `SessionStart`)
+- `app/frontend/.claude/hooks/load-skill.py` — `EXTRA_MAP` (frontend CWD)
+- `app/ai/.claude/hooks/load-skill.py` — `EXTRA_MAP` (ai CWD; `NATIVE_SKILL = None` until an AI-specific skill exists)
+
+Apply this checklist before committing any hook-affecting skill change:
+
+1. Decide explicitly which workspaces should trigger the skill. If the answer is "all workspaces", every file above needs the entry.
+2. Add the matching entry (token + skill name) to every workspace's hook in that set.
+3. Run the drift check:
+   ```bash
+   grep -En "<skill-name>" .claude/hooks/*.py app/*/.claude/hooks/*.py
+   ```
+   Confirm the number of hits equals the number of workspaces the skill should reach.
+4. If only a subset of workspaces should trigger the skill, record the scoping decision (and why) in a Design Note inside that skill's history entry. Example precedent: `env-sync` v0.2 explains why `/infra/env/` lives in each workspace's `EXTRA_MAP` rather than a single central location.
+5. List every modified hook file in the history entry's `Changed files`. Never update the map in one hook and skip the history note — silent workspace-specific behavior is the main failure mode this rule exists to prevent.
+
+Do not rely on the root hook alone. When Claude runs with a sub-workspace (`app/backend`, `app/frontend`, `app/ai`) as CWD, Claude Code uses that workspace's `.claude/settings.json` and the root hook never fires. Sub-workspace coverage is therefore mandatory for any skill that must be available across the whole repo.
+
 ## Protected Area Rule
 
 Treat these as protected areas:
