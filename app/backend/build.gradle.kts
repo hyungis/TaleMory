@@ -32,6 +32,7 @@ dependencies {
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-mysql")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13")
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("com.mysql:mysql-connector-j")
     annotationProcessor("org.projectlombok:lombok")
