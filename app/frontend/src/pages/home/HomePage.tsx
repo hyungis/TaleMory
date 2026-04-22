@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { AuthModal, useAuthModal } from '../../features/auth'
 import { MainPage } from '../main'
 import { ButterflySwarm } from './ui/ButterflySwarm'
@@ -27,8 +28,16 @@ const LANDING_EXIT_DURATION_MS = 6000
  * - /main 직접 URL 진입 시에도 동일 MainPage 가 렌더되므로 북마크/새로고침 호환
  */
 export function HomePage() {
-  const [isExiting, setIsExiting] = useState(false)
-  const [isLandingDone, setIsLandingDone] = useState(false)
+  const location = useLocation()
+  /**
+   * 제작 플로우 완료/이탈에서 `navigate('/', { state: { skipLanding: true } })` 로
+   * 돌아오면 이미 인증된 유저이므로 랜딩 영상·나비 떼·디졸브 마스크를 전부 생략하고
+   * 바로 MainPage(책장 씬)를 보여준다.
+   */
+  const skipLanding =
+    (location.state as { skipLanding?: boolean } | null)?.skipLanding === true
+  const [isExiting, setIsExiting] = useState(skipLanding)
+  const [isLandingDone, setIsLandingDone] = useState(skipLanding)
   const butterflyAnim = useButterflyAnim()
   const particles = useMemo(() => generateSwarmParticles(), [])
   const auth = useAuthModal('login')

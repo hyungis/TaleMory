@@ -30,14 +30,31 @@ export function CreationPage() {
   const navigate = useNavigate()
   const flow = useStoryCreationFlow()
 
+  /**
+   * 제작 플로우 이탈 공통 네비게이션.
+   *
+   * `/main` 으로 가면 새 MainPage 인스턴스가 마운트돼, 책장 씬의 ← (back-to-forest)
+   * 버튼을 누르면 뜬금없이 숲 씬이 "붙어 있는" 것처럼 보이는 UX 혼선이 있었다.
+   * 대신 원래 인라인 MainPage 를 품고 있던 `/` 로 돌아가서 책장 씬으로 진입시키고,
+   * `skipLanding` 플래그로 HomePage 의 랜딩 애니메이션을 스킵한다.
+   * `replace: true` 로 `/creation` 을 히스토리에서 치워 브라우저 뒤로가기가
+   * 제작 플로우로 다시 빨려 들어가지 않도록 한다.
+   */
+  const goToBookshelf = useCallback(() => {
+    navigate(ROUTES.home, {
+      state: { scene: 'bookstore', skipLanding: true },
+      replace: true,
+    })
+  }, [navigate])
+
   const handleBack = useCallback(() => {
     if (flow.currentStep > 1) {
       flow.handlePrev()
     } else {
-      // step 1 에서 back → 메인(서점) 씬으로 복귀
-      navigate(ROUTES.main)
+      // step 1 에서 back → 책장(서점) 씬으로 복귀 (랜딩/숲 재생 없이).
+      goToBookshelf()
     }
-  }, [flow, navigate])
+  }, [flow, goToBookshelf])
 
   return (
     <div className="relative w-full h-full">
@@ -102,13 +119,13 @@ export function CreationPage() {
         <FinalPreviewStep
           projectData={flow.projectData}
           onBack={handleBack}
-          onSaveToBookshelf={() => navigate(ROUTES.main)}
+          onSaveToBookshelf={goToBookshelf}
           onOpenViewer={() => navigate(buildViewerPath(DUMMY_STORIES[0]?.id ?? 1))}
         />
       )}
 
       {flow.currentStep === 8 && (
-        <PublishStoryStep onBack={handleBack} onExit={() => navigate(ROUTES.main)} />
+        <PublishStoryStep onBack={handleBack} onExit={goToBookshelf} />
       )}
     </div>
   )
