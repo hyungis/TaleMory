@@ -1,37 +1,108 @@
-import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
-import { DUMMY_STORIES } from '../../entities/story'
-import { StoryReader } from '../../features/viewer'
-import { DEFAULT_STORYBOARD_PAGES } from '../../features/story-creation'
+import { useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { InvitationCard, StoryBookViewer, useStoryViewQuery } from '../../features/viewer'
 import { ROUTES } from '../../shared/constants'
 
 /**
  * `/viewer/:storyId` 라우트.
+ * `?mode=book` 쿼리 유무로 청첩장 / 동화책 뷰어 분기.
  *
- * 현재(Task 9)는 DUMMY_STORIES 에서 id 매칭 후 title 을 뽑고,
- * 페이지 내용은 DEFAULT_STORYBOARD_PAGES(샘플 10장) 를 그대로 사용.
- * 실 백엔드 연동 시 `useStoryQuery(storyId)` 로 scene/sentence 를 가져와 렌더.
+ * 현재 로그인/토큰 인프라 미완이라 `isOwner=true` 고정 — shareToken 기반 공개 라우트가
+ * 추가되면 InvitationCard 에 `isOwner={false}` 로 재사용.
  */
 export function ViewerPage() {
   const { storyId } = useParams<{ storyId: string }>()
   const navigate = useNavigate()
-  const story = DUMMY_STORIES.find(s => String(s.id) === storyId)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const mode = searchParams.get('mode')
+
+  const parsedId = storyId ? Number(storyId) : undefined
+  const { status, data: story, error } = useStoryViewQuery(parsedId)
+
+  const [showWebtoonNotice, setShowWebtoonNotice] = useState(false)
+
+  if (status === 'loading' || status === 'idle') {
+    return <ViewerLoadingState />
+  }
+  if (status === 'error' || !story) {
+    return <ViewerErrorState message={error?.message ?? '동화를 불러오지 못했어요.'} onBack={() => navigate(ROUTES.main)} />
+  }
+
+  const openBookMode = () => {
+    setSearchParams({ mode: 'book' })
+  }
+  const openWebtoonMode = () => {
+    setShowWebtoonNotice(true)
+  }
+  const closeViewer = () => {
+    setSearchParams({})
+  }
+
+  if (mode === 'book') {
+    return <StoryBookViewer story={story} onExit={closeViewer} />
+  }
 
   return (
-    <div className="relative w-full h-full">
-      <button
-        type="button"
-        onClick={() => navigate(ROUTES.main)}
-        className="absolute top-4 left-4 z-50 w-10 h-10 rounded-full bg-[#2a1b12] text-[#f0e6c0] border-2 border-[#b4dc8c]/50 flex items-center justify-center hover:bg-[#3d5a27] transition-colors"
-        aria-label="뒤로가기"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-
-      <StoryReader
-        title={story?.title ?? '동화책'}
-        pages={DEFAULT_STORYBOARD_PAGES}
+    <>
+      <InvitationCard
+        story={story}
+        isOwner
+        onOpenBook={openBookMode}
+        onOpenWebtoon={openWebtoonMode}
       />
+      {showWebtoonNotice && (
+        <WebtoonNoticeModal onClose={() => setShowWebtoonNotice(false)} />
+      )}
+    </>
+  )
+}
+
+function ViewerLoadingState() {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a1a0a] text-[#f0e6c0]">
+      <div className="text-center">
+        <div className="w-12 h-12 mx-auto mb-4 border-4 border-[#b4dc8c]/30 border-t-[#b4dc8c] rounded-full animate-spin" />
+        <p className="text-sm">동화책을 불러오는 중이에요…</p>
+      </div>
+    </div>
+  )
+}
+
+function ViewerErrorState({ message, onBack }: { message: string; onBack: () => void }) {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a1a0a] text-[#f0e6c0] px-6">
+      <div className="text-center max-w-sm">
+        <p className="text-lg mb-3">⚠️ {message}</p>
+        <button onClick={onBack} className="px-5 py-2 rounded-full bg-[#2d5a27] hover:bg-[#3d6f34] text-sm">
+          메인으로 돌아가기
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function WebtoonNoticeModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1a2414] border-2 border-[#b4dc8c]/60 rounded-2xl p-6 max-w-sm w-full text-center text-[#f0e6c0] shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-2xl mb-2">🚧</p>
+        <h3 className="text-xl font-bold mb-2">아직 준비 중이에요</h3>
+        <p className="text-sm text-[#b4dc8c] mb-5">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
+        <button
+          onClick={onClose}
+          className="px-5 py-2 rounded-full bg-[#2d5a27] hover:bg-[#3d6f34] text-sm font-bold"
+        >
+          알겠어요
+        </button>
+      </div>
     </div>
   )
 }

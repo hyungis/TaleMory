@@ -1,0 +1,517 @@
+/* ==========================================================================
+   StoryBook 동화책 뷰어 전용 스타일 (청첩장 목업에서 이식).
+   Tailwind utility 로 표현이 까다로운 3D 책 단면 / flip / 편지지 애니메이션 전용.
+   ========================================================================== */
+
+.sb-room {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 80px;
+  perspective: 2500px;
+  overflow: hidden;
+  background-color: #0a1a0a;
+  color: #4e342e;
+}
+
+.sb-shell {
+  position: relative;
+  width: min(1100px, 100%);
+  max-height: 100%;
+  aspect-ratio: 3 / 2;
+  transform-style: preserve-3d;
+  transition: aspect-ratio 0.6s ease, width 0.6s ease, height 0.6s ease;
+}
+
+.sb-shell.is-cover,
+.sb-shell.is-back-cover {
+  aspect-ratio: 2 / 2.7;
+  width: auto;
+  height: min(calc(100vh - 80px), 700px);
+}
+
+/* ===== 펼친 책 (2페이지 스프레드) ===== */
+.sb-spread {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #fffef5;
+  border-radius: 4px 14px 14px 4px;
+  box-shadow:
+    2px 0 0 #f4ecd8, 4px 0 0 #eadfbf, 6px 0 0 #f4ecd8, 8px 0 0 #eadfbf,
+    10px 0 0 #f4ecd8, 12px 0 0 #eadfbf, 14px 1px 0 #d9cba3,
+    -2px 0 0 #f4ecd8, -4px 0 0 #eadfbf, -6px 0 0 #f4ecd8, -8px 0 0 #eadfbf,
+    -10px 0 0 #f4ecd8, -12px 0 0 #eadfbf, -14px 1px 0 #d9cba3,
+    0 2px 0 #f4ecd8, 0 4px 0 #eadfbf, 0 6px 0 #f4ecd8, 0 8px 0 #eadfbf,
+    0 10px 0 #f4ecd8, 0 12px 0 #d9cba3,
+    0 22px 50px rgba(56, 40, 34, 0.35), 0 32px 70px rgba(56, 40, 34, 0.2);
+  overflow: hidden;
+  transition: border-radius 0.6s ease, box-shadow 0.6s ease;
+}
+
+/* 표지/뒷표지 단면 모드 */
+.sb-shell.is-cover .sb-spread,
+.sb-shell.is-back-cover .sb-spread {
+  grid-template-columns: 1fr;
+}
+.sb-shell.is-cover .sb-spread {
+  border-radius: 4px 14px 14px 4px;
+  box-shadow:
+    2px 0 0 #f4ecd8, 4px 0 0 #eadfbf, 6px 0 0 #f4ecd8, 8px 0 0 #eadfbf,
+    10px 0 0 #f4ecd8, 12px 0 0 #eadfbf, 14px 1px 0 #d9cba3,
+    0 2px 0 #f4ecd8, 0 4px 0 #eadfbf, 0 6px 0 #f4ecd8, 0 8px 0 #eadfbf,
+    0 10px 0 #f4ecd8, 0 12px 0 #d9cba3,
+    14px 18px 40px rgba(56, 40, 34, 0.35), 20px 30px 60px rgba(56, 40, 34, 0.2);
+}
+.sb-shell.is-back-cover .sb-spread {
+  border-radius: 14px 4px 4px 14px;
+  box-shadow:
+    -2px 0 0 #f4ecd8, -4px 0 0 #eadfbf, -6px 0 0 #f4ecd8, -8px 0 0 #eadfbf,
+    -10px 0 0 #f4ecd8, -12px 0 0 #eadfbf, -14px 1px 0 #d9cba3,
+    0 2px 0 #f4ecd8, 0 4px 0 #eadfbf, 0 6px 0 #f4ecd8, 0 8px 0 #eadfbf,
+    0 10px 0 #f4ecd8, 0 12px 0 #d9cba3,
+    -14px 18px 40px rgba(56, 40, 34, 0.35), -20px 30px 60px rgba(56, 40, 34, 0.2);
+}
+
+/* 중앙 책등 그림자 (펼친 상태) */
+.sb-spread::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.16) 47%, rgba(0, 0, 0, 0.26) 50%, rgba(0, 0, 0, 0.16) 53%, transparent);
+  pointer-events: none;
+  z-index: 5;
+}
+.sb-shell.is-cover .sb-spread::before,
+.sb-shell.is-back-cover .sb-spread::before {
+  display: none;
+}
+
+/* 외곽 종이 가장자리 */
+.sb-spread::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px #e8dfc4, inset 0 0 30px rgba(232, 223, 196, 0.3);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* 책등 (앞표지: 왼쪽 / 뒷표지: 오른쪽) */
+.sb-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  z-index: 7;
+  pointer-events: none;
+}
+.sb-shell.is-cover .sb-spine {
+  left: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.18) 30%, rgba(0, 0, 0, 0.06) 55%, transparent);
+  box-shadow: inset 2px 0 4px rgba(0, 0, 0, 0.3);
+  border-radius: 4px 0 0 4px;
+}
+.sb-shell.is-back-cover .sb-spine {
+  right: 0;
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.18) 30%, rgba(0, 0, 0, 0.06) 55%, transparent);
+  box-shadow: inset -2px 0 4px rgba(0, 0, 0, 0.3);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ===== 내부 페이지 (일러스트 / 텍스트) ===== */
+.sb-page {
+  position: relative;
+  padding: 56px 64px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sb-page.left { padding-right: 80px; }
+.sb-page.right { padding-left: 80px; justify-content: center; }
+
+.sb-page-num {
+  position: absolute;
+  bottom: 26px;
+  color: #8d6e63;
+  font-size: 0.95rem;
+  z-index: 2;
+}
+.sb-page-num.left { left: 64px; }
+.sb-page-num.right { right: 64px; }
+
+/* 일러스트 블롭 */
+.sb-illust {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.sb-illust-art {
+  width: 78%;
+  aspect-ratio: 4 / 3;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.92), transparent 35%),
+    linear-gradient(135deg, var(--illust-a, #c4e3b4), var(--illust-b, #f7c59f));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(56, 40, 34, 0.14), inset 0 -8px 20px rgba(0, 0, 0, 0.05);
+  border: 3px solid #fff;
+}
+.sb-illust-art img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+.sb-illust-art.is-empty {
+  color: rgba(255, 255, 255, 0.92);
+}
+.sb-illust-caption {
+  margin-top: 28px;
+  color: #8d6e63;
+  font-size: 1rem;
+  text-align: center;
+  max-width: 80%;
+}
+
+/* 본문 텍스트 */
+.sb-body-label {
+  color: #7cb342;
+  font-size: 1.05rem;
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1;
+}
+.sb-body-label::before,
+.sb-body-label::after {
+  content: '';
+  flex: 0 0 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #a8d57f, transparent);
+}
+.sb-body-title {
+  font-size: 1.7rem;
+  margin: 0 0 30px 0;
+  color: #4e7c1f;
+  font-weight: 700;
+}
+.sb-body-text {
+  line-height: 2;
+  color: #4e342e;
+  font-size: 1.1rem;
+}
+.sb-body-translation {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px dashed #a8d57f;
+  font-size: 0.92rem;
+  color: #8d6e63;
+  line-height: 1.8;
+}
+
+/* ===== 표지 ===== */
+.sb-cover-single {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.7), transparent 45%),
+    radial-gradient(circle at 70% 75%, rgba(255, 255, 255, 0.4), transparent 50%),
+    linear-gradient(150deg, #c4e3b4, #f7c59f);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 50px;
+  overflow: hidden;
+  border-radius: inherit;
+  color: #fff;
+}
+.sb-cover-single::after {
+  content: '';
+  position: absolute;
+  inset: 24px;
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 22px;
+  pointer-events: none;
+}
+.sb-shell.is-cover .sb-cover-single { padding-left: 84px; }
+.sb-cover-title {
+  font-size: 3rem;
+  line-height: 1.2;
+  color: #fff;
+  margin: 0 0 20px;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  font-weight: 700;
+}
+.sb-cover-subtitle {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.sb-cover-author {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.1rem;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.sb-cover-hint {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: #fff;
+  color: #4e7c1f;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.15), 0 8px 20px rgba(0, 0, 0, 0.12);
+  animation: sb-bounce 2s ease-in-out infinite;
+}
+@keyframes sb-bounce {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -6px); }
+}
+
+/* ===== 뒷표지 + 편지지 ===== */
+.sb-back-cover {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.7), transparent 45%),
+    radial-gradient(circle at 70% 75%, rgba(255, 255, 255, 0.4), transparent 50%),
+    linear-gradient(150deg, #c4e3b4, #f7c59f);
+  overflow: hidden;
+  border-radius: inherit;
+}
+.sb-back-cover::after {
+  content: '';
+  position: absolute;
+  inset: 24px;
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 22px;
+  pointer-events: none;
+}
+.sb-shell.is-back-cover .sb-back-cover { padding-right: 34px; }
+
+.sb-letter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(70%, 480px);
+  min-height: 55%;
+  padding: 44px 38px 30px;
+  background:
+    repeating-linear-gradient(to bottom, transparent, transparent 33px, rgba(201, 163, 122, 0.18) 33px, rgba(201, 163, 122, 0.18) 34px),
+    linear-gradient(180deg, #fffef5, #fdf8e8);
+  border: 1px solid rgba(201, 163, 122, 0.35);
+  border-radius: 4px;
+  box-shadow: 0 30px 60px rgba(56, 40, 34, 0.25), 0 10px 20px rgba(56, 40, 34, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%) translateY(-200%) rotate(-15deg) scale(0.9);
+  opacity: 0;
+  z-index: 3;
+}
+.sb-letter.is-landing {
+  animation: sb-letter-land 1100ms cubic-bezier(0.22, 1.2, 0.36, 1) forwards;
+}
+.sb-letter::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 60px;
+  height: 18px;
+  background: rgba(255, 217, 103, 0.75);
+  border: 1px solid rgba(200, 160, 50, 0.3);
+  transform: translateX(-50%) rotate(-2deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+@keyframes sb-letter-land {
+  0% { transform: translate(-50%, -50%) translateY(-200%) rotate(-18deg) scale(0.85); opacity: 0; }
+  40% { opacity: 1; }
+  65% { transform: translate(-50%, -50%) translateY(-8%) rotate(4deg) scale(1.02); opacity: 1; }
+  85% { transform: translate(-50%, -50%) translateY(2%) rotate(-2deg) scale(0.99); }
+  100% { transform: translate(-50%, -50%) rotate(-1deg) scale(1); opacity: 1; }
+}
+
+.sb-letter-text {
+  font-weight: 700;
+  font-size: 1.35rem;
+  line-height: 34px;
+  color: #3d2818;
+  margin: 0 0 18px;
+  min-height: 170px;
+  white-space: pre-wrap;
+  letter-spacing: 0.5px;
+}
+.sb-letter-char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(-8px) rotate(-6deg) scale(0.6);
+  animation: sb-char-pop 340ms cubic-bezier(0.34, 1.6, 0.5, 1) forwards;
+}
+.sb-letter-char.space { width: 0.3em; }
+.sb-letter-char.newline { display: block; height: 0; }
+@keyframes sb-char-pop {
+  0% { opacity: 0; transform: translateY(-10px) rotate(-8deg) scale(0.5); }
+  60% { opacity: 1; transform: translateY(2px) rotate(2deg) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) rotate(-1deg) scale(1); }
+}
+
+.sb-letter-signature {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #9c4221;
+  text-align: right;
+  margin: 8px 40px 12px 0;
+  opacity: 0;
+  transition: opacity 600ms ease 200ms;
+}
+.sb-letter-signature.is-visible { opacity: 1; }
+
+.sb-letter-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 500ms ease 500ms, transform 500ms ease 500ms;
+}
+.sb-letter-controls.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.sb-letter-btn {
+  font-size: 0.85rem;
+  padding: 7px 14px;
+  background: #fff;
+  border: 2px solid #9c4221;
+  color: #7c2d12;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 3px 0 #9c4221;
+  transition: all 0.15s ease;
+}
+.sb-letter-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 #9c4221; }
+.sb-letter-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #9c4221; }
+
+/* ===== 페이지 넘김 버튼 ===== */
+.sb-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid #a8d57f;
+  color: #4e7c1f;
+  box-shadow: 0 5px 0 rgba(78, 124, 31, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.15s ease;
+}
+.sb-nav-arrow:hover:not(:disabled) {
+  background: #e8f3d6;
+  transform: translateY(calc(-50% - 2px));
+  box-shadow: 0 7px 0 rgba(78, 124, 31, 0.25);
+}
+.sb-nav-arrow:active:not(:disabled) {
+  transform: translateY(calc(-50% + 2px));
+  box-shadow: 0 1px 0 rgba(78, 124, 31, 0.25);
+}
+.sb-nav-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.sb-nav-arrow.prev { left: -32px; }
+.sb-nav-arrow.next { right: -32px; }
+
+/* ===== 우측 상단 부유 버튼 ===== */
+.sb-float-top {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.sb-float-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid #a8d57f;
+  color: #4e7c1f;
+  box-shadow: 0 4px 0 rgba(78, 124, 31, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sb-float-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(78, 124, 31, 0.2);
+  background: #e8f3d6;
+}
+.sb-float-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(78, 124, 31, 0.2);
+}
+
+/* ===== 반응형 (모바일 세로 세워진 책) ===== */
+@media (max-width: 1023px) {
+  .sb-room { padding: 20px 12px; }
+  .sb-shell { aspect-ratio: 3 / 4; max-width: 600px; }
+  .sb-shell.is-cover,
+  .sb-shell.is-back-cover { aspect-ratio: 2 / 2.7; }
+  .sb-spread { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .sb-spread::before {
+    left: 0; right: 0; top: 50%; bottom: auto; width: auto; height: 60px;
+    transform: translateY(-50%);
+    background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.16) 47%, rgba(0, 0, 0, 0.26) 50%, rgba(0, 0, 0, 0.16) 53%, transparent);
+  }
+  .sb-page { padding: 32px 36px; }
+  .sb-page.left { padding-bottom: 50px; padding-right: 36px; }
+  .sb-page.right { padding-top: 50px; padding-left: 36px; }
+  .sb-illust-art { width: 65%; }
+  .sb-body-title { font-size: 1.4rem; margin-bottom: 18px; }
+  .sb-nav-arrow.prev { left: 8px; }
+  .sb-nav-arrow.next { right: 8px; }
+  .sb-page-num.left { left: 36px; }
+  .sb-page-num.right { right: 36px; }
+  .sb-cover-title { font-size: 2.2rem; }
+  .sb-letter { width: min(85%, 380px); padding: 38px 28px 24px; }
+  .sb-letter-text { font-size: 1.15rem; line-height: 30px; }
+}
