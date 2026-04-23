@@ -39,6 +39,22 @@ data class StoryCreateResponse(
     val storyId: Long,
 )
 
+/**
+ * GET /api/stories/draft — 로그인 유저의 "진행 중인 동화" 를 BasicInfoStep 상태로 복원하기 위한 페이로드.
+ * DRAFT 가 없으면 controller 가 `data = null` 로 내려준다.
+ */
+data class StoryDraftResponse(
+    val storyId: Long,
+    val title: String?,
+    val difficulty: String,
+    val companionsJson: String,
+    val mainCharacterJson: String,
+    val travelPlace: String?,
+    val travelStartDate: LocalDate?,
+    val travelEndDate: LocalDate?,
+    val createdAt: LocalDateTime,
+)
+
 data class PhotoResponse(
     val id: Long,
     val imageUrl: String,

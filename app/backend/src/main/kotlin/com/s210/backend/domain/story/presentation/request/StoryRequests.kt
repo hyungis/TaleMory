@@ -1,6 +1,7 @@
 package com.s210.backend.domain.story.presentation.request
 
 import com.s210.backend.domain.story.application.dto.CreateStoryCommand
+import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.model.Difficulty
 import jakarta.validation.constraints.NotBlank
 import java.time.LocalDate
@@ -33,10 +34,30 @@ data class CreateStoryRequest(
     )
 }
 
+/**
+ * PATCH /api/stories/{id} 요청.
+ * 모든 필드 optional — null 은 "미변경" 으로 해석한다.
+ * (FE: BasicInfoStep 에서 뒤로가기 → 값 수정 → 재클릭 시 서버 반영용.)
+ */
 data class ModifyStoryRequest(
-    val title: String?,
-    val difficulty: String?
-)
+    val title: String? = null,
+    val difficulty: String? = null,
+    val companionsJson: String? = null,
+    val mainCharacterJson: String? = null,
+    val travelPlace: String? = null,
+    val travelStartDate: LocalDate? = null,
+    val travelEndDate: LocalDate? = null,
+) {
+    fun toCommand(): ModifyStoryCommand = ModifyStoryCommand(
+        title = title,
+        difficulty = difficulty?.let { Difficulty.valueOf(it.uppercase()) },
+        companionsJson = companionsJson,
+        mainCharacterJson = mainCharacterJson,
+        travelPlace = travelPlace,
+        travelStartDate = travelStartDate,
+        travelEndDate = travelEndDate,
+    )
+}
 
 data class PhotoOrderRequest(
     val photoIds: List<Long>
