@@ -187,3 +187,60 @@ env-sync 스킬 `add` 모드로 처리:
 - 이미 등록된 GitLab Variables는 **수동으로 삭제**해야 함 (env-sync는 로컬 파일만 정리)
 - 변경 시 기존 키를 두고 새 키 추가 후 점진 마이그레이션 권장
 - 비밀번호 로테이션: 새 값으로 GitLab Variables 업데이트 → pipeline 재실행 → 구 값 제거
+---
+
+## AI Env Appendix
+
+The AI service currently uses the following additional env keys beyond `OPENAI_API_KEY`.
+
+### DEV AI
+
+| Key | Masked | Example |
+|---|---|---|
+| `ENV_DEV_AI_PROJECT_NAME` | no | `S210 AI API` |
+| `ENV_DEV_AI_APP_VERSION` | no | `0.1.0` |
+| `ENV_DEV_AI_ENVIRONMENT` | no | `local` |
+| `ENV_DEV_AI_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
+| `ENV_DEV_AI_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
+| `ENV_DEV_AI_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
+| `ENV_DEV_AI_RABBITMQ_HOST` | no | `dev-rabbitmq` |
+| `ENV_DEV_AI_RABBITMQ_PORT` | no | `5672` |
+| `ENV_DEV_AI_RABBITMQ_USERNAME` | no | `rabbit` |
+| `ENV_DEV_AI_RABBITMQ_PASSWORD` | yes | RabbitMQ password |
+| `ENV_DEV_AI_RABBITMQ_VHOST` | no | `/` |
+| `ENV_DEV_AI_RABBITMQ_REQUEST_EXCHANGE` | no | `storyboard.request` |
+| `ENV_DEV_AI_RABBITMQ_RESULT_EXCHANGE` | no | `storyboard.result` |
+| `ENV_DEV_AI_RABBITMQ_GENERATE_QUEUE` | no | `storyboard.generate.request` |
+| `ENV_DEV_AI_RABBITMQ_REGENERATE_QUEUE` | no | `storyboard.regenerate.request` |
+| `ENV_DEV_AI_RABBITMQ_GENERATE_ROUTING_KEY` | no | `storyboard.generate` |
+| `ENV_DEV_AI_RABBITMQ_REGENERATE_ROUTING_KEY` | no | `storyboard.regenerate` |
+| `ENV_DEV_AI_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.generate.completed` |
+| `ENV_DEV_AI_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
+| `ENV_DEV_AI_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
+| `ENV_DEV_AI_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+
+### MASTER AI
+
+| Key | Masked | Example |
+|---|---|---|
+| `ENV_MASTER_AI_PROJECT_NAME` | no | `S210 AI API` |
+| `ENV_MASTER_AI_APP_VERSION` | no | `0.1.0` |
+| `ENV_MASTER_AI_ENVIRONMENT` | no | `master` |
+| `ENV_MASTER_AI_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
+| `ENV_MASTER_AI_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
+| `ENV_MASTER_AI_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
+| `ENV_MASTER_AI_RABBITMQ_HOST` | no | `prod-rabbitmq` |
+| `ENV_MASTER_AI_RABBITMQ_PORT` | no | `5672` |
+| `ENV_MASTER_AI_RABBITMQ_USERNAME` | no | `rabbit` |
+| `ENV_MASTER_AI_RABBITMQ_PASSWORD` | yes | RabbitMQ password |
+| `ENV_MASTER_AI_RABBITMQ_VHOST` | no | `/` |
+| `ENV_MASTER_AI_RABBITMQ_REQUEST_EXCHANGE` | no | `storyboard.request` |
+| `ENV_MASTER_AI_RABBITMQ_RESULT_EXCHANGE` | no | `storyboard.result` |
+| `ENV_MASTER_AI_RABBITMQ_GENERATE_QUEUE` | no | `storyboard.generate.request` |
+| `ENV_MASTER_AI_RABBITMQ_REGENERATE_QUEUE` | no | `storyboard.regenerate.request` |
+| `ENV_MASTER_AI_RABBITMQ_GENERATE_ROUTING_KEY` | no | `storyboard.generate` |
+| `ENV_MASTER_AI_RABBITMQ_REGENERATE_ROUTING_KEY` | no | `storyboard.regenerate` |
+| `ENV_MASTER_AI_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.generate.completed` |
+| `ENV_MASTER_AI_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
+| `ENV_MASTER_AI_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
+| `ENV_MASTER_AI_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |

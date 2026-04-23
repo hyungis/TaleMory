@@ -36,7 +36,3 @@ data class LoginRequest(
             password = password,
         )
 }
-
-data class TokenRefreshRequest(
-    val refreshToken: String
-)
