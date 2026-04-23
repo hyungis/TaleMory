@@ -1,16 +1,11 @@
 from typing import Any
 
-try:
-    import pika
-except ModuleNotFoundError:  # pragma: no cover - handled at runtime
-    pika = None
+import pika
 
 from app.core.config import settings
 
 
 def create_connection() -> Any:
-    if pika is None:
-        raise RuntimeError("pika package is not installed")
     credentials = pika.PlainCredentials(settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD)
     parameters = pika.ConnectionParameters(
         host=settings.RABBITMQ_HOST,

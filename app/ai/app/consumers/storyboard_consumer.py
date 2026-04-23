@@ -1,9 +1,5 @@
+import logging
 from typing import Any
-
-try:
-    import pika
-except ModuleNotFoundError:  # pragma: no cover - handled at runtime
-    pika = None
 
 from app.core.config import settings
 from app.mq.client import create_channel, create_connection, declare_storyboard_topology
@@ -11,6 +7,8 @@ from app.mq.publisher import StoryResultPublisher
 from app.schemas.mq_storyboard import StoryError, StoryGenerateJobMessage, StoryRegenerateJobMessage
 from app.schemas.storyboard import StoryboardGenerateRequest, StoryboardRegenerateRequest
 from app.services.storyboard_service import generate_storyboard, regenerate_storyboard
+
+logger = logging.getLogger(__name__)
 
 
 def consume_storyboard_jobs() -> None:
@@ -48,7 +46,7 @@ def _dispatch_generate_message(
         handle_generate_message(body=body, publisher=publisher)
     except Exception:
         channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
-        raise
+        logger.exception("Unexpected error while processing generate storyboard message")
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -63,7 +61,7 @@ def _dispatch_regenerate_message(
         handle_regenerate_message(body=body, publisher=publisher)
     except Exception:
         channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
-        raise
+        logger.exception("Unexpected error while processing regenerate storyboard message")
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 

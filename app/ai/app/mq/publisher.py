@@ -2,10 +2,7 @@ import json
 from typing import Literal
 from typing import Any
 
-try:
-    import pika
-except ModuleNotFoundError:  # pragma: no cover - handled at runtime
-    pika = None
+import pika
 
 from app.core.config import settings
 from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
@@ -56,8 +53,6 @@ class StoryResultPublisher:
         )
 
     def _publish(self, routing_key: str, message: dict) -> None:
-        if pika is None:
-            raise RuntimeError("pika package is not installed")
         self._channel.basic_publish(
             exchange=settings.RABBITMQ_RESULT_EXCHANGE,
             routing_key=routing_key,
