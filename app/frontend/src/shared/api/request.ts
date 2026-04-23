@@ -7,8 +7,15 @@ export type QueryParamInput = QueryParamValue | QueryParamValue[]
 export type QueryParams = Record<string, QueryParamInput>
 
 export interface ApiClientOptions extends Omit<RequestInit, 'body' | 'headers'> {
-  /** plain object/array는 JSON으로 직렬화하고, FormData 등은 그대로 전달한다. */
-  body?: BodyInit | Record<string, unknown> | unknown[] | null
+  /**
+   * plain object/array는 JSON으로 직렬화하고, FormData 등은 그대로 전달한다.
+   *
+   * NOTE: `Record<string, unknown>` 로 좁히면 interface 로 선언한 DTO가 암묵적 index
+   *       signature 부재로 assignable 하지 않아 TS2345 를 낸다 (`tsc -b` 빌드 체크에서
+   *       잡힘). `object` 로 넓히되 실제 JSON 직렬화 대상 판별은 `isJsonBody` 런타임
+   *       검사에 맡긴다.
+   */
+  body?: BodyInit | object | null
   headers?: HeadersInit
   /** `{ page: 1, tags: ['a', 'b'] }` 형태를 query string으로 변환할 때 사용한다. */
   query?: QueryParams
@@ -104,7 +111,9 @@ export function normalizeRequestBody(
     return JSON.stringify(body)
   }
 
-  return body
+  // isJsonBody 가 false → 런타임상 BodyInit (FormData / Blob / URLSearchParams / ArrayBuffer / ReadableStream) 임이 보장됨.
+  // body 타입을 `object` 로 넓힌 이후로는 TS 가 이 분기에서 BodyInit 까지 자동으로 좁혀주지 않아 cast 로 마무리.
+  return body as BodyInit
 }
 
 /**
