@@ -187,9 +187,10 @@ class MemberService(
         val principalId = user.loginId ?: "oauth:$provider:${user.id}"
 
         return CustomUser(
-            principalId,
-            "",
-            listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
+            userId = user.id,
+            loginId = principalId,
+            password = "",
+            authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
         )
     }
 
