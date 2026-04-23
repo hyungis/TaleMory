@@ -3,6 +3,7 @@ package com.s210.backend.domain.story.presentation.request
 import com.s210.backend.domain.story.application.dto.CreatePhotoCommand
 import com.s210.backend.domain.story.application.dto.ModifyPhotoCommand
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.Pattern
 import java.time.LocalDateTime
 
@@ -64,6 +65,6 @@ data class ModifyPhotoRequest(
  * 누락/중복/외래 photoId 포함 시 400.
  */
 data class PhotoOrderRequest(
-    @field:NotBlank
+    @field:NotEmpty(message = "photoIds 는 비어있을 수 없습니다.")
     val photoIds: List<Long> = emptyList(),
 )
