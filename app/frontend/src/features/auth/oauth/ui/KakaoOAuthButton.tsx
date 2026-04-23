@@ -1,20 +1,13 @@
 import { useCallback } from 'react'
 
-interface KakaoOAuthButtonProps {
-  onSuccess: () => void
-}
-
 /**
  * 카카오 로그인 진입 버튼.
- * 현재는 alert 후 onSuccess 호출 (UI 검증용 stub).
- * TODO(S14P31S210-75): 백엔드 OAuth 엔드포인트(`/api/auth/oauth/kakao`) 연동.
+ * 백엔드 authorize 엔드포인트로 이동해 OAuth 2.0 인가 코드를 받는 흐름을 시작한다.
  */
-export function KakaoOAuthButton({ onSuccess }: KakaoOAuthButtonProps) {
+export function KakaoOAuthButton() {
   const handleClick = useCallback(() => {
-    // TODO(S14P31S210-75): 실제 카카오 OAuth 연동 (redirect or SDK)
-    alert('카카오 로그인은 서버 연동 후 사용 가능합니다. 지금은 테스트로 통과시킬게요!')
-    onSuccess()
-  }, [onSuccess])
+    window.location.assign('/api/auth/oauth/kakao/authorize')
+  }, [])
 
   return (
     <button

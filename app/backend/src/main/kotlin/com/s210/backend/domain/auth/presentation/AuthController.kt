@@ -9,11 +9,15 @@ import com.s210.backend.domain.auth.presentation.request.LoginRequest
 import com.s210.backend.domain.auth.presentation.request.SignupRequest
 import com.s210.backend.domain.auth.presentation.response.AuthResponse
 import com.s210.backend.domain.auth.presentation.response.RefreshTokenResponse
+import com.s210.backend.domain.auth.presentation.response.toAuthResponse
+import com.s210.backend.domain.auth.presentation.support.OauthCallbackRedirectBuilder
 import com.s210.backend.domain.auth.presentation.support.RefreshTokenCookieManager
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val memberService: MemberService,
     private val refreshTokenCookieManager: RefreshTokenCookieManager,
+    private val oauthCallbackRedirectBuilder: OauthCallbackRedirectBuilder,
 ) {
 
     @PostMapping("/signup")
@@ -44,10 +49,7 @@ class AuthController(
         return ResponseEntity.ok(
             ApiResponse(
                 success = true,
-                data = AuthResponse(
-                    accessToken = result.accessToken,
-                    user = result.user,
-                ),
+                data = result.toAuthResponse(),
             )
         )
     }
@@ -82,7 +84,51 @@ class AuthController(
     }
 
     @GetMapping("/oauth/{provider}/authorize")
-    fun authOauthAuthorize(@PathVariable provider: String): ResponseEntity<ApiResponse<Map<String, String>>> {
-        TODO("Not yet implemented")
+    fun authOauthAuthorize(@PathVariable provider: String): ResponseEntity<Void> {
+        return try {
+            val authorizeUrl = memberService.getOauthAuthorizeUrl(provider)
+
+            ResponseEntity.status(HttpStatus.FOUND)
+                .header("Location", authorizeUrl)
+                .build()
+        } catch (exception: BusinessException) {
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthCallbackRedirectBuilder.buildFailureRedirect(exception.message ?: "카카오 로그인에 실패했어요."))
+                .build()
+        }
+    }
+
+    @GetMapping("/oauth/{provider}/callback")
+    fun authOauthCallback(
+        @PathVariable provider: String,
+        @RequestParam(required = false) code: String?,
+        @RequestParam(required = false) error: String?,
+        @RequestParam(name = "error_description", required = false) errorDescription: String?,
+        response: HttpServletResponse,
+    ): ResponseEntity<Void> {
+        if (error != null) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthCallbackRedirectBuilder.buildFailureRedirect(errorDescription ?: "카카오 인증이 취소되었어요."))
+                .build()
+        }
+
+        if (code.isNullOrBlank()) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthCallbackRedirectBuilder.buildFailureRedirect(CommonErrorCode.INVALID_INPUT.message))
+                .build()
+        }
+
+        return try {
+            val result = memberService.loginWithOauthCallback(provider, code)
+            refreshTokenCookieManager.addRefreshToken(response, result.refreshToken)
+
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthCallbackRedirectBuilder.buildSuccessRedirect(result.toAuthResponse()))
+                .build()
+        } catch (exception: BusinessException) {
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthCallbackRedirectBuilder.buildFailureRedirect(exception.message ?: "카카오 로그인에 실패했어요."))
+                .build()
+        }
     }
 }

@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom'
+import { OAuthCallbackPage } from '../../pages/auth'
 import { HomePage } from '../../pages/home'
 import { MainPage } from '../../pages/main'
 import { CreationPage } from '../../pages/creation'
@@ -13,6 +14,7 @@ export function AppRouter() {
       <Route path={ROUTES.main} element={<MainPage />} />
       <Route path={ROUTES.creation} element={<CreationPage />} />
       <Route path={ROUTES.viewer} element={<ViewerPage />} />
+      <Route path={ROUTES.oauthCallback} element={<OAuthCallbackPage />} />
       {/* TODO: mypage */}
     </Routes>
   )

@@ -6,7 +6,8 @@ export const ROUTES = {
   main: '/main',
   creation: '/creation',
   viewer: '/viewer/:storyId',
-  // TODO: mypage, oauthCallback
+  oauthCallback: '/auth/oauth/callback',
+  // TODO: mypage
 } as const
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES]

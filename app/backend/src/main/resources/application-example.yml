@@ -30,3 +30,10 @@ spring:
   jwt:
     access_secret: ${JWT_ACCESS_SECRET}
     refresh_secret: ${JWT_REFRESH_SECRET}
+
+oauth:
+  frontend-callback-uri: ${FRONTEND_OAUTH_CALLBACK_URI:}
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:}
