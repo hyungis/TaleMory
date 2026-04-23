@@ -1,0 +1,13 @@
+{
+  "voiceId": "vce_0b53c79790a1",
+  "label": "hello",
+  "durationSec": 2.0,
+  "sampleRate": 22050,
+  "channels": 1,
+  "language": "en",
+  "createdAt": "2026-04-23T01:34:28.534825+00:00",
+  "cache": {
+    "promptCached": false,
+    "embeddingCached": false
+  }
+}

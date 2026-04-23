@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from app.schemas.tts import ApiSuccessResponse, PreviewRequest, StoryTtsRequest, VoiceRegisterRequest
+from app.schemas.tts import ApiSuccessResponse, PreviewRequest, StoryTtsRequest
+from app.services.cosyvoice_client import CosyVoiceInvocationError, CosyVoiceNotConfiguredError
 from app.services.dev_tts_service import (
     create_story_tts_job,
-    create_voice_clone_job,
     generate_preview,
-    get_voice_info,
     process_story_tts_job,
-    process_voice_clone_job,
     read_manifest,
 )
 
@@ -17,38 +15,16 @@ from app.services.dev_tts_service import (
 router = APIRouter(prefix="/api/v1", tags=["tts"])
 
 
-@router.post("/voices", response_model=ApiSuccessResponse)
-def register_voice(
-    request: VoiceRegisterRequest,
-    background_tasks: BackgroundTasks,
-) -> ApiSuccessResponse:
-    job = create_voice_clone_job(request)
-    background_tasks.add_task(process_voice_clone_job, job["jobId"], job["voiceId"], request)
-    return ApiSuccessResponse(
-        data={
-            "jobId": job["jobId"],
-            "jobType": job["jobType"],
-            "status": job["status"],
-            "voiceId": job["voiceId"],
-        }
-    )
-
-
-@router.get("/voices/{voice_id}", response_model=ApiSuccessResponse)
-def read_voice(voice_id: str) -> ApiSuccessResponse:
+@router.post("/voices/{voiceId}/preview", response_model=ApiSuccessResponse)
+def preview_voice(voiceId: str, request: PreviewRequest) -> ApiSuccessResponse:
     try:
-        data = get_voice_info(voice_id)
+        data = generate_preview(voiceId, request.text, request.language, request.format, request.options)
     except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail=f"Voice not found: {voice_id}") from error
-    return ApiSuccessResponse(data=data)
-
-
-@router.post("/voices/{voice_id}/preview", response_model=ApiSuccessResponse)
-def preview_voice(voice_id: str, request: PreviewRequest) -> ApiSuccessResponse:
-    try:
-        data = generate_preview(voice_id, request.text, request.format, request.options)
-    except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail=f"Voice not found: {voice_id}") from error
+        raise HTTPException(status_code=404, detail=f"Voice not found: {voiceId}") from error
+    except CosyVoiceNotConfiguredError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except CosyVoiceInvocationError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
     return ApiSuccessResponse(data=data)
 
 
@@ -69,11 +45,10 @@ def create_story_tts(request: StoryTtsRequest, background_tasks: BackgroundTasks
     )
 
 
-@router.get("/jobs/{job_id}", response_model=ApiSuccessResponse)
-def read_job(job_id: str) -> ApiSuccessResponse:
+@router.get("/jobs/{jobId}", response_model=ApiSuccessResponse)
+def read_job(jobId: str) -> ApiSuccessResponse:
     try:
-        payload = read_manifest(job_id)
+        payload = read_manifest(jobId)
     except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}") from error
+        raise HTTPException(status_code=404, detail=f"Job not found: {jobId}") from error
     return ApiSuccessResponse(data=payload["data"], message=payload.get("message"))
-

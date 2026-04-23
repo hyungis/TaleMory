@@ -10,6 +10,9 @@ class Settings(BaseModel):
     VERSION: str = getenv("APP_VERSION", "0.1.0")
     ENVIRONMENT: str = getenv("ENVIRONMENT", "local")
     APP_ROOT: Path = Path(__file__).resolve().parents[2]
+    COSYVOICE_BASE_URL: str = getenv("COSYVOICE_BASE_URL", "")
+    COSYVOICE_INSTRUCT_PATH: str = getenv("COSYVOICE_INSTRUCT_PATH", "/inference_instruct2")
+    COSYVOICE_TIMEOUT_SEC: float = float(getenv("COSYVOICE_TIMEOUT_SEC", "60"))
     TTS_STORAGE_ROOT: Path = Path(getenv("TTS_STORAGE_ROOT", str(Path(__file__).resolve().parents[2] / ".runtime" / "storage")))
     TTS_MANIFEST_ROOT: Path = Path(
         getenv("TTS_MANIFEST_ROOT", str(Path(__file__).resolve().parents[2] / ".runtime" / "manifests"))

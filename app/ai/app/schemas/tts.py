@@ -27,7 +27,7 @@ class ApiSuccessResponse(BaseModel):
 
 
 class SourceAudioRequest(BaseModel):
-    s3Key: str
+    path: str
 
 
 class VoiceRegisterOptions(BaseModel):
@@ -89,4 +89,3 @@ class StoryTtsRequest(BaseModel):
     format: AudioFormat = "wav"
     options: StoryTtsOptions
     sentences: list[StorySentenceRequest]
-

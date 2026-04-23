@@ -1,0 +1,35 @@
+{
+  "success": true,
+  "data": {
+    "jobId": "voice_clone_2dd7f685b762",
+    "jobType": "VOICE_CLONE",
+    "status": "SUCCESS",
+    "createdAt": "2026-04-23T01:34:28.518936+00:00",
+    "voiceId": "vce_0b53c79790a1",
+    "startedAt": "2026-04-23T01:34:28.526736+00:00",
+    "finishedAt": "2026-04-23T01:34:28.536912+00:00",
+    "progress": 100,
+    "result": {
+      "voiceId": "vce_0b53c79790a1",
+      "label": "hello",
+      "referenceAudio": {
+        "path": "C:\\Users\\SSAFY\\Desktop\\talemory\\S14P31S210\\app\\ai\\.runtime\\storage\\voices\\vce_0b53c79790a1\\reference.wav",
+        "audioUrl": "/static/voices/vce_0b53c79790a1/reference.wav"
+      },
+      "metadata": {
+        "voiceId": "vce_0b53c79790a1",
+        "label": "hello",
+        "durationSec": 2.0,
+        "sampleRate": 22050,
+        "channels": 1,
+        "language": "en",
+        "createdAt": "2026-04-23T01:34:28.534825+00:00",
+        "cache": {
+          "promptCached": false,
+          "embeddingCached": false
+        }
+      }
+    }
+  },
+  "message": null
+}
