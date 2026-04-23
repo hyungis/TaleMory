@@ -7,13 +7,11 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   accessToken: string
-  refreshToken: string
   user: AuthUser
 }
 
 export interface LoginResponsePayload {
   accessToken: string
-  refreshToken: string
   user: {
     id?: number
     userId?: number

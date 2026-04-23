@@ -5,13 +5,12 @@ const VALID_OAUTH_PROVIDERS: readonly OauthProvider[] = ['kakao', 'google', 'nav
 
 export function mapLoginResponse(payload: LoginResponsePayload): LoginResponse {
   // 토큰이 없으면 이후 인증 요청이 전부 깨지므로 여기서 바로 실패시킨다.
-  if (!isNonEmptyString(payload.accessToken) || !isNonEmptyString(payload.refreshToken)) {
+  if (!isNonEmptyString(payload.accessToken)) {
     throw new Error('로그인 응답에 토큰 정보가 없습니다.')
   }
 
   return {
     accessToken: payload.accessToken,
-    refreshToken: payload.refreshToken,
     user: mapAuthUser(payload.user),
   }
 }
