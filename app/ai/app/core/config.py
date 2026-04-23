@@ -31,7 +31,7 @@ class Settings(BaseModel):
     STORYBOARD_OUTPUT_COST_PER_1M: float = float(getenv("STORYBOARD_OUTPUT_COST_PER_1M", "0.60"))
     RABBITMQ_HOST: str = getenv("RABBITMQ_HOST", "localhost")
     RABBITMQ_PORT: int = int(getenv("RABBITMQ_PORT", "5672"))
-    RABBITMQ_USER: str = getenv("RABBITMQ_USER", "guest")
+    RABBITMQ_USER: str = getenv("RABBITMQ_USERNAME", getenv("RABBITMQ_USER", "guest"))
     RABBITMQ_PASSWORD: str = getenv("RABBITMQ_PASSWORD", "guest")
     RABBITMQ_VHOST: str = getenv("RABBITMQ_VHOST", "/")
     RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "storyboard.request")

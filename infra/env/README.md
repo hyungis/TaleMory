@@ -205,7 +205,7 @@ The AI service currently uses the following additional env keys beyond `OPENAI_A
 | `ENV_DEV_AI_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
 | `ENV_DEV_AI_RABBITMQ_HOST` | no | `dev-rabbitmq` |
 | `ENV_DEV_AI_RABBITMQ_PORT` | no | `5672` |
-| `ENV_DEV_AI_RABBITMQ_USER` | no | `rabbit` |
+| `ENV_DEV_AI_RABBITMQ_USERNAME` | no | `rabbit` |
 | `ENV_DEV_AI_RABBITMQ_PASSWORD` | yes | RabbitMQ password |
 | `ENV_DEV_AI_RABBITMQ_VHOST` | no | `/` |
 | `ENV_DEV_AI_RABBITMQ_REQUEST_EXCHANGE` | no | `storyboard.request` |
@@ -231,7 +231,7 @@ The AI service currently uses the following additional env keys beyond `OPENAI_A
 | `ENV_MASTER_AI_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
 | `ENV_MASTER_AI_RABBITMQ_HOST` | no | `prod-rabbitmq` |
 | `ENV_MASTER_AI_RABBITMQ_PORT` | no | `5672` |
-| `ENV_MASTER_AI_RABBITMQ_USER` | no | `rabbit` |
+| `ENV_MASTER_AI_RABBITMQ_USERNAME` | no | `rabbit` |
 | `ENV_MASTER_AI_RABBITMQ_PASSWORD` | yes | RabbitMQ password |
 | `ENV_MASTER_AI_RABBITMQ_VHOST` | no | `/` |
 | `ENV_MASTER_AI_RABBITMQ_REQUEST_EXCHANGE` | no | `storyboard.request` |

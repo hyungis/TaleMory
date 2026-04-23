@@ -142,7 +142,7 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_DEV_AI_STORYBOARD_OUTPUT_COST_PER_1M` → Variable · `0.60`
 - [x] `ENV_DEV_AI_RABBITMQ_HOST` → Variable · `dev-rabbitmq`
 - [x] `ENV_DEV_AI_RABBITMQ_PORT` → Variable · `5672`
-- [x] `ENV_DEV_AI_RABBITMQ_USER` → Variable · `rabbit`
+- [x] `ENV_DEV_AI_RABBITMQ_USERNAME` → Variable · `rabbit`
 - [x] `ENV_DEV_AI_RABBITMQ_PASSWORD` → Variable · **Masked ✅**
 - [x] `ENV_DEV_AI_RABBITMQ_VHOST` → Variable · `/`
 - [x] `ENV_DEV_AI_RABBITMQ_REQUEST_EXCHANGE` → Variable · `storyboard.request`
@@ -167,7 +167,7 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_MASTER_AI_STORYBOARD_OUTPUT_COST_PER_1M` → Variable · `0.60`
 - [x] `ENV_MASTER_AI_RABBITMQ_HOST` → Variable · `prod-rabbitmq`
 - [x] `ENV_MASTER_AI_RABBITMQ_PORT` → Variable · `5672`
-- [x] `ENV_MASTER_AI_RABBITMQ_USER` → Variable · `rabbit`
+- [x] `ENV_MASTER_AI_RABBITMQ_USERNAME` → Variable · `rabbit`
 - [x] `ENV_MASTER_AI_RABBITMQ_PASSWORD` → Variable · **Masked ✅**
 - [x] `ENV_MASTER_AI_RABBITMQ_VHOST` → Variable · `/`
 - [x] `ENV_MASTER_AI_RABBITMQ_REQUEST_EXCHANGE` → Variable · `storyboard.request`
