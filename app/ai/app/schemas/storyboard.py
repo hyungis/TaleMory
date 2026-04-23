@@ -4,9 +4,6 @@ from pydantic import BaseModel, Field
 
 
 Difficulty = Literal["BEGINNER", "INTERMEDIATE", "ADVANCED"]
-PageCountStrategy = Literal["AUTO"]
-StorybookMagicLevel = Literal["NONE", "GENTLE", "FANTASY"]
-VisionDetail = Literal["low", "high", "auto"]
 Gender = Literal["MALE", "FEMALE"]
 SentenceEmotion = Literal[
     "NEUTRAL",
@@ -42,12 +39,6 @@ class PhotoInput(BaseModel):
     displayOrder: int = Field(..., ge=1)
 
 
-class PageCountPolicy(BaseModel):
-    min: int = Field(default=10, ge=1, le=20)
-    max: int = Field(default=20, ge=10, le=20)
-    strategy: PageCountStrategy = "AUTO"
-
-
 class StoryboardGenerateRequest(BaseModel):
     storyId: int | None = Field(default=None, ge=1)
     children: list[ChildInfo] = Field(..., min_length=1)
@@ -55,11 +46,7 @@ class StoryboardGenerateRequest(BaseModel):
     travel: TravelInfo
     photos: list[PhotoInput] = Field(..., min_length=1)
     difficulty: Difficulty = "BEGINNER"
-    pageCountPolicy: PageCountPolicy = Field(default_factory=PageCountPolicy)
-    storybookMagicLevel: StorybookMagicLevel = "GENTLE"
     additionalInstruction: str | None = Field(default=None, max_length=1000)
-    useVision: bool = False
-    visionDetail: VisionDetail = "low"
 
 
 class ReadingLevel(BaseModel):

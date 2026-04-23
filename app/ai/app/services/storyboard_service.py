@@ -16,6 +16,12 @@ from app.services.storyboard_prompt import (
     STORYBOARD_SYSTEM_PROMPT,
 )
 
+FIXED_PAGE_MIN = 10
+FIXED_PAGE_MAX = 20
+FIXED_MAGIC_LEVEL = "FANTASY"
+FIXED_USE_VISION = True
+FIXED_VISION_DETAIL = "low"
+
 
 def generate_storyboard(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
     if settings.OPENAI_API_KEY:
@@ -122,8 +128,8 @@ def _regenerate_with_openai(request: StoryboardRegenerateRequest) -> StoryboardG
 
 def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dict) -> list[dict[str, str]]:
     photo_count = len(request.photos)
-    min_pages = request.pageCountPolicy.min
-    max_pages = request.pageCountPolicy.max
+    min_pages = FIXED_PAGE_MIN
+    max_pages = FIXED_PAGE_MAX
     page_directive = (
         f"Produce between {min_pages} and {max_pages} pages (inclusive). "
         f"There are {photo_count} source photo(s). "
@@ -139,7 +145,7 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
             "text": json.dumps(payload, ensure_ascii=False),
         },
     ]
-    if not request.useVision:
+    if not FIXED_USE_VISION:
         return content
 
     for photo in sorted(request.photos, key=lambda item: item.displayOrder):
@@ -149,7 +155,7 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
             {
                 "type": "input_image",
                 "image_url": photo.imageUrl,
-                "detail": request.visionDetail,
+                "detail": FIXED_VISION_DETAIL,
             }
         )
     return content
@@ -197,7 +203,7 @@ def _build_openai_regenerate_input_content(
             ),
         },
     ]
-    if not original_request.useVision:
+    if not FIXED_USE_VISION:
         return content
 
     for photo in sorted(original_request.photos, key=lambda item: item.displayOrder):
@@ -207,7 +213,7 @@ def _build_openai_regenerate_input_content(
             {
                 "type": "input_image",
                 "image_url": photo.imageUrl,
-                "detail": original_request.visionDetail,
+                "detail": FIXED_VISION_DETAIL,
             }
         )
     return content
@@ -215,8 +221,8 @@ def _build_openai_regenerate_input_content(
 
 def _page_directive_for_request(request: StoryboardGenerateRequest) -> str:
     photo_count = len(request.photos)
-    min_pages = request.pageCountPolicy.min
-    max_pages = request.pageCountPolicy.max
+    min_pages = FIXED_PAGE_MIN
+    max_pages = FIXED_PAGE_MAX
     return (
         f"Produce between {min_pages} and {max_pages} pages (inclusive). "
         f"There are {photo_count} source photo(s). "
@@ -309,8 +315,8 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
     reading_level = _reading_level_for_age(youngest_age)
     page_count = _choose_page_count(
         photo_count=len(sorted_photos),
-        min_pages=request.pageCountPolicy.min,
-        max_pages=request.pageCountPolicy.max,
+        min_pages=FIXED_PAGE_MIN,
+        max_pages=FIXED_PAGE_MAX,
     )
     photo_groups = _group_photos(sorted_photos, page_count)
     main_child = request.children[0].name
@@ -329,7 +335,7 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
             companion_text=companion_text,
             photo_description=primary_photo.description,
             travel_place=request.travel.place,
-            magic_level=request.storybookMagicLevel,
+            magic_level=FIXED_MAGIC_LEVEL,
             premise=premise,
         )
         english_text = " ".join(sentence.englishText for sentence in sentences)
