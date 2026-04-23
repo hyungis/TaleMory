@@ -4,10 +4,10 @@
 # 복구 경로: git revert → push → 새 pipeline, 또는 GitLab 변수 override로 이전 SHA 재실행.
 #
 # Usage:
-#   bash infra/scripts/deploy-dev.sh                # backend + ai + nginx 전부
+#   bash infra/scripts/deploy-dev.sh                # backend + ai-worker + nginx 전부
 #   bash infra/scripts/deploy-dev.sh backend        # backend만
 #   bash infra/scripts/deploy-dev.sh frontend       # nginx만 (이름 매핑)
-#   bash infra/scripts/deploy-dev.sh ai             # ai만
+#   bash infra/scripts/deploy-dev.sh ai-worker      # ai-worker만
 
 set -euo pipefail
 
@@ -31,9 +31,9 @@ export COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT"
 # frontend(별칭) → 실제 compose 서비스명은 nginx
 resolve_services() {
   case "$SERVICE" in
-    all)              echo "backend ai nginx" ;;
-    frontend|nginx)   echo "nginx" ;;
-    backend|ai)       echo "$SERVICE" ;;
+    all)                echo "backend ai-worker nginx" ;;
+    frontend|nginx)     echo "nginx" ;;
+    backend|ai-worker)  echo "$SERVICE" ;;
     *) echo "unknown service: $SERVICE" >&2; exit 1 ;;
   esac
 }

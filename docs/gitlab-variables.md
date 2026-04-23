@@ -62,6 +62,7 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.generate.failed`
 - [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.regenerate.completed`
 - [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.regenerate.failed`
+- [ ] `ENV_DEV_APP_AI_WORKER_REPLICAS` — Variable — `1` (ai-worker compose `scale:` 값)
 
 ### Infra — `ENV_DEV_INFRA_*`
 
@@ -117,6 +118,7 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.generate.completed`
 - [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.generate.failed`
 - [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.regenerate.completed`
+- [ ] `ENV_MASTER_APP_AI_WORKER_REPLICAS` — Variable — `2` (ai-worker compose `scale:` 값, 운영 권장 2)
 - [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.regenerate.failed`
 
 ### Infra — `ENV_MASTER_INFRA_*`
