@@ -4,10 +4,10 @@
 # 복구 경로: git revert → push → 새 pipeline, 또는 GitLab 변수 override로 이전 SHA 재실행.
 #
 # Usage:
-#   bash infra/scripts/deploy-dev.sh                # backend + ai + nginx 전부
+#   bash infra/scripts/deploy-dev.sh                # backend + ai-worker + nginx 전부
 #   bash infra/scripts/deploy-dev.sh backend        # backend만
 #   bash infra/scripts/deploy-dev.sh frontend       # nginx만 (이름 매핑)
-#   bash infra/scripts/deploy-dev.sh ai             # ai만
+#   bash infra/scripts/deploy-dev.sh ai-worker      # ai-worker만
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ TAG="${APP_IMAGE_TAG:-${CI_COMMIT_SHORT_SHA:?APP_IMAGE_TAG or CI_COMMIT_SHORT_SH
 ENV_NAME="dev"
 
 COMPOSE_FILE="infra/compose/docker-compose.app-${ENV_NAME}.yml"
-COMPOSE_PROJECT="${PROJECT_NAME}-app-${ENV_NAME}"
+COMPOSE_PROJECT="${IMAGE_PREFIX}-app-${ENV_NAME}"
 ENV_FILE="/tmp/env/app.${ENV_NAME}.env"
 
 require_file "$COMPOSE_FILE"
@@ -31,9 +31,9 @@ export COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT"
 # frontend(별칭) → 실제 compose 서비스명은 nginx
 resolve_services() {
   case "$SERVICE" in
-    all)              echo "backend ai nginx" ;;
-    frontend|nginx)   echo "nginx" ;;
-    backend|ai)       echo "$SERVICE" ;;
+    all)                echo "backend ai-worker nginx" ;;
+    frontend|nginx)     echo "nginx" ;;
+    backend|ai-worker)  echo "$SERVICE" ;;
     *) echo "unknown service: $SERVICE" >&2; exit 1 ;;
   esac
 }

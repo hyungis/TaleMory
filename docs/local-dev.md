@@ -97,7 +97,8 @@ dci ps && dca ps
 # Frontend (정적 + API 프록시)
 curl http://localhost:3001/              # → HTTP 200
 curl http://localhost:3001/api/          # → 401 (Spring Security 기본 응답; Tomcat alive 의미)
-curl http://localhost:3001/ai/           # → HTTP 200
+# ai-worker(RabbitMQ consumer)는 HTTP 엔드포인트가 없음. FastAPI를 직접 확인하려면
+# docker 밖에서 `cd app/ai && uvicorn main:app --reload --port 8001` 실행.
 
 # Backend 직접
 curl http://localhost:8081/              # → 401
