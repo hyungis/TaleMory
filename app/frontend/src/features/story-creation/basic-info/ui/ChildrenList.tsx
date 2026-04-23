@@ -38,9 +38,9 @@ export function ChildrenList({
 
   return (
     <div>
-      <label className="block text-[#2d5a27] text-lg mb-2 font-bold">아이 정보</label>
+      <label className="block text-black text-lg mb-2 font-bold">아이 정보</label>
 
-      {onLoadPerson && selectablePersons.length > 0 && (
+      {onLoadPerson && (
         <div className="mb-3">
           <div className="relative">
             <select
@@ -51,18 +51,25 @@ export function ChildrenList({
                 if (person) onLoadPerson(person)
                 e.currentTarget.value = ''
               }}
-              className="w-full appearance-none p-3 pr-12 bg-[#f0e6c0] border-2 border-[#b4dc8c] rounded-xl focus:border-[#2d5a27] focus:outline-none text-base text-[#2d5a27] font-bold cursor-pointer"
+              className="w-full appearance-none p-3 pr-12 bg-[#f0e6c0] border-2 border-[#b4dc8c] rounded-xl focus:border-[#2d5a27] focus:outline-none text-base text-black font-bold cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              disabled={selectablePersons.length === 0}
             >
               <option value="" disabled>
                 저장된 아이 불러오기
               </option>
-              {selectablePersons.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+              {selectablePersons.length === 0 ? (
+                <option value="" disabled>
+                  (저장된 아이가 없습니다)
                 </option>
-              ))}
+              ) : (
+                selectablePersons.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))
+              )}
             </select>
-            <ChevronDown className="w-5 h-5 text-[#2d5a27] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-5 h-5 text-black absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       )}
@@ -77,13 +84,13 @@ export function ChildrenList({
                 placeholder="이름"
                 value={child.name}
                 onChange={e => onChildUpdate(idx, { name: e.target.value })}
-                className="min-w-0 p-4 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-xl text-[#2d5a27] placeholder-[#8b7a52]/60"
+                className="min-w-0 p-4 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-xl text-black placeholder-black/60"
               />
               <div className="relative">
                 <select
                   value={child.gender}
                   onChange={e => onChildUpdate(idx, { gender: e.target.value as Gender })}
-                  className="w-full appearance-none p-4 pr-12 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-lg text-[#2d5a27]"
+                  className="w-full appearance-none p-4 pr-12 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-lg text-black"
                 >
                   {GENDERS.map(g => (
                     <option key={g} value={g}>
@@ -91,14 +98,14 @@ export function ChildrenList({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-5 h-5 text-[#8b7a52] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-5 h-5 text-black absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
               <input
                 type="number"
                 placeholder="나이"
                 value={child.age}
                 onChange={e => onChildUpdate(idx, { age: e.target.value })}
-                className="min-w-0 p-4 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-xl text-[#2d5a27] placeholder-[#8b7a52]/60"
+                className="min-w-0 p-4 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-xl text-black placeholder-black/60"
               />
               {isLast ? (
                 <button
