@@ -71,7 +71,7 @@ def test_handle_generate_message_publishes_completed_envelope() -> None:
     assert published["story_id"] == 1
     assert published["action"] == "GENERATE"
     assert 10 <= published["payload"].pageCount <= 20
-    assert published["payload"].usage.promptTemplateVersion == "storyboard_v5"
+    assert published["payload"].usage.promptTemplateVersion == "storyboard_v2"
 
 
 def test_handle_regenerate_message_publishes_completed_envelope() -> None:
@@ -143,7 +143,7 @@ def test_handle_regenerate_message_publishes_completed_envelope() -> None:
             "outputTokens": 0,
             "totalTokens": 0,
             "costUsd": 0.0,
-            "promptTemplateVersion": "storyboard_v5"
+            "promptTemplateVersion": "storyboard_v2"
           }
         },
         "feedbackInstruction": "Make it feel more like a fairy tale."
