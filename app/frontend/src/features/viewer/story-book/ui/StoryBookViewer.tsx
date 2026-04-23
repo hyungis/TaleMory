@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Maximize, X } from 'lucide-react'
-import type { StoryView } from '../../model/types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bookmark, ChevronLeft, ChevronRight, Maximize, X } from 'lucide-react'
+import type { StoryView, SceneView } from '../../model/types'
 import { BookCover } from './BookCover'
 import { BookSpread } from './BookSpread'
 import { BookBackCover } from './BookBackCover'
 import { TurnSheet } from './TurnSheet'
-import { ViewerToolbar } from './ViewerToolbar'
+import { ViewerToolbar, type ViewerTheme } from './ViewerToolbar'
+import { IllustrationModal } from './IllustrationModal'
+import { WordLookupCard } from './WordLookupCard'
+import { useStoryTts } from '../model/useStoryTts'
+import { getWordMeaning } from '../../api'
 import '../styles/story-book.css'
 
 interface StoryBookViewerProps {
@@ -30,6 +34,11 @@ const FLIP_DURATION_MS = 850
 const FADE_DURATION_MS = 600
 const TOOLBAR_CLOSE_DELAY_MS = 350
 
+const STORAGE_KEY_THEME = 'viewer-theme'
+const storageKeyBookmark = (storyId: number) => `viewer-bookmark-${storyId}`
+
+const VALID_THEMES: ViewerTheme[] = ['forest', 'sunset', 'night']
+
 /**
  * 동화책 모드 메인 뷰어.
  * 페이지 구성: [앞표지] → scene 1..N → [뒷표지(편지지)]
@@ -37,14 +46,21 @@ const TOOLBAR_CLOSE_DELAY_MS = 350
  * scene↔scene 전환은 반쪽 종이 3D 플립 애니메이션, cover/backCover 가 끼어있으면
  * 표지 단면이라 플립이 부자연스러워 opacity 페이드 fallback.
  *
- * 좌측 가장자리 호버 시 사이드 툴바(TTS / 번역 / 폰트 크기)가 슬라이드 인.
+ * TTS 는 `useStoryTts` 훅이 소유 — inline 페이지 재생 / 문장 클릭 / 전체 책 자동 읽기 모두 지원.
+ * 좌측 가장자리 호버 시 사이드 툴바(TTS / 번역 / 폰트 / 책갈피 / 테마)가 슬라이드 인.
+ *
+ * 책갈피·테마는 로그인 인프라 미완성이라 localStorage 에 저장. 추후 `/progress` API 연동 시
+ * 별도 어댑터로 교체 가능.
  */
 export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
-  const pages: ViewerPage[] = [
-    { kind: 'cover' },
-    ...story.scenes.map((_, i) => ({ kind: 'scene' as const, sceneIndex: i })),
-    { kind: 'backCover' },
-  ]
+  const pages: ViewerPage[] = useMemo(
+    () => [
+      { kind: 'cover' as const },
+      ...story.scenes.map((_, i) => ({ kind: 'scene' as const, sceneIndex: i })),
+      { kind: 'backCover' as const },
+    ],
+    [story.scenes],
+  )
 
   const [pageIndex, setPageIndex] = useState(0)
   const [flip, setFlip] = useState<FlipState | null>(null)
@@ -57,11 +73,76 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const [fontSize, setFontSize] = useState(22)
   const toolbarCloseTimerRef = useRef<number | null>(null)
 
+  // 삽화 확대 모달
+  const [zoomedScene, setZoomedScene] = useState<SceneView | null>(null)
+
+  // 단어 번역 팝업
+  const [wordLookup, setWordLookup] = useState<{ word: string; meaning: string | null; isLoading: boolean } | null>(null)
+
+  // 책갈피 — 한 동화당 1개 (pageIndex 단일값)
+  const [bookmark, setBookmark] = useState<number | null>(null)
+
+  // 테마
+  const [theme, setTheme] = useState<ViewerTheme>('forest')
+
+  // TTS
+  const tts = useStoryTts()
+
+  // ===== localStorage 초기 로드 =====
+  useEffect(() => {
+    try {
+      const rawTheme = window.localStorage.getItem(STORAGE_KEY_THEME)
+      if (rawTheme && VALID_THEMES.includes(rawTheme as ViewerTheme)) {
+        setTheme(rawTheme as ViewerTheme)
+      }
+    } catch {
+      /* noop */
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKeyBookmark(story.storyId))
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (typeof parsed === 'number' && Number.isFinite(parsed)) {
+          setBookmark(parsed)
+        }
+      }
+    } catch {
+      /* noop */
+    }
+  }, [story.storyId])
+
+  // ===== localStorage 저장 =====
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY_THEME, theme)
+    } catch {
+      /* noop */
+    }
+  }, [theme])
+
+  useEffect(() => {
+    try {
+      const key = storageKeyBookmark(story.storyId)
+      if (bookmark === null) {
+        window.localStorage.removeItem(key)
+      } else {
+        window.localStorage.setItem(key, JSON.stringify(bookmark))
+      }
+    } catch {
+      /* noop */
+    }
+  }, [bookmark, story.storyId])
+
   const isBusy = flip !== null || isFading
 
   const goTo = (target: number) => {
     if (isBusy) return
     if (target < 0 || target >= pages.length) return
+
+    tts.stop()
 
     const from = pages[pageIndex]
     const to = pages[target]
@@ -132,6 +213,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const isCover = current.kind === 'cover'
   const isBackCover = current.kind === 'backCover'
   const shellClass = `sb-shell ${isCover ? 'is-cover' : ''} ${isBackCover ? 'is-back-cover' : ''}`.trim()
+  const roomClass = `sb-room sb-theme-${theme}`
 
   const flipFromScene = flip && pages[flip.fromPageIndex].kind === 'scene'
     ? story.scenes[pages[flip.fromPageIndex].sceneIndex!]
@@ -140,12 +222,73 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     ? story.scenes[pages[flip.toPageIndex].sceneIndex!]
     : null
 
-  const toolbarScene = current.kind === 'scene' && current.sceneIndex !== undefined
-    ? story.scenes[current.sceneIndex]
-    : null
+  // 전체 책 자동 재생
+  const playFullBook = () => {
+    const startSceneIndex = current.kind === 'scene' && current.sceneIndex !== undefined
+      ? current.sceneIndex
+      : 0
+    const targetPageIndex = startSceneIndex + 1
+
+    const startPlayback = () => {
+      tts.speakFullBook(story.scenes, startSceneIndex, sceneIdx => {
+        setPageIndex(sceneIdx + 1)
+      })
+    }
+
+    if (pageIndex === targetPageIndex) {
+      startPlayback()
+    } else {
+      setIsFading(true)
+      window.setTimeout(() => {
+        setPageIndex(targetPageIndex)
+        window.setTimeout(() => {
+          setIsFading(false)
+          startPlayback()
+        }, FADE_DURATION_MS / 2)
+      }, FADE_DURATION_MS / 2)
+    }
+  }
+
+  // 책갈피 핸들러 (한 동화당 1개)
+  const canBookmarkCurrent = current.kind === 'scene'
+  const isCurrentBookmarked = canBookmarkCurrent && bookmark === pageIndex
+
+  const toggleBookmark = () => {
+    if (!canBookmarkCurrent) return
+    setBookmark(prev => (prev === pageIndex ? null : pageIndex))
+  }
+
+  const jumpToBookmark = () => {
+    if (bookmark === null || bookmark === pageIndex) return
+    goTo(bookmark)
+  }
+
+  // 단어 번역 조회
+  const handleWordClick = (word: string) => {
+    const clean = word.trim()
+    if (!clean) return
+    setWordLookup({ word: clean, meaning: null, isLoading: true })
+    getWordMeaning(clean)
+      .then(meaning => {
+        setWordLookup(prev => (prev && prev.word === clean ? { word: clean, meaning, isLoading: false } : prev))
+      })
+      .catch(() => {
+        setWordLookup(prev => (prev && prev.word === clean ? { word: clean, meaning: null, isLoading: false } : prev))
+      })
+  }
+
+  // 툴바에 넘길 책갈피 표시 라벨 ("Page N") — 유효한 scene 을 가리킬 때만
+  const bookmarkLabel = useMemo(() => {
+    if (bookmark === null) return null
+    if (bookmark < 0 || bookmark >= pages.length) return null
+    const page = pages[bookmark]
+    if (page.kind !== 'scene' || page.sceneIndex === undefined) return null
+    return `Page ${page.sceneIndex + 1}`
+  }, [bookmark, pages])
+  const canJumpToBookmark = bookmark !== null && bookmark !== pageIndex
 
   return (
-    <div className="sb-room">
+    <div className={roomClass}>
       {/* 좌측 호버 트리거 */}
       <div
         className="sb-side-trigger"
@@ -157,11 +300,23 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
       {/* 사이드 툴바 */}
       <ViewerToolbar
         isOpen={isToolbarOpen}
-        currentScene={toolbarScene}
+        ttsMode={tts.status.mode}
         showTranslation={showTranslation}
         fontSize={fontSize}
+        canBookmark={canBookmarkCurrent}
+        isBookmarked={isCurrentBookmarked}
+        bookmarkLabel={bookmarkLabel}
+        canJumpToBookmark={canJumpToBookmark}
+        theme={theme}
+        onPlayFullBook={playFullBook}
+        onPause={tts.pause}
+        onResume={tts.resume}
+        onStop={tts.stop}
         onTranslationToggle={() => setShowTranslation(v => !v)}
         onFontSizeChange={setFontSize}
+        onToggleBookmark={toggleBookmark}
+        onJumpToBookmark={jumpToBookmark}
+        onThemeChange={setTheme}
         onMouseEnter={openToolbar}
         onMouseLeave={scheduleToolbarClose}
       />
@@ -185,6 +340,13 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
         >
           {(isCover || isBackCover) && <div className="sb-spine" />}
 
+          {/* 책갈피 플래그 — 현재 페이지가 책갈피된 scene 인 경우 */}
+          {isCurrentBookmarked && (
+            <div className="sb-bookmark-flag" aria-label="책갈피된 페이지">
+              <Bookmark className="w-3 h-3" />
+            </div>
+          )}
+
           {current.kind === 'cover' && (
             <BookCover
               title={story.title ?? '제목 없는 동화'}
@@ -200,6 +362,11 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
               pageIndex={current.sceneIndex}
               showTranslation={showTranslation}
               fontSize={fontSize}
+              activeSentenceId={tts.status.activeSentenceId}
+              onSentenceClick={(sc, sent) => tts.speakSentence(sc, sent)}
+              onWordClick={handleWordClick}
+              onPlayPage={sc => tts.speakPage(sc)}
+              onIllustrationClick={setZoomedScene}
             />
           )}
 
@@ -238,6 +405,17 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           <ChevronRight className="w-7 h-7" />
         </button>
       </div>
+
+      <IllustrationModal scene={zoomedScene} onClose={() => setZoomedScene(null)} />
+
+      {wordLookup && (
+        <WordLookupCard
+          word={wordLookup.word}
+          meaning={wordLookup.meaning}
+          isLoading={wordLookup.isLoading}
+          onClose={() => setWordLookup(null)}
+        />
+      )}
     </div>
   )
 }
