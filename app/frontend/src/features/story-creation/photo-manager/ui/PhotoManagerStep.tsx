@@ -10,6 +10,7 @@ import { usePhotosQuery } from '../model/usePhotosQuery'
 import { usePhotoUpload } from '../model/usePhotoUpload'
 import { useDeletePhoto } from '../model/useDeletePhoto'
 import { useUpdatePhoto } from '../model/useUpdatePhoto'
+import { useReorderPhotos } from '../model/useReorderPhotos'
 import { MAX_PHOTOS } from '../lib/constants'
 
 interface PhotoManagerStepProps {
@@ -36,6 +37,7 @@ export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: Ph
   const upload = usePhotoUpload(storyId)
   const deleteMutation = useDeletePhoto(storyId)
   const updateMutation = useUpdatePhoto(storyId)
+  const reorderMutation = useReorderPhotos(storyId)
 
   const [isPromptOpen, setIsPromptOpen] = useState(false)
 
@@ -58,6 +60,23 @@ export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: Ph
       deleteMutation.mutate(photoId)
     },
     [deleteMutation],
+  )
+
+  /**
+   * 인접한 두 사진의 순서를 swap 후 서버에 전체 목록 전송.
+   * direction=-1 → 위로, +1 → 아래로.
+   * reorder mutation 은 전체 목록을 보내야 하므로 `serverPhotos` 기준으로 계산.
+   */
+  const handleMove = useCallback(
+    (photoId: number, direction: -1 | 1) => {
+      const ids = serverPhotos.map(p => p.photoId)
+      const idx = ids.indexOf(photoId)
+      const target = idx + direction
+      if (idx < 0 || target < 0 || target >= ids.length) return
+      ;[ids[idx], ids[target]] = [ids[target], ids[idx]]
+      reorderMutation.mutate(ids)
+    },
+    [serverPhotos, reorderMutation],
   )
 
   const handleOpenPrompt = useCallback(() => setIsPromptOpen(true), [])
@@ -115,7 +134,7 @@ export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: Ph
               {!photosQuery.isPending && totalCount === 0 && <EmptyPhotoState />}
 
               {/* 서버 커밋된 사진 */}
-              {serverPhotos.map(photo => (
+              {serverPhotos.map((photo, idx) => (
                 <PhotoItem
                   key={`server-${photo.photoId}`}
                   mode="committed"
@@ -124,7 +143,12 @@ export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: Ph
                   tagsJson={photo.tagsJson}
                   onRemove={() => handleRemove(photo.photoId)}
                   onUpdate={patch => updateMutation.mutate({ photoId: photo.photoId, body: patch })}
+                  onMoveUp={() => handleMove(photo.photoId, -1)}
+                  onMoveDown={() => handleMove(photo.photoId, 1)}
+                  isFirst={idx === 0}
+                  isLast={idx === serverPhotos.length - 1}
                   isRemoving={deleteMutation.isPending && deleteMutation.variables === photo.photoId}
+                  isReordering={reorderMutation.isPending}
                 />
               ))}
 

@@ -5,6 +5,7 @@ import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.PhotoService
 import com.s210.backend.domain.story.presentation.request.CreatePhotoRequest
 import com.s210.backend.domain.story.presentation.request.ModifyPhotoRequest
+import com.s210.backend.domain.story.presentation.request.PhotoOrderRequest
 import com.s210.backend.domain.story.presentation.request.PresignPhotoRequest
 import com.s210.backend.domain.story.presentation.response.PhotoItemResponse
 import com.s210.backend.domain.story.presentation.response.PresignPhotoResponse
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -90,6 +92,22 @@ class PhotoController(
     ): ResponseEntity<ApiResponse<List<PhotoItemResponse>>> {
         val photos = photoService.findPhotos(user.userId, storyId)
         val body = photos.map { PhotoItemResponse.from(it, photoService.presignGetUrl(it.s3Key)) }
+        return ResponseEntity.ok(ApiResponse(data = body))
+    }
+
+    /**
+     * 사진 순서 일괄 변경.
+     * body 의 `photoIds` 는 현재 story 의 활성 사진 전체를 새 순서대로.
+     * 응답은 재정렬된 목록 (각 imageUrl = 새 presigned GET URL).
+     */
+    @PutMapping("/order")
+    fun photoOrderModify(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @RequestBody @Valid request: PhotoOrderRequest,
+    ): ResponseEntity<ApiResponse<List<PhotoItemResponse>>> {
+        val reordered = photoService.reorderPhotos(user.userId, storyId, request.photoIds)
+        val body = reordered.map { PhotoItemResponse.from(it, photoService.presignGetUrl(it.s3Key)) }
         return ResponseEntity.ok(ApiResponse(data = body))
     }
 

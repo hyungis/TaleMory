@@ -59,10 +59,6 @@ data class ModifyStoryRequest(
     )
 }
 
-data class PhotoOrderRequest(
-    val photoIds: List<Long>
-)
-
 data class ModifyStoryboardPageRequest(
     val englishText: String?,
     val koreanText: String?

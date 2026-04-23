@@ -133,11 +133,43 @@ class PhotoService(
     }
 
     /**
-     * FE 가 이미지를 실제로 로드할 수 있는 임시 URL (5분 유효) 을 생성.
+     * FE 가 이미지를 실제로 로드할 수 있는 임시 URL (1시간 유효) 을 생성.
      * `findPhotos` 결과를 presentation layer 가 이 함수로 변환한다.
      */
-    fun presignGetUrl(s3Key: String, ttl: Duration = Duration.ofMinutes(5)): String =
+    fun presignGetUrl(s3Key: String, ttl: Duration = Duration.ofHours(1)): String =
         s3Service.presignGetUrl(s3Key, ttl)
+
+    /**
+     * 사진 순서 일괄 변경 (PUT /photos/order).
+     * `orderedPhotoIds` 는 **현재 story 의 활성 사진 전부** 를 새 순서대로 나열한 리스트여야 함.
+     *
+     * 검증:
+     *  - 소유권: story 가 내 것인가 (`ownedStory`)
+     *  - 완전성: DB 의 활성 사진 수와 입력 리스트 크기 일치 + 중복 없음
+     *  - 소속: 모든 photoId 가 같은 storyId 에 속함
+     *
+     * 실행: 입력 순서대로 `display_order = 0, 1, 2, ...` 재할당. 단일 트랜잭션.
+     */
+    fun reorderPhotos(userId: Long, storyId: Long, orderedPhotoIds: List<Long>): List<PhotoResult> {
+        ownedStory(userId, storyId)
+
+        if (orderedPhotoIds.size != orderedPhotoIds.toSet().size) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        val photos = photoRepository.findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(storyId)
+        if (photos.size != orderedPhotoIds.size) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        val byId = photos.associateBy { it.id }
+        val reordered = orderedPhotoIds.map { id ->
+            byId[id] ?: throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        reordered.forEachIndexed { index, photo -> photo.displayOrder = index.toLong() }
+        return reordered.map(PhotoResult::from)
+    }
 
     /**
      * 단건 조회 + 소유권 검증 공통 헬퍼 (StoryService.ownedStory 와 동일 패턴).

@@ -57,3 +57,13 @@ data class ModifyPhotoRequest(
             tagsJson = tagsJson,
         )
 }
+
+/**
+ * PUT /api/stories/{storyId}/photos/order — 사진 순서 일괄 변경.
+ * `photoIds` 는 현재 story 의 활성 사진 전체를 새 순서대로 나열한 리스트.
+ * 누락/중복/외래 photoId 포함 시 400.
+ */
+data class PhotoOrderRequest(
+    @field:NotBlank
+    val photoIds: List<Long> = emptyList(),
+)

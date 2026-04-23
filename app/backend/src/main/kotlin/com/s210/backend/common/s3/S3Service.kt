@@ -89,10 +89,13 @@ class S3Service(
     }
 
     /**
-     * private 버킷의 이미지를 FE 가 `<img src>` 로 잠깐 로드할 수 있도록 발급하는
-     * 만료형 GET URL. FE 의 사진 목록 응답에 포함돼 브라우저가 S3 로부터 직접 다운로드.
+     * private 버킷의 이미지를 FE 가 `<img src>` 로 로드할 수 있도록 발급하는 만료형 GET URL.
+     *
+     * TTL 기본 1시간 — 사용자가 Step 2 페이지에 오래 머물러도 이미지가 끊기지 않게.
+     * React Query staleTime 은 이 값보다 짧게 잡아 만료 전 refetch 하도록 유도.
+     * (PUT URL 은 5분 유지 — 업로드는 즉시 수행이므로 짧아야 안전.)
      */
-    fun presignGetUrl(s3Key: String, ttl: Duration = Duration.ofMinutes(5)): String {
+    fun presignGetUrl(s3Key: String, ttl: Duration = Duration.ofHours(1)): String {
         val getRequest = GetObjectRequest.builder()
             .bucket(bucket)
             .key(s3Key)

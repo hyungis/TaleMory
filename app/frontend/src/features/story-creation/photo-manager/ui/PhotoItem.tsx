@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react'
+import { Trash2, Image as ImageIcon, Loader2, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react'
 
 /**
  * tagsJson (DB 의 JSON 컬럼) ↔ UI 의 plain 텍스트 변환.
@@ -22,7 +22,12 @@ interface PhotoItemCommittedProps {
   tagsJson: string | null
   onRemove: () => void
   onUpdate: (patch: { description?: string; tagsJson?: string }) => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  isFirst: boolean
+  isLast: boolean
   isRemoving?: boolean
+  isReordering?: boolean
 }
 
 interface PhotoItemUploadingProps {
@@ -48,18 +53,40 @@ export function PhotoItem(props: PhotoItemProps) {
         props.mode === 'error' ? 'border-[#8b3a2a]' : 'border-[#8b7a52]/60 hover:border-[#2d5a27]'
       }`}
     >
-      {/* 우상단 액션 버튼 */}
+      {/* 우상단 액션 버튼 세트 (hover 시 fade-in) */}
       {props.mode === 'committed' && (
-        <button
-          type="button"
-          onClick={props.onRemove}
-          disabled={props.isRemoving}
-          title="사진 삭제"
-          aria-label="사진 삭제"
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] opacity-0 group-hover:opacity-100 hover:bg-[#a84a35] transition-all z-10 disabled:opacity-50"
-        >
-          {props.isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </button>
+        <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <button
+            type="button"
+            onClick={props.onMoveUp}
+            disabled={props.isFirst || props.isReordering}
+            title="위로 이동"
+            aria-label="위로 이동"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={props.onMoveDown}
+            disabled={props.isLast || props.isReordering}
+            title="아래로 이동"
+            aria-label="아래로 이동"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={props.onRemove}
+            disabled={props.isRemoving}
+            title="사진 삭제"
+            aria-label="사진 삭제"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] hover:bg-[#a84a35] transition-colors disabled:opacity-50"
+          >
+            {props.isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </div>
       )}
       {props.mode === 'error' && (
         <button
