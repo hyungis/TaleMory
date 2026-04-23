@@ -14,8 +14,10 @@ const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '/api'
  * "토큰을 꺼내오는 함수"만 외부에서 주입받기 위한 타입이다.
  */
 export type AccessTokenResolver = () => string | null | undefined | Promise<string | null | undefined>
+export type UnauthorizedRetryHandler = (error: ApiError) => boolean | Promise<boolean>
 
 let accessTokenResolver: AccessTokenResolver | null = null
+let unauthorizedRetryHandler: UnauthorizedRetryHandler | null = null
 
 /** request / response / error 각 단계의 공통 후처리 확장 포인트다. */
 export const apiRequestInterceptors = new InterceptorManager<ApiRequestConfig>()
@@ -44,9 +46,17 @@ export function setAccessTokenResolver(resolver: AccessTokenResolver | null): vo
   accessTokenResolver = resolver
 }
 
+export function setUnauthorizedRetryHandler(handler: UnauthorizedRetryHandler | null): void {
+  unauthorizedRetryHandler = handler
+}
+
 /** 로그아웃 등으로 토큰 주입 로직을 비활성화할 때 사용한다. */
 export function clearAccessTokenResolver(): void {
   accessTokenResolver = null
+}
+
+export function clearUnauthorizedRetryHandler(): void {
+  unauthorizedRetryHandler = null
 }
 
 /**
@@ -54,6 +64,14 @@ export function clearAccessTokenResolver(): void {
  * 요청 정규화 -> 요청 인터셉터 -> fetch -> 응답 파싱 -> 에러 정규화 순서로 동작한다.
  */
 export async function apiClient<TData>(path: string, options: ApiClientOptions = {}): Promise<TData> {
+  return executeApiClient<TData>(path, options, false)
+}
+
+async function executeApiClient<TData>(
+  path: string,
+  options: ApiClientOptions,
+  hasRetriedAfterUnauthorized: boolean,
+): Promise<TData> {
   const initialRequest = createApiRequestConfig(path, API_BASE_URL, options)
   const request = await apiRequestInterceptors.run(initialRequest)
   const abortSupport = createAbortSupport(request.signal ?? undefined, request.timeoutMs)
@@ -76,6 +94,14 @@ export async function apiClient<TData>(path: string, options: ApiClientOptions =
     return responseContext.data
   } catch (error) {
     const normalizedError = normalizeRequestError(error, request, abortSupport.signal)
+
+    if (shouldRetryAfterUnauthorized(request, normalizedError, hasRetriedAfterUnauthorized)) {
+      const recovered = await unauthorizedRetryHandler?.(normalizedError)
+      if (recovered === true) {
+        return executeApiClient<TData>(path, options, true)
+      }
+    }
+
     return throwInterceptedError(normalizedError)
   } finally {
     abortSupport.cleanup()
@@ -196,6 +222,7 @@ function createFetchInit(request: ApiRequestConfig, signal: AbortSignal | undefi
     ...rest,
     method,
     headers,
+    credentials: request.credentials ?? 'include',
     signal,
   }
 
@@ -209,6 +236,19 @@ function createFetchInit(request: ApiRequestConfig, signal: AbortSignal | undefi
 function methodAllowsBody(method: string): boolean {
   const normalizedMethod = method.toUpperCase()
   return normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD'
+}
+
+function shouldRetryAfterUnauthorized(
+  request: ApiRequestConfig,
+  error: ApiError,
+  hasRetriedAfterUnauthorized: boolean,
+): boolean {
+  if (hasRetriedAfterUnauthorized) return false
+  if (unauthorizedRetryHandler === null) return false
+  if (error.status !== 401) return false
+  if (request.skipAuth) return false
+
+  return request.meta.isAuthRefreshRequest !== true
 }
 
 /**
