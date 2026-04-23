@@ -101,6 +101,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | — | `storyboard.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | — | `storyboard.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | — | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_AI_WORKER_REPLICAS` | — | `1` (AI worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
 
 > Vite는 `VITE_` prefix만 클라이언트 번들에 주입. 새 frontend 변수 이름은 반드시 `VITE_`로 시작해야 함.
 
@@ -140,6 +141,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `REDIS_PORT` | `6380` | `6379` |
 | `RABBITMQ_PORT` | `5673` | `5672` |
 | `RABBITMQ_MANAGEMENT_PORT` | `15673` | `15672` |
+| `AI_WORKER_REPLICAS` | `1` | `2` (권장 — 병렬 OpenAI 처리량 확보) |
 
 JWT secret 생성 (로컬에서, 4개 전부 각자):
 ```bash
@@ -218,6 +220,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
 
 ### MASTER APP (AI 출처)
 
@@ -240,3 +243,4 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |

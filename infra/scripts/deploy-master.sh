@@ -3,7 +3,7 @@
 # 복구 경로: git revert → push → 새 pipeline, 또는 GitLab 변수 override로 이전 SHA 재실행.
 #
 # Usage:
-#   bash infra/scripts/deploy-master.sh [backend|frontend|ai|all]
+#   bash infra/scripts/deploy-master.sh [backend|frontend|ai-worker|all]
 
 set -euo pipefail
 
@@ -26,9 +26,9 @@ export COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT"
 
 resolve_services() {
   case "$SERVICE" in
-    all)              echo "backend ai nginx" ;;
-    frontend|nginx)   echo "nginx" ;;
-    backend|ai)       echo "$SERVICE" ;;
+    all)                echo "backend ai-worker nginx" ;;
+    frontend|nginx)     echo "nginx" ;;
+    backend|ai-worker)  echo "$SERVICE" ;;
     *) echo "unknown service: $SERVICE" >&2; exit 1 ;;
   esac
 }

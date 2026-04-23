@@ -10,7 +10,6 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-      - ai
     env_file:
       - ${ENV_DIR:-/tmp/env}/app.master.env
     ports:
@@ -43,17 +42,13 @@ services:
       - prod-app-net
       - prod-infra-net
 
-  ai:
+  ai-worker:
     image: ${IMAGE_PREFIX:-s210}-ai:${APP_IMAGE_TAG:-latest}
-    build:
-      context: ../../app/ai
-      dockerfile: Dockerfile
-    container_name: prod-ai
     restart: unless-stopped
+    command: ["python", "worker.py"]
+    scale: ${AI_WORKER_REPLICAS:-1}
     env_file:
       - ${ENV_DIR:-/tmp/env}/app.master.env
-    ports:
-      - "${AI_PORT:-8000}:8000"
     networks:
       - prod-app-net
       - prod-infra-net
