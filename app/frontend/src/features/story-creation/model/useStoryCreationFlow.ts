@@ -45,17 +45,33 @@ export interface UseStoryCreationFlowResult {
 }
 
 /**
+ * `useStoryCreationFlow` 초기 진입 옵션.
+ * "이어서 작성하기" 플로우에서 서버 DRAFT 를 rehydrate 한 값을 주입하기 위함.
+ * 미제공 시 기존 동작 그대로 (step1 부터 빈 state).
+ */
+export interface UseStoryCreationFlowInit {
+  /** 서버 DRAFT storyId. 첫 BasicInfoStep 진입부터 PATCH 모드로 동작. */
+  storyId?: number | null
+  /** 서버 DRAFT 에서 복원한 step1 필드. */
+  step1?: StoryProject['step1']
+}
+
+/**
  * 스토리 제작 워크스페이스의 현재 step + projectData 를 한 묶음으로 관리.
  *
  * NOTE: 프론트 목업 단계에서는 persistence 가 오히려 버그(이전 세션의 stale step 으로 진입)를
  * 유발해서 제거한다. 마운트 시 항상 step 1 + DEFAULT_DATA 로 시작하며,
  * 레거시 localStorage key 가 남아있다면 한 번 정리해준다.
+ *
+ * `init` 으로 서버 DRAFT rehydrate 값을 주입하면 초기 state 로 사용된다 (이후에는 로컬 편집).
  */
-export function useStoryCreationFlow(): UseStoryCreationFlowResult {
+export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryCreationFlowResult {
   const [currentStep, setCurrentStepState] = useState<number>(1)
-  const [projectData, setStoryProject] = useState<StoryProject>(DEFAULT_DATA)
+  const [projectData, setStoryProject] = useState<StoryProject>(() =>
+    init?.step1 ? { ...DEFAULT_DATA, step1: init.step1 } : DEFAULT_DATA,
+  )
   /** BasicInfoStep 에서 POST /api/stories 성공 후 set 되며 step 2~8 의 FK 로 사용. */
-  const [storyId, setStoryIdState] = useState<number | null>(null)
+  const [storyId, setStoryIdState] = useState<number | null>(init?.storyId ?? null)
 
   // 레거시 키 정리 (과거 빌드에서 남겼을 수 있는 stale draft 삭제).
   useEffect(() => {

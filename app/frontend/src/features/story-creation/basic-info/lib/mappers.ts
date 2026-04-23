@@ -28,6 +28,18 @@ export function levelToDifficulty(level: Level): DifficultyApi {
   }
 }
 
+/** BE Difficulty enum → UI 한글 레벨. "이어서 작성하기" rehydrate 경로에서 사용. */
+export function difficultyToLevel(difficulty: DifficultyApi): Level {
+  switch (difficulty) {
+    case 'BEGINNER':
+      return '초급'
+    case 'INTERMEDIATE':
+      return '중급'
+    case 'ADVANCED':
+      return '고급'
+  }
+}
+
 /**
  * 나이(정수 문자열) → 근사치 ISO-8601 생년월일.
  * UI 가 birthDate 대신 age 만 받고 있는 MVP 상태라, 서버가 요구하는 NOT NULL birthDate 는
