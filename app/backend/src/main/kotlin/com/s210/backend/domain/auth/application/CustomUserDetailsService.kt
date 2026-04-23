@@ -20,8 +20,9 @@ class CustomUserDetailsService(
 
     private fun createUserDetails(user: User): UserDetails =
         CustomUser(
-            user.loginId ?: "",
-            user.passwordHash ?: "",
-            listOf(SimpleGrantedAuthority("ROLE_MEMBER"))
+            userId = user.id,
+            loginId = user.loginId ?: "",
+            password = user.passwordHash ?: "",
+            authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
         )
 }
