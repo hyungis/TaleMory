@@ -110,26 +110,29 @@ export function BasicInfoStep({
     setIsSubmitting(true)
     try {
       // 1) 신규 아이 등록 + flow state 반영
-      //    - index 를 data.children 기준으로 추적해야 onChildUpdate 로 올바른 row 에 쓸 수 있음.
-      const resolved: StoryChild[] = []
-      for (let i = 0; i < data.children.length; i += 1) {
-        const child = data.children[i]
-        if (!child.name.trim() || !child.age.trim()) continue
+      //    - Promise.all 로 병렬 요청 (N명일 때 직렬 대비 TTV ~N배 단축).
+      //    - children 의 원래 순서 유지를 위해 map→all 사용 (Promise.all 은 순서 보존).
+      //    - 하나 reject → 전체 reject. "일부만 성공한 채로 step 넘어감" 방지 (기존과 동일한 AllOrNothing 시맨틱).
+      //    - idempotent: `if (child.personId) return child` 로 재시도해도 중복 INSERT 없음.
+      //    - onChildUpdate 가 병렬로 여러 번 호출되지만 React 19 자동 batching 으로 한 렌더에 묶임.
+      const resolved: StoryChild[] = (
+        await Promise.all(
+          data.children.map(async (child, index) => {
+            if (!child.name.trim() || !child.age.trim()) return null
+            if (child.personId) return child
 
-        if (child.personId) {
-          resolved.push(child)
-          continue
-        }
-        const created = await personPost.mutateAsync({
-          name: child.name.trim(),
-          birthDate: ageToBirthDate(child.age),
-          gender: storyChildGenderToApi(child.gender),
-          role: 'CHILD',
-        })
-        // 다음 번 클릭 시 이 행을 또 POST 하지 않도록 flow state 에 personId 저장.
-        onChildUpdate(i, { personId: created.id })
-        resolved.push({ ...child, personId: created.id })
-      }
+            const created = await personPost.mutateAsync({
+              name: child.name.trim(),
+              birthDate: ageToBirthDate(child.age),
+              gender: storyChildGenderToApi(child.gender),
+              role: 'CHILD',
+            })
+            // 다음 번 클릭 시 이 행을 또 POST 하지 않도록 flow state 에 personId 저장.
+            onChildUpdate(index, { personId: created.id })
+            return { ...child, personId: created.id }
+          }),
+        )
+      ).filter((c): c is StoryChild => c !== null)
 
       // 2) story 생성 또는 수정 — 이미 있으면 PATCH 로 값 반영, 없으면 새로 POST.
       const mainCharactersPayload = resolved.map(c => ({
