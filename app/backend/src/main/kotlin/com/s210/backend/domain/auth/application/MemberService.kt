@@ -81,6 +81,11 @@ class MemberService(
         return kakaoOAuthClient.buildAuthorizeUrl()
     }
 
+    fun getOauthLogoutUrl(provider: String): String {
+        requireSupportedProvider(provider)
+        return kakaoOAuthClient.buildLogoutUrl()
+    }
+
     fun loginWithOauthCallback(provider: String, code: String): AuthResult {
         requireSupportedProvider(provider)
 
@@ -101,8 +106,34 @@ class MemberService(
         )
     }
 
+    fun logoutWithOauthCallback(provider: String, refreshToken: String?) {
+        requireSupportedProvider(provider)
+
+        logout(null, refreshToken)
+    }
+
     fun deleteAllRefreshToken(loginId: String) {
         refreshTokenInfoRepositoryRedis.deleteByUserId(loginId)
+    }
+
+    fun logout(loginId: String?, refreshToken: String?) {
+        if (!loginId.isNullOrBlank()) {
+            refreshTokenInfoRepositoryRedis.deleteByUserId(loginId)
+            return
+        }
+
+        if (refreshToken.isNullOrBlank()) {
+            return
+        }
+
+        val principalId = refreshTokenInfoRepositoryRedis.findByRefreshToken(refreshToken)
+
+        if (!principalId.isNullOrBlank()) {
+            refreshTokenInfoRepositoryRedis.deleteByUserId(principalId)
+            return
+        }
+
+        refreshTokenInfoRepositoryRedis.deleteByRefreshToken(refreshToken)
     }
 
     fun validateRefreshTokenAndCreateToken(refreshToken: String): TokenInfo {

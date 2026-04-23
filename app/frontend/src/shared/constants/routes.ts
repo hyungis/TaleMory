@@ -7,6 +7,7 @@ export const ROUTES = {
   creation: '/creation',
   viewer: '/viewer/:storyId',
   oauthCallback: '/auth/oauth/callback',
+  logoutCallback: '/auth/logout/callback',
   // TODO: mypage
 } as const
 

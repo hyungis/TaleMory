@@ -298,11 +298,17 @@
 }
 
 /* 우상단: 우리 가족 책장 열기 */
-.open-library-btn {
+.bookstore-action-buttons {
   position: absolute;
   top: 30px;
   right: 30px;
   z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bookstore-action-btn {
   background: rgba(253, 250, 240, 0.85);
   border: 2px solid #b4dc8c;
   color: #2a1b12;
@@ -319,15 +325,33 @@
   backdrop-filter: blur(5px);
 }
 
-.open-library-btn:hover {
+.bookstore-action-btn:hover:not(:disabled) {
   background: #b4dc8c;
   color: #0a150a;
   transform: translateY(-2px) scale(1.05);
   box-shadow: 0 10px 25px rgba(180, 220, 140, 0.5);
 }
 
+.bookstore-action-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .open-library-btn .icon {
   font-size: 1.2rem;
+}
+
+.logout-btn {
+  background: rgba(42, 27, 18, 0.88);
+  border-color: rgba(180, 220, 140, 0.4);
+  color: #f6f0da;
+}
+
+.logout-btn:hover:not(:disabled) {
+  background: #8b3a2a;
+  border-color: #f2c27c;
+  color: #fff7e8;
+  box-shadow: 0 10px 25px rgba(139, 58, 42, 0.45);
 }
 
 @keyframes bookstoreEntry {

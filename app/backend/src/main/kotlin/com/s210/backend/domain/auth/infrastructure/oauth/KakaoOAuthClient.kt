@@ -19,6 +19,8 @@ class KakaoOAuthClient(
     private val clientSecret: String,
     @Value("\${oauth.kakao.redirect-uri:}")
     private val redirectUri: String,
+    @Value("\${oauth.kakao.logout-redirect-uri:}")
+    private val logoutRedirectUri: String,
 ) {
     private val restClient = RestClient.create()
 
@@ -61,6 +63,23 @@ class KakaoOAuthClient(
             nickname = nickname,
             phone = normalizePhoneNumber(userInfo.kakaoAccount.phoneNumber),
         )
+    }
+
+    fun buildLogoutUrl(): String {
+        if (clientId.isBlank() || logoutRedirectUri.isBlank()) {
+            throw BusinessException(AuthErrorCode.OAUTH_FAILED)
+        }
+
+        return try {
+            UriComponentsBuilder.fromUriString(KAKAO_LOGOUT_URL)
+                .queryParam("client_id", clientId)
+                .queryParam("logout_redirect_uri", logoutRedirectUri)
+                .build()
+                .encode()
+                .toUriString()
+        } catch (_: Exception) {
+            throw BusinessException(AuthErrorCode.OAUTH_FAILED)
+        }
     }
 
     private fun exchangeAuthorizationCode(code: String): String {
@@ -138,6 +157,7 @@ class KakaoOAuthClient(
         private const val KAKAO_PROVIDER = "kakao"
         private const val KAKAO_SCOPE = "account_email profile_nickname"
         private const val KAKAO_AUTHORIZE_URL = "https://kauth.kakao.com/oauth/authorize"
+        private const val KAKAO_LOGOUT_URL = "https://kauth.kakao.com/oauth/logout"
         private const val KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token"
         private const val KAKAO_USER_INFO_URL = "https://kapi.kakao.com/v2/user/me"
     }

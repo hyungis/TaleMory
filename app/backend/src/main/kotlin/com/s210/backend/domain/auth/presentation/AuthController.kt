@@ -11,6 +11,7 @@ import com.s210.backend.domain.auth.presentation.response.AuthResponse
 import com.s210.backend.domain.auth.presentation.response.RefreshTokenResponse
 import com.s210.backend.domain.auth.presentation.response.toAuthResponse
 import com.s210.backend.domain.auth.presentation.support.OauthCallbackRedirectBuilder
+import com.s210.backend.domain.auth.presentation.support.OauthLogoutRedirectBuilder
 import com.s210.backend.domain.auth.presentation.support.RefreshTokenCookieManager
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -31,6 +32,7 @@ class AuthController(
     private val memberService: MemberService,
     private val refreshTokenCookieManager: RefreshTokenCookieManager,
     private val oauthCallbackRedirectBuilder: OauthCallbackRedirectBuilder,
+    private val oauthLogoutRedirectBuilder: OauthLogoutRedirectBuilder,
 ) {
 
     @PostMapping("/signup")
@@ -75,10 +77,12 @@ class AuthController(
 
     @PostMapping("/logout")
     fun authLogout(
-        @AuthenticationPrincipal user: CustomUser,
+        @AuthenticationPrincipal user: CustomUser?,
+        request: HttpServletRequest,
         response: HttpServletResponse,
     ): ResponseEntity<ApiResponse<Unit>> {
-        memberService.deleteAllRefreshToken(user.username)
+        val refreshToken = refreshTokenCookieManager.resolveRefreshToken(request)
+        memberService.logout(user?.username, refreshToken)
         refreshTokenCookieManager.expireRefreshToken(response)
         return ResponseEntity.ok(ApiResponse(success = true))
     }
@@ -128,6 +132,42 @@ class AuthController(
         } catch (exception: BusinessException) {
             ResponseEntity.status(HttpStatus.FOUND)
                 .location(oauthCallbackRedirectBuilder.buildFailureRedirect(exception.message ?: "카카오 로그인에 실패했어요."))
+                .build()
+        }
+    }
+
+    @GetMapping("/oauth/{provider}/logout")
+    fun authOauthLogout(@PathVariable provider: String): ResponseEntity<Void> {
+        return try {
+            val logoutUrl = memberService.getOauthLogoutUrl(provider)
+
+            ResponseEntity.status(HttpStatus.FOUND)
+                .header("Location", logoutUrl)
+                .build()
+        } catch (exception: BusinessException) {
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthLogoutRedirectBuilder.buildFailureRedirect(exception.message ?: "로그아웃 처리에 실패했습니다."))
+                .build()
+        }
+    }
+
+    @GetMapping("/oauth/{provider}/logout/callback")
+    fun authOauthLogoutCallback(
+        @PathVariable provider: String,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ): ResponseEntity<Void> {
+        return try {
+            val refreshToken = refreshTokenCookieManager.resolveRefreshToken(request)
+            memberService.logoutWithOauthCallback(provider, refreshToken)
+            refreshTokenCookieManager.expireRefreshToken(response)
+
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthLogoutRedirectBuilder.buildSuccessRedirect(provider))
+                .build()
+        } catch (exception: BusinessException) {
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(oauthLogoutRedirectBuilder.buildFailureRedirect(exception.message ?: "로그아웃 처리에 실패했습니다."))
                 .build()
         }
     }
