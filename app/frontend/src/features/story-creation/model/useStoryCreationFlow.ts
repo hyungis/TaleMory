@@ -25,9 +25,12 @@ const DEFAULT_DATA: StoryProject = {
 export interface UseStoryCreationFlowResult {
   currentStep: number
   projectData: StoryProject
+  /** POST /api/stories 성공 후 set. step 2~8 에서 리소스 FK 로 사용. */
+  storyId: number | null
   setCurrentStep: (step: number) => void
   handleNext: () => void
   handlePrev: () => void
+  setStoryId: (id: number | null) => void
   updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   updateStep2: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   updateStoryText: (story: string) => void
@@ -36,6 +39,8 @@ export interface UseStoryCreationFlowResult {
   updateVoiceModel: (voiceModel: string | null) => void
   updateChildAt: (index: number, patch: Partial<StoryChild>) => void
   addChild: () => void
+  /** 기존 person 정보를 가져와 새 row 로 append. 드롭다운 "저장된 아이 불러오기" 용. */
+  appendChild: (child: StoryChild) => void
   removeChildAt: (index: number) => void
 }
 
@@ -49,6 +54,8 @@ export interface UseStoryCreationFlowResult {
 export function useStoryCreationFlow(): UseStoryCreationFlowResult {
   const [currentStep, setCurrentStepState] = useState<number>(1)
   const [projectData, setStoryProject] = useState<StoryProject>(DEFAULT_DATA)
+  /** BasicInfoStep 에서 POST /api/stories 성공 후 set 되며 step 2~8 의 FK 로 사용. */
+  const [storyId, setStoryIdState] = useState<number | null>(null)
 
   // 레거시 키 정리 (과거 빌드에서 남겼을 수 있는 stale draft 삭제).
   useEffect(() => {
@@ -122,6 +129,20 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     }))
   }, [])
 
+  const appendChild = useCallback((child: StoryChild) => {
+    setStoryProject(prev => ({
+      ...prev,
+      step1: {
+        ...prev.step1,
+        children: [...prev.step1.children, child],
+      },
+    }))
+  }, [])
+
+  const setStoryId = useCallback((id: number | null) => {
+    setStoryIdState(id)
+  }, [])
+
   const removeChildAt = useCallback((index: number) => {
     setStoryProject(prev => {
       const children = prev.step1.children.filter((_, i) => i !== index)
@@ -138,9 +159,11 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
   return {
     currentStep,
     projectData,
+    storyId,
     setCurrentStep,
     handleNext,
     handlePrev,
+    setStoryId,
     updateStep1,
     updateStep2,
     updateStoryText,
@@ -149,6 +172,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     updateVoiceModel,
     updateChildAt,
     addChild,
+    appendChild,
     removeChildAt,
   }
 }
