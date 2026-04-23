@@ -2,6 +2,7 @@ package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.s3.S3DeletionEvent
 import com.s210.backend.common.s3.S3Service
 import com.s210.backend.domain.story.application.dto.CreatePhotoCommand
 import com.s210.backend.domain.story.application.dto.ModifyPhotoCommand
@@ -11,6 +12,7 @@ import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
@@ -32,6 +34,7 @@ class PhotoService(
     private val photoRepository: PhotoAlbumItemRepository,
     private val storyRepository: StoryRepository,
     private val s3Service: S3Service,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
 
     /**
@@ -94,12 +97,13 @@ class PhotoService(
     }
 
     /**
-     * DB soft delete + S3 객체 즉시 hard delete.
+     * DB soft delete + S3 객체 hard delete.
      * "사용자가 명시적으로 삭제한 사진" = 복구 의도 없음 으로 간주, 스토리지 낭비 방지.
      *
-     * NOTE: S3 삭제는 트랜잭션 밖의 외부 호출이라 실패 시 rollback 불가.
-     *       DB 만 soft delete 되고 S3 객체는 남는 orphan 이 될 수 있으나, 그 경우
-     *       다음 번 배치 정리로 해소 (배치 job 은 후속 MR).
+     * S3 삭제는 **트랜잭션 커밋 직후** 별도 리스너(`S3CleanupEventListener`)가 수행.
+     * 트랜잭션 내에서 직접 호출하면 "S3 삭제 성공 → DB 커밋 실패" 시 broken image
+     * (DB 에는 사진이 있지만 S3 에는 파일 없음 → NoSuchKey) 가 발생할 수 있어 event 분리.
+     * 반대 실패 (DB 커밋 성공 → S3 삭제 실패) 는 orphan 만 남고 배치 정리로 복구 가능.
      */
     fun removePhoto(userId: Long, storyId: Long, photoId: Long) {
         ownedStory(userId, storyId)
@@ -111,8 +115,8 @@ class PhotoService(
         }
         photo.deletedAt = LocalDateTime.now()
 
-        // S3 hard delete — 없는 key 를 지워도 예외 없음 (idempotent).
-        s3Service.deleteObject(photo.imageUrl)
+        // 실제 S3 DeleteObject 는 S3CleanupEventListener 가 AFTER_COMMIT 에 수행.
+        eventPublisher.publishEvent(S3DeletionEvent(photo.imageUrl))
     }
 
     /**
