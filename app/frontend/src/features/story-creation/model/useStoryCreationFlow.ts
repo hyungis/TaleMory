@@ -25,9 +25,12 @@ const DEFAULT_DATA: StoryProject = {
 export interface UseStoryCreationFlowResult {
   currentStep: number
   projectData: StoryProject
+  /** POST /api/stories 성공 후 set. step 2~8 에서 리소스 FK 로 사용. */
+  storyId: number | null
   setCurrentStep: (step: number) => void
   handleNext: () => void
   handlePrev: () => void
+  setStoryId: (id: number | null) => void
   updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   updateStep2: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   updateStoryText: (story: string) => void
@@ -36,7 +39,21 @@ export interface UseStoryCreationFlowResult {
   updateVoiceModel: (voiceModel: string | null) => void
   updateChildAt: (index: number, patch: Partial<StoryChild>) => void
   addChild: () => void
+  /** 기존 person 정보를 가져와 새 row 로 append. 드롭다운 "저장된 아이 불러오기" 용. */
+  appendChild: (child: StoryChild) => void
   removeChildAt: (index: number) => void
+}
+
+/**
+ * `useStoryCreationFlow` 초기 진입 옵션.
+ * "이어서 작성하기" 플로우에서 서버 DRAFT 를 rehydrate 한 값을 주입하기 위함.
+ * 미제공 시 기존 동작 그대로 (step1 부터 빈 state).
+ */
+export interface UseStoryCreationFlowInit {
+  /** 서버 DRAFT storyId. 첫 BasicInfoStep 진입부터 PATCH 모드로 동작. */
+  storyId?: number | null
+  /** 서버 DRAFT 에서 복원한 step1 필드. */
+  step1?: StoryProject['step1']
 }
 
 /**
@@ -45,10 +62,16 @@ export interface UseStoryCreationFlowResult {
  * NOTE: 프론트 목업 단계에서는 persistence 가 오히려 버그(이전 세션의 stale step 으로 진입)를
  * 유발해서 제거한다. 마운트 시 항상 step 1 + DEFAULT_DATA 로 시작하며,
  * 레거시 localStorage key 가 남아있다면 한 번 정리해준다.
+ *
+ * `init` 으로 서버 DRAFT rehydrate 값을 주입하면 초기 state 로 사용된다 (이후에는 로컬 편집).
  */
-export function useStoryCreationFlow(): UseStoryCreationFlowResult {
+export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryCreationFlowResult {
   const [currentStep, setCurrentStepState] = useState<number>(1)
-  const [projectData, setStoryProject] = useState<StoryProject>(DEFAULT_DATA)
+  const [projectData, setStoryProject] = useState<StoryProject>(() =>
+    init?.step1 ? { ...DEFAULT_DATA, step1: init.step1 } : DEFAULT_DATA,
+  )
+  /** BasicInfoStep 에서 POST /api/stories 성공 후 set 되며 step 2~8 의 FK 로 사용. */
+  const [storyId, setStoryIdState] = useState<number | null>(init?.storyId ?? null)
 
   // 레거시 키 정리 (과거 빌드에서 남겼을 수 있는 stale draft 삭제).
   useEffect(() => {
@@ -122,6 +145,20 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     }))
   }, [])
 
+  const appendChild = useCallback((child: StoryChild) => {
+    setStoryProject(prev => ({
+      ...prev,
+      step1: {
+        ...prev.step1,
+        children: [...prev.step1.children, child],
+      },
+    }))
+  }, [])
+
+  const setStoryId = useCallback((id: number | null) => {
+    setStoryIdState(id)
+  }, [])
+
   const removeChildAt = useCallback((index: number) => {
     setStoryProject(prev => {
       const children = prev.step1.children.filter((_, i) => i !== index)
@@ -138,9 +175,11 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
   return {
     currentStep,
     projectData,
+    storyId,
     setCurrentStep,
     handleNext,
     handlePrev,
+    setStoryId,
     updateStep1,
     updateStep2,
     updateStoryText,
@@ -149,6 +188,7 @@ export function useStoryCreationFlow(): UseStoryCreationFlowResult {
     updateVoiceModel,
     updateChildAt,
     addChild,
+    appendChild,
     removeChildAt,
   }
 }
