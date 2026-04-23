@@ -13,6 +13,7 @@
 ## 시스템 변수 (prefix 없음)
 
 - [x] `DISCORD_WEBHOOK_URL` — Variable · **Masked ✅** — notify.sh Discord 웹후크
+- [x] `MATTERMOST_WEBHOOK_URL` — Variable · **Masked ✅** — notify.sh Mattermost 웹후크 (미설정 시 Mattermost 알림 skip)
 
 > `CI_REGISTRY_*`는 GitLab이 자동 주입 — 등록 불필요.
 
