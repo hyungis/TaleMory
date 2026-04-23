@@ -31,6 +31,14 @@ data class StoryDetailResponse(
     val createdAt: LocalDateTime
 )
 
+/**
+ * 동화 기본 정보 생성(POST /api/stories) 직후 FE 가 유일하게 필요로 하는 값은 `storyId` 뿐.
+ * 후속 step 2~8 에서 다른 리소스를 붙일 때 FK 로 사용한다.
+ */
+data class StoryCreateResponse(
+    val storyId: Long,
+)
+
 data class PhotoResponse(
     val id: Long,
     val imageUrl: String,
