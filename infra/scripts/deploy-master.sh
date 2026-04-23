@@ -15,7 +15,7 @@ TAG="${APP_IMAGE_TAG:-${CI_COMMIT_SHORT_SHA:?APP_IMAGE_TAG or CI_COMMIT_SHORT_SH
 ENV_NAME="master"
 
 COMPOSE_FILE="infra/compose/docker-compose.app-${ENV_NAME}.yml"
-COMPOSE_PROJECT="${PROJECT_NAME}-app-${ENV_NAME}"
+COMPOSE_PROJECT="${IMAGE_PREFIX}-app-${ENV_NAME}"
 ENV_FILE="/tmp/env/app.${ENV_NAME}.env"
 
 require_file "$COMPOSE_FILE"

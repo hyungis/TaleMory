@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: ${PROJECT_NAME:-s210}-frontend:${APP_IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX:-s210}-frontend:${APP_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: infra/docker/frontend.Dockerfile
@@ -29,7 +29,7 @@ services:
       - prod-infra-net
 
   backend:
-    image: ${PROJECT_NAME:-s210}-backend:${APP_IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX:-s210}-backend:${APP_IMAGE_TAG:-latest}
     build:
       context: ../../app/backend
       dockerfile: Dockerfile
@@ -44,7 +44,7 @@ services:
       - prod-infra-net
 
   ai:
-    image: ${PROJECT_NAME:-s210}-ai:${APP_IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX:-s210}-ai:${APP_IMAGE_TAG:-latest}
     build:
       context: ../../app/ai
       dockerfile: Dockerfile

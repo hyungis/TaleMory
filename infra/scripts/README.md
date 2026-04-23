@@ -27,7 +27,7 @@ GitLab CI(`.gitlab-ci.yml`)에서 호출되는 shell script와, 일부는 배포
 
 | Var | Default | Origin |
 |---|---|---|
-| `PROJECT_NAME` | `s210` | common.sh |
+| `IMAGE_PREFIX` | `s210` | common.sh |
 | `ROOT_DIR` | `/srv/s210` | common.sh |
 | `APP_IMAGE_TAG` | `$CI_COMMIT_SHORT_SHA` | `.gitlab-ci.yml`의 `variables:`에서 설정 |
 
