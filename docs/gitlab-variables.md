@@ -127,3 +127,56 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 - `/env-sync gitlab-vars` 실행 시 재생성 (체크박스 상태 최대한 보존)
 - 새 변수 추가는 `/env-sync add <KEY> <service>` → 이 체크리스트도 자동 갱신
+---
+
+## AI Env Appendix
+
+### AI → `ENV_DEV_AI_*`
+
+- [ ] `ENV_DEV_AI_OPENAI_API_KEY` → Variable · **Masked ✅**
+- [x] `ENV_DEV_AI_PROJECT_NAME` → Variable · `S210 AI API`
+- [x] `ENV_DEV_AI_APP_VERSION` → Variable · `0.1.0`
+- [x] `ENV_DEV_AI_ENVIRONMENT` → Variable · `local`
+- [x] `ENV_DEV_AI_STORYBOARD_MODEL` → Variable · `gpt-4o-mini`
+- [x] `ENV_DEV_AI_STORYBOARD_INPUT_COST_PER_1M` → Variable · `0.15`
+- [x] `ENV_DEV_AI_STORYBOARD_OUTPUT_COST_PER_1M` → Variable · `0.60`
+- [x] `ENV_DEV_AI_RABBITMQ_HOST` → Variable · `dev-rabbitmq`
+- [x] `ENV_DEV_AI_RABBITMQ_PORT` → Variable · `5672`
+- [x] `ENV_DEV_AI_RABBITMQ_USER` → Variable · `rabbit`
+- [x] `ENV_DEV_AI_RABBITMQ_PASSWORD` → Variable · **Masked ✅**
+- [x] `ENV_DEV_AI_RABBITMQ_VHOST` → Variable · `/`
+- [x] `ENV_DEV_AI_RABBITMQ_REQUEST_EXCHANGE` → Variable · `storyboard.request`
+- [x] `ENV_DEV_AI_RABBITMQ_RESULT_EXCHANGE` → Variable · `storyboard.result`
+- [x] `ENV_DEV_AI_RABBITMQ_GENERATE_QUEUE` → Variable · `storyboard.generate.request`
+- [x] `ENV_DEV_AI_RABBITMQ_REGENERATE_QUEUE` → Variable · `storyboard.regenerate.request`
+- [x] `ENV_DEV_AI_RABBITMQ_GENERATE_ROUTING_KEY` → Variable · `storyboard.generate`
+- [x] `ENV_DEV_AI_RABBITMQ_REGENERATE_ROUTING_KEY` → Variable · `storyboard.regenerate`
+- [x] `ENV_DEV_AI_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` → Variable · `storyboard.generate.completed`
+- [x] `ENV_DEV_AI_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` → Variable · `storyboard.generate.failed`
+- [x] `ENV_DEV_AI_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` → Variable · `storyboard.regenerate.completed`
+- [x] `ENV_DEV_AI_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` → Variable · `storyboard.regenerate.failed`
+
+### AI → `ENV_MASTER_AI_*`
+
+- [ ] `ENV_MASTER_AI_OPENAI_API_KEY` → Variable · **Masked ✅**
+- [x] `ENV_MASTER_AI_PROJECT_NAME` → Variable · `S210 AI API`
+- [x] `ENV_MASTER_AI_APP_VERSION` → Variable · `0.1.0`
+- [x] `ENV_MASTER_AI_ENVIRONMENT` → Variable · `master`
+- [x] `ENV_MASTER_AI_STORYBOARD_MODEL` → Variable · `gpt-4o-mini`
+- [x] `ENV_MASTER_AI_STORYBOARD_INPUT_COST_PER_1M` → Variable · `0.15`
+- [x] `ENV_MASTER_AI_STORYBOARD_OUTPUT_COST_PER_1M` → Variable · `0.60`
+- [x] `ENV_MASTER_AI_RABBITMQ_HOST` → Variable · `prod-rabbitmq`
+- [x] `ENV_MASTER_AI_RABBITMQ_PORT` → Variable · `5672`
+- [x] `ENV_MASTER_AI_RABBITMQ_USER` → Variable · `rabbit`
+- [x] `ENV_MASTER_AI_RABBITMQ_PASSWORD` → Variable · **Masked ✅**
+- [x] `ENV_MASTER_AI_RABBITMQ_VHOST` → Variable · `/`
+- [x] `ENV_MASTER_AI_RABBITMQ_REQUEST_EXCHANGE` → Variable · `storyboard.request`
+- [x] `ENV_MASTER_AI_RABBITMQ_RESULT_EXCHANGE` → Variable · `storyboard.result`
+- [x] `ENV_MASTER_AI_RABBITMQ_GENERATE_QUEUE` → Variable · `storyboard.generate.request`
+- [x] `ENV_MASTER_AI_RABBITMQ_REGENERATE_QUEUE` → Variable · `storyboard.regenerate.request`
+- [x] `ENV_MASTER_AI_RABBITMQ_GENERATE_ROUTING_KEY` → Variable · `storyboard.generate`
+- [x] `ENV_MASTER_AI_RABBITMQ_REGENERATE_ROUTING_KEY` → Variable · `storyboard.regenerate`
+- [x] `ENV_MASTER_AI_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` → Variable · `storyboard.generate.completed`
+- [x] `ENV_MASTER_AI_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` → Variable · `storyboard.generate.failed`
+- [x] `ENV_MASTER_AI_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` → Variable · `storyboard.regenerate.completed`
+- [x] `ENV_MASTER_AI_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` → Variable · `storyboard.regenerate.failed`
