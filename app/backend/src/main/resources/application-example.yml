@@ -41,5 +41,5 @@ oauth:
 aws:
   s3:
     region: ${AWS_REGION:ap-northeast-2}
-    bucket: ${AWS_S3_BUCKET}
+    bucket: ${AWS_S3_BUCKET:}
 
