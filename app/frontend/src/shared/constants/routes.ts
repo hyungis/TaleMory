@@ -6,6 +6,9 @@ export const ROUTES = {
   main: '/main',
   creation: '/creation',
   viewer: '/viewer/:storyId',
+  mypage: '/mypage',
+  mypageVoiceClone: '/mypage/voice-clone',
+  // TODO: oauthCallback
   kakaoCallback: '/auth/kakao/callback',
   oauthCallback: '/auth/oauth/callback',
   logoutCallback: '/auth/logout/callback',
