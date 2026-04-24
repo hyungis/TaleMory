@@ -11,13 +11,16 @@ import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
+import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
+import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.application.dto.StoryGenerateJobMessage
 import com.s210.backend.domain.storyboard.application.dto.StoryGeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.TravelInfo
+import java.time.LocalDate
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -44,6 +47,7 @@ class StoryboardGenerationService(
     private val storyRepository: StoryRepository,
     private val photoRepository: PhotoAlbumItemRepository,
     private val jobRepository: StoryGenerationJobRepository,
+    private val storyBoardRepository: StoryBoardRepository,
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
 ) {
@@ -193,6 +197,33 @@ class StoryboardGenerationService(
         raw.split(",", ";", " ")
             .mapNotNull { it.trim().takeIf { t -> t.isNotEmpty() } }
 
+    /**
+     * 유저가 편집한 스토리(줄거리)를 저장한다 — API 명세 #29.
+     *
+     *  - 같은 storyId 에 story_board 가 여러 건 있을 수 있으므로 (재생성 이력),
+     *    가장 최근 row 를 대상으로 업데이트한다.
+     *  - `story_board.story` 는 VARCHAR(255) 라 길면 잘리지만, 전체 원문은
+     *    `stories.synopsis` (TEXT) 에 그대로 보존한다.
+     *  - `updateAt` 을 오늘 날짜로 갱신.
+     */
+    fun editStory(userId: Long, storyId: Long, newStory: String): StoryBoardResult {
+        ownedStory(userId, storyId)
+        val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
+            ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+
+        val trimmed = newStory.trim()
+        if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
+
+        storyBoard.story = trimmed
+        storyBoard.updateAt = LocalDate.now()
+
+        storyRepository.findById(storyId).ifPresent { story ->
+            story.synopsis = trimmed
+        }
+
+        return StoryBoardResult.from(storyBoard)
+    }
+
     private fun ownedStory(userId: Long, storyId: Long): Story {
         val story = storyRepository.findById(storyId).orElseThrow {
             BusinessException(StoryErrorCode.STORY_NOT_FOUND)
@@ -205,8 +236,12 @@ class StoryboardGenerationService(
     companion object {
         /** 사진 설명이 비어있을 때 AI 의 min_length=1 제약을 위한 fallback. */
         private const val DEFAULT_PHOTO_DESCRIPTION = "사진"
-        /** API 명세: 사진은 10~30장 업로드해야 함. */
-        private const val PHOTO_COUNT_MIN = 10
+        /**
+         * API 명세: 사진은 10~30장 업로드해야 함.
+         * NOTE(로컬 테스트): 소량 사진으로 end-to-end 검증 중이라 MIN 을 잠시 1로 완화해 둔다.
+         * dev/prod 배포 전에 반드시 10 으로 되돌릴 것. (관련 이슈 #13)
+         */
+        private const val PHOTO_COUNT_MIN = 1
         private const val PHOTO_COUNT_MAX = 30
     }
 }

@@ -4,10 +4,14 @@ import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.storyboard.application.StoryboardGenerationService
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
+import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.presentation.request.GenerateStoryRequest
+import com.s210.backend.domain.storyboard.presentation.request.UpdateStoryRequest
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -44,5 +48,24 @@ class StoryboardController(
             prompt = request?.prompt,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
+    }
+
+    /**
+     * API 명세 #29 — 스토리보드 줄거리(본문) 직접 수정.
+     * 유저가 Step 3 result 화면에서 textarea 를 편집한 뒤 onBlur 시점에 호출된다.
+     * 동기 처리 — 즉시 DB 에 반영된 메타를 반환.
+     */
+    @PatchMapping("/story")
+    fun storyboardStoryUpdate(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @Valid @RequestBody request: UpdateStoryRequest,
+    ): ResponseEntity<ApiResponse<StoryBoardResult>> {
+        val result = storyboardGenerationService.editStory(
+            userId = user.userId,
+            storyId = storyId,
+            newStory = request.story,
+        )
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 }

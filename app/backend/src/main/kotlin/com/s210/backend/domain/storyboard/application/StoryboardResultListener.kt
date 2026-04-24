@@ -5,10 +5,8 @@ import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.story.entity.StoryBoard
-import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
-import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.slf4j.LoggerFactory
@@ -39,7 +37,6 @@ import java.time.LocalDateTime
 class StoryboardResultListener(
     private val jobRepository: StoryGenerationJobRepository,
     private val storyBoardRepository: StoryBoardRepository,
-    private val storyboardPageRepository: StoryboardPageRepository,
     private val storyRepository: StoryRepository,
     private val objectMapper: ObjectMapper,
 ) {
@@ -90,46 +87,51 @@ class StoryboardResultListener(
     }
 
     private fun handleSuccess(job: StoryGenerationJob, payload: StoryboardPayload) {
+        // 이번 MR 스코프: "한글 동화 본문 (줄거리)" 만 유저에게 노출/저장한다.
+        // AI 의 synopsis 는 영문 요약이라 유저 표시용으로 부적합.
+        // 대신 pages[].koreanText 를 이어붙인 한글 전체 본문을 보여준다.
+        //
+        // pages / sentences / imagePrompt 같은 세부 메타는 그대로 job.resultPayload 에 보존 —
+        // 후속 MR (스토리보드 확정 + 일러스트 생성) 에서 다시 활용.
+
         // 1) 작업 이력 업데이트 — 비용/소요시간 집계용
         job.status = JobStatus.SUCCESS
         job.resultPayload = objectMapper.writeValueAsString(payload)
         job.costUsd = payload.usage.costUsd?.let { BigDecimal.valueOf(it) }
         job.finishedAt = LocalDateTime.now()
 
-        // 2) 동화 메타 row 1건 생성
-        //    - `prompt`: 자유 프롬프트 입력 없는 정책이라 빈 문자열.
-        //    - `story`:  DB 컬럼이 VARCHAR(255) 라 synopsis 가 길 경우 truncate.
-        //                (원본은 result_payload 및 Story.synopsis 에 보존.)
-        val storyBoard = storyBoardRepository.save(
-            StoryBoard(
-                storyId = job.storyId,
-                prompt = "",
-                story = payload.synopsis.take(255),
-                createAt = LocalDate.now(),
-            ),
-        )
+        // 2) pages[].koreanText 를 단락 구분(\n\n) 으로 이어붙여 한글 동화 본문 생성.
+        val koreanBody = payload.pages
+            .sortedBy { it.pageNumber }
+            .joinToString(separator = "\n\n") { it.koreanText.trim() }
+            .ifBlank { payload.synopsis }   // 극단적으로 pages 비었을 때 fallback.
 
-        // 3) 페이지별 텍스트 저장. imageUrl 은 후속 일러스트 단계에서 채움.
-        payload.pages.forEach { page ->
-            storyboardPageRepository.save(
-                StoryboardPage(
-                    storyBoardId = storyBoard.id,
-                    pageNumber = page.pageNumber,
-                    englishText = page.englishText,
-                    koreanText = page.koreanText,
+        // 3) 동화 메타 row — upsert: 같은 storyId 의 story_board 가 있으면 내용만 교체.
+        //    (재생성해도 row 가 새로 생기지 않도록. story_generation_jobs 는 이력용으로 쌓임.)
+        val existing = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
+        if (existing != null) {
+            existing.story = koreanBody
+            existing.updateAt = LocalDate.now()
+        } else {
+            storyBoardRepository.save(
+                StoryBoard(
+                    storyId = job.storyId,
+                    prompt = "",
+                    story = koreanBody,
+                    createAt = LocalDate.now(),
                 ),
             )
         }
 
-        // 4) FE 가 바로 보여줄 수 있도록 Story 엔티티에도 요약 반영.
+        // 4) FE Step 3 가 즉시 보여줄 수 있도록 Story 엔티티에도 한글 본문 반영.
         storyRepository.findById(job.storyId).ifPresent { story ->
             story.title = payload.title
-            story.synopsis = payload.synopsis
+            story.synopsis = koreanBody
         }
 
         log.info(
-            "Job {} SUCCESS — storyId={}, pages={}, costUsd={}",
-            job.id, job.storyId, payload.pages.size, payload.usage.costUsd,
+            "Job {} SUCCESS — storyId={}, storyLen={}, pages={}, costUsd={}",
+            job.id, job.storyId, koreanBody.length, payload.pages.size, payload.usage.costUsd,
         )
     }
 
