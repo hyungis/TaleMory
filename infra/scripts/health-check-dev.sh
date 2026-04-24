@@ -14,6 +14,7 @@ HOST_PREFIX="dev"
 IMAGE_PREFIX="${IMAGE_PREFIX:-s210}"
 NETWORK="${HOST_PREFIX}-${IMAGE_PREFIX}-infra-net"
 INFRA_ENV="${ENV_DIR:-/tmp/env}/infra.dev.env"
+APP_ENV="${ENV_DIR:-/tmp/env}/app.dev.env"
 
 get_env() { grep -E "^$1=" "$2" | head -1 | cut -d= -f2-; }
 with_retry() {
@@ -87,8 +88,22 @@ case "$SERVICE" in
         | grep -oE '"consumers":[0-9]+' | grep -oE '[0-9]+' || echo 0)
       [[ "${count:-0}" -ge 1 ]]
     }
-    with_retry "storyboard.generate.request consumers>=1"   12 5 check_q storyboard.generate.request
-    with_retry "storyboard.regenerate.request consumers>=1" 12 5 check_q storyboard.regenerate.request
-    echo "[OK] ai-worker ($running containers, both queues have consumers)"
+    # 큐 이름은 하드코딩 금지 — app.dev.env에서 읽어서 코드 변경 없이 큐 이름 rename 대응.
+    if [[ ! -f "$APP_ENV" ]]; then
+      echo "[FAIL] $APP_ENV 없음 (app 스택 env 파일 필요)" >&2
+      exit 1
+    fi
+    GEN_Q=$(get_env RABBITMQ_GENERATE_QUEUE "$APP_ENV")
+    REGEN_Q=$(get_env RABBITMQ_REGENERATE_QUEUE "$APP_ENV")
+    if [[ -z "${GEN_Q:-}" ]]; then
+      echo "[FAIL] RABBITMQ_GENERATE_QUEUE 비어있음 (GitLab Variable 미등록?)" >&2
+      exit 1
+    fi
+    with_retry "${GEN_Q} consumers>=1" 12 5 check_q "$GEN_Q"
+    # GENERATE/REGENERATE가 같은 큐(예: ai.cpu.request.queue)면 중복 probe 생략.
+    if [[ -n "${REGEN_Q:-}" && "$REGEN_Q" != "$GEN_Q" ]]; then
+      with_retry "${REGEN_Q} consumers>=1" 12 5 check_q "$REGEN_Q"
+    fi
+    echo "[OK] ai-worker ($running containers, queue(s) have consumers)"
     ;;
 esac
