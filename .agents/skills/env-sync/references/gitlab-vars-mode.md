@@ -19,7 +19,7 @@ GitLab → Settings → CI/CD → Variables에 **등록해야 할 모든 키**�
 prefix 있는 형식 그대로 추출:
 
 ```bash
-grep -oE '`ENV_(BASE|DEV|MASTER)(_(BACKEND|FRONTEND|AI|INFRA))?_[A-Z][A-Z0-9_]+`' \
+grep -oE '`ENV_(BASE|DEV|MASTER)(_(APP|INFRA))?_[A-Z][A-Z0-9_]+`' \
   "$REPO/infra/env/README.md" \
   | sed 's/`//g' | sort -u
 ```
@@ -41,9 +41,7 @@ grep -oE '\$[A-Z][A-Z0-9_]+|\$\{[A-Z][A-Z0-9_]+' "$REPO/.gitlab-ci.yml" \
 
 | 원 키 | 서비스 판정 | 생성되는 GitLab Variable |
 |---|---|---|
-| backend 코드 참조 | backend | `ENV_DEV_BACKEND_<KEY>`, `ENV_MASTER_BACKEND_<KEY>` |
-| frontend 코드 참조 (VITE_*) | frontend | `ENV_DEV_FRONTEND_<KEY>`, `ENV_MASTER_FRONTEND_<KEY>` |
-| ai 코드 참조 | ai | `ENV_DEV_AI_<KEY>`, `ENV_MASTER_AI_<KEY>` |
+| app 코드 참조 (backend + frontend + ai) | app | `ENV_DEV_APP_<KEY>`, `ENV_MASTER_APP_<KEY>` |
 | infra 표준 (whitelist의 Docker 이미지 표준) | infra | `ENV_DEV_INFRA_<KEY>`, `ENV_MASTER_INFRA_<KEY>` |
 | 시스템 (DISCORD_WEBHOOK_URL 등) | system | 그대로 |
 
@@ -60,14 +58,20 @@ is_masked = re.search(r'_(PASSWORD|TOKEN|KEY|SECRET|WEBHOOK|DSN)(_|$)', key)
 is_protected = target == 'MASTER' and is_masked
 ```
 
-## 체크박스 보존
+## 체크박스 보존 및 삭제 추적
 
 기존 `docs/gitlab-variables.md`가 있으면:
 
-1. 파일 파싱해서 `- [x] \`<VARIABLE_NAME>\`` 형태의 체크된 키 목록 추출
-2. 새로 생성할 때 해당 키가 여전히 존재하면 `- [x]`로 유지
-3. 키가 사라졌으면 제거 (등록 상태와 무관하게 의미 없는 체크)
-4. 새 키는 `- [ ]`로 시작
+1. 파일 파싱해서 `all_old_keys`(전체 키 목록)와 `checked_keys`(체크된 키 목록) 두 셋 추출
+   - `~~\`KEY\`~~` 형태의 삭제 대기 항목도 `old_keys`에서 제외 (이미 처리 중인 항목)
+2. 새로 생성할 때:
+   - **기존과 동일한 키** → `[x]`/`[ ]` 상태 그대로 보존
+   - **새로 추가된 키** → `- [ ]` (미등록 상태로 시작)
+   - **제거된 키** (코드/README 어디에도 없어진 키) → 해당 섹션 말미에 삭제 대기 항목으로 추가:
+     ```
+     - [ ] ~~`OLD_VAR_NAME`~~ — **GitLab에서 삭제 필요** — 삭제 완료 후 체크
+     ```
+3. 삭제 대기 항목(`~~KEY~~`)이 체크되면 다음 재생성 시 해당 항목 제거 (삭제 완료로 간주)
 
 ## 출력 파일 구조
 
@@ -95,14 +99,10 @@ is_protected = target == 'MASTER' and is_masked
 
 ## ENV_DEV_*
 
-### Backend
-- [ ] `ENV_DEV_BACKEND_<KEY>` — Variable · Masked? · 설명(있으면)
-...
-
-### Frontend
-...
-
-### AI
+### APP
+- [x] `ENV_DEV_APP_<EXISTING_KEY>` — Variable · 설명
+- [ ] `ENV_DEV_APP_<NEW_KEY>` — Variable · 설명
+- [ ] ~~`ENV_DEV_APP_<REMOVED_KEY>`~~ — **GitLab에서 삭제 필요** — 삭제 완료 후 체크
 ...
 
 ### Infra
@@ -112,8 +112,8 @@ is_protected = target == 'MASTER' and is_masked
 
 동일 구조, Protected ✅ 표시 추가.
 
-### Backend
-- [ ] `ENV_MASTER_BACKEND_<KEY>` — Variable · Masked ✅ · Protected ✅
+### APP
+- [ ] `ENV_MASTER_APP_<KEY>` — Variable · Masked ✅ · Protected ✅
 ...
 
 ---
@@ -131,18 +131,22 @@ is_protected = target == 'MASTER' and is_masked
 
 ## 실행 흐름
 
-1. **기존 파일 파싱** (있으면) → 체크된 키 셋 만들기
+1. **기존 파일 파싱** (있으면) → `all_old_keys` 셋 + `checked_keys` 셋 만들기 (삭제 대기 항목 제외)
 2. **키 수집**:
    - 코드 grep 3종
    - README 테이블 파싱
    - `.gitlab-ci.yml` 시스템 변수
 3. **화이트리스트 필터**: whitelist.md의 Compose/CI 전용 키 제외
-4. **prefix 확장**: 서비스 판정 결과에 따라 `ENV_<TARGET>_<SVC>_<KEY>` 생성 (dev/master 각각)
+4. **prefix 확장**: 서비스 판정 결과에 따라 app → `ENV_<TARGET>_APP_<KEY>`, infra → `ENV_<TARGET>_INFRA_<KEY>` 생성 (dev/master 각각)
 5. **Masked/Protected 태그**
 6. **설명 채우기 (best-effort)**:
    - `infra/env/README.md` 테이블의 같은 키의 설명 열 복사
    - 없으면 빈칸
-7. **체크박스 적용**: 기존 체크된 키는 `- [x]`, 나머지는 `- [ ]`
+7. **체크박스 적용**:
+   - 기존과 동일한 키 → `[x]`/`[ ]` 보존
+   - 새 키 → `- [ ]`
+   - 제거된 키 → 해당 섹션 말미에 `- [ ] ~~\`KEY\`~~ — **GitLab에서 삭제 필요** — 삭제 완료 후 체크` 추가
+   - 이전 재생성에서 남겨진 삭제 대기 항목 중 체크된 것 → 이번 출력에서 제거
 8. **파일 출력**: `docs/gitlab-variables.md` 덮어쓰기
 
 ## 주의사항

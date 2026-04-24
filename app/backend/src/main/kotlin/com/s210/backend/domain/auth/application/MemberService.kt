@@ -1,20 +1,27 @@
 package com.s210.backend.domain.auth.application
 
+import com.s210.backend.common.entity.TokenInfo
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.jwt.JwtTokenProvider
+import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.dto.AuthResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
+import com.s210.backend.domain.auth.application.dto.OauthUserProfile
 import com.s210.backend.domain.auth.application.dto.SignupCommand
-import com.s210.backend.common.entity.TokenInfo
-import com.s210.backend.common.jwt.JwtTokenProvider
-import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
+import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.auth.exception.AuthErrorCode
+import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
+import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
-import com.s210.backend.domain.auth.presentation.response.AuthResponse
 import com.s210.backend.domain.user.entity.User
+import com.s210.backend.domain.user.entity.OauthAccount
+import com.s210.backend.domain.user.infrastructure.repository.OauthAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
@@ -22,16 +29,15 @@ import org.springframework.stereotype.Service
 @Service
 class MemberService(
     private val memberRepository: MemberRepository,
+    private val oauthAccountRepository: OauthAccountRepository,
     private val jwtTokenProvider: JwtTokenProvider,
     private val passwordEncoder: PasswordEncoder,
     private val refreshTokenInfoRepositoryRedis: RefreshTokenInfoRepositoryRedis,
     private val authenticationManager: AuthenticationManager,
+    private val kakaoOAuthClient: KakaoOAuthClient,
+    private val oauthRedirectUriResolver: OauthRedirectUriResolver,
 ) {
-    /**
-     * 회원가입
-     */
     fun signUp(command: SignupCommand): ApiResponse<Unit> {
-        // ID 중복 검사
         if (memberRepository.existsByLoginId(command.loginId)) {
             throw BusinessException(CommonErrorCode.DUPLICATE_LOGIN_ID)
         }
@@ -52,7 +58,6 @@ class MemberService(
             )
         ).id
 
-
         return ApiResponse(
             success = true,
             data = null,
@@ -60,9 +65,6 @@ class MemberService(
         )
     }
 
-    /**
-     * 로그인 -> 토큰 발행
-     */
     fun login(command: LoginCommand): AuthResult {
         val authenticationToken = UsernamePasswordAuthenticationToken(command.loginId, command.password)
         val authentication = authenticationManager.authenticate(authenticationToken)
@@ -70,40 +72,153 @@ class MemberService(
 
         refreshTokenInfoRepositoryRedis.save(command.loginId, tokenInfo.refreshToken)
 
-        val user = memberRepository.findByLoginId(command.loginId) ?:
-        throw BusinessException(CommonErrorCode.USER_NOT_FOUND)
-
+        val user = memberRepository.findByLoginId(command.loginId)
+            ?: throw BusinessException(CommonErrorCode.USER_NOT_FOUND)
 
         return AuthResult(tokenInfo.grantType, tokenInfo.accessToken, tokenInfo.refreshToken, user)
-    }//컨트롤 어드바이스로
+    }
 
-    /**
-     * 유저의 모든 Refresh 토큰 삭제
-     */
+    fun loginWithKakaoCallback(code: String, redirectUri: String): AuthResult {
+        val allowedRedirectUri = oauthRedirectUriResolver.requireAllowedRedirectUri(redirectUri)
+        val oauthUserProfile = kakaoOAuthClient.fetchUserProfile(code, allowedRedirectUri)
+
+        return createOauthLoginResult(oauthUserProfile)
+    }
+
+    fun getOauthAuthorizeUrl(provider: String, origin: String): String {
+        requireSupportedProvider(provider)
+        val redirectUri = oauthRedirectUriResolver.buildBackendCallbackUri(origin, provider)
+        val state = oauthRedirectUriResolver.createState(origin)
+        return kakaoOAuthClient.buildAuthorizeUrl(redirectUri, state)
+    }
+
+    fun getOauthLogoutUrl(provider: String, origin: String): String {
+        requireSupportedProvider(provider)
+        val logoutRedirectUri = oauthRedirectUriResolver.buildBackendLogoutCallbackUri(origin, provider)
+        val state = oauthRedirectUriResolver.createState(origin)
+        return kakaoOAuthClient.buildLogoutUrl(logoutRedirectUri, state)
+    }
+
+    fun loginWithOauthCallback(provider: String, code: String, origin: String): AuthResult {
+        requireSupportedProvider(provider)
+
+        val redirectUri = oauthRedirectUriResolver.buildBackendCallbackUri(origin, provider)
+        val oauthUserProfile = kakaoOAuthClient.fetchUserProfile(code, redirectUri)
+        return createOauthLoginResult(oauthUserProfile)
+    }
+
+    private fun createOauthLoginResult(oauthUserProfile: OauthUserProfile): AuthResult {
+        val user = findOrCreateOauthUser(oauthUserProfile)
+        val principal = createOauthPrincipal(user, oauthUserProfile.provider)
+        val authentication = UsernamePasswordAuthenticationToken(principal, "", principal.authorities)
+        val tokenInfo = jwtTokenProvider.createToken(authentication)
+
+        refreshTokenInfoRepositoryRedis.save(principal.username, tokenInfo.refreshToken)
+
+        return AuthResult(
+            grantType = tokenInfo.grantType,
+            accessToken = tokenInfo.accessToken,
+            refreshToken = tokenInfo.refreshToken,
+            user = user,
+            provider = oauthUserProfile.provider,
+        )
+    }
+
+    fun logoutWithOauthCallback(provider: String, refreshToken: String?) {
+        requireSupportedProvider(provider)
+
+        logout(null, refreshToken)
+    }
+
     fun deleteAllRefreshToken(loginId: String) {
         refreshTokenInfoRepositoryRedis.deleteByUserId(loginId)
     }
 
-    /**
-     * Refresh 토큰 검증 후 토큰 재발급
-     */
-    fun validateRefreshTokenAndCreateToken(refreshToken: String): ApiResponse<AuthResponse> {
-        // Redis에 refreshToken 유효 여부 확인
+    fun logout(loginId: String?, refreshToken: String?) {
+        if (!loginId.isNullOrBlank()) {
+            refreshTokenInfoRepositoryRedis.deleteByUserId(loginId)
+            return
+        }
+
+        if (refreshToken.isNullOrBlank()) {
+            return
+        }
+
+        val principalId = refreshTokenInfoRepositoryRedis.findByRefreshToken(refreshToken)
+
+        if (!principalId.isNullOrBlank()) {
+            refreshTokenInfoRepositoryRedis.deleteByUserId(principalId)
+            return
+        }
+
+        refreshTokenInfoRepositoryRedis.deleteByRefreshToken(refreshToken)
+    }
+
+    fun validateRefreshTokenAndCreateToken(refreshToken: String): TokenInfo {
         refreshTokenInfoRepositoryRedis.findByRefreshToken(refreshToken)
             ?: throw BusinessException(CommonErrorCode.INVALID_REFRESH_TOKEN)
 
-        // 새로운 accessToken, refreshToken 발급
-        val newTokenInfo: TokenInfo = jwtTokenProvider.validateRefreshTokenAndCreateToken(refreshToken)
+        val newTokenInfo = jwtTokenProvider.validateRefreshTokenAndCreateToken(refreshToken)
 
-        // 기존 refreshToken Redis에서 제거 : refreshToken은 1회용
+        // refresh token 은 1회용으로 운용하고, 재발급 직후 이전 토큰을 폐기한다.
         refreshTokenInfoRepositoryRedis.deleteByRefreshToken(refreshToken)
-
-        // 새로운 refreshToken Redis에 추가
         refreshTokenInfoRepositoryRedis.save(newTokenInfo.userId, newTokenInfo.refreshToken)
-        return ApiResponse(
-            success = true,
-            data = null,
-            message = newTokenInfo.accessToken,
+
+        return newTokenInfo
+    }
+
+    private fun findOrCreateOauthUser(profile: OauthUserProfile): User {
+        val oauthAccount = oauthAccountRepository.findByProviderAndProviderUserIdAndDeletedAtIsNull(
+            profile.provider,
+            profile.providerUserId,
         )
+        if (oauthAccount != null) {
+            return oauthAccount.user
+        }
+
+        val user = memberRepository.findByEmail(profile.email)
+            ?: memberRepository.save(
+                User(
+                    loginId = null,
+                    passwordHash = null,
+                    email = profile.email,
+                    name = profile.name,
+                    nickname = profile.nickname,
+                    phone = profile.phone,
+                    agreeSms = false,
+                    agreeMarketing = false,
+                )
+            )
+
+        oauthAccountRepository.save(
+            OauthAccount(
+                user = user,
+                provider = profile.provider,
+                providerUserId = profile.providerUserId,
+            )
+        )
+
+        return user
+    }
+
+    private fun createOauthPrincipal(user: User, provider: String): CustomUser {
+        val principalId = user.loginId ?: "oauth:$provider:${user.id}"
+
+        return CustomUser(
+            userId = user.id,
+            loginId = principalId,
+            password = "",
+            authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
+        )
+    }
+
+    private fun requireSupportedProvider(provider: String) {
+        if (provider != SUPPORTED_PROVIDER) {
+            throw BusinessException(AuthErrorCode.UNSUPPORTED_OAUTH_PROVIDER)
+        }
+    }
+
+    companion object {
+        private const val SUPPORTED_PROVIDER = "kakao"
     }
 }

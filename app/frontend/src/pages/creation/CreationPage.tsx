@@ -1,5 +1,5 @@
-import { useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BasicInfoStep,
   PhotoManagerStep,
@@ -10,6 +10,11 @@ import {
   FinalPreviewStep,
   PublishStoryStep,
   useStoryCreationFlow,
+  rehydrateStep1,
+} from '../../features/story-creation'
+import type {
+  UseStoryCreationFlowInit,
+  StoryDraftResponse,
 } from '../../features/story-creation'
 import { ROUTES, buildViewerPath } from '../../shared/constants'
 import { DUMMY_STORIES } from '../../entities/story'
@@ -28,7 +33,22 @@ import '../../features/bookshelf/styles/bookshelf.css'
  */
 export function CreationPage() {
   const navigate = useNavigate()
-  const flow = useStoryCreationFlow()
+  const location = useLocation()
+  /**
+   * BookstoreScene "이어서 작성하기" 에서 `navigate(ROUTES.creation, { state: { draft } })` 로
+   * 넘겨준 DRAFT 를 rehydrate 해서 flow 초기값으로 주입.
+   * - state 없음 → 빈 step1 / storyId=null (신규 플로우)
+   * - draft 있음 → step1 복원 + storyId 세팅 → 재클릭 시 PATCH 로 동작
+   */
+  const init = useMemo<UseStoryCreationFlowInit | undefined>(() => {
+    const state = location.state as { draft?: StoryDraftResponse | null } | null
+    const draft = state?.draft
+    if (!draft) return undefined
+    return { storyId: draft.storyId, step1: rehydrateStep1(draft) }
+    // 의도적으로 location.state 만 의존 — 최초 mount 시 한 번만 계산되면 충분.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const flow = useStoryCreationFlow(init)
 
   /**
    * 제작 플로우 이탈 공통 네비게이션.
@@ -61,18 +81,24 @@ export function CreationPage() {
       {flow.currentStep === 1 && (
         <BasicInfoStep
           data={flow.projectData.step1}
+          storyId={flow.storyId}
           onUpdate={flow.updateStep1}
           onChildUpdate={flow.updateChildAt}
           onChildAdd={flow.addChild}
+          onChildAppend={flow.appendChild}
           onChildRemove={flow.removeChildAt}
           onBack={handleBack}
-          onNext={flow.handleNext}
+          onStoryCreated={storyId => {
+            flow.setStoryId(storyId)
+            flow.handleNext()
+          }}
         />
       )}
 
       {flow.currentStep === 2 && (
         <PhotoManagerStep
           data={flow.projectData.step2}
+          storyId={flow.storyId}
           onUpdate={flow.updateStep2}
           onBack={handleBack}
           onNext={flow.handleNext}

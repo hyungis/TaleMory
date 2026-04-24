@@ -6,5 +6,6 @@ data class AuthResult(
     val grantType: String,
     val accessToken: String,
     val refreshToken: String,
-    val user: User
+    val user: User,
+    val provider: String? = null,
 )

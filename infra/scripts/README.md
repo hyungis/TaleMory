@@ -15,11 +15,12 @@ GitLab CI(`.gitlab-ci.yml`)에서 호출되는 shell script와, 일부는 배포
 | `deploy-master.sh [service]` | master 배포 (자동 rollback 없음) | CI: `deploy_master` stage (manual) |
 | `deploy-infra-dev.sh` | dev MySQL/Redis/RabbitMQ compose up | 수동 (변경 있을 때만) |
 | `deploy-infra-master.sh` | master MySQL/Redis/RabbitMQ compose up | 수동 |
-| `health-check-dev.sh [service]` | nginx 경유로 `/`, `/api/health`, `/ai/health` polling | deploy-dev.sh 내부 |
-| `health-check-master.sh [service]` | 위와 동일, master 포트 | deploy-master.sh 내부 |
+| `health-check-dev.sh [service]` | nginx 경유 `/`, `/api/health` polling + `ai-worker` 컨테이너 상태 + RabbitMQ mgmt-API consumer probe | deploy-dev.sh 내부 |
+| `health-check-master.sh [service]` | 위와 동일, master 포트(HTTPS) | deploy-master.sh 내부 |
 | `health-check-infra.sh <env>` | mysql/redis/rabbitmq 실제 접속 + app↔infra creds 정렬 검증 | CI: `verify_infra_<env>` / `deploy_infra_<env>` |
 | `notify.sh <status> <job>` | Discord embed 알림 | CI: `.post` stage |
 | `cleanup-images.sh` | s210-* 서비스별 최근 N개 태그만 유지 + dangling 정리 | CI: `.post` stage, notify 이후 성공 시만 |
+| `purge-queues.sh <env>` | RabbitMQ 큐 메시지 비우기 (dev 전용 — master 차단). 큐 이름은 `app.<env>.env`에서 읽음 | CI: `purge_queues_dev` manual job (수동 클릭) |
 
 `[service]` 인자는 `backend`, `frontend`, `ai`, `all`(기본) 중 하나. `frontend`는 compose 서비스명 `nginx`에 매핑.
 
@@ -27,7 +28,7 @@ GitLab CI(`.gitlab-ci.yml`)에서 호출되는 shell script와, 일부는 배포
 
 | Var | Default | Origin |
 |---|---|---|
-| `PROJECT_NAME` | `s210` | common.sh |
+| `IMAGE_PREFIX` | `s210` | common.sh |
 | `ROOT_DIR` | `/srv/s210` | common.sh |
 | `APP_IMAGE_TAG` | `$CI_COMMIT_SHORT_SHA` | `.gitlab-ci.yml`의 `variables:`에서 설정 |
 

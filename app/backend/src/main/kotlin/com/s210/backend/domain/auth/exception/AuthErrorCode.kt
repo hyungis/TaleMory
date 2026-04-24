@@ -13,4 +13,5 @@ enum class AuthErrorCode(
     TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "AUTH_003", "유효하지 않은 토큰입니다."),
     OAUTH_FAILED(HttpStatus.BAD_REQUEST, "AUTH_004", "OAuth 인증에 실패했습니다."),
     ALREADY_REGISTERED(HttpStatus.CONFLICT, "AUTH_005", "이미 가입된 사용자입니다."),
+    UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH_006", "지원하지 않는 OAuth 제공자입니다."),
 }
