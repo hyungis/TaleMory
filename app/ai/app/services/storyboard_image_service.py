@@ -31,10 +31,7 @@ def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) ->
     storyboard_seed = request_model.seed
 
     for item in request_model.items:
-        if settings.GEMINI_API_KEY:
-            results.append(_generate_item_with_gemini(request_model.storyId, item, storyboard_seed))
-        else:
-            results.append(_generate_item_locally(request_model.storyId, item))
+        results.append(generate_storyboard_image_item(request_model.storyId, item, storyboard_seed))
 
     return StoryboardImageGenerateResponse(
         storyId=request_model.storyId,
@@ -48,17 +45,23 @@ def regenerate_storyboard_image(
     request_model: StoryboardImageRegenerateRequest,
 ) -> StoryboardImageRegenerateResponse:
     regenerate_item = _build_regenerate_item(request_model.item, request_model.userPrompt)
-
-    if settings.GEMINI_API_KEY:
-        result = _generate_item_with_gemini(request_model.storyId, regenerate_item, request_model.seed)
-    else:
-        result = _generate_item_locally(request_model.storyId, regenerate_item)
+    result = generate_storyboard_image_item(request_model.storyId, regenerate_item, request_model.seed)
 
     return StoryboardImageRegenerateResponse(
         storyId=request_model.storyId,
         seed=request_model.seed,
         result=result,
     )
+
+
+def generate_storyboard_image_item(
+    story_id: int,
+    item: StoryboardImageGenerateItemRequest,
+    seed: int,
+) -> StoryboardImageGenerateResult:
+    if settings.GEMINI_API_KEY:
+        return _generate_item_with_gemini(story_id, item, seed)
+    return _generate_item_locally(story_id, item)
 
 
 def _generate_item_with_gemini(

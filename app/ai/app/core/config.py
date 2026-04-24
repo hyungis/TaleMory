@@ -48,27 +48,67 @@ class Settings(BaseModel):
     RABBITMQ_USER: str = getenv("RABBITMQ_USERNAME", getenv("RABBITMQ_USER", "guest"))
     RABBITMQ_PASSWORD: str = getenv("RABBITMQ_PASSWORD", "guest")
     RABBITMQ_VHOST: str = getenv("RABBITMQ_VHOST", "/")
-    RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "storyboard.request")
-    RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "storyboard.result")
-    RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "storyboard.generate.request")
-    RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "storyboard.regenerate.request")
-    RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "storyboard.generate")
-    RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "storyboard.regenerate")
+    RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "ai.request")
+    RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
+    RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.request.queue")
+    RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.regenerate.queue")
+    RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "ai.cpu.story.generate")
+    RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
+    RABBITMQ_IMAGE_GENERATE_QUEUE: str = getenv(
+        "RABBITMQ_IMAGE_GENERATE_QUEUE",
+        "ai.image.generate.request.queue",
+    )
+    RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE: str = getenv(
+        "RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE",
+        "ai.image.generate.item.request.queue",
+    )
+    RABBITMQ_IMAGE_REGENERATE_QUEUE: str = getenv(
+        "RABBITMQ_IMAGE_REGENERATE_QUEUE",
+        "ai.image.regenerate.request.queue",
+    )
+    RABBITMQ_IMAGE_GENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_GENERATE_ROUTING_KEY",
+        "ai.image.generate",
+    )
+    RABBITMQ_IMAGE_GENERATE_ITEM_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_GENERATE_ITEM_ROUTING_KEY",
+        "ai.image.generate.item",
+    )
+    RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY",
+        "ai.image.regenerate",
+    )
     RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY",
-        "storyboard.generate.completed",
+        "ai.result.story.generate.completed",
     )
     RABBITMQ_GENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_FAILED_ROUTING_KEY",
-        "storyboard.generate.failed",
+        "ai.result.story.generate.failed",
     )
     RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY",
-        "storyboard.regenerate.completed",
+        "ai.result.story.regenerate.completed",
     )
     RABBITMQ_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_FAILED_ROUTING_KEY",
-        "storyboard.regenerate.failed",
+        "ai.result.story.regenerate.failed",
+    )
+    RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.image.generate.completed",
+    )
+    RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY",
+        "ai.result.image.generate.failed",
+    )
+    RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.image.regenerate.completed",
+    )
+    RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY",
+        "ai.result.image.regenerate.failed",
     )
 
 
