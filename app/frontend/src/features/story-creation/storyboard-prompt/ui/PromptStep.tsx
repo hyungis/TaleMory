@@ -86,7 +86,11 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
   const status = jobQuery.data?.status
   const isLoading =
     generateMut.isPending ||
-    (jobId !== null && status !== 'SUCCESS' && status !== 'FAILED' && status !== 'CANCELLED')
+    (jobId !== null &&
+      !jobQuery.isTimedOut &&
+      status !== 'SUCCESS' &&
+      status !== 'FAILED' &&
+      status !== 'CANCELLED')
 
   /**
    * 이 화면에서 Result 모드(편집 가능한 한글 본문 + 재요청)를 보여줄지 여부.
@@ -98,11 +102,16 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
   const hasGenerated = status === 'SUCCESS' && !!jobQuery.data?.resultPayload
   const hasRestoredStory = jobId === null && storyId !== null && data.story.trim().length > 0
   const hasResult = hasGenerated || hasRestoredStory
-  const hasFailed = status === 'FAILED' || status === 'CANCELLED' || generateMut.isError
-  const failureMessage =
-    jobQuery.data?.errorMessage ??
-    generateMut.error?.message ??
-    '생성에 실패했어요. 잠시 후 다시 시도해 주세요.'
+  const hasFailed =
+    status === 'FAILED' ||
+    status === 'CANCELLED' ||
+    generateMut.isError ||
+    jobQuery.isTimedOut
+  const failureMessage = jobQuery.isTimedOut
+    ? 'AI 응답이 오래 지연되고 있어요. 잠시 후 다시 시도해 주세요.'
+    : jobQuery.data?.errorMessage ??
+      generateMut.error?.message ??
+      '생성에 실패했어요. 잠시 후 다시 시도해 주세요.'
 
   return (
     <div className="bookshelf-modal step-forest-modal">
