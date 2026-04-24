@@ -30,13 +30,15 @@ with_retry() {
 }
 
 SERVICE="${1:-all}"
-FE_PORT="${DEV_FRONTEND_PORT:-3001}"
-BASE="http://127.0.0.1:${FE_PORT}"
+DOMAIN="${DEV_DOMAIN:-k14s210.p.ssafy.io}"
+HTTPS_PORT="${DEV_HTTPS_PORT:-3443}"
+BASE="https://${DOMAIN}:${HTTPS_PORT}"
 
 check() {
   local name="$1" url="$2" retries="${3:-12}" wait="${4:-5}"
   for i in $(seq 1 "$retries"); do
-    if curl -fsS -m 3 "$url" >/dev/null 2>&1; then
+    # --resolve: hairpin NAT 우회 — 서버 내부에서도 도메인으로 자기 자신에 접근 가능.
+    if curl -fsS -m 3 --resolve "${DOMAIN}:${HTTPS_PORT}:127.0.0.1" "$url" >/dev/null 2>&1; then
       echo "[OK] $name  $url"
       return 0
     fi
