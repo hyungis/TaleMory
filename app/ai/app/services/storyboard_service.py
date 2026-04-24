@@ -1,8 +1,11 @@
 import json
+import base64
+import mimetypes
 from itertools import cycle, islice
 
 from app.core.config import settings
 from app.schemas.storyboard import (
+    PhotoInput,
     ReadingLevel,
     StoryboardGenerateRequest,
     StoryboardGenerateResponse,
@@ -149,12 +152,13 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
         return content
 
     for photo in sorted(request.photos, key=lambda item: item.displayOrder):
-        if not photo.imageUrl:
+        image_url = _resolve_openai_image_url(photo)
+        if not image_url:
             continue
         content.append(
             {
                 "type": "input_image",
-                "image_url": photo.imageUrl,
+                "image_url": image_url,
                 "detail": FIXED_VISION_DETAIL,
             }
         )
@@ -207,12 +211,13 @@ def _build_openai_regenerate_input_content(
         return content
 
     for photo in sorted(original_request.photos, key=lambda item: item.displayOrder):
-        if not photo.imageUrl:
+        image_url = _resolve_openai_image_url(photo)
+        if not image_url:
             continue
         content.append(
             {
                 "type": "input_image",
-                "image_url": photo.imageUrl,
+                "image_url": image_url,
                 "detail": FIXED_VISION_DETAIL,
             }
         )
@@ -288,6 +293,43 @@ def _estimate_cost_usd(input_tokens: int | None, output_tokens: int | None) -> f
     input_cost = input_tokens * settings.STORYBOARD_INPUT_COST_PER_1M / 1_000_000
     output_cost = output_tokens * settings.STORYBOARD_OUTPUT_COST_PER_1M / 1_000_000
     return round(input_cost + output_cost, 6)
+
+
+def _resolve_openai_image_url(photo: PhotoInput) -> str | None:
+    if photo.s3Key:
+        return _build_data_url_from_s3(photo.s3Key)
+    return photo.imageUrl
+
+
+def _build_data_url_from_s3(s3_key: str) -> str:
+    image_bytes = _download_photo_bytes_from_s3(s3_key)
+    mime_type = mimetypes.guess_type(s3_key)[0] or "image/png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def _download_photo_bytes_from_s3(s3_key: str) -> bytes:
+    if not settings.AWS_S3_BUCKET:
+        raise RuntimeError("AWS_S3_BUCKET is not configured")
+
+    try:
+        import boto3
+    except ImportError as exc:
+        raise RuntimeError("boto3 package is required to load storyboard source photos from S3") from exc
+
+    client_kwargs: dict[str, object] = {}
+    if settings.AWS_REGION:
+        client_kwargs["region_name"] = settings.AWS_REGION
+    if settings.AWS_ACCESS_KEY_ID:
+        client_kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
+    if settings.AWS_SECRET_ACCESS_KEY:
+        client_kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+    client = boto3.client("s3", **client_kwargs)
+    try:
+        response = client.get_object(Bucket=settings.AWS_S3_BUCKET, Key=s3_key)
+        return response["Body"].read()
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load source photo from S3: {s3_key}") from exc
 
 
 def _mark_objects_strict(node: object) -> None:
