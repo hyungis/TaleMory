@@ -30,3 +30,9 @@ spring:
   jwt:
     access_secret: ${JWT_ACCESS_SECRET}
     refresh_secret: ${JWT_REFRESH_SECRET}
+
+# AWS 는 top-level namespace — `aws.s3.bucket` 경로로 참조 (spring.* 은 Spring Boot 전용 영역 유지).
+aws:
+  s3:
+    region: ${AWS_REGION:ap-northeast-2}
+    bucket: ${AWS_S3_BUCKET}

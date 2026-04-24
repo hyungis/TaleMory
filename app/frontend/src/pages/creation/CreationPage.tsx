@@ -96,6 +96,7 @@ export function CreationPage() {
       {flow.currentStep === 2 && (
         <PhotoManagerStep
           data={flow.projectData.step2}
+          storyId={flow.storyId}
           onUpdate={flow.updateStep2}
           onBack={handleBack}
           onNext={flow.handleNext}
