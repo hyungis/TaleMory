@@ -19,7 +19,7 @@
 ```bash
 cp infra/env/app.local.env.example   infra/env/app.local.env
 cp infra/env/infra.local.env.example infra/env/infra.local.env
-# (infra/env/app.local.env 편집 — OPENAI_API_KEY 등 필요 시)
+# (infra/env/app.local.env 편집 — OPENAI_API_KEY, Kakao OAuth env (`OAUTH_ALLOWED_REDIRECT_URIS`, `KAKAO_*`, `VITE_KAKAO_CLIENT_ID`) 등 필요 시)
 # 비밀번호는 app.local.env / infra.local.env 간 반드시 일치 유지.
 ```
 
@@ -57,9 +57,9 @@ dca ps
 # HTTP 체크
 curl http://localhost:3001/              # frontend nginx → 200
 curl http://localhost:3001/api/          # backend via nginx → 401 (Spring Security)
-curl http://localhost:3001/ai/           # ai via nginx → 200
 curl http://localhost:8081/              # backend 직접 → 401
-curl http://localhost:8001/              # ai 직접 → 200
+# ai-worker는 HTTP 엔드포인트 없음 (RabbitMQ consumer). FastAPI 직접 테스트 필요 시:
+#   cd app/ai && uvicorn main:app --reload --port 8001
 
 # DB / Cache / MQ
 docker exec -it local-mysql mysql -uapp -papppass iportfolio

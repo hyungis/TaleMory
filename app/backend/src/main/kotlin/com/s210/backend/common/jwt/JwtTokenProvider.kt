@@ -24,6 +24,10 @@ import java.util.Date
 const val ACCESS_EXPIRATION_MILLISECONDS: Long = 1000L * 60 * 30
 const val REFRESH_EXPIRATION_MILLISECONDS: Long = 1000L * 60 * 60 * 24 * 30
 
+/** JWT 클레임 키. `uid` 는 users 테이블 PK — @AuthenticationPrincipal 로 꺼내 도메인 호출에 사용. */
+private const val CLAIM_USER_ID = "uid"
+private const val CLAIM_AUTHORITIES = "auth"
+
 @Component
 class JwtTokenProvider {
     @Value("\${spring.jwt.access_secret}")
@@ -36,12 +40,16 @@ class JwtTokenProvider {
     private val refreshKey by lazy { Keys.hmacShaKeyFor(Decoders.BASE64.decode(refreshSecretKey)) }
 
     fun createToken(authentication: Authentication): TokenInfo {
+        val principal = authentication.principal as? CustomUser
+            ?: throw BusinessException(CommonErrorCode.LOGIN_FAILED)
         val subject = authentication.name
+        val userId = principal.userId
         val authorities = authentication.authorities.toAuthorityString()
 
         val accessToken = createJwt(
             signingKey = accessKey,
             subject = subject,
+            userId = userId,
             authorities = authorities,
             expirationMillis = ACCESS_EXPIRATION_MILLISECONDS,
         )
@@ -49,6 +57,7 @@ class JwtTokenProvider {
         val refreshToken = createJwt(
             signingKey = refreshKey,
             subject = subject,
+            userId = userId,
             authorities = authorities,
             expirationMillis = REFRESH_EXPIRATION_MILLISECONDS,
         )
@@ -64,12 +73,15 @@ class JwtTokenProvider {
         }
 
         val subject = refreshClaims.subject
-        val authorities = refreshClaims["auth"] as? String
+        val userId = refreshClaims.readUserId()
+            ?: throw BusinessException(CommonErrorCode.INVALID_REFRESH_TOKEN)
+        val authorities = refreshClaims[CLAIM_AUTHORITIES] as? String
             ?: throw BusinessException(CommonErrorCode.INVALID_REFRESH_TOKEN)
 
         val newAccessToken = createJwt(
             signingKey = accessKey,
             subject = subject,
+            userId = userId,
             authorities = authorities,
             expirationMillis = ACCESS_EXPIRATION_MILLISECONDS,
         )
@@ -77,6 +89,7 @@ class JwtTokenProvider {
         val newRefreshToken = createJwt(
             signingKey = refreshKey,
             subject = subject,
+            userId = userId,
             authorities = authorities,
             expirationMillis = REFRESH_EXPIRATION_MILLISECONDS,
         )
@@ -86,7 +99,9 @@ class JwtTokenProvider {
 
     fun getAuthentication(token: String): Authentication {
         val claims = getAccessTokenClaims(token)
-        val auth = claims["auth"] as? String
+        val auth = claims[CLAIM_AUTHORITIES] as? String
+            ?: throw BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN)
+        val userId = claims.readUserId()
             ?: throw BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN)
 
         val authorities: Collection<GrantedAuthority> = auth
@@ -94,7 +109,12 @@ class JwtTokenProvider {
             .filter { it.isNotBlank() }
             .map { SimpleGrantedAuthority(it) }
 
-        val principal = CustomUser(claims.subject, "", authorities)
+        val principal = CustomUser(
+            userId = userId,
+            loginId = claims.subject,
+            password = "",
+            authorities = authorities,
+        )
         return UsernamePasswordAuthenticationToken(principal, "", authorities)
     }
 
@@ -116,6 +136,7 @@ class JwtTokenProvider {
     private fun createJwt(
         signingKey: Key,
         subject: String,
+        userId: Long,
         authorities: String,
         expirationMillis: Long,
     ): String {
@@ -124,7 +145,8 @@ class JwtTokenProvider {
 
         return Jwts.builder()
             .setSubject(subject)
-            .claim("auth", authorities)
+            .claim(CLAIM_USER_ID, userId)
+            .claim(CLAIM_AUTHORITIES, authorities)
             .setIssuedAt(now)
             .setExpiration(expiration)
             .signWith(signingKey, SignatureAlgorithm.HS256)
@@ -147,4 +169,10 @@ class JwtTokenProvider {
             .build()
             .parseClaimsJws(token)
             .body
+
+    /**
+     * JWT 라이브러리가 숫자 클레임을 Integer/Long 로 섞어서 돌려주기 때문에
+     * `Number.toLong()` 으로 안전하게 승격. 클레임이 없거나 타입이 Number 가 아니면 null.
+     */
+    private fun Claims.readUserId(): Long? = (this[CLAIM_USER_ID] as? Number)?.toLong()
 }

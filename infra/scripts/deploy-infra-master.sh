@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/common.sh"
 
 ENV_NAME="master"
 COMPOSE_FILE="infra/compose/docker-compose.infra-${ENV_NAME}.yml"
-COMPOSE_PROJECT="${PROJECT_NAME}-infra-${ENV_NAME}"
+COMPOSE_PROJECT="${IMAGE_PREFIX}-infra-${ENV_NAME}"
 ENV_FILE="/tmp/env/infra.${ENV_NAME}.env"
 
 require_file "$COMPOSE_FILE"

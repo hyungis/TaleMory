@@ -21,7 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 KEEP="${KEEP_IMAGES:-5}"
-SERVICES=("${PROJECT_NAME}-frontend" "${PROJECT_NAME}-backend" "${PROJECT_NAME}-ai")
+SERVICES=("${IMAGE_PREFIX}-frontend" "${IMAGE_PREFIX}-backend" "${IMAGE_PREFIX}-ai")
 
 df_docker() {
   df -h /var/lib/docker 2>/dev/null | awk 'NR==2 {print $3"/"$2" ("$5")"}' || echo "n/a"
@@ -43,4 +43,4 @@ for svc in "${SERVICES[@]}"; do
 done
 
 echo "[cleanup] after:  $(df_docker)"
-echo "[cleanup] kept $KEEP latest tags per ${PROJECT_NAME}-* service"
+echo "[cleanup] kept $KEEP latest tags per ${IMAGE_PREFIX}-* service"

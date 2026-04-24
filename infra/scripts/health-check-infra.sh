@@ -28,7 +28,7 @@ case "$ENV_NAME" in
   *) echo "unknown env: $ENV_NAME (expected dev|master)" >&2; exit 1 ;;
 esac
 
-NETWORK="${HOST_PREFIX}-${PROJECT_NAME}-infra-net"
+NETWORK="${HOST_PREFIX}-${IMAGE_PREFIX}-infra-net"
 ENV_DIR_LOCAL="${ENV_DIR:-/tmp/env}"
 INFRA_ENV="$ENV_DIR_LOCAL/infra.${ENV_NAME}.env"
 APP_ENV="$ENV_DIR_LOCAL/app.${ENV_NAME}.env"

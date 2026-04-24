@@ -85,13 +85,15 @@
     0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
-/* Tailwind preflight 아래에서 button/input 이 부모 폰트·색을 상속하게끔 명시 */
+/* Tailwind preflight 아래에서 button/input 이 부모 폰트를 상속하게끔 명시.
+   NOTE: 과거엔 `color: inherit` 도 있었는데, .bookshelf-modal input (특정성 0,1,1) 이
+   Tailwind `.text-black` (0,1,0) 을 이겨서 step 모달 입력값이 전부 크림색으로
+   강제되는 버그가 있어 제거. 각 요소는 Tailwind utility 로 자기 색을 명시. */
 .bookshelf-modal button,
 .bookshelf-modal input,
 .bookshelf-modal select,
 .bookshelf-modal textarea {
   font-family: inherit;
-  color: inherit;
   line-height: inherit;
 }
 

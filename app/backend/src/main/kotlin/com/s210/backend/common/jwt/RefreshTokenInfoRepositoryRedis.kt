@@ -14,7 +14,7 @@ class RefreshTokenInfoRepositoryRedis(
 
     fun save(userId: String, refreshToken: String) {
         val key = "$KEY_PREFIX:$userId:$refreshToken"
-        redisTemplate.opsForValue().set(key, "", REFRESH_EXPIRATION_MILLISECONDS, TimeUnit.MILLISECONDS)
+        redisTemplate.opsForValue().set(key, userId, REFRESH_EXPIRATION_MILLISECONDS, TimeUnit.MILLISECONDS)
     }
 
     fun findByRefreshToken(refreshToken: String): String? {

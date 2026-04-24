@@ -81,6 +81,14 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_PASSWORD` | ✅ | INFRA_RABBITMQ_DEFAULT_PASS와 동일값 |
 | `ENV_DEV_APP_JWT_ACCESS_SECRET` | ✅ | JWT access token 서명 키. `openssl rand -base64 48`로 생성 권장 |
 | `ENV_DEV_APP_JWT_REFRESH_SECRET` | ✅ | JWT refresh token 서명 키. access와 **다른 값** 사용 |
+| `ENV_DEV_APP_OAUTH_ALLOWED_REDIRECT_URIS` | — | comma-separated allowed Kakao frontend callback URIs (`http://k14s210.p.ssafy.io:3001/auth/kakao/callback,https://k14s210.p.ssafy.io:3443/auth/kakao/callback`) |
+| `ENV_DEV_APP_KAKAO_CLIENT_ID` | — | dev Kakao REST API key |
+| `ENV_DEV_APP_VITE_KAKAO_CLIENT_ID` | — | dev Kakao REST API key (Vite build-time 주입) |
+| `ENV_DEV_APP_KAKAO_CLIENT_SECRET` | ✅ | dev Kakao client secret |
+| `ENV_DEV_APP_AWS_ACCESS_KEY_ID` | ✅ | `s210-backend-s3` IAM user Access Key ID (S3 presign / 소프트삭제용) |
+| `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` | ✅ | `s210-backend-s3` IAM user Secret Access Key |
+| `ENV_DEV_APP_AWS_REGION` | — | `ap-northeast-2` (AWS SDK 표준 env 이름 — region 자동 인식용) |
+| `ENV_DEV_APP_AWS_S3_BUCKET` | — | `s210-iportfolio-dev` — 사용자 사진 + 생성 이미지 저장 버킷 |
 | `ENV_DEV_APP_FRONTEND_PORT` | — | `3001` (호스트 publish 포트) |
 | `ENV_DEV_APP_VITE_API_BASE_URL` | — | `/api` (Vite build-time 주입) |
 | `ENV_DEV_APP_OPENAI_API_KEY` | ✅ | OpenAI API 키 |
@@ -101,6 +109,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | — | `storyboard.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | — | `storyboard.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | — | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_AI_WORKER_REPLICAS` | — | `1` (AI worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
 
 > Vite는 `VITE_` prefix만 클라이언트 번들에 주입. 새 frontend 변수 이름은 반드시 `VITE_`로 시작해야 함.
 
@@ -135,11 +144,20 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `RABBITMQ_HOST` | `dev-rabbitmq` | `prod-rabbitmq` |
 | `JWT_ACCESS_SECRET` | (dev 전용 값) | (master 전용 값, **절대 dev와 공유 금지**) |
 | `JWT_REFRESH_SECRET` | (dev 전용 값) | (master 전용 값, **access와도 다르게**) |
+| `OAUTH_ALLOWED_REDIRECT_URIS` | `http://k14s210.p.ssafy.io:3001/auth/kakao/callback,https://k14s210.p.ssafy.io:3443/auth/kakao/callback` | `https://k14s210.p.ssafy.io/auth/kakao/callback` |
+| `KAKAO_CLIENT_ID` | (dev Kakao REST API key) | (prod Kakao REST API key) |
+| `VITE_KAKAO_CLIENT_ID` | (dev Kakao REST API key) | (prod Kakao REST API key) |
+| `KAKAO_CLIENT_SECRET` | (dev Kakao client secret) | (prod Kakao client secret) |
 | `FRONTEND_PORT` | `3001` | `80` |
 | `MYSQL_PORT` | `3307` | `3306` |
 | `REDIS_PORT` | `6380` | `6379` |
 | `RABBITMQ_PORT` | `5673` | `5672` |
 | `RABBITMQ_MANAGEMENT_PORT` | `15673` | `15672` |
+| `AI_WORKER_REPLICAS` | `1` | `2` (권장 — 병렬 OpenAI 처리량 확보) |
+
+Kakao Developers console registration guide:
+- Redirect URI: `http://k14s210.p.ssafy.io:3001/auth/kakao/callback`, `https://k14s210.p.ssafy.io:3443/auth/kakao/callback`, `https://k14s210.p.ssafy.io/auth/kakao/callback`
+- Frontend callback exchanges `{ code, redirectUri }` through `POST /api/auth/kakao/callback`; backend only accepts redirect URIs listed in `OAUTH_ALLOWED_REDIRECT_URIS`.
 
 JWT secret 생성 (로컬에서, 4개 전부 각자):
 ```bash
@@ -218,6 +236,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
 
 ### MASTER APP (AI 출처)
 
@@ -240,3 +259,4 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |
