@@ -30,6 +30,7 @@ class StoryboardImageGenerateItemRequest(BaseModel):
 
 class StoryboardImageGenerateRequest(BaseModel):
     storyId: int = Field(..., ge=1)
+    seed: int = Field(..., ge=0)
     items: list[StoryboardImageGenerateItemRequest] = Field(..., min_length=1, max_length=20)
 
 
@@ -62,5 +63,6 @@ class StoryboardImageBatchUsage(BaseModel):
 
 class StoryboardImageGenerateResponse(BaseModel):
     storyId: int
+    seed: int
     results: list[StoryboardImageGenerateResult]
     usage: StoryboardImageBatchUsage

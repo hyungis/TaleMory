@@ -16,19 +16,19 @@ from app.schemas.storyboard_image import (
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
 )
-
-
 def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
     results: list[StoryboardImageGenerateResult] = []
+    storyboard_seed = request_model.seed
 
     for item in request_model.items:
         if settings.GEMINI_API_KEY:
-            results.append(_generate_item_with_gemini(request_model.storyId, item))
+            results.append(_generate_item_with_gemini(request_model.storyId, item, storyboard_seed))
         else:
             results.append(_generate_item_locally(request_model.storyId, item))
 
     return StoryboardImageGenerateResponse(
         storyId=request_model.storyId,
+        seed=storyboard_seed,
         results=results,
         usage=_aggregate_usage(results),
     )
@@ -37,9 +37,10 @@ def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) ->
 def _generate_item_with_gemini(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
+    seed: int,
 ) -> StoryboardImageGenerateResult:
     final_prompt = _build_final_prompt(item)
-    response_json = _call_gemini_image_api(final_prompt, item.referenceImageUrls)
+    response_json = _call_gemini_image_api(final_prompt, item.referenceImageUrls, seed)
     image_bytes = _extract_image_bytes(response_json)
     image_url = _upload_and_resolve_url(story_id, item, image_bytes)
     usage = _extract_gemini_usage(response_json)
@@ -108,7 +109,7 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
     return "\n".join(parts)
 
 
-def _call_gemini_image_api(final_prompt: str, reference_image_urls: list[str]) -> dict:
+def _call_gemini_image_api(final_prompt: str, reference_image_urls: list[str], seed: int) -> dict:
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured")
 
@@ -119,9 +120,7 @@ def _call_gemini_image_api(final_prompt: str, reference_image_urls: list[str]) -
     parts = _build_gemini_parts(final_prompt, reference_image_urls)
     payload = {
         "contents": [{"parts": parts}],
-        "generationConfig": {
-            "responseModalities": ["TEXT", "IMAGE"],
-        },
+        "generationConfig": _build_gemini_generation_config(seed),
     }
     req = request.Request(
         api_url,
@@ -156,6 +155,13 @@ def _build_gemini_parts(final_prompt: str, reference_image_urls: list[str]) -> l
         )
     parts.append({"text": final_prompt})
     return parts
+
+
+def _build_gemini_generation_config(seed: int) -> dict:
+    return {
+        "responseModalities": ["TEXT", "IMAGE"],
+        "seed": seed,
+    }
 
 
 def _download_reference_image(image_url: str) -> tuple[str, bytes] | None:
@@ -206,7 +212,7 @@ def _upload_and_resolve_url(
     item: StoryboardImageGenerateItemRequest,
     image_bytes: bytes,
 ) -> str:
-    object_path = f"{story_id}/{item.pageNumber}.png"
+    object_path = f"{story_id}/storyboard-image/{item.pageNumber}.png"
     if _has_s3_upload_config():
         _upload_to_s3(object_path, image_bytes)
         return _resolve_public_url(object_path)
@@ -214,7 +220,7 @@ def _upload_and_resolve_url(
     public_url = _join_base_url(settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL, object_path)
     if public_url:
         return public_url
-    return f"local://storyboard-images/{story_id}/{item.pageNumber}.png"
+    return f"local://storyboard-images/{story_id}/storyboard-image/{item.pageNumber}.png"
 
 
 def _aggregate_usage(results: list[StoryboardImageGenerateResult]) -> StoryboardImageBatchUsage:
