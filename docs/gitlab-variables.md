@@ -60,16 +60,16 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` — Variable — `0.15`
 - [x] `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` — Variable — `0.60`
 - [x] `ENV_DEV_APP_RABBITMQ_VHOST` — Variable — `/`
-- [x] `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` — Variable — `storyboard.request`
-- [x] `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` — Variable — `storyboard.result`
-- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` — Variable — `storyboard.generate.request`
-- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` — Variable — `storyboard.regenerate.request`
-- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` — Variable — `storyboard.generate`
-- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` — Variable — `storyboard.regenerate`
-- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.generate.completed`
-- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.generate.failed`
-- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.regenerate.completed`
-- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.regenerate.failed`
+- [ ] `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` — Variable — `ai.request` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` — Variable — `ai.result` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` — Variable — `ai.cpu.request.queue` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` — Variable — `ai.cpu.request.queue` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` — Variable — `ai.cpu.story.generate` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` — Variable — `ai.cpu.story.regenerate` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `ai.result.story.generate.completed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `ai.result.story.generate.failed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `ai.result.story.regenerate.completed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `ai.result.story.regenerate.failed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
 - [x] `ENV_DEV_APP_AI_WORKER_REPLICAS` — Variable — `1` (ai-worker compose `scale:` 값)
 
 ### Infra — `ENV_DEV_INFRA_*`
@@ -125,17 +125,17 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_MASTER_APP_STORYBOARD_INPUT_COST_PER_1M` — Variable — `0.15`
 - [x] `ENV_MASTER_APP_STORYBOARD_OUTPUT_COST_PER_1M` — Variable — `0.60`
 - [x] `ENV_MASTER_APP_RABBITMQ_VHOST` — Variable — `/`
-- [x] `ENV_MASTER_APP_RABBITMQ_REQUEST_EXCHANGE` — Variable — `storyboard.request`
-- [x] `ENV_MASTER_APP_RABBITMQ_RESULT_EXCHANGE` — Variable — `storyboard.result`
-- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_QUEUE` — Variable — `storyboard.generate.request`
-- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_QUEUE` — Variable — `storyboard.regenerate.request`
-- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_ROUTING_KEY` — Variable — `storyboard.generate`
-- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_ROUTING_KEY` — Variable — `storyboard.regenerate`
-- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.generate.completed`
-- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.generate.failed`
-- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.regenerate.completed`
+- [ ] `ENV_MASTER_APP_RABBITMQ_REQUEST_EXCHANGE` — Variable — `ai.request` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_RESULT_EXCHANGE` — Variable — `ai.result` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_GENERATE_QUEUE` — Variable — `ai.cpu.request.queue` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_REGENERATE_QUEUE` — Variable — `ai.cpu.request.queue` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_GENERATE_ROUTING_KEY` — Variable — `ai.cpu.story.generate` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_REGENERATE_ROUTING_KEY` — Variable — `ai.cpu.story.regenerate` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `ai.result.story.generate.completed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `ai.result.story.generate.failed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
+- [ ] `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `ai.result.story.regenerate.completed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
 - [ ] `ENV_MASTER_APP_AI_WORKER_REPLICAS` — Variable — `2` (ai-worker compose `scale:` 값, 운영 권장 2)
-- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.regenerate.failed`
+- [ ] `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `ai.result.story.regenerate.failed` (이슈 #13 로 값 변경 — GitLab Variables 재등록 필요)
 
 ### Infra — `ENV_MASTER_INFRA_*`
 
