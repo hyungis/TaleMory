@@ -34,3 +34,14 @@ body,
   overflow: hidden;
   background: var(--color-dark);
 }
+
+/* 스크롤바 전역 숨김 — 스크롤 동작은 유지, 바만 비노출. */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / 구 Edge */
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome / Safari / Opera / 크로미움 Edge */
+}
