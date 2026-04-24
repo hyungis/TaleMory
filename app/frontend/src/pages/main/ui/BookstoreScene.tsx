@@ -110,13 +110,18 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
 
   return (
     <>
-      <button type="button" className="back-to-forest-btn" onClick={onBackToForest}>
-        <span className="icon">←</span>
+      <button type="button" className="back-to-forest-btn" onClick={onBackToForest} aria-label="숲으로 돌아가기">
+        <span className="icon" aria-hidden="true">←</span>
       </button>
 
-      <button type="button" className="open-library-btn" onClick={handleOpenLibrary}>
-        <span className="icon">📚</span>
+      <button type="button" className="open-library-btn" onClick={handleOpenLibrary} aria-label="우리 가족 책장 열기">
+        <span className="icon" aria-hidden="true">📚</span>
         <span>우리 가족 책장</span>
+      </button>
+
+      <button type="button" className="open-mypage-btn" onClick={() => navigate(ROUTES.mypage)} aria-label="마이페이지로 이동">
+        <span className="icon" aria-hidden="true">👤</span>
+        <span>마이페이지</span>
       </button>
 
       <img src="/bookstore.png" alt="서점 내부" className="bookstore-bg" draggable={false} />

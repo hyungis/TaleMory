@@ -45,3 +45,15 @@ body,
   height: 0;
   display: none; /* Chrome / Safari / Opera / 크로미움 Edge */
 }
+
+/* MypagePage 진입 애니메이션 — bookstoreEntry 와 결을 맞춘 fade + slide-up */
+@keyframes mypageEntry {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
