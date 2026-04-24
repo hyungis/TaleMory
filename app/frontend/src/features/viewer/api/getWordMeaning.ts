@@ -1,35 +1,30 @@
+import type { WordEntry } from '../model/types'
 import { MOCK_DICTIONARY } from './mockDictionary'
+import { apiClient } from '../../../shared/api'
 
 /**
  * 단어 번역 조회 API 호출 (`GET /api/dictionary/words/{word}`).
- * 현재는 Mock 모드 — 로그인/토큰 인프라가 완성되면 실제 호출 경로를 활성화한다.
+ * public endpoint — 인증 불필요.
  *
- * 반환값: 뜻(한글). 미등록 단어면 null.
+ * 반환값: 품사별 WordEntry 배열. 미등록 단어면 빈 배열.
  */
 
-const USE_MOCK = import.meta.env.VITE_VIEWER_USE_MOCK !== 'false'
+const USE_MOCK = import.meta.env.VITE_VIEWER_USE_MOCK === 'true'
 
-export async function getWordMeaning(rawWord: string): Promise<string | null> {
+export async function getWordMeaning(rawWord: string): Promise<WordEntry[]> {
   const word = rawWord.trim().toLowerCase()
-  if (!word) return null
+  if (!word) return []
 
   if (USE_MOCK) {
-    // 네트워크처럼 약간의 딜레이로 로딩 UI 확인 가능
     await new Promise(resolve => setTimeout(resolve, 150))
-    return MOCK_DICTIONARY[word] ?? null
+    const meaning = MOCK_DICTIONARY[word]
+    if (!meaning) return []
+    return [{ word, pos: null, definitionKo: meaning, ipa: null, forms: null }]
   }
 
-  // ===== 로그인/토큰 인프라 완성 후 활성화 =====
-  // const token = localStorage.getItem('accessToken')
-  // try {
-  //   const res = await apiClient<{ word: string; meaning: string }>(
-  //     `/dictionary/words/${encodeURIComponent(word)}`,
-  //     { method: 'GET', headers: token ? { Authorization: `Bearer ${token}` } : {} },
-  //   )
-  //   return res.meaning
-  // } catch (err) {
-  //   if (err instanceof ApiError && err.status === 404) return null
-  //   throw err
-  // }
-  throw new Error('단어 사전 실 API 는 로그인 구현 후 활성화됩니다. VITE_VIEWER_USE_MOCK 확인 필요.')
+  const entries = await apiClient<WordEntry[]>(
+    `/dictionary/words/${encodeURIComponent(word)}`,
+    { skipAuth: true },
+  )
+  return entries ?? []
 }

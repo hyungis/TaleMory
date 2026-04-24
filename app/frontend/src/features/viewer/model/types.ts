@@ -52,3 +52,12 @@ export interface StoryView {
   scenes: SceneView[]
   outro: OutroView | null
 }
+
+/** BE `GET /api/dictionary/words/{word}` 응답 항목. 같은 단어가 품사별로 여러 건 올 수 있다. */
+export interface WordEntry {
+  word: string
+  pos: string | null
+  definitionKo: string
+  ipa: string | null
+  forms: string | null
+}

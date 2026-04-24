@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bookmark, ChevronLeft, ChevronRight, Maximize, X } from 'lucide-react'
-import type { StoryView, SceneView } from '../../model/types'
+import type { StoryView, SceneView, WordEntry } from '../../model/types'
 import { BookCover } from './BookCover'
 import { BookSpread } from './BookSpread'
 import { BookBackCover } from './BookBackCover'
@@ -77,7 +77,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const [zoomedScene, setZoomedScene] = useState<SceneView | null>(null)
 
   // 단어 번역 팝업
-  const [wordLookup, setWordLookup] = useState<{ word: string; meaning: string | null; isLoading: boolean } | null>(null)
+  const [wordLookup, setWordLookup] = useState<{ word: string; entries: WordEntry[]; isLoading: boolean } | null>(null)
 
   // 책갈피 — 한 동화당 1개 (pageIndex 단일값)
   const [bookmark, setBookmark] = useState<number | null>(null)
@@ -267,13 +267,13 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const handleWordClick = (word: string) => {
     const clean = word.trim()
     if (!clean) return
-    setWordLookup({ word: clean, meaning: null, isLoading: true })
+    setWordLookup({ word: clean, entries: [], isLoading: true })
     getWordMeaning(clean)
-      .then(meaning => {
-        setWordLookup(prev => (prev && prev.word === clean ? { word: clean, meaning, isLoading: false } : prev))
+      .then(entries => {
+        setWordLookup(prev => (prev && prev.word === clean ? { word: clean, entries, isLoading: false } : prev))
       })
       .catch(() => {
-        setWordLookup(prev => (prev && prev.word === clean ? { word: clean, meaning: null, isLoading: false } : prev))
+        setWordLookup(prev => (prev && prev.word === clean ? { word: clean, entries: [], isLoading: false } : prev))
       })
   }
 
@@ -411,7 +411,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
       {wordLookup && (
         <WordLookupCard
           word={wordLookup.word}
-          meaning={wordLookup.meaning}
+          entries={wordLookup.entries}
           isLoading={wordLookup.isLoading}
           onClose={() => setWordLookup(null)}
         />
