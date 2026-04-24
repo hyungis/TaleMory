@@ -6,6 +6,7 @@ export const ROUTES = {
   main: '/main',
   creation: '/creation',
   viewer: '/viewer/:storyId',
+  kakaoCallback: '/auth/kakao/callback',
   oauthCallback: '/auth/oauth/callback',
   logoutCallback: '/auth/logout/callback',
   // TODO: mypage

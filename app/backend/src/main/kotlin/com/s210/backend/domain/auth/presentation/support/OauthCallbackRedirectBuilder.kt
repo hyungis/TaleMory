@@ -1,8 +1,8 @@
 package com.s210.backend.domain.auth.presentation.support
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
 import com.s210.backend.domain.auth.presentation.response.AuthResponse
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.util.UriComponentsBuilder
 import org.springframework.web.util.UriUtils
@@ -11,22 +11,22 @@ import java.nio.charset.StandardCharsets
 
 @Component
 class OauthCallbackRedirectBuilder(
-    @Value("\${oauth.frontend-callback-uri}")
-    private val frontendCallbackUri: String,
+    private val oauthRedirectUriResolver: OauthRedirectUriResolver,
 ) {
     private val objectMapper: ObjectMapper = ObjectMapper().findAndRegisterModules()
 
-    fun buildSuccessRedirect(authResponse: AuthResponse): URI {
+    fun buildSuccessRedirect(origin: String, authResponse: AuthResponse): URI {
         val payload = objectMapper.writeValueAsString(authResponse)
-        return buildFragmentRedirect("payload", payload)
+        return buildFragmentRedirect(origin, "payload", payload)
     }
 
-    fun buildFailureRedirect(message: String): URI {
-        return buildFragmentRedirect("error", message)
+    fun buildFailureRedirect(origin: String, message: String): URI {
+        return buildFragmentRedirect(origin, "error", message)
     }
 
-    private fun buildFragmentRedirect(key: String, value: String): URI {
+    private fun buildFragmentRedirect(origin: String, key: String, value: String): URI {
         val encodedValue = UriUtils.encode(value, StandardCharsets.UTF_8)
+        val frontendCallbackUri = oauthRedirectUriResolver.buildFrontendCallbackUri(origin)
 
         return UriComponentsBuilder.fromUriString(frontendCallbackUri)
             .fragment("$key=$encodedValue")

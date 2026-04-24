@@ -11,7 +11,7 @@ export interface UseLogoutResult {
 
 export function useLogout(): UseLogoutResult {
   const navigate = useNavigate()
-  const { user, isAuthenticated } = useAuthSession()
+  const { isAuthenticated } = useAuthSession()
   const [isPending, setIsPending] = useState(false)
 
   const logout = useCallback(async () => {
@@ -26,18 +26,13 @@ export function useLogout(): UseLogoutResult {
         return
       }
 
-      if (user?.provider === 'kakao') {
-        window.location.assign('/api/auth/oauth/kakao/logout')
-        return
-      }
-
       await postLogout()
       clearAuthSession()
       navigate(ROUTES.home, { replace: true })
     } finally {
       setIsPending(false)
     }
-  }, [isAuthenticated, isPending, navigate, user?.provider])
+  }, [isAuthenticated, isPending, navigate])
 
   return {
     isPending,

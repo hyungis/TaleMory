@@ -14,6 +14,7 @@ export function AppRouter() {
       <Route path={ROUTES.main} element={<MainPage />} />
       <Route path={ROUTES.creation} element={<CreationPage />} />
       <Route path={ROUTES.viewer} element={<ViewerPage />} />
+      <Route path={ROUTES.kakaoCallback} element={<OAuthCallbackPage />} />
       <Route path={ROUTES.oauthCallback} element={<OAuthCallbackPage />} />
       <Route path={ROUTES.logoutCallback} element={<LogoutCallbackPage />} />
       {/* TODO: mypage */}

@@ -17,15 +17,11 @@ class KakaoOAuthClient(
     private val clientId: String,
     @Value("\${oauth.kakao.client-secret:}")
     private val clientSecret: String,
-    @Value("\${oauth.kakao.redirect-uri:}")
-    private val redirectUri: String,
-    @Value("\${oauth.kakao.logout-redirect-uri:}")
-    private val logoutRedirectUri: String,
 ) {
     private val restClient = RestClient.create()
 
-    fun buildAuthorizeUrl(): String {
-        if (clientId.isBlank() || redirectUri.isBlank()) {
+    fun buildAuthorizeUrl(redirectUri: String, state: String): String {
+        if (clientId.isBlank() || redirectUri.isBlank() || state.isBlank()) {
             throw BusinessException(AuthErrorCode.OAUTH_FAILED)
         }
 
@@ -35,6 +31,7 @@ class KakaoOAuthClient(
                 .queryParam("client_id", clientId)
                 .queryParam("redirect_uri", redirectUri)
                 .queryParam("scope", KAKAO_SCOPE)
+                .queryParam("state", state)
                 .build()
                 .encode()
                 .toUriString()
@@ -43,8 +40,8 @@ class KakaoOAuthClient(
         }
     }
 
-    fun fetchUserProfile(code: String): OauthUserProfile {
-        val oauthAccessToken = exchangeAuthorizationCode(code)
+    fun fetchUserProfile(code: String, redirectUri: String): OauthUserProfile {
+        val oauthAccessToken = exchangeAuthorizationCode(code, redirectUri)
         val userInfo = requestUserInfo(oauthAccessToken)
 
         val providerUserId = userInfo.id?.toString()
@@ -65,8 +62,8 @@ class KakaoOAuthClient(
         )
     }
 
-    fun buildLogoutUrl(): String {
-        if (clientId.isBlank() || logoutRedirectUri.isBlank()) {
+    fun buildLogoutUrl(logoutRedirectUri: String, state: String): String {
+        if (clientId.isBlank() || logoutRedirectUri.isBlank() || state.isBlank()) {
             throw BusinessException(AuthErrorCode.OAUTH_FAILED)
         }
 
@@ -74,6 +71,7 @@ class KakaoOAuthClient(
             UriComponentsBuilder.fromUriString(KAKAO_LOGOUT_URL)
                 .queryParam("client_id", clientId)
                 .queryParam("logout_redirect_uri", logoutRedirectUri)
+                .queryParam("state", state)
                 .build()
                 .encode()
                 .toUriString()
@@ -82,7 +80,7 @@ class KakaoOAuthClient(
         }
     }
 
-    private fun exchangeAuthorizationCode(code: String): String {
+    private fun exchangeAuthorizationCode(code: String, redirectUri: String): String {
         val formData = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "authorization_code")
             add("client_id", clientId)

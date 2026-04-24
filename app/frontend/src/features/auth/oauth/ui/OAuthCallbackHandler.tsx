@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle, LoaderCircle } from 'lucide-react'
+import { post } from '../../../../shared/api'
 import { ROUTES } from '../../../../shared/constants'
-import { mapLoginResponse } from '../../login'
+import { mapLoginResponse, type LoginResponsePayload } from '../../login'
 import { setAuthSession } from '../../model/authSession'
 import { parseOauthCallbackPayload } from '../lib/parseOauthCallbackPayload'
 
@@ -11,12 +12,56 @@ export function OAuthCallbackHandler() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
 
-  const callbackResult = useMemo(
-    () => parseOauthCallbackPayload(location.hash, location.search),
-    [location.hash, location.search],
-  )
-
   useEffect(() => {
+    let isActive = true
+    const searchParams = new URLSearchParams(location.search)
+    const kakaoError = searchParams.get('error_description') ?? searchParams.get('error')
+    const kakaoCode = searchParams.get('code')
+
+    if (kakaoError !== null) {
+      setError(kakaoError)
+      return () => {
+        isActive = false
+      }
+    }
+
+    if (kakaoCode !== null && kakaoCode.trim() !== '') {
+      const redirectUri = `${window.location.origin}${ROUTES.kakaoCallback}`
+
+      void post<LoginResponsePayload>(
+        '/auth/kakao/callback',
+        {
+          code: kakaoCode,
+          redirectUri,
+        },
+        {
+          skipAuth: true,
+          timeoutMs: 10000,
+        },
+      )
+        .then(payload => {
+          if (!isActive) return
+          const authResult = mapLoginResponse(payload)
+          setAuthSession(authResult)
+          navigate(ROUTES.home, {
+            replace: true,
+            state: {
+              skipLanding: true,
+            },
+          })
+        })
+        .catch(() => {
+          if (!isActive) return
+          setError('Kakao login failed. Please try again.')
+        })
+
+      return () => {
+        isActive = false
+      }
+    }
+
+    const callbackResult = parseOauthCallbackPayload(location.hash, location.search)
+
     if (callbackResult.error) {
       setError(callbackResult.error)
       return
@@ -39,7 +84,7 @@ export function OAuthCallbackHandler() {
     } catch {
       setError('카카오 로그인 세션을 저장하지 못했어요. 다시 시도해주세요.')
     }
-  }, [callbackResult, navigate])
+  }, [location.hash, location.search, navigate])
 
   if (error) {
     return (

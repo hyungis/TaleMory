@@ -32,13 +32,10 @@ spring:
     refresh_secret: ${JWT_REFRESH_SECRET}
 
 oauth:
-  frontend-callback-uri: ${FRONTEND_OAUTH_CALLBACK_URI:}
-  frontend-logout-callback-uri: ${FRONTEND_OAUTH_LOGOUT_CALLBACK_URI:}
+  allowed-redirect-uris: ${OAUTH_ALLOWED_REDIRECT_URIS:}
   kakao:
     client-id: ${KAKAO_CLIENT_ID:}
     client-secret: ${KAKAO_CLIENT_SECRET:}
-    redirect-uri: ${KAKAO_REDIRECT_URI:}
-    logout-redirect-uri: ${KAKAO_LOGOUT_REDIRECT_URI:}
 
 # AWS 는 top-level namespace — `aws.s3.bucket` 경로로 참조 (spring.* 은 Spring Boot 전용 영역 유지).
 aws:

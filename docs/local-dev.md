@@ -28,9 +28,13 @@ cp infra/env/infra.local.env.example infra/env/infra.local.env
 ### 1-2. env 값 검토 (필요 시 편집)
 
 - `infra/env/infra.local.env` — mysql/redis/rabbitmq 비밀번호. 기본 더미값 그대로 써도 로컬은 OK.
-- `infra/env/app.local.env` — backend/ai 비밀번호 + `OPENAI_API_KEY` + Kakao OAuth env (`FRONTEND_OAUTH_*`, `KAKAO_*`). **infra.local.env의 비밀번호와 반드시 일치**해야 함 (`DB_PASSWORD=apppass`=`MYSQL_PASSWORD`, 등).
+- `infra/env/app.local.env` — backend/ai 비밀번호 + `OPENAI_API_KEY` + Kakao OAuth env (`OAUTH_ALLOWED_REDIRECT_URIS`, `KAKAO_*`, `VITE_KAKAO_CLIENT_ID`). **infra.local.env의 비밀번호와 반드시 일치**해야 함 (`DB_PASSWORD=apppass`=`MYSQL_PASSWORD`, 등).
 - 포트 override / `VITE_API_BASE_URL` override는 실행 시점 shell env로 주입: `BACKEND_PORT=18081 docker compose -f ... up`.
-- Kakao 로그인은 `FRONTEND_OAUTH_CALLBACK_URI`, `FRONTEND_OAUTH_LOGOUT_CALLBACK_URI`, `KAKAO_REDIRECT_URI`, `KAKAO_LOGOUT_REDIRECT_URI`가 **Kakao Developers 콘솔 Redirect URI**와 같아야 정상 동작.
+- Kakao 로그인은 frontend가 `window.location.origin` 기준으로 redirect URI를 동적으로 만들고, `POST /api/auth/kakao/callback` body의 `{ code, redirectUri }`를 backend에 전달한다. backend는 `redirectUri`를 `OAUTH_ALLOWED_REDIRECT_URIS` 화이트리스트와 비교한다.
+- Kakao Developers 콘솔 Redirect URI에는 접근 가능한 각 frontend callback URI를 모두 등록.
+  - `http://k14s210.p.ssafy.io:3001/auth/kakao/callback`
+  - `https://k14s210.p.ssafy.io:3443/auth/kakao/callback`
+  - `https://k14s210.p.ssafy.io/auth/kakao/callback`
 
 ### 1-3. 기존 `dev-*` 스택 청소 (있다면)
 
@@ -200,7 +204,7 @@ infra/compose/
 | backend `Flyway Communications link failure` | infra가 healthy 되기 전에 app을 기동. `dca restart backend` 또는 `dci ps`로 healthy 확인 후 재기동 |
 | backend `Unable to resolve host: mysql` | infra가 안 올라간 상태에서 app 기동. `dci up -d` 먼저 |
 | `Redis NOAUTH` | `application.yml`이 `${REDIS_PASSWORD}`를 참조하는지, `infra/env/app.local.env`에 값이 있는지 확인 |
-| Kakao OAuth `redirect_uri mismatch` | `infra/env/app.local.env`의 `FRONTEND_OAUTH_*`, `KAKAO_*_URI` 값과 Kakao Developers 콘솔 등록 값이 동일한지 확인 |
+| Kakao OAuth `redirect_uri mismatch` | `infra/env/app.local.env`의 `OAUTH_ALLOWED_REDIRECT_URIS`에 현재 frontend callback URI가 포함되는지, 그리고 Kakao Developers 콘솔에 동일한 Redirect URI가 등록되어 있는지 확인 |
 | `pnpm install` 실패 | `app/frontend/pnpm-lock.yaml` 없으면 `cd app/frontend && pnpm install` 1회 |
 | app만 down 했는데 infra도 죽음 | `--remove-orphans` 플래그가 있었을 가능성. 평소엔 그냥 `dca down`만 |
 

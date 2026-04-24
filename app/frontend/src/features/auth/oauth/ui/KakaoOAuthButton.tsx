@@ -1,12 +1,23 @@
 import { useCallback } from 'react'
+import { ROUTES } from '../../../../shared/constants'
+
+const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize'
+const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID ?? ''
 
 /**
  * 카카오 로그인 진입 버튼.
- * 백엔드 authorize 엔드포인트로 이동해 OAuth 2.0 인가 코드를 받는 흐름을 시작한다.
+ * 현재 origin을 기준으로 Kakao authorize URL을 만들어 프론트 콜백으로 돌아오게 한다.
  */
 export function KakaoOAuthButton() {
   const handleClick = useCallback(() => {
-    window.location.assign('/api/auth/oauth/kakao/authorize')
+    const redirectUri = `${window.location.origin}${ROUTES.kakaoCallback}`
+    const kakaoUrl = new URL(KAKAO_AUTHORIZE_URL)
+
+    kakaoUrl.searchParams.set('client_id', KAKAO_CLIENT_ID)
+    kakaoUrl.searchParams.set('redirect_uri', redirectUri)
+    kakaoUrl.searchParams.set('response_type', 'code')
+
+    window.location.assign(kakaoUrl.toString())
   }, [])
 
   return (
