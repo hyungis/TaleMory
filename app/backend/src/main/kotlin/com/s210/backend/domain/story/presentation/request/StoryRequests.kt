@@ -59,15 +59,6 @@ data class ModifyStoryRequest(
     )
 }
 
-data class PhotoOrderRequest(
-    val photoIds: List<Long>
-)
-
-data class ModifyPhotoRequest(
-    val description: String?,
-    val tagsJson: String?
-)
-
 data class ModifyStoryboardPageRequest(
     val englishText: String?,
     val koreanText: String?

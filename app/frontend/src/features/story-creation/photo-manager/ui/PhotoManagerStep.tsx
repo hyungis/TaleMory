@@ -1,40 +1,83 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Image as ImageIcon, Wand2 } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { Image as ImageIcon, Loader2, Wand2 } from 'lucide-react'
 import type { StoryProject } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
-import { usePhotoManager, MAX_PHOTOS } from '../model/usePhotoManager'
 import { PhotoUploadZone } from './PhotoUploadZone'
 import { PhotoItem } from './PhotoItem'
 import { EmptyPhotoState } from './EmptyPhotoState'
 import { StoryPromptModal } from './StoryPromptModal'
+import { usePhotosQuery } from '../model/usePhotosQuery'
+import { usePhotoUpload } from '../model/usePhotoUpload'
+import { useDeletePhoto } from '../model/useDeletePhoto'
+import { useUpdatePhoto } from '../model/useUpdatePhoto'
+import { useReorderPhotos } from '../model/useReorderPhotos'
+import { MAX_PHOTOS } from '../lib/constants'
 
 interface PhotoManagerStepProps {
   data: StoryProject['step2']
+  /** BasicInfoStep 에서 POST/PATCH 후 받은 story id. null 이면 업로드 불가 상태로 fallback. */
+  storyId: number | null
   onUpdate: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   onBack: () => void
   onNext: () => void
 }
 
 /**
- * STEP 02 — 추억 사진 선택 & 태깅.
+ * STEP 02 — 추억 사진 업로드 & 스토리보드 프롬프트.
  *
- * 구조:
- *  1. 업로드 존 (드래그앤드롭 + 클릭)
- *  2. 업로드된 사진 리스트 (썸네일 + 사진 설명(선택) + 태그(선택))
- *     · 사진 없을 때 EmptyPhotoState 로 대체
- *  3. 하단 액션 바: "이전 단계" / "스토리보드 만들기 ✨" (→ StoryPromptModal 오픈)
- *  4. StoryPromptModal: 장르/분위기 prompt + 3개 빠른 태그 + "마법 주문 적용!" → onNext()
+ * 서버 상태 관리:
+ *  - `usePhotosQuery(storyId)` — 커밋된 사진 목록 (presigned GET URL 포함)
+ *  - `usePhotoUpload(storyId)` — 3-phase 업로드 (presign → S3 PUT → commit) + pending 로컬 상태
+ *  - `useDeletePhoto(storyId)` — soft delete + 목록 invalidate
+ *
+ * 로컬 상태는 업로드 중/실패인 사진만 보관. commit 성공한 사진은 useQuery 의 서버 데이터로 승격.
  */
-export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManagerStepProps) {
-  const pm = usePhotoManager(data.photos)
+export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: PhotoManagerStepProps) {
+  const photosQuery = usePhotosQuery(storyId)
+  const upload = usePhotoUpload(storyId)
+  const deleteMutation = useDeletePhoto(storyId)
+  const updateMutation = useUpdatePhoto(storyId)
+  const reorderMutation = useReorderPhotos(storyId)
+
   const [isPromptOpen, setIsPromptOpen] = useState(false)
 
-  // photos 변경 시 상위 projectData.step2.photos 로 동기화
-  useEffect(() => {
-    onUpdate('photos', pm.photos)
-    // onUpdate 는 dep 에 넣으면 무한루프 (함수 레퍼런스 바뀜) — photos 만 감시
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pm.photos])
+  const serverPhotos = photosQuery.data ?? []
+  const totalCount = serverPhotos.length + upload.pending.length
+
+  const handleFiles = useCallback(
+    (files: FileList | File[]) => {
+      if (storyId === null) return
+      const remaining = MAX_PHOTOS - totalCount
+      if (remaining <= 0) return
+      const list = Array.from(files).slice(0, remaining)
+      void upload.uploadMany(list)
+    },
+    [storyId, upload, totalCount],
+  )
+
+  const handleRemove = useCallback(
+    (photoId: number) => {
+      deleteMutation.mutate(photoId)
+    },
+    [deleteMutation],
+  )
+
+  /**
+   * 인접한 두 사진의 순서를 swap 후 서버에 전체 목록 전송.
+   * direction=-1 → 위로, +1 → 아래로.
+   * reorder mutation 은 전체 목록을 보내야 하므로 `serverPhotos` 기준으로 계산.
+   */
+  const handleMove = useCallback(
+    (photoId: number, direction: -1 | 1) => {
+      const ids = serverPhotos.map(p => p.photoId)
+      const idx = ids.indexOf(photoId)
+      const target = idx + direction
+      if (idx < 0 || target < 0 || target >= ids.length) return
+      ;[ids[idx], ids[target]] = [ids[target], ids[idx]]
+      reorderMutation.mutate(ids)
+    },
+    [serverPhotos, reorderMutation],
+  )
 
   const handleOpenPrompt = useCallback(() => setIsPromptOpen(true), [])
   const handleClosePrompt = useCallback(() => setIsPromptOpen(false), [])
@@ -42,6 +85,8 @@ export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManage
     setIsPromptOpen(false)
     onNext()
   }, [onNext])
+
+  const canProceed = serverPhotos.length > 0 && upload.pending.every(p => p.status === 'error' || false)
 
   return (
     <div className="bookshelf-modal step-forest-modal">
@@ -55,35 +100,77 @@ export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManage
               <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
                 <ImageIcon className="w-8 h-8 text-[#f0e6c0]" />
               </div>
-              <h2 className="text-3xl text-[#f0e6c0] font-bold">추억이 담긴 사진에 이야기를 달아주세요</h2>
+              <h2 className="text-3xl text-[#f0e6c0] font-bold">추억이 담긴 사진을 올려주세요</h2>
               <p className="text-[#b4c4a4] mt-2">
-                사진에 남긴 짧은 설명과 태그들이 모여 멋진 동화책의 뼈대가 됩니다.
+                업로드된 사진들이 모여 멋진 동화책의 뼈대가 됩니다.
               </p>
             </div>
 
+            {/* storyId 없으면 경고 */}
+            {storyId === null && (
+              <div className="bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#f0e6c0] text-sm px-4 py-3 rounded-xl mb-4">
+                ⚠ step 1 저장이 완료되지 않았습니다. 이전 단계로 돌아가 다시 시도해주세요.
+              </div>
+            )}
+
             {/* 업로드 영역 */}
-            <PhotoUploadZone onFiles={pm.addFiles} />
+            <PhotoUploadZone onFiles={handleFiles} />
 
             {/* 업로드된 사진 리스트 */}
             <div className="space-y-4 mb-8">
               <h3 className="text-xl text-[#f0e6c0] border-b border-[#4a3a24] pb-2 font-bold flex justify-between items-center">
                 <span>업로드된 사진</span>
                 <span className="bg-[#2a1b12]/70 text-[#b4dc8c] px-3 py-1 rounded-full text-sm border border-[#b4dc8c]/50 font-sans shadow-sm">
-                  {pm.photos.length} / {MAX_PHOTOS} 장
+                  {totalCount} / {MAX_PHOTOS} 장
                 </span>
               </h3>
 
-              {pm.photos.length === 0 ? (
-                <EmptyPhotoState />
-              ) : (
-                pm.photos.map(photo => (
+              {photosQuery.isPending && storyId !== null && (
+                <div className="flex items-center justify-center gap-2 text-[#b4c4a4] py-8">
+                  <Loader2 className="w-5 h-5 animate-spin" /> 사진 목록 불러오는 중…
+                </div>
+              )}
+
+              {!photosQuery.isPending && totalCount === 0 && <EmptyPhotoState />}
+
+              {/* 서버 커밋된 사진 */}
+              {serverPhotos.map((photo, idx) => (
+                <PhotoItem
+                  key={`server-${photo.photoId}`}
+                  mode="committed"
+                  imageUrl={photo.imageUrl}
+                  description={photo.description}
+                  tagsJson={photo.tagsJson}
+                  onRemove={() => handleRemove(photo.photoId)}
+                  onUpdate={patch => updateMutation.mutate({ photoId: photo.photoId, body: patch })}
+                  onMoveUp={() => handleMove(photo.photoId, -1)}
+                  onMoveDown={() => handleMove(photo.photoId, 1)}
+                  isFirst={idx === 0}
+                  isLast={idx === serverPhotos.length - 1}
+                  isRemoving={deleteMutation.isPending && deleteMutation.variables === photo.photoId}
+                  isReordering={reorderMutation.isPending}
+                />
+              ))}
+
+              {/* 업로드 중/실패 */}
+              {upload.pending.map(p =>
+                p.status === 'uploading' ? (
                   <PhotoItem
-                    key={photo.id}
-                    photo={photo}
-                    onRemove={() => pm.removePhoto(photo.id)}
-                    onUpdate={patch => pm.updatePhoto(photo.id, patch)}
+                    key={`pending-${p.tempId}`}
+                    mode="uploading"
+                    previewUrl={p.previewUrl}
+                    fileName={p.fileName}
                   />
-                ))
+                ) : (
+                  <PhotoItem
+                    key={`pending-${p.tempId}`}
+                    mode="error"
+                    previewUrl={p.previewUrl}
+                    fileName={p.fileName}
+                    error={p.error ?? '알 수 없는 오류'}
+                    onDismiss={() => upload.dismissPending(p.tempId)}
+                  />
+                ),
               )}
             </div>
 
@@ -99,7 +186,8 @@ export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManage
               <button
                 type="button"
                 onClick={handleOpenPrompt}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+                disabled={!canProceed}
+                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 스토리보드 만들기 <Wand2 className="w-5 h-5" />
               </button>
@@ -108,7 +196,6 @@ export function PhotoManagerStep({ data, onUpdate, onBack, onNext }: PhotoManage
         </main>
       </div>
 
-      {/* 스토리보드 마법 주문 모달 */}
       <StoryPromptModal
         isOpen={isPromptOpen}
         prompt={data.prompt}
