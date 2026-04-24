@@ -22,6 +22,52 @@ class CosyVoiceInvocationError(CosyVoiceError):
     """Raised when the CosyVoice endpoint returns an unusable response."""
 
 
+def synthesize_cross_lingual_tts(
+    *,
+    text: str,
+    prompt_wav_path: Path,
+    audio_format: str,
+) -> tuple[bytes, str]:
+    if not settings.COSYVOICE_BASE_URL:
+        raise CosyVoiceNotConfiguredError(
+            "CosyVoice preview requires COSYVOICE_BASE_URL to be configured."
+        )
+
+    endpoint = _build_endpoint(settings.COSYVOICE_BASE_URL, settings.COSYVOICE_CROSS_LINGUAL_PATH)
+    body, content_type = _build_multipart_payload(
+        fields={
+            "tts_text": text,
+            "format": audio_format,
+        },
+        files={"prompt_wav": prompt_wav_path},
+    )
+    return _invoke_cosyvoice(endpoint=endpoint, body=body, content_type=content_type, audio_format=audio_format)
+
+
+def synthesize_zero_shot_tts(
+    *,
+    text: str,
+    prompt_text: str,
+    prompt_wav_path: Path,
+    audio_format: str,
+) -> tuple[bytes, str]:
+    if not settings.COSYVOICE_BASE_URL:
+        raise CosyVoiceNotConfiguredError(
+            "CosyVoice preview requires COSYVOICE_BASE_URL to be configured."
+        )
+
+    endpoint = _build_endpoint(settings.COSYVOICE_BASE_URL, settings.COSYVOICE_ZERO_SHOT_PATH)
+    body, content_type = _build_multipart_payload(
+        fields={
+            "tts_text": text,
+            "prompt_text": prompt_text,
+            "format": audio_format,
+        },
+        files={"prompt_wav": prompt_wav_path},
+    )
+    return _invoke_cosyvoice(endpoint=endpoint, body=body, content_type=content_type, audio_format=audio_format)
+
+
 def synthesize_instruct_tts(
     *,
     text: str,
@@ -43,6 +89,16 @@ def synthesize_instruct_tts(
         },
         files={"prompt_wav": prompt_wav_path},
     )
+    return _invoke_cosyvoice(endpoint=endpoint, body=body, content_type=content_type, audio_format=audio_format)
+
+
+def _invoke_cosyvoice(
+    *,
+    endpoint: str,
+    body: bytes,
+    content_type: str,
+    audio_format: str,
+) -> tuple[bytes, str]:
     req = request.Request(
         endpoint,
         data=body,

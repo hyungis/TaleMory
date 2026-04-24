@@ -21,6 +21,8 @@ def preview_voice(voiceId: str, request: PreviewRequest) -> ApiSuccessResponse:
         data = generate_preview(voiceId, request.text, request.language, request.format, request.options)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"Voice not found: {voiceId}") from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except CosyVoiceNotConfiguredError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except CosyVoiceInvocationError as error:

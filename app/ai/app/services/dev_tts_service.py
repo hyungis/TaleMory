@@ -11,24 +11,25 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.schemas.tts import PreviewOptions, VoiceRegisterRequest
-from app.services.cosyvoice_client import synthesize_instruct_tts
+from app.services.cosyvoice_client import synthesize_cross_lingual_tts
 
 
 SAMPLE_RATE = 22050
 SAMPLE_WIDTH = 2
 CHANNELS = 1
+ASSISTANT_PREFIX = "You are a helpful assistant. Read slowly.<|endofprompt|>"
 
 EMOTION_INSTRUCTIONS = {
-    "NEUTRAL": "Speak naturally with a calm and clear tone.",
-    "WARM": "Speak warmly and gently, like a caring parent reading at bedtime.",
-    "HAPPY": "Speak cheerfully with a light and pleasant tone.",
-    "EXCITED": "Speak brightly and excitedly, but keep the pronunciation clear.",
-    "CALM": "Speak calmly with steady pacing and a composed tone.",
-    "SAD": "Speak slowly and quietly with a subdued emotional tone.",
-    "SOFT": "Speak softly and calmly with a low, relaxed energy.",
-    "SERIOUS": "Speak with a serious and focused tone.",
-    "ANGRY": "Speak with firm intensity, without shouting.",
-    "NARRATION": "Read like a clear children's story narrator.",
+    "NEUTRAL": "Neutral.",
+    "WARM": "Warm.",
+    "HAPPY": "Happy.",
+    "EXCITED": "Excited.",
+    "CALM": "Calm.",
+    "SAD": "Sad.",
+    "SOFT": "Soft.",
+    "SERIOUS": "Serious.",
+    "ANGRY": "Angry.",
+    "NARRATION": "Calm narration.",
 }
 
 
@@ -108,54 +109,18 @@ def _duration_ms_from_audio(audio_bytes: bytes, audio_format: str, fallback_text
     return int(max(1000, min(6000, len(fallback_text) * 80)))
 
 
-def _language_instruction(language: str) -> str:
-    if language == "ko-KR":
-        return "Speak in Korean."
-    if language == "en-US":
-        return "Speak in English."
-    return f"Speak in {language}."
+def _cross_lingual_text(text: str) -> str:
+    normalized = text.strip()
+    if normalized.startswith(ASSISTANT_PREFIX):
+        return normalized
+    return f"{ASSISTANT_PREFIX}{normalized}"
 
 
-def _preview_instruction(language: str, options: PreviewOptions) -> str:
-    parts = [
-        "Use the reference speaker's voice.",
-        _language_instruction(language),
-        EMOTION_INSTRUCTIONS[options.emotion],
-    ]
-    if options.speakingRate is not None:
-        parts.append(f"Speaking rate: {options.speakingRate}.")
-    if options.pitch is not None:
-        parts.append(f"Pitch adjustment: {options.pitch}.")
-    if options.volumeGain is not None:
-        parts.append(f"Volume gain: {options.volumeGain}.")
-    if options.stylePrompt:
-        parts.append(f"Additional style: {options.stylePrompt}")
-    return f'{" ".join(parts).strip()}<|endofprompt|>'
-
-
-def _story_instruction(
-    *,
-    language: str,
-    emotion: str,
-    style_prompt: str | None,
-    speaking_rate: float | None,
-    pitch: float | None,
-    volume_gain: float | None,
-) -> str:
-    parts = [
-        "Use the reference speaker's voice.",
-        _language_instruction(language),
-        EMOTION_INSTRUCTIONS[emotion],
-    ]
-    if style_prompt:
-        parts.append(f"Additional style: {style_prompt}")
-    if speaking_rate is not None:
-        parts.append(f"Speaking rate: {speaking_rate}.")
-    if pitch is not None:
-        parts.append(f"Pitch adjustment: {pitch}.")
-    if volume_gain is not None:
-        parts.append(f"Volume gain: {volume_gain}.")
-    return f'{" ".join(parts).strip()}<|endofprompt|>'
+def _voice_metadata(voice_id: str) -> dict[str, Any]:
+    metadata_path = _voice_metadata_path(voice_id)
+    if not metadata_path.exists():
+        raise FileNotFoundError(voice_id)
+    return _read_json(metadata_path)
 
 
 def _concat_wavs(paths: list[Path], output_path: Path) -> None:
@@ -273,11 +238,7 @@ def process_voice_clone_job(job_id: str, voice_id: str, request: VoiceRegisterRe
 
 
 def get_voice_info(voice_id: str) -> dict[str, Any]:
-    metadata_path = _voice_metadata_path(voice_id)
-    if not metadata_path.exists():
-        raise FileNotFoundError(voice_id)
-
-    metadata = _read_json(metadata_path)
+    metadata = _voice_metadata(voice_id)
     reference_path = _voice_reference_path(voice_id)
     return {
         "voiceId": voice_id,
@@ -303,10 +264,8 @@ def generate_preview(
         raise FileNotFoundError(voice_id)
 
     preview_id = f"preview_{uuid4().hex[:12]}"
-    instruction = _preview_instruction(language, options)
-    audio_bytes, resolved_format = synthesize_instruct_tts(
-        text=text,
-        instruct_text=instruction,
+    audio_bytes, resolved_format = synthesize_cross_lingual_tts(
+        text=_cross_lingual_text(text),
         prompt_wav_path=reference_path,
         audio_format=output_format,
     )
@@ -332,7 +291,7 @@ def generate_preview(
             "stylePrompt": options.stylePrompt,
             "speakingRate": options.speakingRate,
             "pitch": options.pitch,
-            "engine": "cosyvoice.inference_instruct2",
+            "engine": "cosyvoice.inference_cross_lingual",
         },
     }
 
@@ -370,9 +329,6 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
 
     default_emotion = request["options"]["defaultEmotion"]
     default_style_prompt = request["options"].get("defaultStylePrompt")
-    speaking_rate = request["options"].get("speakingRate")
-    pitch = request["options"].get("pitch")
-    volume_gain = request["options"].get("volumeGain")
     output_format = request.get("format", "wav")
 
     try:
@@ -380,17 +336,8 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
             sentence_id = sentence["sentenceId"]
             emotion = sentence.get("emotion") or default_emotion
             style_prompt = sentence.get("stylePrompt") or default_style_prompt
-            instruction = _story_instruction(
-                language=request["language"],
-                emotion=emotion,
-                style_prompt=style_prompt,
-                speaking_rate=speaking_rate,
-                pitch=pitch,
-                volume_gain=volume_gain,
-            )
-            audio_bytes, resolved_format = synthesize_instruct_tts(
-                text=sentence["text"],
-                instruct_text=instruction,
+            audio_bytes, resolved_format = synthesize_cross_lingual_tts(
+                text=_cross_lingual_text(sentence["text"]),
                 prompt_wav_path=reference_path,
                 audio_format=output_format,
             )
