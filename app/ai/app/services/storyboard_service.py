@@ -1,7 +1,10 @@
 import json
 import base64
 import mimetypes
+from functools import lru_cache
 from itertools import cycle, islice
+
+import boto3
 
 from app.core.config import settings
 from app.schemas.storyboard import (
@@ -308,15 +311,8 @@ def _build_data_url_from_s3(s3_key: str) -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
-def _download_photo_bytes_from_s3(s3_key: str) -> bytes:
-    if not settings.AWS_S3_BUCKET:
-        raise RuntimeError("AWS_S3_BUCKET is not configured")
-
-    try:
-        import boto3
-    except ImportError as exc:
-        raise RuntimeError("boto3 package is required to load storyboard source photos from S3") from exc
-
+@lru_cache
+def _get_s3_client():
     client_kwargs: dict[str, object] = {}
     if settings.AWS_REGION:
         client_kwargs["region_name"] = settings.AWS_REGION
@@ -324,7 +320,14 @@ def _download_photo_bytes_from_s3(s3_key: str) -> bytes:
         client_kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
     if settings.AWS_SECRET_ACCESS_KEY:
         client_kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
-    client = boto3.client("s3", **client_kwargs)
+    return boto3.client("s3", **client_kwargs)
+
+
+def _download_photo_bytes_from_s3(s3_key: str) -> bytes:
+    if not settings.AWS_S3_BUCKET:
+        raise RuntimeError("AWS_S3_BUCKET is not configured")
+
+    client = _get_s3_client()
     try:
         response = client.get_object(Bucket=settings.AWS_S3_BUCKET, Key=s3_key)
         return response["Body"].read()
