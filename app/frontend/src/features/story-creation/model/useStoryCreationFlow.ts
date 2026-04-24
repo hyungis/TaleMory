@@ -8,12 +8,17 @@ const LEGACY_STORAGE_KEY_STEP = 'talemory_draft_step'
 const LEGACY_STORAGE_KEY_DATA = 'talemory_draft_project'
 
 /**
- * 새로고침/탭 이탈 후 재진입 시 현재 단계 + storyId + step3 한글 본문을 복구하기 위한 저장소.
+ * 새로고침 후 재진입 시 현재 단계 + storyId + step3 한글 본문을 복구하기 위한 저장소.
  * 전체 projectData 대신 "서버에서 복구 가능한 메타 + 편집 중이던 한글 본문" 만 저장한다
  * (사진 / children / 여행지 등은 서버 API 로 재조회되므로 로컬 persistence 불필요).
+ *
+ * **sessionStorage** 를 쓰는 이유:
+ *  - 브라우저 탭마다 독립된 storage 이므로 두 탭에서 서로 다른 DRAFT 를 진행해도 덮어쓰기 없음.
+ *  - 탭을 닫으면 날아가지만, 그 시점엔 이미 서버 DB 에 저장 돼 있고 (`step3.story` 는 onBlur
+ *    시점에 PATCH 완료) "이어서 작성하기" 플로우로 복원 가능하므로 UX 손실 없음.
  */
 const PROGRESS_STORAGE_KEY = 'talemory.creation.progress.v1'
-/** 24시간 이상 경과한 progress 는 무효화 — 같은 브라우저에서 다른 스토리로 넘어갔을 수 있어서. */
+/** 오래된 snapshot 무효화 — 같은 탭을 하루 이상 열어둔 뒤 새로고침한 edge case 대비. */
 const PROGRESS_TTL_MS = 24 * 60 * 60 * 1000
 
 interface CreationProgressSnapshot {
@@ -26,7 +31,7 @@ interface CreationProgressSnapshot {
 function readProgressSnapshot(): CreationProgressSnapshot | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY)
+    const raw = window.sessionStorage.getItem(PROGRESS_STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<CreationProgressSnapshot>
     if (
@@ -37,7 +42,7 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
       return null
     }
     if (Date.now() - parsed.savedAt > PROGRESS_TTL_MS) {
-      window.localStorage.removeItem(PROGRESS_STORAGE_KEY)
+      window.sessionStorage.removeItem(PROGRESS_STORAGE_KEY)
       return null
     }
     return {
@@ -55,7 +60,7 @@ function writeProgressSnapshot(snapshot: Omit<CreationProgressSnapshot, 'savedAt
   if (typeof window === 'undefined') return
   try {
     const payload: CreationProgressSnapshot = { ...snapshot, savedAt: Date.now() }
-    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(payload))
+    window.sessionStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(payload))
   } catch {
     /* quota exceeded 등 무시 — 핵심 기능 차단 X */
   }
@@ -63,12 +68,13 @@ function writeProgressSnapshot(snapshot: Omit<CreationProgressSnapshot, 'savedAt
 
 /**
  * 진행 snapshot 제거. 스토리 발행(publish) / 명시적 리셋 시점에 호출해
- * 다음 세션이 과거 DRAFT 로 오염되지 않도록 정리. 현재는 24h TTL 에 의존하지만,
- * 후속 이슈에서 "새로 시작하기" 버튼 등에 연결할 예정이라 hook return 으로 노출한다.
+ * 같은 탭에서 과거 DRAFT 가 남지 않도록 정리. sessionStorage 라 탭을 닫으면
+ * 자동 소멸되지만, 같은 탭 내에서 새 스토리 시작 시 명시 초기화가 필요하므로
+ * hook return 으로 노출한다.
  */
 function clearProgressSnapshot(): void {
   if (typeof window === 'undefined') return
-  window.localStorage.removeItem(PROGRESS_STORAGE_KEY)
+  window.sessionStorage.removeItem(PROGRESS_STORAGE_KEY)
 }
 
 const DEFAULT_DATA: StoryProject = {
