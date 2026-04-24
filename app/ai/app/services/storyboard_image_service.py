@@ -1,7 +1,10 @@
 import base64
 import json
 import mimetypes
+from functools import lru_cache
 from urllib import error, parse, request
+
+import boto3
 
 from app.core.config import settings
 from app.schemas.storyboard_image import (
@@ -17,6 +20,9 @@ from app.schemas.storyboard_image import (
 
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
+)
+_FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
+    "Keep it as a rough pre-coloring storyboard sketch with loose linework and no polished final rendering."
 )
 
 
@@ -61,8 +67,29 @@ def _generate_item_with_gemini(
     seed: int,
 ) -> StoryboardImageGenerateResult:
     final_prompt = _build_final_prompt(item)
-    response_json = _call_gemini_image_api(final_prompt, item.referenceImageUrls, seed)
-    image_bytes = _extract_image_bytes(response_json)
+    response_json = _call_gemini_image_api(
+        final_prompt,
+        item.referenceImageUrls,
+        item.referenceImageS3Keys,
+        seed,
+    )
+    try:
+        image_bytes = _extract_image_bytes(response_json)
+    except ValueError as exc:
+        if "no image data" not in str(exc):
+            raise
+        retry_prompt = (
+            f"{final_prompt}\n"
+            "Return only the generated image. Do not return any explanatory text."
+        )
+        retry_response_json = _call_gemini_image_api(
+            retry_prompt,
+            item.referenceImageUrls,
+            item.referenceImageS3Keys,
+            seed,
+        )
+        image_bytes = _extract_image_bytes(retry_response_json)
+        response_json = retry_response_json
     image_url = _upload_and_resolve_url(story_id, item, image_bytes)
     usage = _extract_gemini_usage(response_json)
     return StoryboardImageGenerateResult(
@@ -116,8 +143,6 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         "Create a rough children's storybook sketch just before the coloring stage.",
         f"Story title: {item.storyboard.title}",
         f"Story synopsis: {item.storyboard.synopsis}",
-        f"Moral theme: {item.storyboard.moralTheme}",
-        f"Recurring motif: {item.storyboard.recurringMotif}",
         f"Page {item.pageNumber} scene summary: {item.page.sceneSummary}",
         f"Page English text: {item.page.englishText}",
         f"Page Korean text: {item.page.koreanText}",
@@ -134,16 +159,27 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
             "or typographic elements inside the image."
         ),
     ]
-    if item.referenceImageUrls:
+    if item.referenceImageUrls or item.referenceImageS3Keys:
         parts.append(
             "Reference images are provided to preserve the travel mood and character consistency where possible."
         )
-    if item.additionalInstruction:
-        parts.append(f"Additional instruction: {item.additionalInstruction}")
+    parts.append(f"Additional instruction: {_compose_additional_instruction(item.additionalInstruction)}")
     return "\n".join(parts)
 
 
-def _call_gemini_image_api(final_prompt: str, reference_image_urls: list[str], seed: int) -> dict:
+def _compose_additional_instruction(additional_instruction: str | None) -> str:
+    instruction_parts = [_FIXED_STORYBOARD_SKETCH_INSTRUCTION]
+    if additional_instruction and additional_instruction.strip():
+        instruction_parts.append(additional_instruction.strip())
+    return "\n".join(instruction_parts)
+
+
+def _call_gemini_image_api(
+    final_prompt: str,
+    reference_image_urls: list[str],
+    reference_image_s3_keys: list[str],
+    seed: int,
+) -> dict:
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured")
 
@@ -151,7 +187,7 @@ def _call_gemini_image_api(final_prompt: str, reference_image_urls: list[str], s
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{settings.STORYBOARD_IMAGE_MODEL}:generateContent?key={parse.quote(settings.GEMINI_API_KEY)}"
     )
-    parts = _build_gemini_parts(final_prompt, reference_image_urls)
+    parts = _build_gemini_parts(final_prompt, reference_image_urls, reference_image_s3_keys)
     payload = {
         "contents": [{"parts": parts}],
         "generationConfig": _build_gemini_generation_config(seed),
@@ -172,8 +208,25 @@ def _call_gemini_image_api(final_prompt: str, reference_image_urls: list[str], s
         raise RuntimeError(f"Gemini image generation network error: {exc.reason}") from exc
 
 
-def _build_gemini_parts(final_prompt: str, reference_image_urls: list[str]) -> list[dict]:
+def _build_gemini_parts(
+    final_prompt: str,
+    reference_image_urls: list[str],
+    reference_image_s3_keys: list[str],
+) -> list[dict]:
     parts: list[dict] = []
+    for s3_key in reference_image_s3_keys[:3]:
+        downloaded = _download_reference_image_from_s3(s3_key)
+        if downloaded is None:
+            continue
+        mime_type, raw_bytes = downloaded
+        parts.append(
+            {
+                "inlineData": {
+                    "mimeType": mime_type,
+                    "data": base64.b64encode(raw_bytes).decode("ascii"),
+                }
+            }
+        )
     for image_url in reference_image_urls[:3]:
         downloaded = _download_reference_image(image_url)
         if downloaded is None:
@@ -193,7 +246,7 @@ def _build_gemini_parts(final_prompt: str, reference_image_urls: list[str]) -> l
 
 def _build_gemini_generation_config(seed: int) -> dict:
     return {
-        "responseModalities": ["TEXT", "IMAGE"],
+        "responseModalities": ["Image"],
         "seed": seed,
     }
 
@@ -210,6 +263,30 @@ def _download_reference_image(image_url: str) -> tuple[str, bytes] | None:
         return None
 
 
+@lru_cache
+def _get_s3_client():
+    client_kwargs: dict[str, object] = {}
+    if settings.STORYBOARD_IMAGE_S3_REGION:
+        client_kwargs["region_name"] = settings.STORYBOARD_IMAGE_S3_REGION
+    if settings.STORYBOARD_IMAGE_S3_ACCESS_KEY_ID:
+        client_kwargs["aws_access_key_id"] = settings.STORYBOARD_IMAGE_S3_ACCESS_KEY_ID
+    if settings.STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY:
+        client_kwargs["aws_secret_access_key"] = settings.STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY
+    return boto3.client("s3", **client_kwargs)
+
+
+def _download_reference_image_from_s3(s3_key: str) -> tuple[str, bytes] | None:
+    if not settings.STORYBOARD_IMAGE_S3_BUCKET:
+        return None
+    try:
+        response = _get_s3_client().get_object(Bucket=settings.STORYBOARD_IMAGE_S3_BUCKET, Key=s3_key)
+        raw_bytes = response["Body"].read()
+        mime_type = mimetypes.guess_type(s3_key)[0] or "image/png"
+        return mime_type, raw_bytes
+    except Exception:
+        return None
+
+
 def _extract_image_bytes(response_json: dict) -> bytes:
     for candidate in response_json.get("candidates", []):
         content = candidate.get("content", {})
@@ -220,7 +297,22 @@ def _extract_image_bytes(response_json: dict) -> bytes:
             data = inline_data.get("data")
             if data:
                 return base64.b64decode(data)
-    raise ValueError("Gemini image generation returned no image data")
+    finish_reasons = [
+        candidate.get("finishReason") or candidate.get("finish_reason")
+        for candidate in response_json.get("candidates", [])
+    ]
+    text_parts: list[str] = []
+    for candidate in response_json.get("candidates", []):
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            text_value = part.get("text")
+            if text_value:
+                text_parts.append(text_value.strip())
+    text_preview = " | ".join(part for part in text_parts if part)[:500]
+    raise ValueError(
+        "Gemini image generation returned no image data. "
+        f"finishReasons={finish_reasons} textPreview={text_preview!r}"
+    )
 
 
 def _extract_gemini_usage(response_json: dict) -> StoryboardImageUsage:
@@ -319,18 +411,7 @@ def _has_s3_upload_config() -> bool:
 
 def _upload_to_s3(object_path: str, image_bytes: bytes) -> None:
     try:
-        import boto3
-    except ImportError as exc:
-        raise RuntimeError("boto3 package is not installed") from exc
-
-    session = boto3.session.Session(
-        aws_access_key_id=settings.STORYBOARD_IMAGE_S3_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY,
-        region_name=settings.STORYBOARD_IMAGE_S3_REGION,
-    )
-    client = session.client("s3", endpoint_url=settings.STORYBOARD_IMAGE_S3_ENDPOINT_URL)
-    try:
-        client.put_object(
+        _get_s3_client().put_object(
             Bucket=settings.STORYBOARD_IMAGE_S3_BUCKET,
             Key=object_path,
             Body=image_bytes,

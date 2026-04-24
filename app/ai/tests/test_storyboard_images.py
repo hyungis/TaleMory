@@ -96,7 +96,7 @@ def test_call_gemini_image_api_sends_requested_seed() -> None:
         storyboard_image_service.request.urlopen = original_urlopen
 
     generation_config = captured_payload["generationConfig"]
-    assert generation_config["responseModalities"] == ["TEXT", "IMAGE"]
+    assert generation_config["responseModalities"] == ["Image"]
     assert generation_config["seed"] == 987654321
 
 

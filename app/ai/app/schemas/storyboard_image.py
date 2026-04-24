@@ -6,8 +6,6 @@ from app.schemas.storyboard import ChildInfo
 class StoryboardImageContext(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     synopsis: str = Field(..., min_length=1, max_length=2000)
-    moralTheme: str = Field(..., min_length=1, max_length=500)
-    recurringMotif: str = Field(..., min_length=1, max_length=500)
 
 
 class StoryboardImagePageInput(BaseModel):
@@ -25,6 +23,7 @@ class StoryboardImageGenerateItemRequest(BaseModel):
     children: list[ChildInfo] = Field(..., min_length=1)
     companions: list[str] = Field(default_factory=list)
     referenceImageUrls: list[str] = Field(default_factory=list, max_length=3)
+    referenceImageS3Keys: list[str] = Field(default_factory=list, max_length=3)
     additionalInstruction: str | None = Field(default=None, max_length=2000)
 
 
