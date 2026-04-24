@@ -32,8 +32,9 @@ class SecurityConfig(
                     "/api/health",
                     "/api/auth/signup",
                     "/api/auth/login",
+                    "/api/auth/kakao/callback",
                     "/api/auth/refresh",
-                    "/api/auth/oauth/**",
+                    "/api/auth/logout",
                 ).permitAll()
                     .anyRequest().authenticated()
             }

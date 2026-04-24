@@ -34,6 +34,7 @@ services:
       dockerfile: infra/docker/frontend.Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_KAKAO_CLIENT_ID: ${VITE_KAKAO_CLIENT_ID:-kakao-rest-api-key-change-me}
     image: s210-frontend:local
     container_name: local-nginx
     restart: unless-stopped

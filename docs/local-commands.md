@@ -19,7 +19,7 @@
 ```bash
 cp infra/env/app.local.env.example   infra/env/app.local.env
 cp infra/env/infra.local.env.example infra/env/infra.local.env
-# (infra/env/app.local.env 편집 — OPENAI_API_KEY 등 필요 시)
+# (infra/env/app.local.env 편집 — OPENAI_API_KEY, Kakao OAuth env (`OAUTH_ALLOWED_REDIRECT_URIS`, `KAKAO_*`, `VITE_KAKAO_CLIENT_ID`) 등 필요 시)
 # 비밀번호는 app.local.env / infra.local.env 간 반드시 일치 유지.
 ```
 

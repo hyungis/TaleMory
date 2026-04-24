@@ -36,3 +36,8 @@ data class LoginRequest(
             password = password,
         )
 }
+
+data class KakaoCallbackRequest(
+    val code: String,
+    val redirectUri: String,
+)

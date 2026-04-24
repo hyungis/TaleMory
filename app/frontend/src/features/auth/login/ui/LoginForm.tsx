@@ -136,7 +136,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         <div className="flex-1 h-px bg-[#8b7a52]/40"></div>
       </div>
 
-      <KakaoOAuthButton onSuccess={onSuccess} />
+      <KakaoOAuthButton />
 
       <p className="text-center text-[#8b7a52] text-sm pt-2">
         아직 계정이 없으신가요?{' '}
