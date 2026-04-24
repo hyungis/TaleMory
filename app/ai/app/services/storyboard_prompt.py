@@ -168,6 +168,8 @@ the user's photo descriptions and hashtags.
 - pageNumber MUST be a 1-based index matching the page's position inside pages[].
 - wordCount for a page should reflect the actual words in englishText.
 - imagePrompt must preserve the same characters, setting, and recurring elements where relevant.
+- imagePrompt must describe a rough pre-coloring storyboard sketch, not a polished final illustration.
+- imagePrompt should favor loose pencil or ink linework, simple shading, and child-safe picture-book composition.
 - The synopsis must name the moral theme, central thread, emotional resolution, and the recurring symbolic element.
 
 ========================

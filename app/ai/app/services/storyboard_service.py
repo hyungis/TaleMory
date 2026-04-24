@@ -563,7 +563,8 @@ def _image_prompt(
 ) -> str:
     hashtag_text = ", ".join(hashtags) if hashtags else "family memory"
     return (
-        "A rough children's book storyboard sketch, warm and gentle, "
+        "A rough pre-coloring children's book storyboard sketch, warm and gentle, "
         f"featuring {child_name} at {travel_place}. Scene: {scene_summary}. "
+        "Loose pencil-and-ink linework, minimal shading, no polished final rendering. "
         f"Visual hints: {hashtag_text}."
     )
