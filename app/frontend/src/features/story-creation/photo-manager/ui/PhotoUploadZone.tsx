@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type DragEvent, type ChangeEvent } from 'react'
 import { UploadCloud } from 'lucide-react'
-import { MAX_PHOTOS } from '../model/usePhotoManager'
+import { MAX_PHOTOS } from '../lib/constants'
 
 interface PhotoUploadZoneProps {
   onFiles: (files: FileList | File[]) => void
