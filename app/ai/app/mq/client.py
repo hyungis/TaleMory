@@ -25,12 +25,12 @@ def create_channel(connection: Any) -> Any:
 def declare_storyboard_topology(channel: Any) -> None:
     channel.exchange_declare(
         exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
-        exchange_type="direct",
+        exchange_type="topic",
         durable=True,
     )
     channel.exchange_declare(
         exchange=settings.RABBITMQ_RESULT_EXCHANGE,
-        exchange_type="direct",
+        exchange_type="topic",
         durable=True,
     )
 
