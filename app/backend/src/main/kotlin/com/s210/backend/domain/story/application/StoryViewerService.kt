@@ -38,6 +38,19 @@ class StoryViewerService(
     private val memberRepository: MemberRepository,
     private val objectMapper: ObjectMapper,
 ) {
+    fun findPublicStoryView(shareToken: String): StoryViewResponse {
+        val story = storyRepository.findByShareTokenAndDeletedAtIsNull(shareToken)
+            ?: throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
+
+        verifyPublished(story)
+
+        val scenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(story.id)
+        val sentencesByScene = loadSentencesByScene(scenes)
+        val outro = storyOutroRepository.findByStoryId(story.id)
+
+        return toViewResponse(story, scenes, sentencesByScene, outro)
+    }
+
     fun findStoryView(loginId: String, storyId: Long): StoryViewResponse {
         val userId = resolveUserId(loginId)
         val story = storyRepository.findById(storyId)

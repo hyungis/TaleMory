@@ -121,10 +121,4 @@ class StoryController(
         TODO("Not yet implemented")
     }
 
-    // 공개 동화 조회 (비로그인 접근 가능)
-    @GetMapping("/public/{shareToken}")
-    fun storyPublicDetails(@PathVariable shareToken: String): ResponseEntity<ApiResponse<StoryDetailResponse>> {
-        // TODO: StoryService.findPublicStory(shareToken)
-        TODO("Not yet implemented")
-    }
 }
