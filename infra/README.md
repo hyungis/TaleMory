@@ -15,8 +15,8 @@ infra/
     frontend.Dockerfile               ← multi-stage: React build → nginx
   nginx/
     nginx.common.conf                 ← proxy header 공용
-    nginx.dev.conf                    ← dev용 upstream (dev-backend, dev-ai)
-    nginx.prod.conf                   ← master용 upstream (prod-backend, prod-ai)
+    nginx.dev.conf                    ← dev용 upstream (dev-backend)
+    nginx.prod.conf                   ← master용 upstream (prod-backend)
   env/
     README.md                         ← GitLab Variables → env 파일 변환 규칙
     app.local.env.example             ← 로컬 app 스택
@@ -49,14 +49,14 @@ infra/
 |---|---|---|
 | nginx (외부 진입) | `dev-nginx` / 3001 | `prod-nginx` / 80 |
 | backend | `dev-backend` / 8081 | `prod-backend` / 8080 |
-| ai | `dev-ai` / 8001 | `prod-ai` / 8000 |
+| ai-worker | `dev-ai-worker-*` / (내부 only, HTTP 없음) | `prod-ai-worker-*` / (내부 only) |
 | mysql | `dev-mysql` / 3307 | `prod-mysql` / 3306 |
 | redis | `dev-redis` / 6380 | `prod-redis` / 6379 |
 | rabbitmq | `dev-rabbitmq` / 5673, 15673 | `prod-rabbitmq` / 5672, 15672 |
 
-각 포트는 `${FRONTEND_PORT}`, `${BACKEND_PORT}`, `${AI_PORT}` 등 env로 override 가능.
+각 포트는 `${FRONTEND_PORT}`, `${BACKEND_PORT}` 등 env로 override 가능. ai-worker는 RabbitMQ consumer로 동작하므로 HTTP 포트를 publish하지 않음.
 
-> backend/ai를 외부로 직접 publish하는 건 nginx 우회 경로가 됩니다. 실 운영에선 서버 방화벽으로 내부/오피스 IP에서만 접근 가능하도록 막아주세요.
+> backend를 외부로 직접 publish하는 건 nginx 우회 경로가 됩니다. 실 운영에선 서버 방화벽으로 내부/오피스 IP에서만 접근 가능하도록 막아주세요.
 
 ## 네트워크
 
@@ -73,7 +73,7 @@ dev 브랜치로 merge
   → health-check-infra.sh dev                        (mysql/redis/rabbitmq 접속 + creds 정렬 검증)
   → build-frontend / build-backend / build-ai        (3개 병렬, 로컬 docker daemon에 태그만 생성)
   → deploy-dev.sh                                    (같은 daemon의 이미지로 compose up)
-  → health-check-dev.sh                              (nginx 경유 /api/health, /ai/health)
+  → health-check-dev.sh                              (nginx 경유 /api/health + ai-worker container + RabbitMQ consumer probe)
   → notify.sh success/failure                        (Discord)
 ```
 

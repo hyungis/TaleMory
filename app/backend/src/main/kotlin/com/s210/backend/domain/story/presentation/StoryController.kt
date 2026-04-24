@@ -3,9 +3,13 @@ package com.s210.backend.domain.story.presentation
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.common.response.PageResponse
 import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.story.application.StoryService
 import com.s210.backend.domain.story.application.StoryViewerService
 import com.s210.backend.domain.story.presentation.request.CreateStoryRequest
+import com.s210.backend.domain.story.presentation.request.ModifyStoryRequest
 import com.s210.backend.domain.story.presentation.response.*
+import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
@@ -13,6 +17,7 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/stories")
 class StoryController(
+    private val storyService: StoryService,
     private val storyViewerService: StoryViewerService,
 ) {
 
@@ -26,11 +31,46 @@ class StoryController(
         TODO("Not yet implemented")
     }
 
-    // 동화 기본 정보 생성
+    @GetMapping("/draft")
+    fun storyDraftDetails(
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<StoryDraftResponse?>> {
+        val draft = storyService.findLatestDraft(user.userId)
+        val body = draft?.let {
+            StoryDraftResponse(
+                storyId = it.id,
+                title = it.title,
+                difficulty = it.difficulty.name,
+                companionsJson = it.companionsJson,
+                mainCharacterJson = it.mainCharacterJson,
+                travelPlace = it.travelPlace,
+                travelStartDate = it.travelStartDate,
+                travelEndDate = it.travelEndDate,
+                createdAt = it.createdAt,
+            )
+        }
+        return ResponseEntity.ok(ApiResponse(data = body))
+    }
+
     @PostMapping
-    fun storyAdd(@RequestBody request: CreateStoryRequest): ResponseEntity<ApiResponse<StoryDetailResponse>> {
-        // TODO: StoryService.addStory(userId, command)
-        TODO("Not yet implemented")
+    fun storyAdd(
+        @AuthenticationPrincipal user: CustomUser,
+        @RequestBody @Valid request: CreateStoryRequest,
+    ): ResponseEntity<ApiResponse<StoryCreateResponse>> {
+        val result = storyService.addStory(request.toCommand(user.userId))
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse(data = StoryCreateResponse(storyId = result.id)))
+    }
+
+    @PatchMapping("/{storyId}")
+    fun storyModify(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @RequestBody request: ModifyStoryRequest,
+    ): ResponseEntity<ApiResponse<StoryCreateResponse>> {
+        val result = storyService.modifyStory(user.userId, storyId, request.toCommand())
+        return ResponseEntity.ok(ApiResponse(data = StoryCreateResponse(storyId = result.id)))
     }
 
     // 동화 상세 조회
@@ -52,9 +92,12 @@ class StoryController(
 
     // 동화 삭제
     @DeleteMapping("/{storyId}")
-    fun storyRemove(@PathVariable storyId: Long): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: StoryService.removeStory(storyId)
-        TODO("Not yet implemented")
+    fun storyRemove(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<Unit>> {
+        storyService.removeStory(user.userId, storyId)
+        return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 
     // 즐겨찾기 토글

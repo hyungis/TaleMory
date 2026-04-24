@@ -50,6 +50,11 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
+
+    // AWS SDK for S3 (image upload via presigned URL + storyboard 결과 업로드용).
+    // BOM 을 import 해 모든 aws 모듈 버전을 한 곳에서 관리.
+    implementation(platform("software.amazon.awssdk:bom:2.28.0"))
+    implementation("software.amazon.awssdk:s3")
 }
 
 kotlin {

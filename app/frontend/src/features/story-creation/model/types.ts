@@ -20,6 +20,12 @@ export interface StoryChild {
   name: string
   gender: Gender
   age: string
+  /**
+   * persons 테이블에 이미 저장된 인물이면 해당 PK.
+   *  - 드롭다운으로 기존 인물 선택 시 세팅 → step 1 종료 때 재사용(재등록 안 함)
+   *  - 사용자가 직접 입력한 신규 아이면 undefined → step 1 종료 때 POST /api/persons 로 먼저 등록
+   */
+  personId?: number
 }
 
 /** 사진 업로드 단계에서 클라이언트가 쥐고 있는 draft 사진 (서버 `Photo` 와 별개). */

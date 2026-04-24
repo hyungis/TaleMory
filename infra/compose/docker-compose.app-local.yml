@@ -16,17 +16,17 @@ services:
     ports:
       - "${BACKEND_PORT:-8081}:8080"
 
-  ai:
+  ai-worker:
     build:
       context: ../../app/ai
       dockerfile: Dockerfile
     image: s210-ai:local
-    container_name: local-ai
+    container_name: local-ai-worker
     restart: unless-stopped
+    command: ["python", "worker.py"]
+    scale: ${AI_WORKER_REPLICAS:-1}
     env_file:
       - ../env/app.local.env
-    ports:
-      - "${AI_PORT:-8001}:8000"
 
   nginx:
     build:
@@ -34,12 +34,12 @@ services:
       dockerfile: infra/docker/frontend.Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_KAKAO_CLIENT_ID: ${VITE_KAKAO_CLIENT_ID:-kakao-rest-api-key-change-me}
     image: s210-frontend:local
     container_name: local-nginx
     restart: unless-stopped
     depends_on:
       - backend
-      - ai
     ports:
       - "${FRONTEND_PORT:-3001}:80"
     volumes:

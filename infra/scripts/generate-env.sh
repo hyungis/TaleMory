@@ -3,9 +3,7 @@
 #
 # Naming convention:
 #   ENV_BASE_K=V                  → app.<target>.env AND infra.<target>.env : K=V
-#   ENV_<TARGET>_BACKEND_K=V      → app.<target>.env : K=V
-#   ENV_<TARGET>_FRONTEND_K=V     → app.<target>.env : K=V
-#   ENV_<TARGET>_AI_K=V           → app.<target>.env : K=V
+#   ENV_<TARGET>_APP_K=V          → app.<target>.env : K=V  (backend + frontend + ai 통합)
 #   ENV_<TARGET>_INFRA_K=V        → infra.<target>.env : K=V
 #
 # Usage:
@@ -35,10 +33,8 @@ INFRA_OUT="$OUT_DIR/infra.${TARGET}.env"
 append_prefix_match "ENV_BASE_" "$APP_OUT"
 append_prefix_match "ENV_BASE_" "$INFRA_OUT"
 
-# 앱 서비스 변수 — 전부 app.<target>.env 하나로 합침
-for svc in BACKEND FRONTEND AI; do
-  append_prefix_match "ENV_${target_upper}_${svc}_" "$APP_OUT"
-done
+# 앱 서비스 변수 (backend + frontend + ai 통합) — app.<target>.env 하나로 합침
+append_prefix_match "ENV_${target_upper}_APP_" "$APP_OUT"
 
 # 인프라(MySQL/Redis/RabbitMQ) 변수
 append_prefix_match "ENV_${target_upper}_INFRA_" "$INFRA_OUT"

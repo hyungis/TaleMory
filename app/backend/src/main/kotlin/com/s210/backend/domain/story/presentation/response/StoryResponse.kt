@@ -31,6 +31,30 @@ data class StoryDetailResponse(
     val createdAt: LocalDateTime
 )
 
+/**
+ * 동화 기본 정보 생성(POST /api/stories) 직후 FE 가 유일하게 필요로 하는 값은 `storyId` 뿐.
+ * 후속 step 2~8 에서 다른 리소스를 붙일 때 FK 로 사용한다.
+ */
+data class StoryCreateResponse(
+    val storyId: Long,
+)
+
+/**
+ * GET /api/stories/draft — 로그인 유저의 "진행 중인 동화" 를 BasicInfoStep 상태로 복원하기 위한 페이로드.
+ * DRAFT 가 없으면 controller 가 `data = null` 로 내려준다.
+ */
+data class StoryDraftResponse(
+    val storyId: Long,
+    val title: String?,
+    val difficulty: String,
+    val companionsJson: String,
+    val mainCharacterJson: String,
+    val travelPlace: String?,
+    val travelStartDate: LocalDate?,
+    val travelEndDate: LocalDate?,
+    val createdAt: LocalDateTime,
+)
+
 data class PhotoResponse(
     val id: Long,
     val imageUrl: String,

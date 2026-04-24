@@ -19,7 +19,7 @@ app/
 - 외부 진입점은 nginx 하나
   - `/` → frontend 정적 파일
   - `/api` → backend
-  - `/ai` → AI 서비스
+- AI는 `ai-worker` 컨테이너(RabbitMQ consumer)로만 배포 — nginx 라우트 없음. Backend가 MQ publish 로 호출.
 
 ### 인프라 (상시 상주)
 
@@ -354,7 +354,7 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
                 up -d --no-build
      │
      ▼
- health-check-<env>.sh all                 (/, /api/health, /ai/health)
+ health-check-<env>.sh all                 (/, /api/health + ai-worker container+MQ probe)
      │
  ┌───┴───┐
  성공    실패
@@ -437,10 +437,10 @@ deploy_dev 시작  (master도 동일, manual gate만 추가)
                                              │  Docker Engine            │
                                               │   dev-nginx               │
                                               │   dev-backend             │
-                                              │   dev-ai                  │
+                                              │   dev-ai-worker-*         │
                                               │   prod-nginx              │
                                               │   prod-backend            │
-                                              │   prod-ai                 │
+                                              │   prod-ai-worker-*        │
                                               │                           │
                                               │   (상시 가동 infra-common)│
                                               │   dev-mysql,  prod-mysql  │

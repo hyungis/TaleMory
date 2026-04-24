@@ -37,6 +37,7 @@ data class LoginRequest(
         )
 }
 
-data class TokenRefreshRequest(
-    val refreshToken: String
+data class KakaoCallbackRequest(
+    val code: String,
+    val redirectUri: String,
 )
