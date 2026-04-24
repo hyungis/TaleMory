@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
@@ -15,6 +16,13 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+    )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     application.mount(settings.TTS_PUBLIC_BASE_URL, StaticFiles(directory=settings.TTS_STORAGE_ROOT), name="static")
     application.include_router(api_router)

@@ -8,8 +8,14 @@ export interface AuthUser {
   id: number
   loginId: string
   email: string
+  name: string
   nickname: string
-  phone?: string
+  phone?: string | null
+  agreeSms: boolean
+  agreeMarketing: boolean
+  provider: OauthProvider | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface OauthAccount {
@@ -18,7 +24,5 @@ export interface OauthAccount {
 }
 
 export interface UserProfile extends AuthUser {
-  agreeSms: boolean
-  agreeMarketing: boolean
-  oauthAccounts: OauthAccount[]
+  oauthAccounts?: OauthAccount[]
 }

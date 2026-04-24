@@ -137,14 +137,14 @@ compose 파일(`infra/compose/docker-compose.{app,infra}-local.yml`)도 필요 �
 
 ## 예시 실행
 
-사용자: "OPENAI_MODEL을 backend에 추가해줘 (기본값 gpt-4o-mini)"
+사용자: "OPENAI_MODEL을 app에 추가해줘 (기본값 gpt-4o-mini)"
 
-1. 서비스=`backend`, 환경=`both`(기본) 확인
+1. 서비스=`app`, 환경=`both`(기본) 확인
 2. `infra/env/app.local.env.example`에 `OPENAI_MODEL=gpt-4o-mini` 추가
-3. `infra/env/README.md` 3-3 섹션(`ENV_DEV_BACKEND_*`)에 행 추가. master 값이 dev와 같으면 3-7에 별도 표기 불필요.
+3. `infra/env/README.md` 3-3 섹션(`ENV_DEV_APP_*`)에 행 추가. master 값이 dev와 같으면 3-5에 별도 표기 불필요.
 4. `docs/gitlab-variables.md` 재생성 (체크박스 보존)
-5. backend 힌트 출력
+5. app 힌트 출력
 6. GitLab 체크리스트:
-   - `ENV_DEV_BACKEND_OPENAI_MODEL`
-   - `ENV_MASTER_BACKEND_OPENAI_MODEL` (Protected)
+   - `ENV_DEV_APP_OPENAI_MODEL`
+   - `ENV_MASTER_APP_OPENAI_MODEL` (Protected)
 7. 요약

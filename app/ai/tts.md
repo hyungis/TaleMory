@@ -1705,3 +1705,223 @@ result payload 예시:
 6. `GET /internal/dev/manifests/{jobId}`
 
 이 순서대로 하면 backend 없이도 `모델 연동`, `MQ publish`, `worker 처리`, `결과 저장`까지 전부 검증할 수 있습니다.
+
+---
+
+## 19. 내일 바로 시작하는 실행 가이드
+
+이 섹션은 "이번 주 안에 내가 맡은 TTS 부분을 끝낸다"는 기준으로 정리한다.
+
+핵심 결론:
+
+- 1차 목표는 `AI API -> CosyVoice API` 연결을 먼저 끝내는 것
+- 2차 목표는 그 처리 로직을 유지한 채 `MQ consumer`로 감싸는 것
+- 즉 지금 당장 중요한 것은 `TTS 처리 본체`이고, MQ는 그 다음에 붙여도 된다
+
+### 19.1 지금 내가 끝내야 하는 범위
+
+내가 맡는 범위는 아래까지다.
+
+- voice용 `reference.wav`를 받아서 사용할 수 있게 준비
+- preview TTS 생성
+- story sentence TTS 생성
+- 감정값을 CosyVoice instruction으로 변환
+- 생성 결과를 파일/URL 기준으로 확인 가능하게 정리
+
+지금 단계에서 굳이 내가 안 맡아도 되는 것은 아래다.
+
+- 사용자 업로드/권한 검증
+- `voice_profiles`, `stories` 같은 최종 제품 도메인 저장 책임
+- outro 녹음 관리
+- backend의 최종 API 설계
+- MQ 공통 인프라 설계 전체
+
+즉 지금은 `AI 서버가 입력을 받아 실제 음성을 생성해 줄 수 있느냐`에 집중하면 된다.
+
+### 19.2 제일 먼저 할 일: API -> API 연결 완성
+
+순서는 아래가 가장 현실적이다.
+
+1. `POST /api/v1/voices` 또는 그에 준하는 개발용 입력 경로에서 `reference.wav`를 확보한다.
+2. `POST /api/v1/voices/{voiceId}/preview`에서 CosyVoice API를 실제 호출한다.
+3. `POST /api/v1/tts/story`에서 문장별로 CosyVoice API를 실제 호출한다.
+4. preview/story 결과 파일이 실제로 생성되는지 확인한다.
+5. 실패 케이스까지 확인한다.
+
+여기서 중요한 점:
+
+- 지금은 `HTTP 요청을 받아서 다시 CosyVoice HTTP API로 넘기는 구조`면 충분하다.
+- 이 단계가 끝나면 TTS 본체는 거의 완성된 것이다.
+- MQ는 이 처리 로직을 다른 입력 통로로 실행시키는 작업에 가깝다.
+
+### 19.3 API -> API 단계에서 완료로 보는 기준
+
+아래가 되면 1차 완료로 본다.
+
+- preview 요청 시 실제 음성이 생성된다.
+- story 요청 시 sentence별 음성이 생성된다.
+- 문장별 감정값이 적용된다.
+- 잘못된 wav, 없는 voice, CosyVoice 응답 실패 시 에러를 확인할 수 있다.
+- 결과 파일 경로나 `audioUrl`을 확인할 수 있다.
+
+즉 단순히 "CosyVoice 응답 한 번 성공"이 아니라, 내 API 기준으로 `입력 -> 처리 -> 결과 확인`이 돌아가야 완료다.
+
+### 19.4 API -> API 연결 시 내부 구조를 어떻게 잡아야 하는가
+
+지금부터는 라우터와 처리 로직을 분리해서 생각해야 한다.
+
+- 라우터
+  - 요청 파싱
+  - 응답 포맷 정리
+- 서비스
+  - reference wav 준비
+  - emotion -> instruct_text 매핑
+  - CosyVoice 호출
+  - 결과 파일 저장
+
+이렇게 나누는 이유는 나중에 MQ를 붙일 때 consumer가 동일한 서비스 함수를 그대로 호출하게 만들기 위해서다.
+
+즉 최종적으로는 아래 구조가 가장 좋다.
+
+- `HTTP route -> TTS service`
+- `MQ consumer -> 같은 TTS service`
+
+그러면 MQ 붙일 때 처리 본체를 다시 짤 필요가 없다.
+
+### 19.5 CosyVoice API 연결 시 실제로 확인할 것
+
+CosyVoice는 지금 요구사항상 `클로닝 화자 + 감정 제어`가 필요하므로, 기본 경로는 `inference_instruct2` 계열로 본다.
+
+확인 포인트:
+
+- `prompt_wav`
+  - 부모 음성에서 만든 `reference.wav`
+- `tts_text`
+  - 실제 읽을 문장
+- `instruct_text`
+  - 감정/말투 지시문
+
+즉 내부에서는 아래 순서가 된다.
+
+1. 요청에서 `voiceId`를 받는다.
+2. `voiceId -> reference.wav`를 찾는다.
+3. `emotion/stylePrompt -> instruct_text`로 변환한다.
+4. `reference.wav + tts_text + instruct_text`로 CosyVoice 호출
+5. 결과 오디오 저장
+6. `audioUrl` 반환
+
+이 부분만 실제로 되면 preview/story는 둘 다 같은 계열의 작업이다.
+
+### 19.6 MQ는 나중에 어떻게 붙이면 되는가
+
+MQ를 붙인다고 해서 TTS 처리 본체가 바뀌는 것은 아니다.
+
+바뀌는 것은 입력과 완료 통지 방식이다.
+
+지금:
+
+- backend 또는 dev client
+- HTTP로 AI 서버 호출
+- AI 서버가 바로 처리
+- 응답/결과 반환
+
+나중:
+
+- backend
+- command MQ publish
+- AI worker consume
+- 같은 TTS service 실행
+- result MQ publish
+
+즉 바뀌는 것은 아래뿐이다.
+
+- `HTTP request body` -> `MQ message payload`
+- `HTTP response` -> `result event`
+
+반대로 안 바뀌어야 하는 것은 아래다.
+
+- `reference.wav`를 읽는 방식
+- emotion 매핑
+- CosyVoice 호출 방식
+- 결과 파일 저장 방식
+
+그래서 반드시 지금 단계에서 서비스 로직을 HTTP 라우터 밖으로 빼놓는 게 중요하다.
+
+### 19.7 MQ 붙일 때 실제 작업 순서
+
+MQ는 아래 순서로 붙이면 된다.
+
+1. command payload 스키마 확정
+2. worker consumer 추가
+3. consumer에서 기존 TTS service 호출
+4. 성공/실패 result event publish
+5. backend consumer가 결과 반영
+
+즉 `CosyVoice 호출 함수`를 MQ용으로 새로 만드는 게 아니라, 이미 있는 실행 함수를 consumer가 호출하게 만들면 된다.
+
+### 19.8 동료가 만들어 둔 MQ 코드 볼 때 무엇을 봐야 하는가
+
+동료 코드가 있으면 아래 순서로 확인한다.
+
+1. RabbitMQ 연결 설정 방식
+2. exchange 이름
+3. queue 이름
+4. routing key 이름
+5. message envelope 형식
+6. ack / nack / retry 방식
+7. 실패 시 DLQ 처리 여부
+8. 결과 이벤트 publish 형식
+
+특히 내가 맞춰야 하는 것은 아래 네 가지다.
+
+- command payload 필드명
+- result payload 필드명
+- `jobId` 관리 방식
+- 성공/실패 상태값 표현 방식
+
+즉 MQ 구현은 처음부터 새로 설계하기보다, 동료 코드의 `publisher/consumer/event schema` 스타일을 맞춰 붙이는 게 우선이다.
+
+### 19.9 동료 코드 확인 후 내가 바로 맞춰야 하는 포인트
+
+동료 코드를 본 뒤에는 아래를 체크한다.
+
+- command queue가 하나인지, 작업 타입별로 분리되는지
+- result queue가 하나인지, backend 전용 consumer가 따로 있는지
+- `VOICE_CLONE`, `TTS` 같은 job type naming을 어떻게 쓰는지
+- payload 안에 `storyId`, `voiceId`, `sentences`, `options`를 어떤 구조로 넣는지
+- 실패 시 `errorCode`, `errorMessage`를 어떻게 넣는지
+
+그리고 나서 내 쪽 구현은 아래만 맞추면 된다.
+
+- HTTP 요청 body와 동일하거나 유사한 payload 구조 정의
+- worker에서 그 payload를 기존 서비스 입력으로 변환
+- 결과를 backend가 기대하는 result event 형태로 publish
+
+### 19.10 내일 아침 시작 체크리스트
+
+내일 아침에는 아래 순서대로 시작하면 된다.
+
+1. `reference.wav`가 실제로 준비되는지 확인
+2. preview에서 placeholder가 아니라 CosyVoice 호출로 바꾸기
+3. preview 음성이 실제로 생성되는지 확인
+4. story sentence TTS를 CosyVoice 호출로 바꾸기
+5. sentence별 결과와 full-book 결과 확인
+6. 실패 케이스 2~3개 확인
+7. 그 다음에 MQ는 동료 코드 보고 붙이기 시작
+
+### 19.11 이번 주 안에 끝내는 기준
+
+이번 주 안에 아래가 되면 네 파트는 거의 끝난 것으로 봐도 된다.
+
+- AI API가 실제 CosyVoice를 호출한다.
+- preview가 된다.
+- story sentence TTS가 된다.
+- 감정값이 반영된다.
+- 결과 파일을 확인할 수 있다.
+- MQ로 옮길 수 있게 서비스 로직이 분리되어 있다.
+
+여기까지 되면 이후 MQ 작업은 "TTS 엔진 개발"이 아니라 "전달 방식 전환"에 가깝다.
+
+### 19.12 한 줄 정리
+
+지금은 `API -> CosyVoice API`를 먼저 끝내고, 그 다음에 동료 MQ 코드를 참고해서 `HTTP route 대신 consumer가 같은 서비스 로직을 호출하게` 바꾸면 된다.

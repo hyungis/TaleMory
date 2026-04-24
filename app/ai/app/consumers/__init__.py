@@ -1,0 +1,1 @@
+"""MQ consumer entrypoints."""

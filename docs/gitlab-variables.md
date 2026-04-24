@@ -13,6 +13,7 @@
 ## 시스템 변수 (prefix 없음)
 
 - [x] `DISCORD_WEBHOOK_URL` — Variable · **Masked ✅** — notify.sh Discord 웹후크
+- [x] `MATTERMOST_WEBHOOK_URL` — Variable · **Masked ✅** — notify.sh Mattermost 웹후크 (미설정 시 Mattermost 알림 skip)
 
 > `CI_REGISTRY_*`는 GitLab이 자동 주입 — 등록 불필요.
 
@@ -26,30 +27,42 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 ## ENV_DEV_*
 
-### Backend — `ENV_DEV_BACKEND_*`
+### APP — `ENV_DEV_APP_*`
 
-- [x] `ENV_DEV_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `dev`
-- [x] `ENV_DEV_BACKEND_DB_URL` — Variable — `jdbc:mysql://dev-mysql:3306/iportfolio?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC`
-- [x] `ENV_DEV_BACKEND_DB_USERNAME` — Variable — `app`
-- [x] `ENV_DEV_BACKEND_DB_PASSWORD` — Variable · **Masked ✅** · INFRA_MYSQL_PASSWORD와 동일값
-- [x] `ENV_DEV_BACKEND_REDIS_HOST` — Variable — `dev-redis`
-- [x] `ENV_DEV_BACKEND_REDIS_PORT` — Variable — `6379`
-- [x] `ENV_DEV_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅** · INFRA_REDIS_PASSWORD와 동일값
-- [x] `ENV_DEV_BACKEND_RABBITMQ_HOST` — Variable — `dev-rabbitmq`
-- [x] `ENV_DEV_BACKEND_RABBITMQ_PORT` — Variable — `5672`
-- [x] `ENV_DEV_BACKEND_RABBITMQ_USERNAME` — Variable · INFRA_RABBITMQ_DEFAULT_USER와 동일값
-- [x] `ENV_DEV_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · INFRA_RABBITMQ_DEFAULT_PASS와 동일값
-- [x] `ENV_DEV_BACKEND_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · JWT access token 서명 키 (Base64-safe 32자+ 권장)
-- [x] `ENV_DEV_BACKEND_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · JWT refresh token 서명 키 (Base64-safe 32자+ 권장)
-
-### Frontend — `ENV_DEV_FRONTEND_*`
-
-- [x] `ENV_DEV_FRONTEND_FRONTEND_PORT` — Variable — `3001`
-- [x] `ENV_DEV_FRONTEND_VITE_API_BASE_URL` — Variable — `/api`
-
-### AI — `ENV_DEV_AI_*`
-
-- [ ] `ENV_DEV_AI_OPENAI_API_KEY` — Variable · **Masked ✅** · OpenAI API 키
+- [x] `ENV_DEV_APP_SPRING_PROFILES_ACTIVE` — Variable — `dev`
+- [x] `ENV_DEV_APP_DB_URL` — Variable — `jdbc:mysql://dev-mysql:3306/iportfolio?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC`
+- [x] `ENV_DEV_APP_DB_USERNAME` — Variable — `app`
+- [x] `ENV_DEV_APP_DB_PASSWORD` — Variable · **Masked ✅** · INFRA_MYSQL_PASSWORD와 동일값
+- [x] `ENV_DEV_APP_REDIS_HOST` — Variable — `dev-redis`
+- [x] `ENV_DEV_APP_REDIS_PORT` — Variable — `6379`
+- [x] `ENV_DEV_APP_REDIS_PASSWORD` — Variable · **Masked ✅** · INFRA_REDIS_PASSWORD와 동일값
+- [x] `ENV_DEV_APP_RABBITMQ_HOST` — Variable — `dev-rabbitmq`
+- [x] `ENV_DEV_APP_RABBITMQ_PORT` — Variable — `5672`
+- [x] `ENV_DEV_APP_RABBITMQ_USERNAME` — Variable · INFRA_RABBITMQ_DEFAULT_USER와 동일값
+- [x] `ENV_DEV_APP_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · INFRA_RABBITMQ_DEFAULT_PASS와 동일값
+- [x] `ENV_DEV_APP_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · JWT access token 서명 키 (Base64-safe 32자+ 권장)
+- [x] `ENV_DEV_APP_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · JWT refresh token 서명 키 (Base64-safe 32자+ 권장)
+- [x] `ENV_DEV_APP_FRONTEND_PORT` — Variable — `3001`
+- [x] `ENV_DEV_APP_VITE_API_BASE_URL` — Variable — `/api`
+- [ ] `ENV_DEV_APP_OPENAI_API_KEY` — Variable · **Masked ✅** · OpenAI API 키
+- [x] `ENV_DEV_APP_PROJECT_NAME` — Variable — `S210 AI API`
+- [x] `ENV_DEV_APP_APP_VERSION` — Variable — `0.1.0`
+- [x] `ENV_DEV_APP_ENVIRONMENT` — Variable — `local`
+- [x] `ENV_DEV_APP_STORYBOARD_MODEL` — Variable — `gpt-4o-mini`
+- [x] `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` — Variable — `0.15`
+- [x] `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` — Variable — `0.60`
+- [x] `ENV_DEV_APP_RABBITMQ_VHOST` — Variable — `/`
+- [x] `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` — Variable — `storyboard.request`
+- [x] `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` — Variable — `storyboard.result`
+- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` — Variable — `storyboard.generate.request`
+- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` — Variable — `storyboard.regenerate.request`
+- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` — Variable — `storyboard.generate`
+- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` — Variable — `storyboard.regenerate`
+- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.generate.completed`
+- [x] `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.generate.failed`
+- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.regenerate.completed`
+- [x] `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.regenerate.failed`
+- [x] `ENV_DEV_APP_AI_WORKER_REPLICAS` — Variable — `1` (ai-worker compose `scale:` 값)
 
 ### Infra — `ENV_DEV_INFRA_*`
 
@@ -71,30 +84,42 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 값은 운영용으로 별도 관리.
 
-### Backend — `ENV_MASTER_BACKEND_*`
+### APP — `ENV_MASTER_APP_*`
 
-- [x] `ENV_MASTER_BACKEND_SPRING_PROFILES_ACTIVE` — Variable — `prod`
-- [x] `ENV_MASTER_BACKEND_DB_URL` — Variable — `jdbc:mysql://prod-mysql:3306/<운영DB>?...`
-- [x] `ENV_MASTER_BACKEND_DB_USERNAME` — Variable
-- [x] `ENV_MASTER_BACKEND_DB_PASSWORD` — Variable · **Masked ✅**
-- [x] `ENV_MASTER_BACKEND_REDIS_HOST` — Variable — `prod-redis`
-- [x] `ENV_MASTER_BACKEND_REDIS_PORT` — Variable — `6379`
-- [x] `ENV_MASTER_BACKEND_REDIS_PASSWORD` — Variable · **Masked ✅**
-- [x] `ENV_MASTER_BACKEND_RABBITMQ_HOST` — Variable — `prod-rabbitmq`
-- [x] `ENV_MASTER_BACKEND_RABBITMQ_PORT` — Variable — `5672`
-- [x] `ENV_MASTER_BACKEND_RABBITMQ_USERNAME` — Variable
-- [x] `ENV_MASTER_BACKEND_RABBITMQ_PASSWORD` — Variable · **Masked ✅**
-- [x] `ENV_MASTER_BACKEND_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
-- [x] `ENV_MASTER_BACKEND_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
-
-### Frontend — `ENV_MASTER_FRONTEND_*`
-
-- [x] `ENV_MASTER_FRONTEND_FRONTEND_PORT` — Variable — `80`
-- [x] `ENV_MASTER_FRONTEND_VITE_API_BASE_URL` — Variable — `/api`
-
-### AI — `ENV_MASTER_AI_*`
-
-- [ ] `ENV_MASTER_AI_OPENAI_API_KEY` — Variable · **Masked ✅**
+- [x] `ENV_MASTER_APP_SPRING_PROFILES_ACTIVE` — Variable — `prod`
+- [x] `ENV_MASTER_APP_DB_URL` — Variable — `jdbc:mysql://prod-mysql:3306/<운영DB>?...`
+- [x] `ENV_MASTER_APP_DB_USERNAME` — Variable
+- [x] `ENV_MASTER_APP_DB_PASSWORD` — Variable · **Masked ✅**
+- [x] `ENV_MASTER_APP_REDIS_HOST` — Variable — `prod-redis`
+- [x] `ENV_MASTER_APP_REDIS_PORT` — Variable — `6379`
+- [x] `ENV_MASTER_APP_REDIS_PASSWORD` — Variable · **Masked ✅**
+- [x] `ENV_MASTER_APP_RABBITMQ_HOST` — Variable — `prod-rabbitmq`
+- [x] `ENV_MASTER_APP_RABBITMQ_PORT` — Variable — `5672`
+- [x] `ENV_MASTER_APP_RABBITMQ_USERNAME` — Variable
+- [x] `ENV_MASTER_APP_RABBITMQ_PASSWORD` — Variable · **Masked ✅**
+- [x] `ENV_MASTER_APP_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
+- [x] `ENV_MASTER_APP_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
+- [x] `ENV_MASTER_APP_FRONTEND_PORT` — Variable — `80`
+- [x] `ENV_MASTER_APP_VITE_API_BASE_URL` — Variable — `/api`
+- [ ] `ENV_MASTER_APP_OPENAI_API_KEY` — Variable · **Masked ✅** · OpenAI API 키
+- [x] `ENV_MASTER_APP_PROJECT_NAME` — Variable — `S210 AI API`
+- [x] `ENV_MASTER_APP_APP_VERSION` — Variable — `0.1.0`
+- [x] `ENV_MASTER_APP_ENVIRONMENT` — Variable — `master`
+- [x] `ENV_MASTER_APP_STORYBOARD_MODEL` — Variable — `gpt-4o-mini`
+- [x] `ENV_MASTER_APP_STORYBOARD_INPUT_COST_PER_1M` — Variable — `0.15`
+- [x] `ENV_MASTER_APP_STORYBOARD_OUTPUT_COST_PER_1M` — Variable — `0.60`
+- [x] `ENV_MASTER_APP_RABBITMQ_VHOST` — Variable — `/`
+- [x] `ENV_MASTER_APP_RABBITMQ_REQUEST_EXCHANGE` — Variable — `storyboard.request`
+- [x] `ENV_MASTER_APP_RABBITMQ_RESULT_EXCHANGE` — Variable — `storyboard.result`
+- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_QUEUE` — Variable — `storyboard.generate.request`
+- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_QUEUE` — Variable — `storyboard.regenerate.request`
+- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_ROUTING_KEY` — Variable — `storyboard.generate`
+- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_ROUTING_KEY` — Variable — `storyboard.regenerate`
+- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.generate.completed`
+- [x] `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.generate.failed`
+- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` — Variable — `storyboard.regenerate.completed`
+- [ ] `ENV_MASTER_APP_AI_WORKER_REPLICAS` — Variable — `2` (ai-worker compose `scale:` 값, 운영 권장 2)
+- [x] `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` — Variable — `storyboard.regenerate.failed`
 
 ### Infra — `ENV_MASTER_INFRA_*`
 

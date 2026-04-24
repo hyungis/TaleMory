@@ -5,7 +5,8 @@
 set -euo pipefail
 
 ROOT_DIR="${ROOT_DIR:-/srv/s210}"
-PROJECT_NAME="${PROJECT_NAME:-s210}"
+# IMAGE_PREFIX: Docker 이미지 이름 prefix. app.*.env의 PROJECT_NAME(AI 앱 표시명)과 별개.
+IMAGE_PREFIX="${IMAGE_PREFIX:-s210}"
 
 require_file() {
   local f="$1"
@@ -18,5 +19,5 @@ require_file() {
 image_ref() {
   local service="$1"
   local tag="$2"
-  echo "${PROJECT_NAME}-${service}:${tag}"
+  echo "${IMAGE_PREFIX}-${service}:${tag}"
 }
