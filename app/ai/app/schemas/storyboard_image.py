@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.storyboard import ChildInfo
 
@@ -34,6 +34,21 @@ class StoryboardImageGenerateRequest(BaseModel):
     items: list[StoryboardImageGenerateItemRequest] = Field(..., min_length=1, max_length=20)
 
 
+class StoryboardImageRegenerateRequest(BaseModel):
+    storyId: int = Field(..., ge=1)
+    seed: int = Field(..., ge=0)
+    userPrompt: str = Field(..., min_length=1, max_length=2000)
+    item: StoryboardImageGenerateItemRequest
+
+    @field_validator("userPrompt")
+    @classmethod
+    def validate_user_prompt(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("userPrompt must not be blank")
+        return normalized
+
+
 class StoryboardImageUsage(BaseModel):
     provider: str
     model: str
@@ -65,3 +80,9 @@ class StoryboardImageGenerateResponse(BaseModel):
     seed: int
     results: list[StoryboardImageGenerateResult]
     usage: StoryboardImageBatchUsage
+
+
+class StoryboardImageRegenerateResponse(BaseModel):
+    storyId: int
+    seed: int
+    result: StoryboardImageGenerateResult

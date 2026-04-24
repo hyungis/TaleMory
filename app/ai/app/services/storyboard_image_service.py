@@ -10,12 +10,16 @@ from app.schemas.storyboard_image import (
     StoryboardImageGenerateRequest,
     StoryboardImageGenerateResponse,
     StoryboardImageGenerateResult,
+    StoryboardImageRegenerateRequest,
+    StoryboardImageRegenerateResponse,
     StoryboardImageUsage,
 )
 
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
 )
+
+
 def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
     results: list[StoryboardImageGenerateResult] = []
     storyboard_seed = request_model.seed
@@ -31,6 +35,23 @@ def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) ->
         seed=storyboard_seed,
         results=results,
         usage=_aggregate_usage(results),
+    )
+
+
+def regenerate_storyboard_image(
+    request_model: StoryboardImageRegenerateRequest,
+) -> StoryboardImageRegenerateResponse:
+    regenerate_item = _build_regenerate_item(request_model.item, request_model.userPrompt)
+
+    if settings.GEMINI_API_KEY:
+        result = _generate_item_with_gemini(request_model.storyId, regenerate_item, request_model.seed)
+    else:
+        result = _generate_item_locally(request_model.storyId, regenerate_item)
+
+    return StoryboardImageRegenerateResponse(
+        storyId=request_model.storyId,
+        seed=request_model.seed,
+        result=result,
     )
 
 
@@ -68,6 +89,21 @@ def _generate_item_locally(
             imageCount=1,
             costUsd=0.0,
         ),
+    )
+
+
+def _build_regenerate_item(
+    item: StoryboardImageGenerateItemRequest,
+    user_prompt: str,
+) -> StoryboardImageGenerateItemRequest:
+    instruction_parts = []
+    if item.additionalInstruction:
+        instruction_parts.append(item.additionalInstruction.strip())
+    instruction_parts.append(f"User regeneration request: {user_prompt.strip()}")
+    return item.model_copy(
+        update={
+            "additionalInstruction": "\n".join(part for part in instruction_parts if part),
+        }
     )
 
 

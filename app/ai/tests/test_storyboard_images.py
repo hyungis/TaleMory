@@ -215,3 +215,139 @@ def test_generate_storyboard_images_requires_seed() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_regenerate_storyboard_image_uses_local_fallback_when_gemini_key_missing() -> None:
+    response = client.post(
+        "/internal/storyboard-images/regenerate",
+        json={
+            "storyId": 1,
+            "seed": 1234,
+            "userPrompt": "리나가 더 환하게 웃도록 바꿔줘",
+            "item": {
+                "pageNumber": 1,
+                "storyboard": {
+                    "title": "리나의 와이키키 모험",
+                    "synopsis": "가족과 함께한 따뜻한 여행 이야기",
+                    "moralTheme": "가족의 소중함",
+                    "recurringMotif": "노을 속에서의 순간들",
+                },
+                "page": {
+                    "pageNumber": 1,
+                    "sceneSummary": "리나가 와이키키에 도착한 장면",
+                    "englishText": "Lina arrived at Waikiki with her family.",
+                    "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
+                    "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
+                },
+                "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
+                "companions": ["엄마", "아빠"],
+                "referenceImageUrls": [],
+                "additionalInstruction": "따뜻한 동화책 느낌",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["storyId"] == 1
+    assert body["seed"] == 1234
+    assert body["result"]["pageNumber"] == 1
+    assert body["result"]["imageUrl"] == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1.png"
+    assert body["result"]["usage"]["model"] == settings.STORYBOARD_IMAGE_MODEL
+
+
+def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction() -> None:
+    settings.GEMINI_API_KEY = "test-key"
+    captured_prompt: dict[str, str] = {}
+
+    def fake_call_gemini_image_api(final_prompt: str, reference_image_urls: list[str], seed: int) -> dict:
+        captured_prompt["value"] = final_prompt
+        assert reference_image_urls == ["https://example.com/reference.png"]
+        assert seed == 4321
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "inlineData": {
+                                    "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
+                                }
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {},
+        }
+
+    original_call = storyboard_image_service._call_gemini_image_api
+    storyboard_image_service._call_gemini_image_api = fake_call_gemini_image_api
+    try:
+        response = storyboard_image_service.regenerate_storyboard_image(
+            storyboard_image_service.StoryboardImageRegenerateRequest.model_validate(
+                {
+                    "storyId": 1,
+                    "seed": 4321,
+                    "userPrompt": "리나 표정을 더 신나게 바꿔줘",
+                    "item": {
+                        "pageNumber": 1,
+                        "storyboard": {
+                            "title": "리나의 와이키키 모험",
+                            "synopsis": "가족과 함께한 따뜻한 여행 이야기",
+                            "moralTheme": "가족의 소중함",
+                            "recurringMotif": "노을 속에서의 순간들",
+                        },
+                        "page": {
+                            "pageNumber": 1,
+                            "sceneSummary": "리나가 와이키키에 도착한 장면",
+                            "englishText": "Lina arrived at Waikiki with her family.",
+                            "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
+                            "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
+                        },
+                        "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
+                        "companions": ["엄마", "아빠"],
+                        "referenceImageUrls": ["https://example.com/reference.png"],
+                        "additionalInstruction": "따뜻한 동화책 느낌",
+                    },
+                }
+            )
+        )
+    finally:
+        storyboard_image_service._call_gemini_image_api = original_call
+
+    assert response.seed == 4321
+    assert response.result.pageNumber == 1
+    assert "Additional instruction: 따뜻한 동화책 느낌" in captured_prompt["value"]
+    assert "User regeneration request: 리나 표정을 더 신나게 바꿔줘" in captured_prompt["value"]
+
+
+def test_regenerate_storyboard_image_requires_user_prompt() -> None:
+    response = client.post(
+        "/internal/storyboard-images/regenerate",
+        json={
+            "storyId": 1,
+            "seed": 1234,
+            "item": {
+                "pageNumber": 1,
+                "storyboard": {
+                    "title": "리나의 와이키키 모험",
+                    "synopsis": "가족과 함께한 따뜻한 여행 이야기",
+                    "moralTheme": "가족의 소중함",
+                    "recurringMotif": "노을 속에서의 순간들",
+                },
+                "page": {
+                    "pageNumber": 1,
+                    "sceneSummary": "리나가 와이키키에 도착한 장면",
+                    "englishText": "Lina arrived at Waikiki with her family.",
+                    "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
+                    "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
+                },
+                "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
+                "companions": ["엄마", "아빠"],
+                "referenceImageUrls": [],
+            },
+        },
+    )
+
+    assert response.status_code == 422
