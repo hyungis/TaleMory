@@ -47,7 +47,6 @@ def _generate_item_with_gemini(
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
-        finalPrompt=final_prompt,
         usage=usage,
     )
 
@@ -60,7 +59,6 @@ def _generate_item_locally(
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
-        finalPrompt=_build_final_prompt(item),
         usage=StoryboardImageUsage(
             provider="local",
             model=settings.STORYBOARD_IMAGE_MODEL,
@@ -212,7 +210,7 @@ def _upload_and_resolve_url(
     item: StoryboardImageGenerateItemRequest,
     image_bytes: bytes,
 ) -> str:
-    object_path = f"{story_id}/storyboard-image/{item.pageNumber}.png"
+    object_path = f"stories/{story_id}/storyboard-image/{item.pageNumber}.png"
     if _has_s3_upload_config():
         _upload_to_s3(object_path, image_bytes)
         return _resolve_public_url(object_path)
@@ -220,7 +218,7 @@ def _upload_and_resolve_url(
     public_url = _join_base_url(settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL, object_path)
     if public_url:
         return public_url
-    return f"local://storyboard-images/{story_id}/storyboard-image/{item.pageNumber}.png"
+    return f"local://storyboard-images/{object_path}"
 
 
 def _aggregate_usage(results: list[StoryboardImageGenerateResult]) -> StoryboardImageBatchUsage:
@@ -300,7 +298,7 @@ def _upload_to_s3(object_path: str, image_bytes: bytes) -> None:
             Bucket=settings.STORYBOARD_IMAGE_S3_BUCKET,
             Key=object_path,
             Body=image_bytes,
-            ContentType=settings.STORYBOARD_IMAGE_UPLOAD_CONTENT_TYPE,
+            ContentType="image/png",
         )
     except Exception as exc:
         raise RuntimeError(f"S3 image upload failed: {exc}") from exc

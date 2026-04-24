@@ -63,10 +63,8 @@ def test_generate_storyboard_images_uses_local_fallback_when_gemini_key_missing(
     assert body["seed"] == 1234
     assert len(body["results"]) == 1
     assert body["results"][0]["pageNumber"] == 1
-    assert body["results"][0]["imageUrl"] == "https://cdn.example.com/storyboards/1/storyboard-image/1.png"
-    assert "rough children's storybook sketch" in body["results"][0]["finalPrompt"]
-    assert "no polished final rendering" in body["results"][0]["finalPrompt"]
-    assert "Do not render any words" in body["results"][0]["finalPrompt"]
+    assert body["results"][0]["imageUrl"] == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1.png"
+    assert "finalPrompt" not in body["results"][0]
     assert body["results"][0]["usage"]["model"] == settings.STORYBOARD_IMAGE_MODEL
     assert body["usage"]["totalImages"] == 1
 
@@ -111,8 +109,7 @@ def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() ->
         captured_seeds.append(seed)
         return storyboard_image_service.StoryboardImageGenerateResult(
             pageNumber=item.pageNumber,
-            imageUrl=f"https://cdn.example.com/storyboards/1/storyboard-image/{item.pageNumber}.png",
-            finalPrompt=f"prompt-{item.pageNumber}",
+            imageUrl=f"https://cdn.example.com/storyboards/stories/1/storyboard-image/{item.pageNumber}.png",
             usage=storyboard_image_service.StoryboardImageUsage(
                 provider="google",
                 model=settings.STORYBOARD_IMAGE_MODEL,

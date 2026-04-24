@@ -47,7 +47,6 @@ class StoryboardImageUsage(BaseModel):
 class StoryboardImageGenerateResult(BaseModel):
     pageNumber: int
     imageUrl: str
-    finalPrompt: str
     usage: StoryboardImageUsage
 
 
