@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ArrowLeft, Library } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from '../../../features/auth'
 import { BookshelfModal } from '../../../features/bookshelf'
@@ -113,13 +113,23 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
   return (
     <>
       <button type="button" className="back-to-forest-btn" onClick={onBackToForest} aria-label="숲으로 돌아가기">
-        <ArrowLeft className="icon" aria-hidden="true" aria-hidden />
+        <ArrowLeft className="icon" aria-hidden="true" />
       </button>
 
-      <button type="button" className="open-library-btn" onClick={handleOpenLibrary}>
-        <span className="icon">📚</span>
-        <span>우리 가족 책장</span>
-      </button>
+      {/* 우상단 버튼 그룹 — CSS flex 컨테이너 */}
+      <div className="bookstore-action-buttons">
+        <button type="button" className="bookstore-action-btn" onClick={handleOpenLibrary} aria-label="우리 가족 책장 열기">
+          <span className="icon" aria-hidden="true">📚</span>
+          <span>우리 가족 책장</span>
+        </button>
+
+        <button type="button" className="bookstore-action-btn" onClick={() => navigate(ROUTES.mypage)} aria-label="마이페이지로 이동">
+          <span className="icon" aria-hidden="true">👤</span>
+          <span>마이페이지</span>
+        </button>
+
+        <LogoutButton />
+      </div>
 
       <img src="/bookstore.png" alt="서점 배경" className="bookstore-bg" draggable={false} />
 
