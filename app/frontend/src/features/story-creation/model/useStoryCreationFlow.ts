@@ -1,11 +1,75 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { StoryChild, StoryProject, StoryboardPageDraft } from './types'
 import { MAX_STEP } from './types'
-import { DEFAULT_STORY_TEXT, DEFAULT_STORYBOARD_PAGES } from '../storyboard-editor/lib/defaults'
+import { DEFAULT_STORYBOARD_PAGES } from '../storyboard-editor/lib/defaults'
 
 // 레거시 저장 키 (목업 전환 이전 버전에서 localStorage 에 남아있을 수 있어 한 번 정리해준다).
 const LEGACY_STORAGE_KEY_STEP = 'talemory_draft_step'
 const LEGACY_STORAGE_KEY_DATA = 'talemory_draft_project'
+
+/**
+ * 새로고침/탭 이탈 후 재진입 시 현재 단계 + storyId + step3 한글 본문을 복구하기 위한 저장소.
+ * 전체 projectData 대신 "서버에서 복구 가능한 메타 + 편집 중이던 한글 본문" 만 저장한다
+ * (사진 / children / 여행지 등은 서버 API 로 재조회되므로 로컬 persistence 불필요).
+ */
+const PROGRESS_STORAGE_KEY = 'talemory.creation.progress.v1'
+/** 24시간 이상 경과한 progress 는 무효화 — 같은 브라우저에서 다른 스토리로 넘어갔을 수 있어서. */
+const PROGRESS_TTL_MS = 24 * 60 * 60 * 1000
+
+interface CreationProgressSnapshot {
+  savedAt: number
+  currentStep: number
+  storyId: number | null
+  step3Story: string
+}
+
+function readProgressSnapshot(): CreationProgressSnapshot | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<CreationProgressSnapshot>
+    if (
+      typeof parsed.savedAt !== 'number' ||
+      typeof parsed.currentStep !== 'number' ||
+      typeof parsed.step3Story !== 'string'
+    ) {
+      return null
+    }
+    if (Date.now() - parsed.savedAt > PROGRESS_TTL_MS) {
+      window.localStorage.removeItem(PROGRESS_STORAGE_KEY)
+      return null
+    }
+    return {
+      savedAt: parsed.savedAt,
+      currentStep: Math.max(1, Math.min(MAX_STEP, parsed.currentStep)),
+      storyId: typeof parsed.storyId === 'number' ? parsed.storyId : null,
+      step3Story: parsed.step3Story,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeProgressSnapshot(snapshot: Omit<CreationProgressSnapshot, 'savedAt'>): void {
+  if (typeof window === 'undefined') return
+  try {
+    const payload: CreationProgressSnapshot = { ...snapshot, savedAt: Date.now() }
+    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(payload))
+  } catch {
+    /* quota exceeded 등 무시 — 핵심 기능 차단 X */
+  }
+}
+
+/**
+ * 진행 snapshot 제거. 스토리 발행(publish) / 명시적 리셋 시점에 호출해
+ * 다음 세션이 과거 DRAFT 로 오염되지 않도록 정리. 현재는 24h TTL 에 의존하지만,
+ * 후속 이슈에서 "새로 시작하기" 버튼 등에 연결할 예정이라 hook return 으로 노출한다.
+ */
+function clearProgressSnapshot(): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(PROGRESS_STORAGE_KEY)
+}
 
 const DEFAULT_DATA: StoryProject = {
   step1: {
@@ -16,7 +80,7 @@ const DEFAULT_DATA: StoryProject = {
     location: '',
   },
   step2: { photos: [], prompt: '' },
-  step3: { story: DEFAULT_STORY_TEXT },
+  step3: { story: '' },
   step4: { pages: DEFAULT_STORYBOARD_PAGES },
   step5: { style: 'watercolor' },
   step6: { voiceModel: null },
@@ -42,6 +106,8 @@ export interface UseStoryCreationFlowResult {
   /** 기존 person 정보를 가져와 새 row 로 append. 드롭다운 "저장된 아이 불러오기" 용. */
   appendChild: (child: StoryChild) => void
   removeChildAt: (index: number) => void
+  /** 로컬 진행 상태를 날린다. publish / "새로 시작하기" 시점에 호출 예정. */
+  resetProgress: () => void
 }
 
 /**
@@ -66,12 +132,22 @@ export interface UseStoryCreationFlowInit {
  * `init` 으로 서버 DRAFT rehydrate 값을 주입하면 초기 state 로 사용된다 (이후에는 로컬 편집).
  */
 export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryCreationFlowResult {
-  const [currentStep, setCurrentStepState] = useState<number>(1)
-  const [projectData, setStoryProject] = useState<StoryProject>(() =>
-    init?.step1 ? { ...DEFAULT_DATA, step1: init.step1 } : DEFAULT_DATA,
-  )
+  // `init` (서버 DRAFT rehydrate) 이 있으면 그것이 최우선. 없으면 localStorage snapshot 으로 복구.
+  // snapshot 이 없으면 초기 상태 (step 1, 빈 데이터).
+  const restored = init ? null : readProgressSnapshot()
+
+  const [currentStep, setCurrentStepState] = useState<number>(restored?.currentStep ?? 1)
+  const [projectData, setStoryProject] = useState<StoryProject>(() => {
+    const base = init?.step1 ? { ...DEFAULT_DATA, step1: init.step1 } : DEFAULT_DATA
+    if (restored?.step3Story) {
+      return { ...base, step3: { story: restored.step3Story } }
+    }
+    return base
+  })
   /** BasicInfoStep 에서 POST /api/stories 성공 후 set 되며 step 2~8 의 FK 로 사용. */
-  const [storyId, setStoryIdState] = useState<number | null>(init?.storyId ?? null)
+  const [storyId, setStoryIdState] = useState<number | null>(
+    init?.storyId ?? restored?.storyId ?? null,
+  )
 
   // 레거시 키 정리 (과거 빌드에서 남겼을 수 있는 stale draft 삭제).
   useEffect(() => {
@@ -79,6 +155,19 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     window.localStorage.removeItem(LEGACY_STORAGE_KEY_STEP)
     window.localStorage.removeItem(LEGACY_STORAGE_KEY_DATA)
   }, [])
+
+  // currentStep / storyId / step3.story 변경 시마다 snapshot 갱신.
+  // step 1 + storyId=null + 빈 story 인 "아무것도 안 한 상태" 는 저장할 이유 없어 건너뜀.
+  useEffect(() => {
+    const meaningful = currentStep > 1 || storyId !== null || projectData.step3.story.length > 0
+    if (meaningful) {
+      writeProgressSnapshot({
+        currentStep,
+        storyId,
+        step3Story: projectData.step3.story,
+      })
+    }
+  }, [currentStep, storyId, projectData.step3.story])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))
@@ -172,6 +261,10 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     })
   }, [])
 
+  const resetProgress = useCallback(() => {
+    clearProgressSnapshot()
+  }, [])
+
   return {
     currentStep,
     projectData,
@@ -190,5 +283,6 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     addChild,
     appendChild,
     removeChildAt,
+    resetProgress,
   }
 }
