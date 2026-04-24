@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { UserProfile } from '../../../entities/user'
+import type { UserProfile } from '../../../../entities/user'
 
 interface Props {
   user: UserProfile

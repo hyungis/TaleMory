@@ -1,4 +1,4 @@
-import type { Person } from '../../../entities/person'
+import type { Person } from '../../../../entities/person'
 
 interface Props {
   persons: Person[]

@@ -4,15 +4,19 @@ import { ROUTES } from '../../shared/constants'
 import type { UserProfile } from '../../entities/user'
 import type { Person } from '../../entities/person'
 import type { VoiceProfile } from '../../entities/voice-profile'
-import { ProfileSection } from './ui/ProfileSection'
-import { ProfileEditModal } from './ui/ProfileEditModal'
-import { WithdrawDialog } from './ui/WithdrawDialog'
-import { PersonsSection } from './ui/PersonsSection'
-import { PersonEditModal } from './ui/PersonEditModal'
-import { VoiceProfilesSection } from './ui/VoiceProfilesSection'
-import { VoiceProfileEditModal } from './ui/VoiceProfileEditModal'
-import { DangerZone } from './ui/DangerZone'
-import { mockPersons, mockUser, mockVoiceProfiles } from './model/mockData'
+import {
+  ProfileSection,
+  ProfileEditModal,
+  mockUser,
+  PersonsSection,
+  PersonEditModal,
+  mockPersons,
+  VoiceProfilesSection,
+  VoiceProfileEditModal,
+  mockVoiceProfiles,
+  DangerZone,
+  WithdrawDialog,
+} from '../../features/mypage'
 
 /**
  * 마이페이지 — 세로 스크롤 섹션 구성.

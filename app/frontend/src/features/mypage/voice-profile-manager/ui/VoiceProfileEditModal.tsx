@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { VoiceProfile } from '../../../entities/voice-profile'
+import type { VoiceProfile } from '../../../../entities/voice-profile'
 
 interface Props {
   initial: VoiceProfile // 편집 전용 — 추가는 /mypage/voice-clone 라우트에서 처리

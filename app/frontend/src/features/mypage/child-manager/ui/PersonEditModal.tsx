@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Person } from '../../../entities/person'
+import type { Person } from '../../../../entities/person'
 
 type PersonDraft = Omit<Person, 'id' | 'userId'>
 type Gender = NonNullable<Person['gender']>

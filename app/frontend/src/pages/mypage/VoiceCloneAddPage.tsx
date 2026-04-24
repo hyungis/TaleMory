@@ -16,8 +16,11 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../shared/constants'
-import { VOICE_SAMPLE_SCRIPT } from './lib/voiceDefaults'
-import { formatAudioTime, useVoiceClone } from './model/useVoiceClone'
+import {
+  VOICE_SAMPLE_SCRIPT,
+  useVoiceClone,
+  formatAudioTime,
+} from '../../features/mypage'
 // bookshelf.css 의 `bookshelf-modal / step-forest-modal / bookshelf-scroll` 스타일 재사용.
 // 동화 생성 플로우와 같은 CSS 를 참조하지만, 이 페이지 자체 로직은 story-creation 과 완전히 분리.
 import '../../features/bookshelf/styles/bookshelf.css'

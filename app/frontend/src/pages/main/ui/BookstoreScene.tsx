@@ -5,10 +5,12 @@ import { LogoutButton } from '../../../features/auth'
 import { BookshelfModal } from '../../../features/bookshelf'
 import type { Story } from '../../../entities/story'
 import { ROUTES, buildViewerPath } from '../../../shared/constants'
-import { getDraftStory } from '../../../features/story-creation/basic-info/api/getDraftStory'
-import { deleteStory } from '../../../features/story-creation/basic-info/api/deleteStory'
-import type { StoryDraftResponse } from '../../../features/story-creation/basic-info/api/types'
-import { DraftResumeModal } from '../../../features/story-creation/basic-info/ui/DraftResumeModal'
+import {
+  getDraftStory,
+  deleteStory,
+  DraftResumeModal,
+} from '../../../features/story-creation'
+import type { StoryDraftResponse } from '../../../features/story-creation'
 
 interface BookstoreSceneProps {
   onBackToForest: () => void

@@ -6,7 +6,7 @@ import {
   TTS_STORAGE_KEY,
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
-} from '../lib/voiceDefaults'
+} from './voiceDefaults'
 
 /**
  * 마이페이지 목소리 추가 전용 훅.
