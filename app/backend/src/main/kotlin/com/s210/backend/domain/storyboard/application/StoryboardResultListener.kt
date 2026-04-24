@@ -48,7 +48,14 @@ class StoryboardResultListener(
     @RabbitListener(queues = [RabbitMQConfig.RESULT_QUEUE])
     @Transactional
     fun onResult(envelope: StoryResultEnvelope) {
-        val job = jobRepository.findByExternalId(envelope.jobId)
+        // envelope.jobId 는 AI 스펙상 string. DB PK (Long) 로 파싱 실패하면 잘못된 메시지.
+        val jobIdLong = envelope.jobId.toLongOrNull()
+        if (jobIdLong == null) {
+            log.warn("Invalid jobId format from AI: {} (not a Long)", envelope.jobId)
+            return
+        }
+
+        val job = jobRepository.findById(jobIdLong).orElse(null)
         if (job == null) {
             // 우리가 발행한 적 없는 jobId — 시스템 재배포 or 다른 환경 오배달 가능성.
             log.warn("Unknown jobId from AI: {} (status={})", envelope.jobId, envelope.status)

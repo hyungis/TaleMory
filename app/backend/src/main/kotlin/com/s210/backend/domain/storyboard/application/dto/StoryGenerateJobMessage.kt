@@ -34,6 +34,11 @@ data class StoryGeneratePayload(
     val travel: TravelInfo,
     val photos: List<PhotoInput>,
     val difficulty: String,   // BEGINNER | INTERMEDIATE | ADVANCED
+    /**
+     * 사용자가 Step 3 에서 입력한 자유 프롬프트.
+     * AI 스키마의 `additionalInstruction` 필드에 대응.
+     */
+    val additionalInstruction: String? = null,
 )
 
 /** 동화 주인공 아이 정보. gender 는 "MALE" / "FEMALE". */

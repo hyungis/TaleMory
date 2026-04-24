@@ -13,14 +13,6 @@ class StoryGenerationJob(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
-    /**
-     * 외부(MQ / API) 로 노출되는 jobId.
-     * AI 스펙이 `jobId: string` 이라 UUID 를 사용하고, DB PK 는 외부에 숨긴다.
-     * Spring 이 생성 시점에 UUID v4 를 발급한다.
-     */
-    @Column(name = "external_id", nullable = false, unique = true, length = 36, updatable = false)
-    val externalId: String,
-
     @Column(name = "story_id", nullable = false)
     val storyId: Long,
 
