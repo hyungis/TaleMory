@@ -92,6 +92,19 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_APP_FRONTEND_PORT` | — | `3001` (호스트 publish 포트) |
 | `ENV_DEV_APP_VITE_API_BASE_URL` | — | `/api` (Vite build-time 주입) |
 | `ENV_DEV_APP_OPENAI_API_KEY` | ✅ | OpenAI API 키 |
+| `ENV_DEV_APP_GEMINI_API_KEY` | ✅ | Gemini API 키 (storyboard 이미지 생성). 미설정 시 이미지 생성 호출 실패 |
+| `ENV_DEV_APP_VITE_TTS_API_BASE` | — | 마이페이지 voice-profile TTS API base URL (Vite build-time 주입) |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | — | `gemini-2.5-flash-image` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | — | `ai.image.generate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | — | `ai.image.generate.item.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | — | `ai.image.regenerate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ROUTING_KEY` | — | `ai.image.generate` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_ROUTING_KEY` | — | `ai.image.generate.item` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY` | — | `ai.image.regenerate` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.image.generate.completed` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY` | — | `ai.result.image.generate.failed` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.image.regenerate.completed` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | — | `ai.result.image.regenerate.failed` |
 | `ENV_DEV_APP_PROJECT_NAME` | — | `S210 AI API` |
 | `ENV_DEV_APP_APP_VERSION` | — | `0.1.0` |
 | `ENV_DEV_APP_ENVIRONMENT` | — | `local` |
@@ -236,6 +249,19 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_GEMINI_API_KEY` | yes | (Gemini API 키 — storyboard 이미지 생성) |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | no | `ai.image.generate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | no | `ai.image.generate.item.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | no | `ai.image.regenerate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ROUTING_KEY` | no | `ai.image.generate` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_ROUTING_KEY` | no | `ai.image.generate.item` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY` | no | `ai.image.regenerate` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.generate.completed` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.generate.failed` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.regenerate.completed` |
+| `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.regenerate.failed` |
+| `ENV_DEV_APP_VITE_TTS_API_BASE` | no | TTS API base URL (마이페이지 voice-profile) |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
 
 ### MASTER APP (AI 출처)
@@ -259,4 +285,17 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_MASTER_APP_GEMINI_API_KEY` | yes | (prod Gemini API 키 — storyboard 이미지 생성) |
+| `ENV_MASTER_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | no | `ai.image.generate.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | no | `ai.image.generate.item.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | no | `ai.image.regenerate.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_ROUTING_KEY` | no | `ai.image.generate` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_ITEM_ROUTING_KEY` | no | `ai.image.generate.item` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY` | no | `ai.image.regenerate` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.generate.completed` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.generate.failed` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.regenerate.completed` |
+| `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.regenerate.failed` |
+| `ENV_MASTER_APP_VITE_TTS_API_BASE` | no | TTS API base URL (마이페이지 voice-profile) |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |
