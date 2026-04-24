@@ -1,6 +1,7 @@
 import base64
 import json
 import mimetypes
+import time
 from functools import lru_cache
 from urllib import error, parse, request
 
@@ -24,6 +25,7 @@ _ONE_PIXEL_PNG = base64.b64decode(
 _FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
     "Keep it as a rough pre-coloring storyboard sketch with loose linework and no polished final rendering."
 )
+_GEMINI_RETRY_DELAY_SECONDS = 0.5
 
 
 def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
@@ -81,6 +83,7 @@ def _generate_item_with_gemini(
     except ValueError as exc:
         if "no image data" not in str(exc):
             raise
+        time.sleep(_GEMINI_RETRY_DELAY_SECONDS)
         retry_prompt = (
             f"{final_prompt}\n"
             "Return only the generated image. Do not return any explanatory text."

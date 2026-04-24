@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -47,8 +48,11 @@ def _dispatch_generate_batch_message(
     try:
         handle_generate_batch_message(body=body, publisher=publisher)
     except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
         logger.exception("Unexpected error while processing generate storyboard image batch message")
+        if _publish_unexpected_failure(body, publisher, action="GENERATE"):
+            channel.basic_ack(delivery_tag=delivery_tag)
+            return
+        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -62,8 +66,11 @@ def _dispatch_generate_item_message(
     try:
         handle_generate_item_message(body=body, publisher=publisher)
     except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
         logger.exception("Unexpected error while processing generate storyboard image item message")
+        if _publish_unexpected_failure(body, publisher, action="GENERATE"):
+            channel.basic_ack(delivery_tag=delivery_tag)
+            return
+        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -77,8 +84,11 @@ def _dispatch_regenerate_message(
     try:
         handle_regenerate_message(body=body, publisher=publisher)
     except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
         logger.exception("Unexpected error while processing regenerate storyboard image message")
+        if _publish_unexpected_failure(body, publisher, action="REGENERATE"):
+            channel.basic_ack(delivery_tag=delivery_tag)
+            return
+        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -169,3 +179,31 @@ def handle_regenerate_message(body: bytes, publisher: StoryboardImageJobPublishe
         result=response.result,
         action="REGENERATE",
     )
+
+
+def _publish_unexpected_failure(
+    body: bytes,
+    publisher: StoryboardImageJobPublisher,
+    action: str,
+) -> bool:
+    try:
+        payload = json.loads(body.decode("utf-8"))
+        job_id = payload["jobId"]
+        story_id = payload["storyId"]
+        page_number = payload.get("pageNumber")
+        if page_number is None:
+            page_number = payload.get("payload", {}).get("item", {}).get("pageNumber")
+        publisher.publish_failure(
+            job_id=job_id,
+            story_id=story_id,
+            page_number=page_number,
+            error=StoryboardImageError(
+                code=f"{action}_STORYBOARD_IMAGE_UNEXPECTED_ERROR",
+                message="Unexpected worker error",
+            ),
+            action=action,
+        )
+        return True
+    except Exception:
+        logger.exception("Failed to publish unexpected storyboard image failure event")
+        return False
