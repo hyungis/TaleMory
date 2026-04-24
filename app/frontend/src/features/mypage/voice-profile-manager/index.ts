@@ -1,0 +1,6 @@
+export { VoiceProfilesSection } from './ui/VoiceProfilesSection'
+export { VoiceProfileEditModal } from './ui/VoiceProfileEditModal'
+export { useVoiceClone, formatAudioTime } from './lib/useVoiceClone'
+export type { UseVoiceCloneResult, RecordingStatus } from './lib/useVoiceClone'
+export { VOICE_SAMPLE_SCRIPT, DEFAULT_TTS_TEXT } from './lib/voiceDefaults'
+export { mockVoiceProfiles } from './model/mockVoiceProfiles'

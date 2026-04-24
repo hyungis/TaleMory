@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { VoiceProfile } from '../../../entities/voice-profile'
+import type { VoiceProfile } from '../../../../entities/voice-profile'
 
 interface Props {
   voiceProfiles: VoiceProfile[]
