@@ -33,6 +33,7 @@ class TravelInfo(BaseModel):
 
 class PhotoInput(BaseModel):
     photoId: int = Field(..., ge=1)
+    s3Key: str | None = Field(default=None, max_length=1000)
     imageUrl: str | None = Field(default=None, max_length=500)
     description: str = Field(..., min_length=1, max_length=1000)
     hashtags: list[str] = Field(default_factory=list)

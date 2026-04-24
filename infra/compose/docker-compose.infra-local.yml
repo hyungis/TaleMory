@@ -38,7 +38,7 @@ services:
       - ../env/infra.local.env
     ports:
       - "${RABBITMQ_PORT:-5673}:5672"
-      - "${RABBITMQ_MGMT_PORT:-15673}:15672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
 
