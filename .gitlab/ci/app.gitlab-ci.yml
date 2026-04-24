@@ -116,6 +116,22 @@ deploy_master:
   script:
     - bash infra/scripts/deploy-master.sh all
 
+# ─── 수동 유틸: dev RabbitMQ 큐 purge ───────────────────────────
+# 큐 스키마 변경 / 스테일 메시지 정리 / 개발 환경 리셋 시 사용.
+# - 평소 dev 배포엔 영향 없음 (manual + allow_failure).
+# - dev 브랜치 파이프라인에만 버튼이 렌더링됨. master에선 아예 보이지 않음.
+# - 큐 이름은 /tmp/env/app.dev.env 에서 읽음 (하드코딩 없음).
+purge_queues_dev:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      when: manual
+      allow_failure: true
+  needs:
+    - generate_env_dev
+  script:
+    - bash infra/scripts/purge-queues.sh dev
+
 # ─── .post: Discord 알림 ──────────────────────────────────────
 # jq 필요. 서버에 `sudo apt install -y jq` 한 번 실행해두기.
 notify_success:

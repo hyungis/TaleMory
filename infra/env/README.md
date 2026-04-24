@@ -81,6 +81,10 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_PASSWORD` | ✅ | INFRA_RABBITMQ_DEFAULT_PASS와 동일값 |
 | `ENV_DEV_APP_JWT_ACCESS_SECRET` | ✅ | JWT access token 서명 키. `openssl rand -base64 48`로 생성 권장 |
 | `ENV_DEV_APP_JWT_REFRESH_SECRET` | ✅ | JWT refresh token 서명 키. access와 **다른 값** 사용 |
+| `ENV_DEV_APP_AWS_ACCESS_KEY_ID` | ✅ | `s210-backend-s3` IAM user Access Key ID (S3 presign / 소프트삭제용) |
+| `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` | ✅ | `s210-backend-s3` IAM user Secret Access Key |
+| `ENV_DEV_APP_AWS_REGION` | — | `ap-northeast-2` (AWS SDK 표준 env 이름 — region 자동 인식용) |
+| `ENV_DEV_APP_AWS_S3_BUCKET` | — | `s210-iportfolio-dev` — 사용자 사진 + 생성 이미지 저장 버킷 |
 | `ENV_DEV_APP_FRONTEND_PORT` | — | `3001` (호스트 publish 포트) |
 | `ENV_DEV_APP_VITE_API_BASE_URL` | — | `/api` (Vite build-time 주입) |
 | `ENV_DEV_APP_OPENAI_API_KEY` | ✅ | OpenAI API 키 |
