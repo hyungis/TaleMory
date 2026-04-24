@@ -42,6 +42,12 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_DEV_APP_RABBITMQ_PASSWORD` — Variable · **Masked ✅** · INFRA_RABBITMQ_DEFAULT_PASS와 동일값
 - [x] `ENV_DEV_APP_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · JWT access token 서명 키 (Base64-safe 32자+ 권장)
 - [x] `ENV_DEV_APP_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · JWT refresh token 서명 키 (Base64-safe 32자+ 권장)
+- [ ] `ENV_DEV_APP_FRONTEND_OAUTH_CALLBACK_URI` — Variable — dev frontend OAuth callback URI (`https://<dev-frontend-host>/auth/oauth/callback`)
+- [ ] `ENV_DEV_APP_FRONTEND_OAUTH_LOGOUT_CALLBACK_URI` — Variable — dev frontend logout callback URI (`https://<dev-frontend-host>/auth/logout/callback`)
+- [ ] `ENV_DEV_APP_KAKAO_CLIENT_ID` — Variable — dev Kakao REST API key
+- [ ] `ENV_DEV_APP_KAKAO_CLIENT_SECRET` — Variable · **Masked ✅** · dev Kakao client secret
+- [ ] `ENV_DEV_APP_KAKAO_REDIRECT_URI` — Variable — dev backend Kakao callback URI (`https://<dev-frontend-host>/api/auth/oauth/kakao/callback`)
+- [ ] `ENV_DEV_APP_KAKAO_LOGOUT_REDIRECT_URI` — Variable — dev backend Kakao logout callback URI (`https://<dev-frontend-host>/api/auth/oauth/kakao/logout/callback`)
 - [x] `ENV_DEV_APP_AWS_ACCESS_KEY_ID` — Variable · **Masked ✅** · `s210-backend-s3` IAM user Access Key ID
 - [x] `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` — Variable · **Masked ✅** · `s210-backend-s3` IAM user Secret Access Key
 - [x] `ENV_DEV_APP_AWS_REGION` — Variable — `ap-northeast-2`
@@ -103,6 +109,12 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 - [x] `ENV_MASTER_APP_RABBITMQ_PASSWORD` — Variable · **Masked ✅**
 - [x] `ENV_MASTER_APP_JWT_ACCESS_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
 - [x] `ENV_MASTER_APP_JWT_REFRESH_SECRET` — Variable · **Masked ✅** · dev와 반드시 다른 값
+- [ ] `ENV_MASTER_APP_FRONTEND_OAUTH_CALLBACK_URI` — Variable — `https://k14s210.p.ssafy.io/auth/oauth/callback`
+- [ ] `ENV_MASTER_APP_FRONTEND_OAUTH_LOGOUT_CALLBACK_URI` — Variable — `https://k14s210.p.ssafy.io/auth/logout/callback`
+- [ ] `ENV_MASTER_APP_KAKAO_CLIENT_ID` — Variable — prod Kakao REST API key
+- [ ] `ENV_MASTER_APP_KAKAO_CLIENT_SECRET` — Variable · **Masked ✅** · **Protected ✅** · prod Kakao client secret
+- [ ] `ENV_MASTER_APP_KAKAO_REDIRECT_URI` — Variable — `https://k14s210.p.ssafy.io/api/auth/oauth/kakao/callback`
+- [ ] `ENV_MASTER_APP_KAKAO_LOGOUT_REDIRECT_URI` — Variable — `https://k14s210.p.ssafy.io/api/auth/oauth/kakao/logout/callback`
 - [ ] `ENV_MASTER_APP_AWS_ACCESS_KEY_ID` — Variable · **Masked ✅** · **Protected ✅** · prod 전용 IAM user (dev 와 분리 권장)
 - [x] `ENV_MASTER_APP_AWS_SECRET_ACCESS_KEY` — Variable · **Masked ✅** · **Protected ✅**
 - [x] `ENV_MASTER_APP_AWS_REGION` — Variable · **Protected ✅** — `ap-northeast-2`
