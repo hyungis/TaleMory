@@ -9,6 +9,10 @@ export const ROUTES = {
   mypage: '/mypage',
   mypageVoiceClone: '/mypage/voice-clone',
   // TODO: oauthCallback
+  kakaoCallback: '/auth/kakao/callback',
+  oauthCallback: '/auth/oauth/callback',
+  logoutCallback: '/auth/logout/callback',
+  // TODO: mypage
 } as const
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES]

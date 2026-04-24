@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom'
+import { LogoutCallbackPage, OAuthCallbackPage } from '../../pages/auth'
 import { HomePage } from '../../pages/home'
 import { MainPage } from '../../pages/main'
 import { CreationPage } from '../../pages/creation'
@@ -14,6 +15,9 @@ export function AppRouter() {
       <Route path={ROUTES.main} element={<MainPage />} />
       <Route path={ROUTES.creation} element={<CreationPage />} />
       <Route path={ROUTES.viewer} element={<ViewerPage />} />
+      <Route path={ROUTES.kakaoCallback} element={<OAuthCallbackPage />} />
+      <Route path={ROUTES.oauthCallback} element={<OAuthCallbackPage />} />
+      <Route path={ROUTES.logoutCallback} element={<LogoutCallbackPage />} />
       <Route path={ROUTES.mypage} element={<MypagePage />} />
       <Route path={ROUTES.mypageVoiceClone} element={<VoiceCloneAddPage />} />
     </Routes>
