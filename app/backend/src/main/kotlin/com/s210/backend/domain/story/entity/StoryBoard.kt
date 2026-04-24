@@ -16,7 +16,7 @@ class StoryBoard(
     @Column(nullable = false, length = 255)
     var prompt: String,
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, columnDefinition = "TEXT")
     var story: String,
 
     @Column(name = "create_at", nullable = false)

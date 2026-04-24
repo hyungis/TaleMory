@@ -19,6 +19,7 @@ export {
 } from './basic-info'
 export type { StoryDraftResponse } from './basic-info'
 export { PhotoManagerStep } from './photo-manager'
+export { PromptStep } from './storyboard-prompt'
 export {
   StoryTextStep,
   StoryboardEditorStep,

@@ -1,0 +1,24 @@
+package com.s210.backend.common.mq
+
+/**
+ * AI MQ publish 시 사용하는 라우팅 키 상수 모음.
+ *
+ * 규약: "ai.{hardware}.{jobType}.{action}"
+ *   - hardware: cpu | gpu               — 필요 워커 능력
+ *   - jobType:  story | illustration | tts | bgm | voice_clone 등
+ *   - action:   generate | regenerate
+ *
+ * RabbitMQConfig 의 binding 패턴 ("ai.cpu.#" / "ai.gpu.#") 과 조합되어
+ * 각 메시지가 올바른 큐로 자동 라우팅된다.
+ *
+ * 결과 라우팅 키 (ai.result.*) 는 AI 가 publish 하므로 Spring 은 구독 패턴만 관리한다.
+ */
+object RoutingKeys {
+    // ---------- 스토리(동화 본문) 생성 ----------
+    const val STORY_GENERATE = "ai.cpu.story.generate"
+
+    // ---------- 후속 이슈에서 추가 예정 ----------
+    // const val STORY_REGENERATE = "ai.cpu.story.regenerate"
+    // const val ILLUSTRATION_GENERATE = "ai.cpu.illustration.generate"
+    // const val TTS_GENERATE = "ai.gpu.tts.generate"
+}

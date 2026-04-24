@@ -99,16 +99,16 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.en
 | `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` | — | `0.15` |
 | `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` | — | `0.60` |
 | `ENV_DEV_APP_RABBITMQ_VHOST` | — | `/` |
-| `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` | — | `storyboard.request` |
-| `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` | — | `storyboard.result` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` | — | `storyboard.generate.request` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` | — | `storyboard.regenerate.request` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` | — | `storyboard.generate` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` | — | `storyboard.regenerate` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | — | `storyboard.generate.completed` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | — | `storyboard.generate.failed` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | — | `storyboard.regenerate.completed` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | — | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` | — | `ai.request` |
+| `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` | — | `ai.result` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` | — | `ai.cpu.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` | — | `ai.cpu.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` | — | `ai.cpu.story.generate` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` | — | `ai.cpu.story.regenerate` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.story.generate.completed` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | — | `ai.result.story.generate.failed` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.story.regenerate.completed` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | — | `ai.result.story.regenerate.failed` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | — | `1` (AI worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
 
 > Vite는 `VITE_` prefix만 클라이언트 번들에 주입. 새 frontend 변수 이름은 반드시 `VITE_`로 시작해야 함.
@@ -226,16 +226,16 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
 | `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
 | `ENV_DEV_APP_RABBITMQ_VHOST` | no | `/` |
-| `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` | no | `storyboard.request` |
-| `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` | no | `storyboard.result` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` | no | `storyboard.generate.request` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` | no | `storyboard.regenerate.request` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` | no | `storyboard.generate` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` | no | `storyboard.regenerate` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.generate.completed` |
-| `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
-| `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` | no | `ai.request` |
+| `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` | no | `ai.result` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_QUEUE` | no | `ai.cpu.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_QUEUE` | no | `ai.cpu.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_ROUTING_KEY` | no | `ai.cpu.story.generate` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_ROUTING_KEY` | no | `ai.cpu.story.regenerate` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.generate.completed` |
+| `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.generate.failed` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.regenerate.completed` |
+| `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.regenerate.failed` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
 
 ### MASTER APP (AI 출처)
@@ -249,14 +249,14 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
 | `ENV_MASTER_APP_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
 | `ENV_MASTER_APP_RABBITMQ_VHOST` | no | `/` |
-| `ENV_MASTER_APP_RABBITMQ_REQUEST_EXCHANGE` | no | `storyboard.request` |
-| `ENV_MASTER_APP_RABBITMQ_RESULT_EXCHANGE` | no | `storyboard.result` |
-| `ENV_MASTER_APP_RABBITMQ_GENERATE_QUEUE` | no | `storyboard.generate.request` |
-| `ENV_MASTER_APP_RABBITMQ_REGENERATE_QUEUE` | no | `storyboard.regenerate.request` |
-| `ENV_MASTER_APP_RABBITMQ_GENERATE_ROUTING_KEY` | no | `storyboard.generate` |
-| `ENV_MASTER_APP_RABBITMQ_REGENERATE_ROUTING_KEY` | no | `storyboard.regenerate` |
-| `ENV_MASTER_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.generate.completed` |
-| `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `storyboard.generate.failed` |
-| `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `storyboard.regenerate.completed` |
-| `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `storyboard.regenerate.failed` |
+| `ENV_MASTER_APP_RABBITMQ_REQUEST_EXCHANGE` | no | `ai.request` |
+| `ENV_MASTER_APP_RABBITMQ_RESULT_EXCHANGE` | no | `ai.result` |
+| `ENV_MASTER_APP_RABBITMQ_GENERATE_QUEUE` | no | `ai.cpu.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_REGENERATE_QUEUE` | no | `ai.cpu.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_GENERATE_ROUTING_KEY` | no | `ai.cpu.story.generate` |
+| `ENV_MASTER_APP_RABBITMQ_REGENERATE_ROUTING_KEY` | no | `ai.cpu.story.regenerate` |
+| `ENV_MASTER_APP_RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.generate.completed` |
+| `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.generate.failed` |
+| `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.regenerate.completed` |
+| `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.regenerate.failed` |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |
