@@ -6,5 +6,8 @@ enum class JobType {
     TTS,
     BGM,
     VOICE_CLONE,
-    STORY
+    STORY,
+
+    /** 스토리보드의 본문(줄거리 + 페이지 텍스트) 생성 작업 — API 명세 #28. */
+    STORYBOARD_STORY,
 }
