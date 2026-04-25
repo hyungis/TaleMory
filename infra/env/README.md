@@ -8,45 +8,111 @@ S210의 **CI/운영 배포용** 환경변수 단일 문서. GitLab → **Setting
 
 ## 1. 동작 원리
 
+GitLab CI Variables는 **두 종류**로 등록된다 (하이브리드):
+
 ```
-GitLab CI Variables (ENV_DEV_APP_DB_PASSWORD=xxx …)
+GitLab CI Variables
+├── File Variable (Type=File)             ← 비밀이 아닌 설정값 묶음
+│     ENV_DEV_APP_FILE   = (env 파일 통째)
+│     ENV_DEV_INFRA_FILE = (env 파일 통째)
+│     ENV_MASTER_APP_FILE / ENV_MASTER_INFRA_FILE
+│
+└── 개별 Variable (Type=Variable + Masked) ← 진짜 비밀값
+      ENV_DEV_APP_DB_PASSWORD       = xxx
+      ENV_DEV_APP_JWT_ACCESS_SECRET = xxx
+      ENV_DEV_APP_KAKAO_CLIENT_SECRET = xxx
+      ...
           │
           ▼
 pipeline 실행 시 job 환경변수로 주입
+  - File 변수 → runner 의 임시 파일 경로 (예: /runner/build/var/abc123)
+  - 개별 변수 → 일반 환경변수
           │
           ▼
 bash infra/scripts/generate-env.sh <dev|master>
+  ① ENV_<TARGET>_<SCOPE>_FILE 이 가리키는 파일을 base 로 cp
+  ② ENV_BASE_*, ENV_<TARGET>_<SCOPE>_* 개별 변수를 그 위에 append
+     (`_FILE` 자기 재귀는 awk 필터로 제외)
           │
           ▼
-prefix 제거 후 두 파일로 분리 출력:
-  /tmp/env/app.<target>.env    ← backend + frontend + ai (+ BASE)
-  /tmp/env/infra.<target>.env  ← mysql + redis + rabbitmq (+ BASE)
+출력:
+  /tmp/env/app.<target>.env    ← backend + frontend + ai
+  /tmp/env/infra.<target>.env  ← mysql + redis + rabbitmq
           │
           ▼
-infra/compose/docker-compose.{app,infra}-<target>.yml 이 이 파일들을 env_file로 주입
+infra/compose/docker-compose.{app,infra}-<target>.yml 이 env_file 로 주입
 ```
+
+같은 키가 ①·② 양쪽에 있으면 **②(개별 Masked) 값이 이김** — `env_file:` 의 표준 동작 (last KEY=VALUE wins). → 비밀은 File 에 placeholder 만 두고 진짜 값은 개별 Masked 변수로 두는 패턴.
 
 `.env.example` 같은 실 파일이 repo에 없음. CI runtime에만 `/tmp/env/`에 존재 → pipeline 종료 시 runner ephemeral 스토리지라 정리됨 (project runner면 재부팅까지 유지).
 
 ---
 
+## 1-A. 하이브리드 마이그레이션 가이드
+
+### 왜 하이브리드?
+
+40+개 개별 변수를 GitLab UI 에서 하나하나 클릭으로 등록하는 수고를 줄이기 위해, **비밀이 아닌 값들은 File Variable 한 개에 통째 업로드**한다. 비밀은 여전히 개별 Masked 변수로 유지 → CI 로그 자동 마스킹 보존.
+
+체크박스 등록 작업: 40+ → ~13개 (-70%).
+
+### 등록 양식 어디 보고?
+
+`docs/gitlab-variables.md` 가 환경별로 두 종류를 나눠 안내한다:
+- **File Variable** 섹션 — 코드 블록을 통째 복사해 GitLab File 변수에 붙여넣기
+- **개별 Masked Variables** 섹션 — 체크박스로 한 줄씩 등록
+
+### 기존 변수 살리고 점진 마이그레이션 OK
+
+`generate-env.sh` 가 File 우선 → 개별 append 순서이고, 같은 KEY 가 둘 다 있으면 **개별이 이김**. 따라서:
+
+| 마이그레이션 단계 | 동작 |
+|------------------|------|
+| (A) File 미등록, 개별만 있음 (변경 전 상태) | 기존 prefix 매칭만 동작 — 그대로 정상 |
+| (B) File 등록 + 개별도 그대로 (중간 상태) | File 깔리고 개별이 override — 동작 동일 |
+| (C) 비민감 개별 삭제 후 File 만 (최종) | File 값 사용 — 등록 부담 최소 |
+
+→ 어느 중간 상태에서도 시스템이 깨지지 않음. 안 풀리면 File 변수 하나만 삭제해 (A) 로 즉시 롤백 가능.
+
+### File Variable 작성 시 주의 (Footguns)
+
+| 실수 | 결과 |
+|------|------|
+| `KEY="value"` (값에 따옴표) | env_file 은 따옴표 안 벗김 → 값에 literal `"` 포함 |
+| 줄 끝이 CRLF (Windows) | 일부 파서가 `value\r` 로 인식 → 비교/연결 실패 |
+| 키 오타 (`DB_URLL=`) | 개별 변수에 같은 키가 없으면 default fallback → 조용한 버그 |
+| 비밀값을 File 에 넣음 | 동작은 하지만 GitLab 마스킹 못 받음 → 로그 노출 위험 |
+
+권장:
+- 값에 따옴표 절대 X (`KEY=value`)
+- 에디터에서 줄바꿈 **LF (Unix)** 로 저장
+- 비밀은 File 에 placeholder, 진짜 값은 개별 Masked Variable
+
+---
+
 ## 2. 변수 네이밍 규칙
 
-| Prefix 형식 | 투입되는 파일 | 대상 컨테이너 |
-|---|---|---|
-| `ENV_BASE_<KEY>` | `app.*.env` + `infra.*.env` 양쪽 | 공통 |
-| `ENV_<TARGET>_APP_<KEY>` | `app.<target>.env` | backend + frontend + ai |
-| `ENV_<TARGET>_INFRA_<KEY>` | `infra.<target>.env` | mysql / redis / rabbitmq |
+| Prefix 형식 | GitLab Type | 투입되는 파일 | 대상 컨테이너 |
+|---|---|---|---|
+| `ENV_<TARGET>_APP_FILE` | **File** | `app.<target>.env` (통째 cp) | backend + frontend + ai |
+| `ENV_<TARGET>_INFRA_FILE` | **File** | `infra.<target>.env` (통째 cp) | mysql / redis / rabbitmq |
+| `ENV_BASE_<KEY>` | Variable | `app.*.env` + `infra.*.env` 양쪽 | 공통 |
+| `ENV_<TARGET>_APP_<KEY>` | Variable (Masked 권장) | `app.<target>.env` (append) | backend + frontend + ai |
+| `ENV_<TARGET>_INFRA_<KEY>` | Variable (Masked 권장) | `infra.<target>.env` (append) | mysql / redis / rabbitmq |
 
-`<TARGET>` ∈ `DEV`, `MASTER`.
+`<TARGET>` ∈ `DEV`, `MASTER`. **`_FILE` 자체가 prefix 매칭에 다시 걸리지 않도록 `generate-env.sh` 가 awk 로 제외 처리** (재귀 방지).
 
 변환 예시:
 
 ```
-ENV_BASE_REDIS_HOST=redis          → REDIS_HOST=redis            (양쪽 파일)
-ENV_DEV_APP_DB_PASSWORD=xxx        → DB_PASSWORD=xxx             (app.dev.env)
-ENV_DEV_INFRA_MYSQL_PASSWORD=xxx   → MYSQL_PASSWORD=xxx          (infra.dev.env)
+ENV_DEV_APP_FILE=/runner/build/var/abc      → /tmp/env/app.dev.env 로 통째 cp (base)
+ENV_BASE_REDIS_HOST=redis                   → REDIS_HOST=redis  (양쪽 파일에 append)
+ENV_DEV_APP_DB_PASSWORD=xxx                 → DB_PASSWORD=xxx   (app.dev.env 에 append, File 보다 뒤)
+ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.env 에 append)
 ```
+
+→ File 의 비민감값과 개별 Masked 변수가 합쳐져 단일 env 파일로 출력됨. 같은 키 충돌 시 마지막 값(개별 Masked)이 이김.
 
 ---
 
