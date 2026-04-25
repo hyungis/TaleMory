@@ -10,8 +10,10 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
+import com.s210.backend.domain.storyboard.application.dto.StoryboardImageResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.slf4j.LoggerFactory
+import org.springframework.amqp.core.Message
 import org.springframework.amqp.rabbit.annotation.RabbitListener
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -45,9 +47,44 @@ class StoryboardResultListener(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    /**
+     * 통합 결과 큐 진입점. STORY / STORYBOARD_IMAGE envelope 가 같은 큐로 들어오므로
+     * raw Message body 의 `type` 필드를 보고 분기한다.
+     *
+     * 분기 방식:
+     *  - "STORYBOARD_IMAGE" 가 포함된 type → 이미지 결과
+     *  - "STORY" 가 포함된 type           → 줄거리(STORY) 결과
+     *  - 그 외                             → warn 로그 후 무시
+     *
+     * Jackson `treeToValue` 로 각 타입에 맞춰 deserialize 하므로,
+     * STORY 메시지가 IMAGE envelope 으로 잘못 매핑되거나 vice versa 하는 일은 없다.
+     */
     @RabbitListener(queues = [RabbitMQConfig.RESULT_QUEUE])
     @Transactional
-    fun onResult(envelope: StoryResultEnvelope) {
+    fun onResult(message: Message) {
+        val body = String(message.body, Charsets.UTF_8)
+        val tree = try {
+            objectMapper.readTree(body)
+        } catch (e: Exception) {
+            log.warn("Cannot parse AI result envelope JSON: {}", body, e)
+            return
+        }
+        val type = tree.get("type")?.asString().orEmpty()
+
+        when {
+            type.contains("STORYBOARD_IMAGE") -> {
+                val envelope = objectMapper.treeToValue(tree, StoryboardImageResultEnvelope::class.java)
+                handleImageResult(envelope)
+            }
+            type.contains("STORY") -> {
+                val envelope = objectMapper.treeToValue(tree, StoryResultEnvelope::class.java)
+                handleStoryResult(envelope)
+            }
+            else -> log.warn("Unknown envelope type='{}', body={}", type, body)
+        }
+    }
+
+    private fun handleStoryResult(envelope: StoryResultEnvelope) {
         // envelope.jobId 는 AI 스펙상 string. DB PK (Long) 로 파싱 실패하면 잘못된 메시지.
         val jobIdLong = envelope.jobId.toLongOrNull()
         if (jobIdLong == null) {
@@ -87,6 +124,132 @@ class StoryboardResultListener(
                 log.warn("Unknown envelope status '{}' for jobId {}", envelope.status, envelope.jobId)
             }
         }
+    }
+
+    /**
+     * 이미지 결과 한 건 처리.
+     *
+     * 정책:
+     *  - 페이지의 `image_url` 은 일단 항상 갱신 (FAILED 가 아니라 COMPLETED 인 경우).
+     *  - 잡 마무리:
+     *      - REGENERATE_* type → 1장 도달 즉시 SUCCESS
+     *      - GENERATE_*    type → 모든 페이지의 image_url 이 채워졌을 때만 SUCCESS
+     *  - 1장이라도 FAILED 면 잡 즉시 FAILED. 이미 채운 다른 페이지의 image_url 은 보존
+     *    (유저가 실패한 페이지만 재생성으로 보완할 수 있도록).
+     */
+    private fun handleImageResult(envelope: StoryboardImageResultEnvelope) {
+        val jobIdLong = envelope.jobId.toLongOrNull()
+        if (jobIdLong == null) {
+            log.warn("Invalid jobId format from AI image result: {}", envelope.jobId)
+            return
+        }
+
+        val job = jobRepository.findById(jobIdLong).orElse(null)
+        if (job == null) {
+            log.warn("Unknown image jobId from AI: {} (status={})", envelope.jobId, envelope.status)
+            return
+        }
+
+        if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) {
+            // 잡이 이미 끝난 경우라도 도착한 COMPLETED 페이지는 storyboard_pages 에 반영해두면
+            // 유저 입장에선 "그 페이지는 이미지가 있다" 라는 데이터 자체는 살아남음.
+            // 단 잡 status 는 더 변경하지 않는다.
+            if (envelope.status.equals("COMPLETED", ignoreCase = true)) {
+                applyImageUrlIfPresent(envelope)
+            }
+            log.info(
+                "Image job {} already finalized ({}), skip job-level update",
+                job.id, job.status,
+            )
+            return
+        }
+
+        when (envelope.status.uppercase()) {
+            "COMPLETED" -> handleImageSuccess(job, envelope)
+            "FAILED" -> {
+                val code = envelope.error?.code ?: "UNKNOWN"
+                val message = envelope.error?.message ?: "에러 정보 없음"
+                markFailed(job, code, message)
+            }
+            else -> log.warn(
+                "Unknown image envelope status '{}' for jobId {}",
+                envelope.status, envelope.jobId,
+            )
+        }
+    }
+
+    private fun handleImageSuccess(job: StoryGenerationJob, envelope: StoryboardImageResultEnvelope) {
+        val payload = envelope.payload
+        val resultData = payload?.result
+        if (resultData == null) {
+            log.warn("Image COMPLETED envelope missing payload.result jobId={}", envelope.jobId)
+            markFailed(job, "PAYLOAD_MISSING", "이미지 결과 payload 가 없습니다.")
+            return
+        }
+
+        val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(envelope.storyId)
+        if (storyBoard == null) {
+            log.warn("StoryBoard not found for storyId={} (image job={})", envelope.storyId, envelope.jobId)
+            markFailed(job, "STORY_BOARD_NOT_FOUND", "스토리보드 row 가 없습니다.")
+            return
+        }
+
+        val page = storyboardPageRepository.findByStoryBoardIdAndPageNumber(storyBoard.id, resultData.pageNumber)
+        if (page == null) {
+            log.warn(
+                "StoryboardPage not found storyBoardId={}, pageNumber={} (image job={})",
+                storyBoard.id, resultData.pageNumber, envelope.jobId,
+            )
+            markFailed(job, "PAGE_NOT_FOUND", "해당 페이지 row 가 없습니다.")
+            return
+        }
+
+        page.imageUrl = resultData.imageUrl
+        // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
+
+        val isRegenerate = envelope.type.startsWith("REGENERATE_")
+        if (isRegenerate) {
+            // 단일 페이지 재생성 — 1장 도달 = 즉시 마무리.
+            finalizeImageJobSuccess(job, payload.seed, totalPagesDone = 1)
+            return
+        }
+
+        // 배치 GENERATE — 같은 storyBoard 의 모든 페이지가 image_url 을 가졌는지 확인.
+        val pages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
+        val allFilled = pages.isNotEmpty() && pages.all { !it.imageUrl.isNullOrBlank() }
+        if (allFilled) {
+            finalizeImageJobSuccess(job, payload.seed, totalPagesDone = pages.size)
+        } else {
+            log.info(
+                "Image job {} progressing — page {} done ({}/{})",
+                job.id, resultData.pageNumber,
+                pages.count { !it.imageUrl.isNullOrBlank() }, pages.size,
+            )
+        }
+    }
+
+    /**
+     * 잡 status 에 영향 주지 않고 storyboard_pages.image_url 만 best-effort 로 update.
+     * 이미 SUCCESS/FAILED 된 잡에 뒤늦게 도착한 결과 메시지 처리용.
+     */
+    private fun applyImageUrlIfPresent(envelope: StoryboardImageResultEnvelope) {
+        val resultData = envelope.payload?.result ?: return
+        val storyBoard = storyBoardRepository
+            .findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(envelope.storyId) ?: return
+        val page = storyboardPageRepository
+            .findByStoryBoardIdAndPageNumber(storyBoard.id, resultData.pageNumber) ?: return
+        page.imageUrl = resultData.imageUrl
+    }
+
+    private fun finalizeImageJobSuccess(job: StoryGenerationJob, seed: Int, totalPagesDone: Int) {
+        job.status = JobStatus.SUCCESS
+        job.finishedAt = LocalDateTime.now()
+        // costUsd: 페이지별 usage 가 따로 와서 합산해야 정확. PR 통합 단계에선 누적 X
+        // (필요 시 후속 이슈에서 누적 로직 추가).
+        log.info(
+            "Image job {} SUCCESS — storyId={}, seed={}, pagesDone={}",
+            job.id, job.storyId, seed, totalPagesDone,
+        )
     }
 
     private fun handleSuccess(job: StoryGenerationJob, payload: StoryboardPayload) {
