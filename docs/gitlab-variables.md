@@ -44,7 +44,7 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_DEV_APP_FILE`**
+- Key: **`ENV_DEV_APP_ENV_FILE`**
 - Environment scope: `dev`
 - Protect: ❌ · Mask: ❌
 
@@ -98,7 +98,7 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AI_WORKER_REPLICAS=1
 ```
 
-- [x] `ENV_DEV_APP_FILE` 업로드 완료
+- [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
 
 ## ② APP — 개별 Masked Variables
 
@@ -119,7 +119,7 @@ AI_WORKER_REPLICAS=1
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_DEV_INFRA_FILE`**
+- Key: **`ENV_DEV_INFRA_ENV_FILE`**
 - Environment scope: `dev`
 - Protect: ❌ · Mask: ❌
 
@@ -133,7 +133,7 @@ RABBITMQ_PORT=5673
 RABBITMQ_MANAGEMENT_PORT=15673
 ```
 
-- [ ] `ENV_DEV_INFRA_FILE` 업로드 완료
+- [ ] `ENV_DEV_INFRA_ENV_FILE` 업로드 완료
 
 ## ④ Infra — 개별 Masked Variables
 
@@ -154,7 +154,7 @@ RABBITMQ_MANAGEMENT_PORT=15673
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_MASTER_APP_FILE`**
+- Key: **`ENV_MASTER_APP_ENV_FILE`**
 - Environment scope: `master`
 - Protect: ✅ · Mask: ❌
 
@@ -206,7 +206,7 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AI_WORKER_REPLICAS=2
 ```
 
-- [x] `ENV_MASTER_APP_FILE` 업로드 완료
+- [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료
 
 ## ② APP — 개별 Masked Variables
 
@@ -227,7 +227,7 @@ AI_WORKER_REPLICAS=2
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_MASTER_INFRA_FILE`**
+- Key: **`ENV_MASTER_INFRA_ENV_FILE`**
 - Environment scope: `master`
 - Protect: ✅ · Mask: ❌
 
@@ -241,7 +241,7 @@ RABBITMQ_PORT=5672
 RABBITMQ_MANAGEMENT_PORT=15672
 ```
 
-- [ ] `ENV_MASTER_INFRA_FILE` 업로드 완료
+- [ ] `ENV_MASTER_INFRA_ENV_FILE` 업로드 완료
 
 ## ④ Infra — 개별 Masked Variables
 
