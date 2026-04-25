@@ -29,7 +29,6 @@ import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -55,6 +54,7 @@ class StoryboardImageGenerationService(
     private val jobRepository: StoryGenerationJobRepository,
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
+    private val storyParticipantParser: StoryParticipantParser,
 ) {
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
@@ -72,9 +72,9 @@ class StoryboardImageGenerationService(
             storyPayload.pages.associate { it.pageNumber to it.sourcePhotoIds }
 
         // 3) 등장인물 / 동행자 정보 — Story 엔티티 JSON 필드 파싱.
-        val children = parseChildren(story.mainCharacterJson)
+        val children = storyParticipantParser.parseChildren(story.mainCharacterJson)
         if (children.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
-        val companions = parseCompanions(story.companionsJson)
+        val companions = storyParticipantParser.parseCompanions(story.companionsJson)
 
         // 4) 사진 — id → s3Key 매핑.
         val photoMap: Map<Long, PhotoAlbumItem> = photoRepository
@@ -146,9 +146,9 @@ class StoryboardImageGenerationService(
         val origPage = storyPayload.pages.firstOrNull { it.pageNumber == pageNumber }
         val sourcePhotoIds = origPage?.sourcePhotoIds ?: emptyList()
 
-        val children = parseChildren(story.mainCharacterJson)
+        val children = storyParticipantParser.parseChildren(story.mainCharacterJson)
         if (children.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
-        val companions = parseCompanions(story.companionsJson)
+        val companions = storyParticipantParser.parseCompanions(story.companionsJson)
 
         val photoMap = photoRepository
             .findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(storyId)
@@ -278,49 +278,6 @@ class StoryboardImageGenerationService(
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
     }
-
-    /**
-     * StoryboardGenerationService 의 동명 메서드와 동일 — 차후 helper 추출 검토.
-     */
-    private fun parseChildren(json: String): List<ChildInfo> {
-        val root = parseTreeOrNull(json) ?: return emptyList()
-        if (!root.isArray) return emptyList()
-
-        val list = mutableListOf<ChildInfo>()
-        for (node in root) {
-            val name = node.get("name")?.asString()?.trim()?.takeIf { it.isNotEmpty() } ?: continue
-            val age = extractInt(node.get("age")) ?: continue
-            val gender = node.get("gender")?.asString()?.uppercase()?.takeIf { it.isNotEmpty() } ?: continue
-            list.add(ChildInfo(name, age, gender))
-        }
-        return list
-    }
-
-    private fun parseCompanions(json: String): List<String> {
-        val root = parseTreeOrNull(json) ?: return emptyList()
-        return when {
-            root.isString -> splitFreeText(root.asString())
-            root.isArray -> root.mapNotNull {
-                it.takeIf(JsonNode::isString)?.asString()?.trim()?.takeIf { s -> s.isNotEmpty() }
-            }
-            else -> emptyList()
-        }
-    }
-
-    private fun parseTreeOrNull(json: String): JsonNode? =
-        if (json.isBlank()) null
-        else try { objectMapper.readTree(json) } catch (_: Exception) { null }
-
-    private fun extractInt(node: JsonNode?): Int? = when {
-        node == null || node.isNull -> null
-        node.isNumber -> node.asInt()
-        node.isString -> node.asString().toIntOrNull()
-        else -> null
-    }
-
-    private fun splitFreeText(raw: String): List<String> =
-        raw.split(",", ";", " ")
-            .mapNotNull { it.trim().takeIf { t -> t.isNotEmpty() } }
 
     companion object {
         /** AI 측 referenceImageS3Keys max_length = 3. */
