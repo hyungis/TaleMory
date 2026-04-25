@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ArrowRight,
   BookOpenCheck,
-  Check,
   Loader2,
   RotateCcw,
   Send,
@@ -11,48 +11,70 @@ import {
   Wand2,
 } from 'lucide-react'
 import type { StoryProject } from '../../model/types'
+import { useStoryboardPagesQuery } from '../../storyboard-pages'
 import { useGenerateStoryboardStoryPost } from '../model/useGenerateStoryboardStoryPost'
 import { useGenerationJobQuery } from '../model/useGenerationJobQuery'
-import { useStoryboardStoryPatch } from '../model/useStoryboardStoryPatch'
 
 interface PromptStepProps {
   storyId: number | null
   data: StoryProject['step3']
+  /**
+   * SUCCESS 시점에 한 번 — sessionStorage 보관용 step3.story 동기화.
+   * Step 3 자체에서 직접 텍스트 편집은 더 이상 일어나지 않는다 (옵션 D — 책임 분리).
+   */
   onStoryChange: (story: string) => void
   onBack: () => void
   onNext: () => void
 }
 
 /**
- * STEP 03 — "스토리(줄거리) 생성 & 편집"
+ * STEP 03 — "스토리(줄거리) 확정"
  *
- * UI 상태:
+ * 옵션 D 적용 후 책임:
+ *  - 통합 한글 본문을 **read-only** 로 보여주기 (storyboard_pages 의 koreanText join)
+ *  - 마음에 안 들면 AI 재생성 (POST /storyboard/story) 호출
+ *  - "스토리 확정하고 다음" → Step 4 로 이동 (페이지별 글·그림 다듬기는 Step 4 의 책임)
+ *
+ * UI 모드:
  *  - INPUT   : 최초 프롬프트 입력 + "스토리 만들기" (POST 호출)
  *  - LOADING : Job polling 중
  *  - FAIL    : 실패 메시지 + "다시 시도"
- *  - RESULT  : synopsis textarea 편집(onBlur PATCH 자동 저장)
- *              + "프롬프트로 재요청" (POST 재호출)
- *              + "확정하기" (onNext → Step 4)
+ *  - RESULT  : 통합 한글본 read-only 표시 + AI 재요청 입력
  *
- * 관련 명세:
- *  - POST /storyboard/story  (#28)   — 생성 트리거
- *  - GET  /generation-jobs   (#56)   — 상태 polling
- *  - PATCH /storyboard/story (#29)   — 유저 편집 저장
+ * 데이터 source:
+ *  - `useStoryboardPagesQuery(storyId)` 의 `pages[].koreanText` 를 `\n\n` 으로 join.
+ *    Step 4 에서 페이지별 PATCH 한 결과가 자동 반영된다.
+ *  - 캐시 미스 / 줄거리 미생성 상태에선 `data.story` (sessionStorage 복구값) 으로 fallback.
  */
 export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: PromptStepProps) {
   const [prompt, setPrompt] = useState('')
   const [jobId, setJobId] = useState<number | null>(null)
+  const queryClient = useQueryClient()
 
   const generateMut = useGenerateStoryboardStoryPost(storyId)
   const jobQuery = useGenerationJobQuery(jobId)
-  const patchMut = useStoryboardStoryPatch(storyId)
+  const pagesQuery = useStoryboardPagesQuery(storyId)
 
-  // 생성 결과 도착 시 한 번만 step3.story 에 한글 본문을 반영한다.
-  // AI 의 `synopsis` 는 영문 요약이라 유저에게 부적합 — pages[].koreanText 를 단락 단위로
-  // 이어붙인 한글 본문을 노출한다. BE Listener 가 저장하는 값과 동일한 규칙.
-  // 이후 사용자가 편집한 값은 data.story 에 덮여 살아있고, onBlur 에서 PATCH 로 서버에도 반영.
+  // pages → 통합 한글 본문. Step 4 에서 PATCH 한 수정본이 자동 반영된다.
+  const koreanBodyFromPages = useMemo(() => {
+    const pages = pagesQuery.data?.pages ?? []
+    if (pages.length === 0) return ''
+    return pages
+      .slice()
+      .sort((a, b) => a.pageNumber - b.pageNumber)
+      .map(p => (p.koreanText ?? '').trim())
+      .filter(t => t.length > 0)
+      .join('\n\n')
+  }, [pagesQuery.data])
+
+  // 화면 표시용 본문 — pages 가 있으면 그것이 진실, 없으면 sessionStorage 복구값으로 fallback.
+  const displayBody = koreanBodyFromPages.length > 0 ? koreanBodyFromPages : data.story
+
+  // Job SUCCESS 도달 시:
+  //  1) parent state(step3.story) 동기화 — 새로고침 시 즉시 표시 가능하도록
+  //  2) storyboard-pages 캐시 invalidate — 즉시 새 페이지 fetch
   useEffect(() => {
-    if (jobQuery.data?.status === 'SUCCESS' && jobQuery.data.resultPayload) {
+    if (jobQuery.data?.status === 'SUCCESS' && jobQuery.data.resultPayload && storyId !== null) {
       const payload = jobQuery.data.resultPayload
       const koreanBody =
         payload.pages
@@ -62,8 +84,9 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
           .filter(t => t.length > 0)
           .join('\n\n') || payload.synopsis
       onStoryChange(koreanBody)
+      void queryClient.invalidateQueries({ queryKey: ['storyboard-pages', storyId] })
     }
-  }, [jobQuery.data, onStoryChange])
+  }, [jobQuery.data, onStoryChange, queryClient, storyId])
 
   const triggerGenerate = useCallback(
     async (promptText?: string) => {
@@ -93,15 +116,17 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
       status !== 'CANCELLED')
 
   /**
-   * 이 화면에서 Result 모드(편집 가능한 한글 본문 + 재요청)를 보여줄지 여부.
-   * 두 가지 경로로 진입:
-   *  1) 방금 생성이 SUCCESS 로 돌아왔을 때 (resultPayload 존재)
-   *  2) 새로고침 후 storyId + data.story 가 복구돼 있어 서버에 이미 저장된 스토리가 있을 때
-   *     (이 경우 jobId 없이도 Result 모드 시작 — 텍스트는 복구된 data.story 사용)
+   * Result 모드 (통합본 read-only + 재요청) 진입 조건:
+   *  1) 방금 생성이 SUCCESS 로 돌아왔을 때
+   *  2) 새로고침 후 storyId 가 복구돼 페이지 데이터가 이미 서버에 있을 때
+   *     (`pagesQuery.data.pages.length > 0`)
+   *  3) sessionStorage 에 step3.story 가 남아있을 때 (캐시 미도착 케이스의 fallback)
    */
   const hasGenerated = status === 'SUCCESS' && !!jobQuery.data?.resultPayload
+  const hasServerPages = (pagesQuery.data?.pages.length ?? 0) > 0
   const hasRestoredStory = jobId === null && storyId !== null && data.story.trim().length > 0
-  const hasResult = hasGenerated || hasRestoredStory
+  const hasResult = hasGenerated || hasServerPages || hasRestoredStory
+
   const hasFailed =
     status === 'FAILED' ||
     status === 'CANCELLED' ||
@@ -146,7 +171,7 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
               </h1>
               <p className="text-[#b4c4a4] text-lg">
                 {hasResult
-                  ? '전체적인 흐름이 마음에 드시나요? 내용을 직접 수정하거나 AI 에게 다시 부탁할 수 있어요.'
+                  ? '전체적인 흐름이 마음에 드시나요? 마음에 안 들면 AI 에게 다시 부탁할 수 있고, 페이지별 세부 내용은 다음 단계에서 다듬을 수 있어요.'
                   : '원하는 분위기나 주제를 자유롭게 적어주세요. 비워도 업로드하신 사진·여행 정보만으로 만들 수 있어요.'}
               </p>
             </div>
@@ -168,19 +193,7 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
 
             {hasResult && (
               <ResultSection
-                synopsis={data.story}
-                onSynopsisChange={onStoryChange}
-                onPatch={async value => {
-                  const trimmed = value.trim()
-                  if (trimmed.length === 0) return
-                  try {
-                    await patchMut.mutateAsync({ story: trimmed })
-                  } catch {
-                    /* 에러는 patchMut.error 로 표시 */
-                  }
-                }}
-                patchPending={patchMut.isPending}
-                patchError={patchMut.error?.message ?? null}
+                synopsis={displayBody}
                 onRegenerate={newPrompt => {
                   setJobId(null)
                   generateMut.reset()
@@ -284,29 +297,18 @@ function FailureCard({ message, onRetry }: { message: string; onRetry: () => voi
 }
 
 /**
- * 결과 섹션 = 편집 가능한 synopsis + AI 재요청 입력.
+ * 결과 섹션 = 통합 한글본 read-only 표시 + AI 재요청 입력.
  *
- * - synopsis textarea 는 로컬 제어. blur 시 PATCH 자동 호출.
- * - 재요청 입력 + "요청" 버튼 → 부모에게 위임, 새 POST 트리거.
+ * 옵션 D 적용:
+ *  - 직접 텍스트 편집 X — Step 4 에서 페이지별로 다듬는다.
+ *  - "AI 에게 다시 요청" 버튼만 활성. 결과는 새 STORY job 으로 들어와 storyboard_pages 갈아끼움.
  */
 function ResultSection(props: {
   synopsis: string
-  onSynopsisChange: (v: string) => void
-  onPatch: (v: string) => Promise<void> | void
-  patchPending: boolean
-  patchError: string | null
   onRegenerate: (prompt: string) => void
   regenerating: boolean
 }) {
-  const {
-    synopsis,
-    onSynopsisChange,
-    onPatch,
-    patchPending,
-    patchError,
-    onRegenerate,
-    regenerating,
-  } = props
+  const { synopsis, onRegenerate, regenerating } = props
 
   const [refinePrompt, setRefinePrompt] = useState('')
 
@@ -324,38 +326,23 @@ function ResultSection(props: {
 
   return (
     <div className="bg-[#f0e6c0] rounded-[2.5rem] border-2 border-[#2a1b12] shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden">
-      {/* 본문 편집 */}
+      {/* 본문 read-only 표시 */}
       <div className="p-6 md:p-10">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl text-[#2d5a27] flex items-center gap-2 font-bold">
             <BookOpenCheck className="w-7 h-7" />
             동화책 줄거리
           </h2>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-[#8b7a52] font-sans">약 {synopsis.length}자</span>
-            {patchPending && (
-              <span className="inline-flex items-center gap-1 text-[#8b7a52]">
-                <Loader2 className="w-4 h-4 animate-spin" /> 저장 중
-              </span>
-            )}
-            {!patchPending && !patchError && synopsis.length > 0 && (
-              <span className="inline-flex items-center gap-1 text-[#2d5a27]">
-                <Check className="w-4 h-4" /> 저장됨
-              </span>
-            )}
-          </div>
+          <span className="text-[#8b7a52] font-sans text-sm">약 {synopsis.length}자</span>
         </div>
 
-        <textarea
-          value={synopsis}
-          onChange={e => onSynopsisChange(e.target.value)}
-          onBlur={e => void onPatch(e.target.value)}
-          className="w-full h-64 p-6 rounded-2xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] text-lg leading-relaxed focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 focus:outline-none resize-none font-sans"
-        />
+        {/* whitespace-pre-wrap 으로 \n\n 단락이 화면에서도 단락으로 보이게 한다. */}
+        <div className="w-full min-h-[16rem] p-6 rounded-2xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] text-lg leading-relaxed font-sans whitespace-pre-wrap">
+          {synopsis || '줄거리를 불러오는 중이에요...'}
+        </div>
         <p className="mt-3 text-[#8b7a52] text-sm">
-          내용을 직접 수정하실 수 있어요. 포커스를 빼면 자동으로 저장됩니다.
+          페이지별 세부 내용은 다음 단계(스토리보드)에서 다듬을 수 있어요.
         </p>
-        {patchError && <p className="mt-2 text-[#a3413f] text-sm">저장 실패: {patchError}</p>}
       </div>
 
       {/* AI 재요청 영역 */}
