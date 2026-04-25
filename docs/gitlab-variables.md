@@ -98,7 +98,7 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AI_WORKER_REPLICAS=1
 ```
 
-- [ ] `ENV_DEV_APP_FILE` 업로드 완료
+- [x] `ENV_DEV_APP_FILE` 업로드 완료
 
 ## ② APP — 개별 Masked Variables
 
@@ -112,8 +112,8 @@ AI_WORKER_REPLICAS=1
 - [x] `ENV_DEV_APP_KAKAO_CLIENT_SECRET` — dev Kakao client secret
 - [x] `ENV_DEV_APP_AWS_ACCESS_KEY_ID` — `s210-backend-s3` IAM user Access Key ID
 - [x] `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` — `s210-backend-s3` IAM user Secret Access Key
-- [ ] `ENV_DEV_APP_OPENAI_API_KEY` — OpenAI API 키
-- [ ] `ENV_DEV_APP_GEMINI_API_KEY` — Gemini API 키 (storyboard 이미지 생성)
+- [x] `ENV_DEV_APP_OPENAI_API_KEY` — OpenAI API 키
+- [x] `ENV_DEV_APP_GEMINI_API_KEY` — Gemini API 키 (storyboard 이미지 생성)
 
 ## ③ Infra — File Variable
 
@@ -206,7 +206,7 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AI_WORKER_REPLICAS=2
 ```
 
-- [ ] `ENV_MASTER_APP_FILE` 업로드 완료
+- [x] `ENV_MASTER_APP_FILE` 업로드 완료
 
 ## ② APP — 개별 Masked Variables
 
@@ -218,10 +218,10 @@ AI_WORKER_REPLICAS=2
 - [x] `ENV_MASTER_APP_JWT_ACCESS_SECRET` — dev 와 반드시 다른 값
 - [x] `ENV_MASTER_APP_JWT_REFRESH_SECRET` — access 와 반드시 다른 값
 - [x] `ENV_MASTER_APP_KAKAO_CLIENT_SECRET` — prod Kakao client secret
-- [ ] `ENV_MASTER_APP_AWS_ACCESS_KEY_ID` — prod 전용 IAM user (dev 와 분리 권장)
+- [x] `ENV_MASTER_APP_AWS_ACCESS_KEY_ID` — prod 전용 IAM user (dev 와 분리 권장)
 - [x] `ENV_MASTER_APP_AWS_SECRET_ACCESS_KEY`
-- [ ] `ENV_MASTER_APP_OPENAI_API_KEY` — OpenAI API 키
-- [ ] `ENV_MASTER_APP_GEMINI_API_KEY` — prod Gemini API 키
+- [x] `ENV_MASTER_APP_OPENAI_API_KEY` — OpenAI API 키
+- [x] `ENV_MASTER_APP_GEMINI_API_KEY` — prod Gemini API 키
 
 ## ③ Infra — File Variable
 
