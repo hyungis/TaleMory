@@ -6,6 +6,7 @@ import wave
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
@@ -315,21 +316,14 @@ def create_story_tts_job(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
+def generate_story_tts_result(
+    request: dict[str, Any],
+    progress_callback: Callable[[int], None] | None = None,
+) -> dict[str, Any]:
     voice_id = request["voiceId"]
     reference_path = _voice_reference_path(voice_id)
     if not reference_path.exists():
-        update_manifest(
-            job_id,
-            {
-                "status": "FAILED",
-                "finishedAt": _now(),
-                "error": {"message": f"Voice not found: {voice_id}"},
-            },
-        )
-        return
-
-    update_manifest(job_id, {"status": "RUNNING", "startedAt": _now(), "progress": 5})
+        raise FileNotFoundError(voice_id)
 
     story_id = request["storyId"]
     sentence_paths: list[Path] = []
@@ -339,60 +333,54 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
     default_style_prompt = request["options"].get("defaultStylePrompt")
     output_format = request.get("format", "wav")
 
-    try:
-        for index, sentence in enumerate(request["sentences"], start=1):
-            sentence_id = sentence["sentenceId"]
-            emotion = sentence.get("emotion") or default_emotion
-            style_prompt = sentence.get("stylePrompt") or default_style_prompt
-            audio_bytes, resolved_format = synthesize_cross_lingual_tts(
-                text=_cross_lingual_text(sentence["text"]),
-                prompt_wav_path=reference_path,
-                audio_format=output_format,
-            )
-            sentence_path = (
-                settings.TTS_STORAGE_ROOT
-                / "generated"
-                / "story-tts"
-                / str(story_id)
-                / "sentences"
-                / f"{sentence_id}.{resolved_format}"
-            )
-            stored_sentence = store_bytes(sentence_path, audio_bytes, _audio_content_type(resolved_format))
-            if resolved_format == "wav":
-                sentence_paths.append(sentence_path)
-            items.append(
-                {
-                    "sentenceId": sentence_id,
-                    "appliedStyle": {
-                        "emotion": emotion,
-                        "stylePrompt": style_prompt,
-                    },
-                    "audio": {
-                        "audioUrl": stored_sentence.url,
-                        "s3Key": stored_sentence.key,
-                        "durationMs": _duration_ms_from_audio(audio_bytes, resolved_format, sentence["text"]),
-                        "format": resolved_format,
-                    },
-                }
-            )
-            update_manifest(job_id, {"progress": min(95, int(index / len(request["sentences"]) * 90) + 5)})
-    except Exception as error:
-        update_manifest(
-            job_id,
-            {
-                "status": "FAILED",
-                "finishedAt": _now(),
-                "error": {"message": str(error)},
-            },
+    for index, sentence in enumerate(request["sentences"], start=1):
+        sentence_id = sentence["sentenceId"]
+        emotion = sentence.get("emotion") or default_emotion
+        style_prompt = sentence.get("stylePrompt") or default_style_prompt
+        audio_bytes, resolved_format = synthesize_cross_lingual_tts(
+            text=_cross_lingual_text(sentence["text"]),
+            prompt_wav_path=reference_path,
+            audio_format=output_format,
         )
-        return
+        sentence_path = (
+            settings.TTS_STORAGE_ROOT
+            / "generated"
+            / "story-tts"
+            / str(story_id)
+            / "sentences"
+            / f"{sentence_id}.{resolved_format}"
+        )
+        stored_sentence = store_bytes(sentence_path, audio_bytes, _audio_content_type(resolved_format))
+        if resolved_format == "wav":
+            sentence_paths.append(sentence_path)
+        items.append(
+            {
+                "sentenceId": sentence_id,
+                "appliedStyle": {
+                    "emotion": emotion,
+                    "stylePrompt": style_prompt,
+                },
+                "audio": {
+                    "audioUrl": stored_sentence.url,
+                    "s3Key": stored_sentence.key,
+                    "durationMs": _duration_ms_from_audio(audio_bytes, resolved_format, sentence["text"]),
+                    "format": resolved_format,
+                },
+            }
+        )
+        if progress_callback is not None:
+            progress_callback(min(95, int(index / len(request["sentences"]) * 90) + 5))
 
     result: dict[str, Any] = {
         "storyId": story_id,
         "voiceId": voice_id,
         "items": items,
         "sceneSentenceUpdates": [
-            {"sentenceId": item["sentenceId"], "ttsAudioUrl": item["audio"]["audioUrl"]}
+            {
+                "sentenceId": item["sentenceId"],
+                "ttsAudioUrl": item["audio"]["audioUrl"],
+                "ttsAudioS3Key": item["audio"]["s3Key"],
+            }
             for item in items
         ],
         "summary": {
@@ -415,6 +403,29 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
         }
     elif request["options"].get("generateFullBookAudio"):
         result["fullBookAudio"] = None
+
+    return result
+
+
+def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
+    update_manifest(job_id, {"status": "RUNNING", "startedAt": _now(), "progress": 5})
+
+    try:
+        result = generate_story_tts_result(
+            request,
+            progress_callback=lambda progress: update_manifest(job_id, {"progress": progress}),
+        )
+    except Exception as error:
+        message = f"Voice not found: {error}" if isinstance(error, FileNotFoundError) else str(error)
+        update_manifest(
+            job_id,
+            {
+                "status": "FAILED",
+                "finishedAt": _now(),
+                "error": {"message": message},
+            },
+        )
+        return
 
     update_manifest(
         job_id,

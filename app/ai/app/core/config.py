@@ -77,8 +77,12 @@ class Settings(BaseModel):
     RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
     RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.request.queue")
     RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.regenerate.queue")
+    RABBITMQ_TTS_GENERATE_QUEUE: str = getenv("RABBITMQ_TTS_GENERATE_QUEUE", "ai.gpu.request.queue")
+    RABBITMQ_TTS_RESULT_QUEUE: str = getenv("RABBITMQ_TTS_RESULT_QUEUE", "ai.result.tts.queue")
     RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "ai.cpu.story.generate")
     RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
+    RABBITMQ_TTS_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_TTS_GENERATE_ROUTING_KEY", "ai.gpu.tts.generate")
+    RABBITMQ_TTS_RESULT_BINDING_KEY: str = getenv("RABBITMQ_TTS_RESULT_BINDING_KEY", "ai.result.tts.#")
     RABBITMQ_IMAGE_GENERATE_QUEUE: str = getenv(
         "RABBITMQ_IMAGE_GENERATE_QUEUE",
         "ai.image.generate.request.queue",
@@ -118,6 +122,14 @@ class Settings(BaseModel):
     RABBITMQ_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.regenerate.failed",
+    )
+    RABBITMQ_TTS_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_TTS_GENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.tts.generate.completed",
+    )
+    RABBITMQ_TTS_GENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_TTS_GENERATE_FAILED_ROUTING_KEY",
+        "ai.result.tts.generate.failed",
     )
     RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_IMAGE_GENERATE_COMPLETED_ROUTING_KEY",
