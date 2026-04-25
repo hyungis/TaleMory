@@ -12,6 +12,7 @@ from uuid import uuid4
 from app.core.config import settings
 from app.schemas.tts import PreviewOptions, VoiceRegisterRequest
 from app.services.cosyvoice_client import synthesize_cross_lingual_tts
+from app.services.storage_service import build_public_url, store_bytes, store_file
 
 
 SAMPLE_RATE = 22050
@@ -41,19 +42,9 @@ def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _public_url(path: Path) -> str:
-    relative = path.relative_to(settings.TTS_STORAGE_ROOT).as_posix()
-    return f"{settings.TTS_PUBLIC_BASE_URL.rstrip('/')}/{relative}"
-
-
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     _ensure_parent(path)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _write_bytes(path: Path, payload: bytes) -> None:
-    _ensure_parent(path)
-    path.write_bytes(payload)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -107,6 +98,14 @@ def _duration_ms_from_audio(audio_bytes: bytes, audio_format: str, fallback_text
             pass
 
     return int(max(1000, min(6000, len(fallback_text) * 80)))
+
+
+def _audio_content_type(audio_format: str) -> str:
+    if audio_format == "wav":
+        return "audio/wav"
+    if audio_format == "mp3":
+        return "audio/mpeg"
+    return "application/octet-stream"
 
 
 def _cross_lingual_text(text: str) -> str:
@@ -193,6 +192,7 @@ def process_voice_clone_job(job_id: str, voice_id: str, request: VoiceRegisterRe
     try:
         reference_path = _voice_reference_path(voice_id)
         _copy_or_generate_reference(request.sourceAudio.path, reference_path)
+        stored_reference = store_file(reference_path, "audio/wav")
 
         metadata = {
             "voiceId": voice_id,
@@ -205,6 +205,10 @@ def process_voice_clone_job(job_id: str, voice_id: str, request: VoiceRegisterRe
             "cache": {
                 "promptCached": request.options.generatePromptCache,
                 "embeddingCached": False,
+            },
+            "referenceAudio": {
+                "audioUrl": stored_reference.url,
+                "s3Key": stored_reference.key,
             },
         }
         _write_json(_voice_metadata_path(voice_id), metadata)
@@ -220,7 +224,8 @@ def process_voice_clone_job(job_id: str, voice_id: str, request: VoiceRegisterRe
                     "label": request.label,
                     "referenceAudio": {
                         "path": str(reference_path),
-                        "audioUrl": _public_url(reference_path),
+                        "audioUrl": stored_reference.url,
+                        "s3Key": stored_reference.key,
                     },
                     "metadata": metadata,
                 },
@@ -240,12 +245,14 @@ def process_voice_clone_job(job_id: str, voice_id: str, request: VoiceRegisterRe
 def get_voice_info(voice_id: str) -> dict[str, Any]:
     metadata = _voice_metadata(voice_id)
     reference_path = _voice_reference_path(voice_id)
+    reference_audio = metadata.get("referenceAudio", {})
     return {
         "voiceId": voice_id,
         "label": metadata["label"],
         "status": "SUCCESS",
         "language": metadata["language"],
-        "referenceAudioUrl": _public_url(reference_path),
+        "referenceAudioUrl": reference_audio.get("audioUrl") or build_public_url(reference_path),
+        "referenceAudioS3Key": reference_audio.get("s3Key"),
         "durationSec": metadata["durationSec"],
         "cache": metadata["cache"],
         "createdAt": metadata["createdAt"],
@@ -276,13 +283,14 @@ def generate_preview(
         / voice_id
         / f"{preview_id}.{resolved_format}"
     )
-    _write_bytes(output_path, audio_bytes)
+    stored_audio = store_bytes(output_path, audio_bytes, _audio_content_type(resolved_format))
     duration_ms = _duration_ms_from_audio(audio_bytes, resolved_format, text)
 
     return {
         "previewId": preview_id,
         "audio": {
-            "audioUrl": _public_url(output_path),
+            "audioUrl": stored_audio.url,
+            "s3Key": stored_audio.key,
             "durationMs": duration_ms,
             "format": resolved_format,
         },
@@ -349,7 +357,7 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
                 / "sentences"
                 / f"{sentence_id}.{resolved_format}"
             )
-            _write_bytes(sentence_path, audio_bytes)
+            stored_sentence = store_bytes(sentence_path, audio_bytes, _audio_content_type(resolved_format))
             if resolved_format == "wav":
                 sentence_paths.append(sentence_path)
             items.append(
@@ -360,7 +368,8 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
                         "stylePrompt": style_prompt,
                     },
                     "audio": {
-                        "audioUrl": _public_url(sentence_path),
+                        "audioUrl": stored_sentence.url,
+                        "s3Key": stored_sentence.key,
                         "durationMs": _duration_ms_from_audio(audio_bytes, resolved_format, sentence["text"]),
                         "format": resolved_format,
                     },
@@ -398,8 +407,10 @@ def process_story_tts_job(job_id: str, request: dict[str, Any]) -> None:
             settings.TTS_STORAGE_ROOT / "generated" / "story-tts" / str(story_id) / "full-book" / "full-book.wav"
         )
         _concat_wavs(sentence_paths, full_book_path)
+        stored_full_book = store_file(full_book_path, "audio/wav")
         result["fullBookAudio"] = {
-            "audioUrl": _public_url(full_book_path),
+            "audioUrl": stored_full_book.url,
+            "s3Key": stored_full_book.key,
             "format": "wav",
         }
     elif request["options"].get("generateFullBookAudio"):

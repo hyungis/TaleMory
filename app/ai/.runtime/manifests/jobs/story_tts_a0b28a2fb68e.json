@@ -1,0 +1,82 @@
+{
+  "success": true,
+  "data": {
+    "jobId": "story_tts_a0b28a2fb68e",
+    "jobType": "TTS",
+    "status": "SUCCESS",
+    "createdAt": "2026-04-24T06:27:57.482694+00:00",
+    "storyId": 1201,
+    "voiceId": "test-mom",
+    "startedAt": "2026-04-24T06:27:57.487768+00:00",
+    "progress": 100,
+    "finishedAt": "2026-04-24T06:28:25.718821+00:00",
+    "result": {
+      "storyId": 1201,
+      "voiceId": "test-mom",
+      "items": [
+        {
+          "sentenceId": 5001,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/sentences/5001.wav",
+            "s3Key": "stories/tts/generated/story-tts/1201/sentences/5001.wav",
+            "durationMs": 3680,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 5002,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/sentences/5002.wav",
+            "s3Key": "stories/tts/generated/story-tts/1201/sentences/5002.wav",
+            "durationMs": 3080,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 5003,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/sentences/5003.wav",
+            "s3Key": "stories/tts/generated/story-tts/1201/sentences/5003.wav",
+            "durationMs": 3560,
+            "format": "wav"
+          }
+        }
+      ],
+      "sceneSentenceUpdates": [
+        {
+          "sentenceId": 5001,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/sentences/5001.wav"
+        },
+        {
+          "sentenceId": 5002,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/sentences/5002.wav"
+        },
+        {
+          "sentenceId": 5003,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/sentences/5003.wav"
+        }
+      ],
+      "summary": {
+        "sentenceCount": 3
+      },
+      "fullBookAudio": {
+        "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1201/full-book/full-book.wav",
+        "s3Key": "stories/tts/generated/story-tts/1201/full-book/full-book.wav",
+        "format": "wav"
+      }
+    }
+  },
+  "message": null
+}

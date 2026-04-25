@@ -1,0 +1,388 @@
+{
+  "success": true,
+  "data": {
+    "jobId": "story_tts_0d59f8e43dc3",
+    "jobType": "TTS",
+    "status": "SUCCESS",
+    "createdAt": "2026-04-24T08:12:56.815420+00:00",
+    "storyId": 1207,
+    "voiceId": "test-dad",
+    "startedAt": "2026-04-24T08:12:56.821460+00:00",
+    "progress": 100,
+    "finishedAt": "2026-04-24T08:18:25.913731+00:00",
+    "result": {
+      "storyId": 1207,
+      "voiceId": "test-dad",
+      "items": [
+        {
+          "sentenceId": 7001,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7001.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7001.wav",
+            "durationMs": 8320,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7002,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7002.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7002.wav",
+            "durationMs": 7920,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7003,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7003.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7003.wav",
+            "durationMs": 9560,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7004,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7004.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7004.wav",
+            "durationMs": 7560,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7005,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7005.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7005.wav",
+            "durationMs": 8440,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7006,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7006.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7006.wav",
+            "durationMs": 5160,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7007,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7007.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7007.wav",
+            "durationMs": 9240,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7008,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7008.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7008.wav",
+            "durationMs": 7600,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7009,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7009.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7009.wav",
+            "durationMs": 5800,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7010,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7010.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7010.wav",
+            "durationMs": 7080,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7011,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7011.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7011.wav",
+            "durationMs": 6360,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7012,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7012.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7012.wav",
+            "durationMs": 6200,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7013,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7013.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7013.wav",
+            "durationMs": 7400,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7014,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7014.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7014.wav",
+            "durationMs": 7960,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7015,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7015.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7015.wav",
+            "durationMs": 6760,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7016,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7016.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7016.wav",
+            "durationMs": 7160,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7017,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7017.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7017.wav",
+            "durationMs": 6240,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7018,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7018.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7018.wav",
+            "durationMs": 5320,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7019,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7019.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7019.wav",
+            "durationMs": 8920,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7020,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7020.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7020.wav",
+            "durationMs": 7280,
+            "format": "wav"
+          }
+        },
+        {
+          "sentenceId": 7021,
+          "appliedStyle": {
+            "emotion": "NEUTRAL",
+            "stylePrompt": null
+          },
+          "audio": {
+            "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7021.wav",
+            "s3Key": "stories/tts/generated/story-tts/1207/sentences/7021.wav",
+            "durationMs": 6680,
+            "format": "wav"
+          }
+        }
+      ],
+      "sceneSentenceUpdates": [
+        {
+          "sentenceId": 7001,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7001.wav"
+        },
+        {
+          "sentenceId": 7002,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7002.wav"
+        },
+        {
+          "sentenceId": 7003,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7003.wav"
+        },
+        {
+          "sentenceId": 7004,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7004.wav"
+        },
+        {
+          "sentenceId": 7005,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7005.wav"
+        },
+        {
+          "sentenceId": 7006,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7006.wav"
+        },
+        {
+          "sentenceId": 7007,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7007.wav"
+        },
+        {
+          "sentenceId": 7008,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7008.wav"
+        },
+        {
+          "sentenceId": 7009,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7009.wav"
+        },
+        {
+          "sentenceId": 7010,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7010.wav"
+        },
+        {
+          "sentenceId": 7011,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7011.wav"
+        },
+        {
+          "sentenceId": 7012,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7012.wav"
+        },
+        {
+          "sentenceId": 7013,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7013.wav"
+        },
+        {
+          "sentenceId": 7014,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7014.wav"
+        },
+        {
+          "sentenceId": 7015,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7015.wav"
+        },
+        {
+          "sentenceId": 7016,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7016.wav"
+        },
+        {
+          "sentenceId": 7017,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7017.wav"
+        },
+        {
+          "sentenceId": 7018,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7018.wav"
+        },
+        {
+          "sentenceId": 7019,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7019.wav"
+        },
+        {
+          "sentenceId": 7020,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7020.wav"
+        },
+        {
+          "sentenceId": 7021,
+          "ttsAudioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/sentences/7021.wav"
+        }
+      ],
+      "summary": {
+        "sentenceCount": 21
+      },
+      "fullBookAudio": {
+        "audioUrl": "https://s210-iportfolio-dev.s3.ap-northeast-2.amazonaws.com/stories/tts/generated/story-tts/1207/full-book/full-book.wav",
+        "s3Key": "stories/tts/generated/story-tts/1207/full-book/full-book.wav",
+        "format": "wav"
+      }
+    }
+  },
+  "message": null
+}

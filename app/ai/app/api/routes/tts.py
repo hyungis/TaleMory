@@ -10,6 +10,7 @@ from app.services.dev_tts_service import (
     process_story_tts_job,
     read_manifest,
 )
+from app.services.storage_service import StorageConfigurationError, StorageUploadError
 
 
 router = APIRouter(prefix="/api/v1", tags=["tts"])
@@ -27,6 +28,8 @@ def preview_voice(voiceId: str, request: PreviewRequest) -> ApiSuccessResponse:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except CosyVoiceInvocationError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
+    except (StorageConfigurationError, StorageUploadError) as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
     return ApiSuccessResponse(data=data)
 
 
