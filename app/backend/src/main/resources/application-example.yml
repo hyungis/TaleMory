@@ -31,8 +31,15 @@ spring:
     access_secret: ${JWT_ACCESS_SECRET}
     refresh_secret: ${JWT_REFRESH_SECRET}
 
+oauth:
+  allowed-redirect-uris: ${OAUTH_ALLOWED_REDIRECT_URIS:}
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+
 # AWS 는 top-level namespace — `aws.s3.bucket` 경로로 참조 (spring.* 은 Spring Boot 전용 영역 유지).
 aws:
   s3:
     region: ${AWS_REGION:ap-northeast-2}
-    bucket: ${AWS_S3_BUCKET}
+    bucket: ${AWS_S3_BUCKET:}
+

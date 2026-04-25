@@ -52,6 +52,7 @@ def test_handle_generate_message_publishes_completed_envelope() -> None:
         "photos": [
           {
             "photoId": 101,
+            "s3Key": "stories/1/photos/101.png",
             "description": "Haesol put her feet in the ocean for the first time.",
             "hashtags": ["beach", "first_time"],
             "displayOrder": 1
@@ -95,6 +96,7 @@ def test_handle_regenerate_message_publishes_completed_envelope() -> None:
           "photos": [
             {
               "photoId": 101,
+              "s3Key": "stories/1/photos/101.png",
               "description": "Haesol put her feet in the ocean for the first time.",
               "hashtags": ["beach", "first_time"],
               "displayOrder": 1

@@ -15,6 +15,15 @@ def consume_storyboard_jobs() -> None:
     connection = create_connection()
     channel = create_channel(connection)
     declare_storyboard_topology(channel)
+    register_storyboard_consumers(channel)
+    try:
+        channel.start_consuming()
+    finally:
+        if connection.is_open:
+            connection.close()
+
+
+def register_storyboard_consumers(channel: Any) -> None:
     publisher = StoryResultPublisher(channel)
 
     channel.basic_consume(
@@ -29,11 +38,6 @@ def consume_storyboard_jobs() -> None:
             ch, method.delivery_tag, body, publisher
         ),
     )
-    try:
-        channel.start_consuming()
-    finally:
-        if connection.is_open:
-            connection.close()
 
 
 def _dispatch_generate_message(

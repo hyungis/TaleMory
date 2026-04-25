@@ -1,12 +1,16 @@
 import { useCallback, useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { LogoutButton } from '../../../features/auth'
 import { BookshelfModal } from '../../../features/bookshelf'
 import type { Story } from '../../../entities/story'
 import { ROUTES, buildViewerPath } from '../../../shared/constants'
-import { getDraftStory } from '../../../features/story-creation/basic-info/api/getDraftStory'
-import { deleteStory } from '../../../features/story-creation/basic-info/api/deleteStory'
-import type { StoryDraftResponse } from '../../../features/story-creation/basic-info/api/types'
-import { DraftResumeModal } from '../../../features/story-creation/basic-info/ui/DraftResumeModal'
+import {
+  getDraftStory,
+  deleteStory,
+  DraftResumeModal,
+} from '../../../features/story-creation'
+import type { StoryDraftResponse } from '../../../features/story-creation'
 
 interface BookstoreSceneProps {
   onBackToForest: () => void
@@ -110,18 +114,26 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
 
   return (
     <>
-      <button type="button" className="back-to-forest-btn" onClick={onBackToForest}>
-        <span className="icon">←</span>
+      <button type="button" className="back-to-forest-btn" onClick={onBackToForest} aria-label="숲으로 돌아가기">
+        <ArrowLeft className="icon" aria-hidden="true" />
       </button>
 
-      <button type="button" className="open-library-btn" onClick={handleOpenLibrary}>
-        <span className="icon">📚</span>
-        <span>우리 가족 책장</span>
-      </button>
+      {/* 우상단 버튼 그룹 — CSS flex 컨테이너 */}
+      <div className="bookstore-action-buttons">
+        <button type="button" className="bookstore-action-btn" onClick={handleOpenLibrary} aria-label="우리 가족 책장 열기">
+          <span className="icon" aria-hidden="true">📚</span>
+          <span>우리 가족 책장</span>
+        </button>
 
-      <img src="/bookstore.png" alt="서점 내부" className="bookstore-bg" draggable={false} />
+        <button type="button" className="bookstore-action-btn" onClick={() => navigate(ROUTES.mypage)} aria-label="마이페이지로 이동">
+          <span className="icon" aria-hidden="true">👤</span>
+          <span>마이페이지</span>
+        </button>
 
-      {/* TODO(S14P31S210-76, Task 4~8): steps-container (STEP 0: 책장 대시보드, STEP 1~5: 제작 플로우) */}
+        <LogoutButton />
+      </div>
+
+      <img src="/bookstore.png" alt="서점 배경" className="bookstore-bg" draggable={false} />
 
       <BookshelfModal
         isOpen={isLibraryOpen}

@@ -3,17 +3,19 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BasicInfoStep,
   PhotoManagerStep,
-  StoryTextStep,
+  PromptStep,
   StoryboardEditorStep,
   StyleSelectorStep,
   VoiceCloneStep,
   FinalPreviewStep,
   PublishStoryStep,
   useStoryCreationFlow,
+  rehydrateStep1,
 } from '../../features/story-creation'
-import type { UseStoryCreationFlowInit } from '../../features/story-creation/model/useStoryCreationFlow'
-import { rehydrateStep1 } from '../../features/story-creation/basic-info/lib/rehydrate'
-import type { StoryDraftResponse } from '../../features/story-creation/basic-info/api/types'
+import type {
+  UseStoryCreationFlowInit,
+  StoryDraftResponse,
+} from '../../features/story-creation'
 import { ROUTES, buildViewerPath } from '../../shared/constants'
 import { DUMMY_STORIES } from '../../entities/story'
 // bookshelf 모달과 동일 테마(step-forest-modal / bookshelf-scroll / bookshelf-fade-in)를 재사용하므로
@@ -95,16 +97,15 @@ export function CreationPage() {
 
       {flow.currentStep === 2 && (
         <PhotoManagerStep
-          data={flow.projectData.step2}
           storyId={flow.storyId}
-          onUpdate={flow.updateStep2}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
       )}
 
       {flow.currentStep === 3 && (
-        <StoryTextStep
+        <PromptStep
+          storyId={flow.storyId}
           data={flow.projectData.step3}
           onStoryChange={flow.updateStoryText}
           onBack={handleBack}

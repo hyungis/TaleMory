@@ -46,6 +46,7 @@ Spring Boot는 env var → property name 자동 변환:
 - `ENV_DIR`
 - `REGISTRY`
 - `APP_IMAGE_TAG`
+- `AI_WORKER_REPLICAS`
 
 ## 앱 표준 env (프레임워크가 직접 읽지만 코드에는 안 나타나는 경우)
 
@@ -53,6 +54,24 @@ Spring Boot는 env var → property name 자동 변환:
 - `VITE_API_BASE_URL` — Vite 빌드 시 자동 주입 (코드에서 `import.meta.env.VITE_API_BASE_URL`로 쓰면 grep에 걸림)
 
 → `DB_*` 3개는 backend `application.yml`이 `${DB_URL}`로 명시 참조해야 정상. 참조 없으면 Spring이 사실상 무시.
+
+## Fallback alias (코드에서만 참조되는 하위 폴백 — 선언 불필요)
+
+config.py 등에서 `getenv("X", getenv("Y"))` 패턴의 **두 번째 인자**로만 등장하는 키들. 실제로는 첫 번째 키가 주 이름이고 아래 키들은 "설정 안 했으면 이걸 대신 써"라는 레거시/공유 폴백. 따라서 `infra/env/*.local.env.example` / `infra/env/README.md`에 별도 선언 불필요.
+
+- `GOOGLE_API_KEY` — `GEMINI_API_KEY`의 폴백 (`app/ai/app/core/config.py`)
+- `RABBITMQ_USER` — `RABBITMQ_USERNAME`의 폴백 (`app/ai/app/core/config.py`)
+- `STORYBOARD_IMAGE_S3_BUCKET` — `AWS_S3_BUCKET`을 재사용 (별도 버킷 분리 시에만 직접 설정)
+- `STORYBOARD_IMAGE_S3_REGION` — `AWS_REGION`을 재사용
+- `STORYBOARD_IMAGE_S3_ACCESS_KEY_ID` — `AWS_ACCESS_KEY_ID`를 재사용
+- `STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY` — `AWS_SECRET_ACCESS_KEY`를 재사용
+
+## 선택 기능 (코드 참조 O, 기본값 None에서도 정상 동작 — 현재 미사용)
+
+`getenv("X")` 단독 호출이지만 **None일 때 호출부가 조건 분기로 graceful하게 처리**해서 값이 없어도 무관한 키들. 특정 환경/인프라(non-AWS S3, CDN 등) 도입 시에만 활성화.
+
+- `STORYBOARD_IMAGE_S3_ENDPOINT_URL` — MinIO 등 non-AWS S3 endpoint 쓸 때만. 미설정 시 boto3 기본 AWS 사용 (`app/ai/app/services/storyboard_image_service.py`의 `client_kwargs` 조건부 주입).
+- `STORYBOARD_IMAGE_PUBLIC_BASE_URL` — CloudFront 등 공개 CDN base URL. 미설정 시 presigned URL 경로로 폴백.
 
 ## 확장 규칙
 

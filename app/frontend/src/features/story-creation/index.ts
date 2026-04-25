@@ -1,4 +1,5 @@
 export { useStoryCreationFlow } from './model/useStoryCreationFlow'
+export type { UseStoryCreationFlowInit } from './model/useStoryCreationFlow'
 export type {
   StoryProject,
   StoryChild,
@@ -9,8 +10,16 @@ export type {
   StylePresetCode,
 } from './model/types'
 export { MAX_STEP } from './model/types'
-export { BasicInfoStep } from './basic-info'
+export {
+  BasicInfoStep,
+  DraftResumeModal,
+  getDraftStory,
+  deleteStory,
+  rehydrateStep1,
+} from './basic-info'
+export type { StoryDraftResponse } from './basic-info'
 export { PhotoManagerStep } from './photo-manager'
+export { PromptStep } from './storyboard-prompt'
 export {
   StoryTextStep,
   StoryboardEditorStep,
