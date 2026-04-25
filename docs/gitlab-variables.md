@@ -44,7 +44,7 @@ _(현재 공통으로 선언된 키 없음. 두 환경에서 값이 완전히 �
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_DEV_APP_FILE`**
+- Key: **`ENV_DEV_APP_ENV_FILE`**
 - Environment scope: `dev`
 - Protect: ❌ · Mask: ❌
 
@@ -98,7 +98,7 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AI_WORKER_REPLICAS=1
 ```
 
-- [x] `ENV_DEV_APP_FILE` 업로드 완료
+- [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
 
 ## ② APP — 개별 Masked Variables
 
@@ -119,7 +119,7 @@ AI_WORKER_REPLICAS=1
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_DEV_INFRA_FILE`**
+- Key: **`ENV_DEV_INFRA_ENV_FILE`**
 - Environment scope: `dev`
 - Protect: ❌ · Mask: ❌
 
@@ -133,7 +133,7 @@ RABBITMQ_PORT=5673
 RABBITMQ_MANAGEMENT_PORT=15673
 ```
 
-- [ ] `ENV_DEV_INFRA_FILE` 업로드 완료
+- [ ] `ENV_DEV_INFRA_ENV_FILE` 업로드 완료
 
 ## ④ Infra — 개별 Masked Variables
 
@@ -154,7 +154,7 @@ RABBITMQ_MANAGEMENT_PORT=15673
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_MASTER_APP_FILE`**
+- Key: **`ENV_MASTER_APP_ENV_FILE`**
 - Environment scope: `master`
 - Protect: ✅ · Mask: ❌
 
@@ -206,7 +206,7 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AI_WORKER_REPLICAS=2
 ```
 
-- [x] `ENV_MASTER_APP_FILE` 업로드 완료
+- [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료
 
 ## ② APP — 개별 Masked Variables
 
@@ -227,7 +227,7 @@ AI_WORKER_REPLICAS=2
 
 **Add variable**
 - Type: **File**
-- Key: **`ENV_MASTER_INFRA_FILE`**
+- Key: **`ENV_MASTER_INFRA_ENV_FILE`**
 - Environment scope: `master`
 - Protect: ✅ · Mask: ❌
 
@@ -241,7 +241,7 @@ RABBITMQ_PORT=5672
 RABBITMQ_MANAGEMENT_PORT=15672
 ```
 
-- [ ] `ENV_MASTER_INFRA_FILE` 업로드 완료
+- [ ] `ENV_MASTER_INFRA_ENV_FILE` 업로드 완료
 
 ## ④ Infra — 개별 Masked Variables
 
@@ -281,6 +281,62 @@ RABBITMQ_MANAGEMENT_PORT=15672
 - 값에 따옴표 절대 X (`KEY=value`)
 - 에디터에서 줄바꿈 **LF (Unix)** 로 저장
 - 비밀은 File 에 placeholder 만 두고 진짜 값은 개별 Masked Variable 로
+
+---
+
+## 신규 키 추가 시 — 코드 블록 갱신 방식 (예시)
+
+`/env-sync gitlab-vars` 재생성 시 **새로 추가된 비민감 키는 빈 줄 1개로 분리해 블록 말미에 모입니다.** Diff 가독성 + GitLab UI 부분 업데이트 편의를 위함.
+
+### 시나리오 — `STORYBOARD_VOICE_MODEL` 과 `RABBITMQ_VOICE_QUEUE` 가 신규 추가된 경우
+
+**재생성 직후 `docs/gitlab-variables.md` 의 DEV ① APP File 코드 블록:**
+
+```env
+SPRING_PROFILES_ACTIVE=dev
+DB_URL=jdbc:mysql://dev-mysql:3306/iportfolio?...
+DB_USERNAME=app
+... (이전 회차에 이미 있던 키들 — canonical 순서 유지)
+AI_WORKER_REPLICAS=1
+
+STORYBOARD_VOICE_MODEL=tts-1-hd
+RABBITMQ_VOICE_QUEUE=ai.voice.generate.request.queue
+```
+
+위 빈 줄 + 아래 두 줄이 **이번에 새로 들어간 부분**.
+
+### 사용자 작업 (GitLab UI)
+
+GitLab → Settings → CI/CD → Variables → `ENV_DEV_APP_ENV_FILE` → Edit → Value 편집 영역 끝으로 스크롤 → **빈 줄 + 신규 키들만 그대로 붙여넣기** → Save.
+
+전체 Value 를 다시 채울 필요 없음 (기존 블록은 변경 없으므로). 같은 작업을 `ENV_MASTER_APP_ENV_FILE` 에도 반복 (운영용 값 반영해서).
+
+### 다음 회차 재생성 시
+
+신규 키들은 "기존" 으로 분류되어 빈 줄 없이 **canonical 순서로 합쳐짐** → 블록은 다시 단일 단위. 사용자가 매번 새 키만 누적 붙여 넣어도 GitLab File Variable 의 최종 내용은 항상 doc 의 블록과 일치.
+
+```
+회차 N         회차 N+1
+─────         ─────
+기존키들      기존키들 (캐노니컬에 흡수)
+(빈 줄)       STORYBOARD_VOICE_MODEL  ← 캐노니컬 자리로
+신규키들      RABBITMQ_VOICE_QUEUE
+              (이번 회차의 새 키)
+              (빈 줄)
+              ...
+```
+
+### 개별 Masked Variable 신규 추가 시
+
+빈 줄 분리 없이 그냥 같은 섹션에 `- [ ]` 체크박스로 추가됩니다. 미체크 상태가 등록 미완료를 의미하므로 시각적 구분 불필요.
+
+```diff
+  ## ② APP — 개별 Masked Variables
+  ...
+  - [x] `ENV_DEV_APP_OPENAI_API_KEY`
+  - [x] `ENV_DEV_APP_GEMINI_API_KEY`
++ - [ ] `ENV_DEV_APP_NEW_API_TOKEN` — 새 외부 API 토큰   ← 신규 (미체크)
+```
 
 ---
 

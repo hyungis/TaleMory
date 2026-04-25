@@ -12,10 +12,10 @@ GitLab CI Variables는 **두 종류**로 등록된다 (하이브리드):
 
 ```
 GitLab CI Variables
-├── File Variable (Type=File)             ← 비밀이 아닌 설정값 묶음
-│     ENV_DEV_APP_FILE   = (env 파일 통째)
-│     ENV_DEV_INFRA_FILE = (env 파일 통째)
-│     ENV_MASTER_APP_FILE / ENV_MASTER_INFRA_FILE
+├── File Variable (Type=File)                 ← 비밀이 아닌 설정값 묶음
+│     ENV_DEV_APP_ENV_FILE   = (env 파일 통째)
+│     ENV_DEV_INFRA_ENV_FILE = (env 파일 통째)
+│     ENV_MASTER_APP_ENV_FILE / ENV_MASTER_INFRA_ENV_FILE
 │
 └── 개별 Variable (Type=Variable + Masked) ← 진짜 비밀값
       ENV_DEV_APP_DB_PASSWORD       = xxx
@@ -30,9 +30,9 @@ pipeline 실행 시 job 환경변수로 주입
           │
           ▼
 bash infra/scripts/generate-env.sh <dev|master>
-  ① ENV_<TARGET>_<SCOPE>_FILE 이 가리키는 파일을 base 로 cp
+  ① ENV_<TARGET>_<SCOPE>_ENV_FILE 이 가리키는 파일을 base 로 cp
   ② ENV_BASE_*, ENV_<TARGET>_<SCOPE>_* 개별 변수를 그 위에 append
-     (`_FILE` 자기 재귀는 awk 필터로 제외)
+     (하이브리드 키 `ENV_FILE` 만 awk 필터로 제외 — 자기 재귀 방지)
           │
           ▼
 출력:
@@ -95,18 +95,18 @@ infra/compose/docker-compose.{app,infra}-<target>.yml 이 env_file 로 주입
 
 | Prefix 형식 | GitLab Type | 투입되는 파일 | 대상 컨테이너 |
 |---|---|---|---|
-| `ENV_<TARGET>_APP_FILE` | **File** | `app.<target>.env` (통째 cp) | backend + frontend + ai |
-| `ENV_<TARGET>_INFRA_FILE` | **File** | `infra.<target>.env` (통째 cp) | mysql / redis / rabbitmq |
+| `ENV_<TARGET>_APP_ENV_FILE` | **File** | `app.<target>.env` (통째 cp) | backend + frontend + ai |
+| `ENV_<TARGET>_INFRA_ENV_FILE` | **File** | `infra.<target>.env` (통째 cp) | mysql / redis / rabbitmq |
 | `ENV_BASE_<KEY>` | Variable | `app.*.env` + `infra.*.env` 양쪽 | 공통 |
 | `ENV_<TARGET>_APP_<KEY>` | Variable (Masked 권장) | `app.<target>.env` (append) | backend + frontend + ai |
 | `ENV_<TARGET>_INFRA_<KEY>` | Variable (Masked 권장) | `infra.<target>.env` (append) | mysql / redis / rabbitmq |
 
-`<TARGET>` ∈ `DEV`, `MASTER`. **`_FILE` 자체가 prefix 매칭에 다시 걸리지 않도록 `generate-env.sh` 가 awk 로 제외 처리** (재귀 방지).
+`<TARGET>` ∈ `DEV`, `MASTER`. **하이브리드 키만 정확히 차단**하기 위해 `generate-env.sh` 의 awk 필터는 prefix strip 후 `ENV_FILE` 과 정확 일치하는 경우에만 제외 — `TLS_CERT_FILE`, `CONFIG_FILE` 같은 일반 `_FILE` 접미사 변수는 영향 없이 통과.
 
 변환 예시:
 
 ```
-ENV_DEV_APP_FILE=/runner/build/var/abc      → /tmp/env/app.dev.env 로 통째 cp (base)
+ENV_DEV_APP_ENV_FILE=/runner/build/var/abc  → /tmp/env/app.dev.env 로 통째 cp (base)
 ENV_BASE_REDIS_HOST=redis                   → REDIS_HOST=redis  (양쪽 파일에 append)
 ENV_DEV_APP_DB_PASSWORD=xxx                 → DB_PASSWORD=xxx   (app.dev.env 에 append, File 보다 뒤)
 ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.env 에 append)

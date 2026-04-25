@@ -5,9 +5,11 @@
 #
 #   ① File Variable                                                          (1단계 — base)
 #      - GitLab Type=File 로 등록한 변수. runner 가 임시 파일 경로로 주입.
-#      - ENV_<TARGET>_APP_FILE   →  /tmp/env/app.<target>.env  로 복사
-#      - ENV_<TARGET>_INFRA_FILE →  /tmp/env/infra.<target>.env 로 복사
+#      - ENV_<TARGET>_APP_ENV_FILE   →  /tmp/env/app.<target>.env  로 복사
+#      - ENV_<TARGET>_INFRA_ENV_FILE →  /tmp/env/infra.<target>.env 로 복사
 #      - 비밀이 아닌 일반 설정값 묶음 (DB_URL, FRONTEND_PORT 등 수십 개).
+#      - 키 접미사 `_ENV_FILE` 은 하이브리드 스킴 전용 — 일반 `_FILE` 변수
+#        (TLS_CERT_FILE, CONFIG_FILE 등) 와 명확히 구분.
 #
 #   ② Prefix Variables                                                       (2단계 — append)
 #      - GitLab Type=Variable + Masked 로 등록한 개별 변수. (PASSWORD/SECRET/KEY 류)
@@ -41,26 +43,28 @@ INFRA_OUT="$OUT_DIR/infra.${TARGET}.env"
 # ── ① File Variable 복사 (있을 때만) ────────────────────────────────────
 # GitLab File 변수는 runner 환경에 `KEY=/path/to/tmpfile` 형태로 주입된다.
 # 변수 자체가 미설정이거나 파일이 사라졌으면 조용히 스킵 → 기존 prefix-only 흐름과 동일.
-APP_FILE_VAR="ENV_${target_upper}_APP_FILE"
-INFRA_FILE_VAR="ENV_${target_upper}_INFRA_FILE"
+APP_ENV_FILE_VAR="ENV_${target_upper}_APP_ENV_FILE"
+INFRA_ENV_FILE_VAR="ENV_${target_upper}_INFRA_ENV_FILE"
 
-if [[ -n "${!APP_FILE_VAR:-}" && -f "${!APP_FILE_VAR}" ]]; then
-  cp "${!APP_FILE_VAR}" "$APP_OUT"
-  echo "copied ($APP_FILE_VAR) → $APP_OUT"
+if [[ -n "${!APP_ENV_FILE_VAR:-}" && -f "${!APP_ENV_FILE_VAR}" ]]; then
+  cp "${!APP_ENV_FILE_VAR}" "$APP_OUT"
+  echo "copied ($APP_ENV_FILE_VAR) → $APP_OUT"
 else
   : > "$APP_OUT"
 fi
 
-if [[ -n "${!INFRA_FILE_VAR:-}" && -f "${!INFRA_FILE_VAR}" ]]; then
-  cp "${!INFRA_FILE_VAR}" "$INFRA_OUT"
-  echo "copied ($INFRA_FILE_VAR) → $INFRA_OUT"
+if [[ -n "${!INFRA_ENV_FILE_VAR:-}" && -f "${!INFRA_ENV_FILE_VAR}" ]]; then
+  cp "${!INFRA_ENV_FILE_VAR}" "$INFRA_OUT"
+  echo "copied ($INFRA_ENV_FILE_VAR) → $INFRA_OUT"
 else
   : > "$INFRA_OUT"
 fi
 
 # ── ② Prefix-based 개별 변수 append ──────────────────────────────────────
 # 동일 키가 ①·② 양쪽에 있으면 나중에 append 된 ② 값이 최종 사용됨.
-# `_FILE` 로 끝나는 키 자체가 prefix 매칭에 걸리는 것을 막기 위해 제외 (재귀 방지).
+# 하이브리드 File 변수(`ENV_<TARGET>_<SCOPE>_ENV_FILE`) 자체가 prefix 매칭에
+# 걸리는 것을 막기 위해 제외 (재귀 방지). 정확히 `ENV_FILE` 키만 차단하므로
+# 일반 `_FILE` 접미사 변수(TLS_CERT_FILE, CONFIG_FILE 등) 는 영향 없음.
 append_prefix_match() {
   local prefix="$1"
   local out="$2"
@@ -68,7 +72,7 @@ append_prefix_match() {
     index($0, p) == 1 {
       sub("^" p, "")
       split($0, kv, "=")
-      if (kv[1] ~ /_FILE$/ || kv[1] == "FILE") next
+      if (kv[1] == "ENV_FILE") next
       print
     }
   ' >> "$out"

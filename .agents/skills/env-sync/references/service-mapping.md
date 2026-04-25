@@ -57,16 +57,38 @@ add 모드에서 frontend 대상이면 이 규칙을 사용자에게 확인 후 
 
 dev/master 공통값은 `ENV_BASE_*`로 넣으면 generate-env.sh가 양쪽 파일에 모두 주입. 하지만 실제로는 거의 다르므로 `ENV_BASE_*`는 드물게만 사용.
 
-## 참고: generate-env.sh의 동작
+## 참고: generate-env.sh 의 동작 (하이브리드)
 
-`infra/scripts/generate-env.sh <target>`이 GitLab Variables의 prefix를 벗겨 env 파일로 변환:
+`infra/scripts/generate-env.sh <target>` 은 **두 종류의 GitLab Variables** 를 합쳐 env 파일로 변환:
+
+### ① File Variable (하이브리드 base)
 
 ```
-ENV_DEV_APP_DB_PASSWORD=xxx   →   DB_PASSWORD=xxx   (in app.dev.env)
-ENV_DEV_INFRA_MYSQL_ROOT_PASSWORD=yyy   →   MYSQL_ROOT_PASSWORD=yyy   (in infra.dev.env)
+ENV_<TARGET>_APP_ENV_FILE     →  /tmp/env/app.<target>.env   (통째 cp)
+ENV_<TARGET>_INFRA_ENV_FILE   →  /tmp/env/infra.<target>.env (통째 cp)
 ```
 
-즉 `infra/env/README.md`의 테이블에는 **prefix 없는 최종 키 이름**으로 기재 (`DB_PASSWORD`, `ENV_DEV_APP_DB_PASSWORD` 아님). prefix는 GitLab Variables 등록 시점에만 붙는 메타데이터.
+GitLab Type=File 변수. runner 가 임시 파일 경로로 주입하면 그대로 cp. 비밀이 아닌 설정값 ~30개 묶음.
+
+### ② 개별 Variable (하이브리드 append)
+
+```
+ENV_DEV_APP_DB_PASSWORD=xxx          →   DB_PASSWORD=xxx    (in app.dev.env, append)
+ENV_DEV_INFRA_MYSQL_ROOT_PASSWORD=y  →   MYSQL_ROOT_PASSWORD=y (in infra.dev.env, append)
+```
+
+GitLab Type=Variable + Masked. prefix 떼고 ① 위에 append. 동일 키 충돌 시 **마지막 값(개별) 이 이김** — Docker Compose `env_file:` 표준.
+
+### 명명 규칙
+
+| 변수 종류 | 키 패턴 | 자동 매칭 필터 |
+|---|---|---|
+| File 변수 (하이브리드 전용) | `ENV_<TARGET>_<SCOPE>_ENV_FILE` | `generate-env.sh` 의 awk 가 prefix strip 후 `ENV_FILE` 정확 매칭으로 차단 (자기 재귀 방지) |
+| 일반 `_FILE` 접미사 변수 (TLS_CERT_FILE 등) | `ENV_<TARGET>_<SCOPE>_<KEY_FILE>` | 정상 통과 (`ENV_FILE` 과 다름) |
+
+즉 `infra/env/README.md` 의 테이블에는 **prefix 없는 최종 키 이름**으로 기재 (`DB_PASSWORD`, `ENV_DEV_APP_DB_PASSWORD` 아님). prefix 는 GitLab Variables 등록 시점에만 붙는 메타데이터.
+
+`ENV_FILE` 접미사는 **하이브리드 스킴 전용 예약어** — env-sync 가 자동 추가/검사하지 않음. 사용자가 GitLab UI 에서 직접 4개 등록 (DEV/MASTER × APP/INFRA).
 
 ## 파일 위치 체크리스트
 
