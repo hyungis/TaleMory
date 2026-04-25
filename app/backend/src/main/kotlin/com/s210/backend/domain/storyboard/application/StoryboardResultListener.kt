@@ -5,8 +5,10 @@ import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.story.entity.StoryBoard
+import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.slf4j.LoggerFactory
@@ -37,6 +39,7 @@ import java.time.LocalDateTime
 class StoryboardResultListener(
     private val jobRepository: StoryGenerationJobRepository,
     private val storyBoardRepository: StoryBoardRepository,
+    private val storyboardPageRepository: StoryboardPageRepository,
     private val storyRepository: StoryRepository,
     private val objectMapper: ObjectMapper,
 ) {
@@ -108,22 +111,46 @@ class StoryboardResultListener(
 
         // 3) 동화 메타 row — upsert: 같은 storyId 의 story_board 가 있으면 내용만 교체.
         //    (재생성해도 row 가 새로 생기지 않도록. story_generation_jobs 는 이력용으로 쌓임.)
-        val existing = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
-        if (existing != null) {
-            existing.story = koreanBody
-            existing.updateAt = LocalDate.now()
-        } else {
-            storyBoardRepository.save(
-                StoryBoard(
-                    storyId = job.storyId,
-                    prompt = "",
-                    story = koreanBody,
-                    createAt = LocalDate.now(),
-                ),
-            )
+        //    이후 storyboard_pages 갈아끼우기에 storyBoard.id 를 사용해야 하므로 한 변수로 묶어둔다.
+        val storyBoard = run {
+            val existing = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
+            if (existing != null) {
+                existing.story = koreanBody
+                existing.updateAt = LocalDate.now()
+                existing
+            } else {
+                storyBoardRepository.save(
+                    StoryBoard(
+                        storyId = job.storyId,
+                        prompt = "",
+                        story = koreanBody,
+                        createAt = LocalDate.now(),
+                    ),
+                )
+            }
         }
 
-        // 4) FE Step 3 가 즉시 보여줄 수 있도록 Story 엔티티에도 한글 본문 반영.
+        // 4) 페이지 단위 진실 테이블(storyboard_pages) 갈아끼우기.
+        //    - 줄거리 재생성 시 페이지 수가 바뀔 수 있으므로 delete-then-insert.
+        //    - sceneSummary / imagePrompt 까지 함께 보존해야 이후 이미지 생성 단계에서
+        //      storyboard_pages 단일 소스로 페이로드를 조립할 수 있다 (옵션 D').
+        //    - bulk DELETE (flushAutomatically=true) 로 UK(storyBoardId, pageNumber) 충돌 회피.
+        storyboardPageRepository.deleteAllByStoryBoardId(storyBoard.id)
+        storyboardPageRepository.saveAll(
+            payload.pages.map { p ->
+                StoryboardPage(
+                    storyBoardId = storyBoard.id,
+                    pageNumber = p.pageNumber,
+                    englishText = p.englishText,
+                    koreanText = p.koreanText,
+                    sceneSummary = p.sceneSummary,
+                    imagePrompt = p.imagePrompt,
+                    imageUrl = null,
+                )
+            },
+        )
+
+        // 5) FE Step 3 가 즉시 보여줄 수 있도록 Story 엔티티에도 한글 본문 반영.
         storyRepository.findById(job.storyId).ifPresent { story ->
             story.title = payload.title
             story.synopsis = koreanBody
