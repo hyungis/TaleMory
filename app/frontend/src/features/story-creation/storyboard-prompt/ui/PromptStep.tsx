@@ -70,23 +70,27 @@ export function PromptStep({ storyId, data, onStoryChange, onBack, onNext }: Pro
   // 화면 표시용 본문 — pages 가 있으면 그것이 진실, 없으면 sessionStorage 복구값으로 fallback.
   const displayBody = koreanBodyFromPages.length > 0 ? koreanBodyFromPages : data.story
 
-  // Job SUCCESS 도달 시:
-  //  1) parent state(step3.story) 동기화 — 새로고침 시 즉시 표시 가능하도록
-  //  2) storyboard-pages 캐시 invalidate — 즉시 새 페이지 fetch
+  // Job SUCCESS 도달 시점에 한 번만 실행되도록 의존성을 좁힌다.
+  //  - status 만 의존성에 두면 "PENDING/RUNNING → SUCCESS" 1회 transition 에서만 트리거됨.
+  //  - jobQuery.data 통째로 두면 React Query 의 background refetch 마다 ref 가 바뀌어
+  //    invalidateQueries 가 반복 호출될 위험이 있어 분리.
+  //  - onStoryChange / queryClient 는 안정적인 ref (각각 useCallback / context) 라 deps 에서 제외.
   useEffect(() => {
-    if (jobQuery.data?.status === 'SUCCESS' && jobQuery.data.resultPayload && storyId !== null) {
-      const payload = jobQuery.data.resultPayload
-      const koreanBody =
-        payload.pages
-          .slice()
-          .sort((a, b) => a.pageNumber - b.pageNumber)
-          .map(p => p.koreanText.trim())
-          .filter(t => t.length > 0)
-          .join('\n\n') || payload.synopsis
-      onStoryChange(koreanBody)
-      void queryClient.invalidateQueries({ queryKey: ['storyboard-pages', storyId] })
-    }
-  }, [jobQuery.data, onStoryChange, queryClient, storyId])
+    if (jobQuery.data?.status !== 'SUCCESS') return
+    const payload = jobQuery.data.resultPayload
+    if (!payload || storyId === null) return
+
+    const koreanBody =
+      payload.pages
+        .slice()
+        .sort((a, b) => a.pageNumber - b.pageNumber)
+        .map(p => p.koreanText.trim())
+        .filter(t => t.length > 0)
+        .join('\n\n') || payload.synopsis
+    onStoryChange(koreanBody)
+    void queryClient.invalidateQueries({ queryKey: ['storyboard-pages', storyId] })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobQuery.data?.status, storyId])
 
   const triggerGenerate = useCallback(
     async (promptText?: string) => {
