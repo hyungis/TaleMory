@@ -1,11 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { Image as ImageIcon, Loader2, Wand2 } from 'lucide-react'
-import type { StoryProject } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
 import { PhotoUploadZone } from './PhotoUploadZone'
 import { PhotoItem } from './PhotoItem'
 import { EmptyPhotoState } from './EmptyPhotoState'
-import { StoryPromptModal } from './StoryPromptModal'
 import { usePhotosQuery } from '../model/usePhotosQuery'
 import { usePhotoUpload } from '../model/usePhotoUpload'
 import { useDeletePhoto } from '../model/useDeletePhoto'
@@ -14,10 +12,8 @@ import { useReorderPhotos } from '../model/useReorderPhotos'
 import { MAX_PHOTOS } from '../lib/constants'
 
 interface PhotoManagerStepProps {
-  data: StoryProject['step2']
   /** BasicInfoStep 에서 POST/PATCH 후 받은 story id. null 이면 업로드 불가 상태로 fallback. */
   storyId: number | null
-  onUpdate: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   onBack: () => void
   onNext: () => void
 }
@@ -32,14 +28,12 @@ interface PhotoManagerStepProps {
  *
  * 로컬 상태는 업로드 중/실패인 사진만 보관. commit 성공한 사진은 useQuery 의 서버 데이터로 승격.
  */
-export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: PhotoManagerStepProps) {
+export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepProps) {
   const photosQuery = usePhotosQuery(storyId)
   const upload = usePhotoUpload(storyId)
   const deleteMutation = useDeletePhoto(storyId)
   const updateMutation = useUpdatePhoto(storyId)
   const reorderMutation = useReorderPhotos(storyId)
-
-  const [isPromptOpen, setIsPromptOpen] = useState(false)
 
   const serverPhotos = photosQuery.data ?? []
   const totalCount = serverPhotos.length + upload.pending.length
@@ -78,13 +72,6 @@ export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: Ph
     },
     [serverPhotos, reorderMutation],
   )
-
-  const handleOpenPrompt = useCallback(() => setIsPromptOpen(true), [])
-  const handleClosePrompt = useCallback(() => setIsPromptOpen(false), [])
-  const handleApplyPrompt = useCallback(() => {
-    setIsPromptOpen(false)
-    onNext()
-  }, [onNext])
 
   const canProceed = serverPhotos.length > 0 && upload.pending.every(p => p.status === 'error' || false)
 
@@ -185,24 +172,16 @@ export function PhotoManagerStep({ data, storyId, onUpdate, onBack, onNext }: Ph
               </button>
               <button
                 type="button"
-                onClick={handleOpenPrompt}
+                onClick={onNext}
                 disabled={!canProceed}
                 className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
-                스토리보드 만들기 <Wand2 className="w-5 h-5" />
+                다음: 스토리 만들기 <Wand2 className="w-5 h-5" />
               </button>
             </div>
           </div>
         </main>
       </div>
-
-      <StoryPromptModal
-        isOpen={isPromptOpen}
-        prompt={data.prompt}
-        onPromptChange={value => onUpdate('prompt', value)}
-        onClose={handleClosePrompt}
-        onApply={handleApplyPrompt}
-      />
     </div>
   )
 }

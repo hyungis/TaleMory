@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BasicInfoStep,
   PhotoManagerStep,
-  StoryTextStep,
+  PromptStep,
   StoryboardEditorStep,
   StyleSelectorStep,
   VoiceCloneStep,
@@ -97,16 +97,15 @@ export function CreationPage() {
 
       {flow.currentStep === 2 && (
         <PhotoManagerStep
-          data={flow.projectData.step2}
           storyId={flow.storyId}
-          onUpdate={flow.updateStep2}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
       )}
 
       {flow.currentStep === 3 && (
-        <StoryTextStep
+        <PromptStep
+          storyId={flow.storyId}
           data={flow.projectData.step3}
           onStoryChange={flow.updateStoryText}
           onBack={handleBack}
@@ -116,9 +115,7 @@ export function CreationPage() {
 
       {flow.currentStep === 4 && (
         <StoryboardEditorStep
-          storySummary={flow.projectData.step3.story}
-          pages={flow.projectData.step4.pages}
-          onPageUpdate={flow.updateStoryboardPage}
+          storyId={flow.storyId}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
