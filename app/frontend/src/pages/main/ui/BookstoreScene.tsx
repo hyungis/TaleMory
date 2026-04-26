@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from '../../../features/auth'
-import { BookshelfModal } from '../../../features/bookshelf'
+import { BookshelfModal, getMyStories, deleteStoryById, getShareLink, publishStory, mapApiToStory } from '../../../features/bookshelf'
 import type { Story } from '../../../entities/story'
 import { ROUTES, buildViewerPath } from '../../../shared/constants'
 import {
@@ -31,9 +31,27 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
   const [draft, setDraft] = useState<StoryDraftResponse | null>(null)
   const [isResolvingDraft, setIsResolvingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
+  const [stories, setStories] = useState<Story[]>([])
+  const [storiesLoading, setStoriesLoading] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  const handleOpenLibrary = useCallback(() => {
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 2500)
+  }, [])
+
+  const handleOpenLibrary = useCallback(async () => {
     setIsLibraryOpen(true)
+    setStoriesLoading(true)
+    try {
+      const result = await getMyStories()
+      setStories(result.map(mapApiToStory))
+    } catch {
+      // API 실패 시 빈 목록 표시
+      setStories([])
+    } finally {
+      setStoriesLoading(false)
+    }
   }, [])
 
   const handleCloseLibrary = useCallback(() => {
@@ -112,6 +130,34 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
     [navigate],
   )
 
+  const handleDeleteStory = useCallback(async (story: Story) => {
+    if (!window.confirm(`"${story.title}" 을(를) 정말 삭제하시겠어요?`)) return
+    try {
+      await deleteStoryById(story.id)
+      setStories(prev => prev.filter(s => s.id !== story.id))
+      showToast('동화가 삭제되었습니다.')
+    } catch {
+      showToast('삭제에 실패했습니다.')
+    }
+  }, [showToast])
+
+  const handleShareStory = useCallback(async (story: Story) => {
+    try {
+      let shareData: { shareToken: string; shareUrl: string }
+      if (story.status === 'PUBLISHED') {
+        shareData = await getShareLink(story.id)
+      } else {
+        shareData = await publishStory(story.id)
+        setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'PUBLISHED', shareToken: shareData.shareToken } : s))
+      }
+      const fullUrl = `${window.location.origin}${shareData.shareUrl}`
+      await navigator.clipboard.writeText(fullUrl)
+      showToast('공유 링크가 복사되었습니다!')
+    } catch {
+      showToast('공유 링크 생성에 실패했습니다.')
+    }
+  }, [showToast])
+
   return (
     <>
       <button type="button" className="back-to-forest-btn" onClick={onBackToForest} aria-label="숲으로 돌아가기">
@@ -140,6 +186,10 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
         onClose={handleCloseLibrary}
         onCreateStory={handleCreateStory}
         onReadStory={handleReadStory}
+        onShareStory={handleShareStory}
+        onDeleteStory={handleDeleteStory}
+        stories={stories}
+        isLoading={storiesLoading}
       />
 
       {draft && (
@@ -153,8 +203,14 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
       )}
 
       {draftError && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-[#8b3a2a] text-[#f0e6c0] px-5 py-3 rounded-full shadow-lg text-sm">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[6000] bg-[#8b3a2a] text-[#f0e6c0] px-5 py-3 rounded-full shadow-lg text-sm">
           {draftError}
+        </div>
+      )}
+
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[6000] bg-[#2d5a27] text-[#f0e6c0] px-5 py-3 rounded-full shadow-lg text-sm font-bold">
+          {toastMessage}
         </div>
       )}
     </>

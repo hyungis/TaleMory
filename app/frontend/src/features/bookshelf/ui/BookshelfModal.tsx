@@ -14,8 +14,14 @@ interface BookshelfModalProps {
   onCreateStory?: () => void
   /** 개별 카드 "읽기" 버튼. Task 9(viewer) 에서 연결. */
   onReadStory?: (story: Story) => void
+  /** 개별 카드 "공유" 버튼. */
+  onShareStory?: (story: Story) => void
+  /** 개별 카드 "삭제" 버튼. */
+  onDeleteStory?: (story: Story) => void
   /** 렌더할 책 목록. 미제공 시 DUMMY_STORIES 사용. */
   stories?: Story[]
+  /** 목록 로딩 중 여부. */
+  isLoading?: boolean
 }
 
 /**
@@ -31,7 +37,10 @@ export function BookshelfModal({
   onClose,
   onCreateStory,
   onReadStory,
+  onShareStory,
+  onDeleteStory,
   stories = DUMMY_STORIES,
+  isLoading = false,
 }: BookshelfModalProps) {
   const { paged, filtered, activeFilters, toggleFilter, sort, updateSort, page, setPage, totalPages } =
     useBookshelf(stories)
@@ -78,7 +87,13 @@ export function BookshelfModal({
               </div>
 
               {/* 책 그리드 (현재 페이지만) */}
-              <StoryGrid stories={paged} onRead={onReadStory} />
+              {isLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-10 h-10 border-4 border-[#b4dc8c]/30 border-t-[#b4dc8c] rounded-full animate-spin" />
+                </div>
+              ) : (
+                <StoryGrid stories={paged} onRead={onReadStory} onShare={onShareStory} onDelete={onDeleteStory} />
+              )}
 
               {/* 페이지네이션 (1페이지 초과시만) */}
               {totalPages > 1 && (

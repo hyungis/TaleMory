@@ -6,4 +6,5 @@
 export { InvitationCard } from './invitation/ui/InvitationCard'
 export { StoryBookViewer } from './story-book/ui/StoryBookViewer'
 export { useStoryViewQuery } from './model/useStoryViewQuery'
+export { usePublicStoryViewQuery } from './model/usePublicStoryViewQuery'
 export type { StoryView, SceneView, SentenceView, OutroView } from './model/types'
