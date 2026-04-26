@@ -7,11 +7,15 @@ import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.application.dto.StoryResult
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
+import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.model.StoryStatus
+import com.s210.backend.domain.story.presentation.response.ShareLinkResponse
+import com.s210.backend.domain.story.presentation.response.StoryResponse
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import java.util.UUID
 
 /**
  * 동화 제작 워크스페이스의 진입 스토리 (DRAFT) 를 생성/수정하는 유스케이스.
@@ -25,6 +29,7 @@ import java.time.LocalDateTime
 @Transactional
 class StoryService(
     private val storyRepository: StoryRepository,
+    private val sceneRepository: SceneRepository,
 ) {
     /**
      * 로그인 유저의 "진행 중인 동화" 1건(최신 DRAFT) 을 반환한다.
@@ -81,6 +86,80 @@ class StoryService(
     fun removeStory(userId: Long, storyId: Long) {
         val story = ownedStory(userId, storyId)
         story.deletedAt = LocalDateTime.now()
+    }
+
+    /**
+     * 내 동화 목록 조회. soft-delete 제외, 최신순.
+     * Scene 정보를 벌크 로딩해 sceneCount / coverImageUrl 을 포함한다.
+     */
+    @Transactional(readOnly = true)
+    fun findStories(userId: Long): List<StoryResponse> {
+        val stories = storyRepository.findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
+        if (stories.isEmpty()) return emptyList()
+
+        val storyIds = stories.map { it.id }
+        val scenesByStory = sceneRepository
+            .findByStoryIdInOrderByStoryIdAscPageNumberAsc(storyIds)
+            .groupBy { it.storyId }
+
+        return stories.map { story ->
+            val scenes = scenesByStory[story.id].orEmpty()
+            StoryResponse(
+                id = story.id,
+                title = story.title,
+                difficulty = story.difficulty.name,
+                status = story.status.name,
+                isBookmarked = story.isBookmarked,
+                travelPlace = story.travelPlace,
+                travelStartDate = story.travelStartDate,
+                travelEndDate = story.travelEndDate,
+                publishedAt = story.publishedAt,
+                createdAt = story.createdAt,
+                sceneCount = scenes.size,
+                coverImageUrl = scenes.firstOrNull()?.illustrationUrl,
+                shareToken = story.shareToken,
+            )
+        }
+    }
+
+    /**
+     * 동화 공개(출판). DRAFT → PUBLISHED 전환 + shareToken 발급.
+     */
+    fun publishStory(userId: Long, storyId: Long): ShareLinkResponse {
+        val story = ownedStory(userId, storyId)
+        if (story.status == StoryStatus.PUBLISHED) {
+            return ShareLinkResponse(
+                shareToken = story.shareToken!!,
+                shareUrl = "/shared/${story.shareToken}",
+            )
+        }
+        story.status = StoryStatus.PUBLISHED
+        story.publishedAt = LocalDateTime.now()
+        if (story.shareToken == null) {
+            story.shareToken = UUID.randomUUID().toString().replace("-", "")
+        }
+        return ShareLinkResponse(
+            shareToken = story.shareToken!!,
+            shareUrl = "/shared/${story.shareToken}",
+        )
+    }
+
+    /**
+     * 공유 링크 조회. PUBLISHED 상태가 아니면 409.
+     * shareToken 이 아직 없으면 자동 발급.
+     */
+    fun findShareLink(userId: Long, storyId: Long): ShareLinkResponse {
+        val story = ownedStory(userId, storyId)
+        if (story.status != StoryStatus.PUBLISHED) {
+            throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        }
+        if (story.shareToken == null) {
+            story.shareToken = UUID.randomUUID().toString().replace("-", "")
+        }
+        return ShareLinkResponse(
+            shareToken = story.shareToken!!,
+            shareUrl = "/shared/${story.shareToken}",
+        )
     }
 
     /**

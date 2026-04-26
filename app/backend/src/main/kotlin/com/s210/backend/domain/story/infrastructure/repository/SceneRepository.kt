@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface SceneRepository : JpaRepository<Scene, Long> {
     fun findByStoryIdOrderByPageNumberAsc(storyId: Long): List<Scene>
+    fun findByStoryIdInOrderByStoryIdAscPageNumberAsc(storyIds: List<Long>): List<Scene>
 }
