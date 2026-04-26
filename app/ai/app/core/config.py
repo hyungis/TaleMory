@@ -27,8 +27,11 @@ class Settings(BaseModel):
     ENVIRONMENT: str = getenv("ENVIRONMENT", "local")
     OPENAI_API_KEY: str | None = getenv("OPENAI_API_KEY")
     GEMINI_API_KEY: str | None = getenv("GEMINI_API_KEY", getenv("GOOGLE_API_KEY"))
+    REPLICATE_API_TOKEN: str | None = getenv("REPLICATE_API_TOKEN")
     STORYBOARD_MODEL: str = getenv("STORYBOARD_MODEL", "gpt-4o-mini")
     STORYBOARD_IMAGE_MODEL: str = getenv("STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
+    FINAL_ILLUSTRATION_MODEL: str = getenv("FINAL_ILLUSTRATION_MODEL", "black-forest-labs/flux-2-klein-9b")
+    FINAL_ILLUSTRATION_REPLICATE_VERSION: str | None = getenv("FINAL_ILLUSTRATION_REPLICATE_VERSION")
     STORYBOARD_IMAGE_S3_BUCKET: str | None = getenv("STORYBOARD_IMAGE_S3_BUCKET", getenv("AWS_S3_BUCKET"))
     STORYBOARD_IMAGE_S3_REGION: str | None = getenv("STORYBOARD_IMAGE_S3_REGION", getenv("AWS_REGION"))
     STORYBOARD_IMAGE_S3_ACCESS_KEY_ID: str | None = getenv(
@@ -41,6 +44,10 @@ class Settings(BaseModel):
     )
     STORYBOARD_IMAGE_S3_ENDPOINT_URL: str | None = getenv("STORYBOARD_IMAGE_S3_ENDPOINT_URL")
     STORYBOARD_IMAGE_PUBLIC_BASE_URL: str | None = getenv("STORYBOARD_IMAGE_PUBLIC_BASE_URL")
+    FINAL_ILLUSTRATION_PUBLIC_BASE_URL: str | None = getenv(
+        "FINAL_ILLUSTRATION_PUBLIC_BASE_URL",
+        getenv("STORYBOARD_IMAGE_PUBLIC_BASE_URL"),
+    )
     STORYBOARD_INPUT_COST_PER_1M: float = float(getenv("STORYBOARD_INPUT_COST_PER_1M", "0.15"))
     STORYBOARD_OUTPUT_COST_PER_1M: float = float(getenv("STORYBOARD_OUTPUT_COST_PER_1M", "0.60"))
     AWS_REGION: str | None = getenv("AWS_REGION")
@@ -82,6 +89,30 @@ class Settings(BaseModel):
         "RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY",
         "ai.image.regenerate",
     )
+    RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE",
+        "ai.final-illustration.generate.request.queue",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE",
+        "ai.final-illustration.generate.item.request.queue",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_QUEUE: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_QUEUE",
+        "ai.final-illustration.regenerate.request.queue",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY",
+        "ai.image.final-illustration.generate",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY",
+        "ai.image.final-illustration.generate.item",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_ROUTING_KEY",
+        "ai.image.final-illustration.regenerate",
+    )
     RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY",
         "ai.result.story.generate.completed",
@@ -113,6 +144,22 @@ class Settings(BaseModel):
     RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY",
         "ai.result.image.regenerate.failed",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.final-illustration.generate.completed",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY",
+        "ai.result.final-illustration.generate.failed",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.final-illustration.regenerate.completed",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_FAILED_ROUTING_KEY",
+        "ai.result.final-illustration.regenerate.failed",
     )
 
 
