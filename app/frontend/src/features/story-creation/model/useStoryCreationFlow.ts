@@ -138,9 +138,19 @@ export interface UseStoryCreationFlowInit {
  * `init` 으로 서버 DRAFT rehydrate 값을 주입하면 초기 state 로 사용된다 (이후에는 로컬 편집).
  */
 export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryCreationFlowResult {
-  // `init` (서버 DRAFT rehydrate) 이 있으면 그것이 최우선. 없으면 localStorage snapshot 으로 복구.
-  // snapshot 이 없으면 초기 상태 (step 1, 빈 데이터).
-  const restored = init ? null : readProgressSnapshot()
+  // 두 소스를 함께 활용한다:
+  //  - `init` (서버 DRAFT rehydrate)        → step1 데이터(아이/여행지) 복구. "이어서 작성하기" 진입.
+  //  - `snapshot` (sessionStorage)          → currentStep / storyId / step3.story 복구.
+  //                                            "Step 4 같은 곳에서 새로고침 후 그 자리" 흐름.
+  //
+  // 핵심 보호: snapshot.storyId 와 init.storyId 가 다르면 다른 스토리로 새로 진입한 것이므로
+  // 옛 진행 상태를 누수시키지 않도록 snapshot 을 무시한다.
+  const snapshotRaw = readProgressSnapshot()
+  const restored = (() => {
+    if (!snapshotRaw) return null
+    if (init?.storyId != null && init.storyId !== snapshotRaw.storyId) return null
+    return snapshotRaw
+  })()
 
   const [currentStep, setCurrentStepState] = useState<number>(restored?.currentStep ?? 1)
   const [projectData, setStoryProject] = useState<StoryProject>(() => {
