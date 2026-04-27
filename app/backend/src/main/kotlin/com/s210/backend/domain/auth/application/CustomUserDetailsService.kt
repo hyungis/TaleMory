@@ -14,7 +14,7 @@ class CustomUserDetailsService(
     private val memberRepository: MemberRepository
 ) : UserDetailsService {
     override fun loadUserByUsername(username: String): UserDetails =
-        memberRepository.findByLoginId(username)
+        memberRepository.findByLoginIdAndDeletedAtIsNull(username)
             ?.let { createUserDetails(it) }
             ?: throw UsernameNotFoundException("해당 유저는 없습니다.")
 
