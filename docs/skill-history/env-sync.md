@@ -1,5 +1,21 @@
 # env-sync — Skill History
 
+## v0.10 - 2026-04-27
+
+- Summary: Strengthened `gitlab-vars` output rules so newly added non-sensitive File Variable keys MUST be rendered as a separate append group: existing env lines first, exactly one blank line, then new keys.
+- Reason: The previous skill history described the desired blank-line separation, but the executable reference path did not state it as a mandatory invariant. Agents could still append a new non-secret key directly next to existing keys, making GitLab File Variable updates less obvious.
+- Changed files:
+  - `.agents/skills/env-sync/references/gitlab-vars-mode.md`
+  - `docs/skill-history/env-sync.md`
+- User approval: Approved in conversation on 2026-04-27.
+- Impact:
+  - `/env-sync add` followed by `gitlab-vars` should always produce a visible `existing keys`, blank line, `new keys` shape for newly added non-sensitive values.
+  - GitLab UI work becomes copy-paste friendly: open the existing File Variable, go to the end, paste a blank line plus the new keys, save.
+  - Sensitive keys remain unaffected and continue to appear as individual Masked Variable checklist rows.
+- Validation:
+  - Added a text-level invariant containing `MUST treat newly added non-sensitive File Variable keys`.
+  - Added bad/good env block examples showing adjacency vs blank-line separation.
+
 ## v0.9 - 2026-04-25
 
 - Summary: GitLab CI/CD Variables 등록을 **하이브리드(File + 개별 Masked) 운영** 으로 전환. 비밀이 아닌 ~30개 설정값은 GitLab Type=File 변수 한 개에 통째 업로드, 비밀값(PASSWORD/SECRET/API_KEY 류) 만 개별 Masked Variable 로 유지. 등록 클릭 수 40+ → ~13. `generate-env.sh` 가 File 변수를 base 로 cp 한 뒤 개별 변수를 그 위에 append (last-wins). 하이브리드 키 접미사는 명확성을 위해 `_ENV_FILE` 로 결정 (`_FILE` 단독은 `TLS_CERT_FILE` 등 일반 변수와 충돌 위험).
