@@ -25,6 +25,40 @@ _ONE_PIXEL_PNG = base64.b64decode(
 _FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
     "Keep it as a rough pre-coloring storyboard sketch with loose linework and no polished final rendering."
 )
+
+_STYLE_VISUAL_DIRECTIONS: dict[str, str] = {
+    "watercolor": (
+        "Visual direction: soft watercolor painting style, warm and gentle color palette, "
+        "delicate brush strokes with visible paper texture, light washes and blending, "
+        "dreamy and whimsical atmosphere, child-safe tone."
+    ),
+    "digital": (
+        "Visual direction: polished digital painting style similar to Pixar/Disney animation, "
+        "vibrant saturated colors, smooth shading and lighting, 3D-like depth, "
+        "expressive character faces, lively and dynamic composition, child-safe tone."
+    ),
+    "crayon": (
+        "Visual direction: colored pencil and crayon drawing style, as if drawn by a child, "
+        "rough and playful strokes, warm earthy tones, visible pencil texture, "
+        "simple and charming composition, child-safe tone."
+    ),
+    "line": (
+        "Visual direction: clean line drawing style, minimal black ink outlines, "
+        "simple and elegant composition, mostly monochrome with sparse accent colors, "
+        "refined and sophisticated sketch feel, child-safe tone."
+    ),
+    "collage": (
+        "Visual direction: paper collage and cut-out art style, layered torn paper textures, "
+        "mixed media feel with overlapping shapes, bold colors and patterns, "
+        "handcrafted and tactile appearance, child-safe tone."
+    ),
+}
+
+_DEFAULT_VISUAL_DIRECTION = (
+    "Visual direction: loose pencil-and-ink storyboard sketch, rough hand-drawn linework, "
+    "minimal flat shading, no polished final rendering, expressive faces, clean composition, "
+    "child-safe tone."
+)
 _GEMINI_RETRY_DELAY_SECONDS = 0.5
 
 
@@ -145,8 +179,9 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         f"{child.name} ({child.age}, {child.gender.lower()})" for child in item.children
     )
     companions = ", ".join(item.companions) if item.companions else "family"
+    visual_direction = _STYLE_VISUAL_DIRECTIONS.get(item.stylePreset or "", _DEFAULT_VISUAL_DIRECTION)
     parts = [
-        "Create a rough children's storybook sketch just before the coloring stage.",
+        "Create a children's storybook illustration.",
         f"Story title: {item.storyboard.title}",
         f"Story synopsis: {item.storyboard.synopsis}",
         f"Page {item.pageNumber} scene summary: {item.page.sceneSummary}",
@@ -155,11 +190,7 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         f"Base image prompt: {item.page.imagePrompt}",
         f"Main children: {child_descriptions}",
         f"Companions in scene: {companions}",
-        (
-            "Visual direction: loose pencil-and-ink storyboard sketch, rough hand-drawn linework, "
-            "minimal flat shading, no polished final rendering, expressive faces, clean composition, "
-            "child-safe tone."
-        ),
+        visual_direction,
         (
             "Do not render any words, letters, captions, subtitles, speech bubbles, sound effects, "
             "or typographic elements inside the image."

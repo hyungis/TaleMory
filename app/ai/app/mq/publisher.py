@@ -14,6 +14,7 @@ from app.schemas.mq_storyboard_image import (
 )
 from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
 from app.schemas.mq_storyboard_summary import StorySummaryFailureEnvelope, StorySummarySuccessEnvelope
+from app.schemas.mq_tts import StoryTtsResultPayload, TtsError, TtsFailureEnvelope, TtsSuccessEnvelope
 from app.schemas.storyboard import StoryboardGenerateResponse
 from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
@@ -156,6 +157,54 @@ def _summary_failed_routing_key_for_action(action: StoryAction) -> str:
         if action == "GENERATE"
         else settings.RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY
     )
+class TtsResultPublisher:
+    def __init__(self, channel: Any):
+        self._channel = channel
+
+    def publish_result(
+        self,
+        job_id: str,
+        story_id: int | None,
+        payload: StoryTtsResultPayload,
+    ) -> None:
+        envelope = TtsSuccessEnvelope(
+            jobId=job_id,
+            type="GENERATE_TTS_COMPLETED",
+            storyId=story_id,
+            payload=payload,
+        )
+        self._publish(
+            routing_key=settings.RABBITMQ_TTS_GENERATE_COMPLETED_ROUTING_KEY,
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_failure(
+        self,
+        job_id: str,
+        story_id: int | None,
+        error: TtsError,
+    ) -> None:
+        envelope = TtsFailureEnvelope(
+            jobId=job_id,
+            type="GENERATE_TTS_FAILED",
+            storyId=story_id,
+            error=error,
+        )
+        self._publish(
+            routing_key=settings.RABBITMQ_TTS_GENERATE_FAILED_ROUTING_KEY,
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def _publish(self, routing_key: str, message: dict) -> None:
+        self._channel.basic_publish(
+            exchange=settings.RABBITMQ_RESULT_EXCHANGE,
+            routing_key=routing_key,
+            body=json.dumps(message, ensure_ascii=False).encode("utf-8"),
+            properties=pika.BasicProperties(
+                content_type="application/json",
+                delivery_mode=2,
+            ),
+        )
 
 
 StoryboardImageAction = Literal["GENERATE", "REGENERATE"]
