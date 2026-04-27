@@ -9,6 +9,7 @@ import {
   getDraftStory,
   deleteStory,
   DraftResumeModal,
+  clearCreationProgressSnapshot,
 } from '../../../features/story-creation'
 import type { StoryDraftResponse } from '../../../features/story-creation'
 
@@ -80,14 +81,18 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
         setIsLibraryOpen(false)
         return
       }
-      // DRAFT 없음 — 바로 진입 (empty state)
+      // DRAFT 없음 — 바로 진입 (empty state).
+      // sessionStorage 의 이전 작업 snapshot 을 비워 stale storyId 가 PATCH 모드를
+      // 트리거하지 않도록 명시 reset (특히 dev DB 리셋 후 새 동화 시작 케이스).
       setIsLibraryOpen(false)
+      clearCreationProgressSnapshot()
       navigate(ROUTES.creation)
     } catch (err) {
       // 조회 실패 → 기존 동작(빈 상태 진입) 으로 폴백.
       const message = err instanceof Error ? err.message : '초안 조회에 실패했습니다.'
       setDraftError(message)
       setIsLibraryOpen(false)
+      clearCreationProgressSnapshot()
       navigate(ROUTES.creation)
     } finally {
       setIsResolvingDraft(false)
@@ -109,6 +114,8 @@ export function BookstoreScene({ onBackToForest }: BookstoreSceneProps) {
     try {
       await deleteStory(draft.storyId)
       setDraft(null)
+      // 서버 DRAFT 를 지웠으니 sessionStorage 의 옛 storyId snapshot 도 명시 reset.
+      clearCreationProgressSnapshot()
       navigate(ROUTES.creation)
     } catch (err) {
       const message = err instanceof Error ? err.message : '초안 삭제에 실패했습니다.'
