@@ -4,6 +4,7 @@ import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.voice.application.VoiceService
 import com.s210.backend.domain.voice.presentation.response.VoicePreviewResponse
+import com.s210.backend.domain.voice.presentation.response.VoicePresignResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceProfileResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceRecordingScriptResponse
 import org.springframework.http.ResponseEntity
@@ -41,21 +42,43 @@ class VoiceController(
             ),
         )
 
-    // 음성 녹음 저장 (presigned URL 발급)
+    // Phase 1: presigned PUT URL 발급 (DB 저장 없음)
+    @PostMapping("/voice-profiles/presigned-url")
+    fun voiceProfilePresignedUrl(
+        @AuthenticationPrincipal user: CustomUser,
+        @RequestBody body: VoicePresignRequest,
+    ): ResponseEntity<ApiResponse<VoicePresignResponse>> {
+        val presigned = voiceService.presignVoiceUpload(user.userId, body.contentType)
+        return ResponseEntity.ok(
+            ApiResponse(
+                data = VoicePresignResponse(
+                    uploadUrl = presigned.uploadUrl,
+                    s3Key = presigned.s3Key,
+                    expiresAt = presigned.expiresAt,
+                ),
+            ),
+        )
+    }
+
+    data class VoicePresignRequest(
+        val contentType: String = "audio/webm",
+    )
+
+    // Phase 3: S3 업로드 완료 후 DB commit
     @PostMapping("/voice-profiles")
     fun voiceProfileAdd(
         @AuthenticationPrincipal user: CustomUser,
         @RequestBody body: VoiceProfileCreateRequest,
     ): ResponseEntity<ApiResponse<VoiceProfileResponse>> {
-        val result = voiceService.addVoiceProfile(user.userId, body.title, body.contentType)
+        val result = voiceService.addVoiceProfile(user.userId, body.title, body.s3Key)
         return ResponseEntity.ok(
-            ApiResponse(data = VoiceProfileResponse.from(result.profile, result.uploadUrl)),
+            ApiResponse(data = VoiceProfileResponse.from(result)),
         )
     }
 
     data class VoiceProfileCreateRequest(
         val title: String,
-        val contentType: String = "audio/webm",
+        val s3Key: String,
     )
 
     @DeleteMapping("/voice-profiles/{voiceProfileId}")

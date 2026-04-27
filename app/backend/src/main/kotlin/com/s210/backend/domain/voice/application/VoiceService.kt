@@ -53,24 +53,32 @@ class VoiceService(
         voiceProfileRepository.findAllByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
             .map(VoiceProfileResult::from)
 
-    data class VoiceProfileCreateResult(
-        val profile: VoiceProfileResult,
-        val uploadUrl: String,
-    )
-
     /**
-     * 보이스 프로필을 DB에 저장하고, 프론트가 직접 S3에 PUT할 presigned URL을 발급한다.
+     * Phase 1: presigned PUT URL 발급만 수행 (DB 저장 없음).
+     * FE 가 이 URL 로 S3 에 직접 PUT 한 뒤, addVoiceProfile 로 commit.
      */
-    fun addVoiceProfile(userId: Long, title: String, contentType: String): VoiceProfileCreateResult {
-        val trimmedTitle = title.trim()
-        if (trimmedTitle.isBlank()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
-
+    @Transactional(readOnly = true)
+    fun presignVoiceUpload(userId: Long, contentType: String): S3Service.PresignedUpload {
         if (contentType !in ALLOWED_AUDIO_TYPES) {
             throw BusinessException(VoiceErrorCode.INVALID_AUDIO_FORMAT)
         }
+        return s3Service.presignVoicePutUrl(userId, contentType)
+    }
 
-        val presigned = s3Service.presignVoicePutUrl(userId, contentType)
-        val audioUrl = s3Service.buildPublicImageUrl(presigned.s3Key)
+    /**
+     * Phase 3: S3 업로드 완료 후 commit — DB 에 row 생성.
+     * s3Key prefix 가 `stories/voice/{userId}/` 인지 검증하여 타 유저 key 오염 방지.
+     */
+    fun addVoiceProfile(userId: Long, title: String, s3Key: String): VoiceProfileResult {
+        val trimmedTitle = title.trim()
+        if (trimmedTitle.isBlank()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
+
+        val expectedPrefix = "stories/voice/$userId/"
+        if (!s3Key.startsWith(expectedPrefix)) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        val audioUrl = s3Service.buildPublicImageUrl(s3Key)
 
         val profile = voiceProfileRepository.save(
             VoiceProfile(
@@ -79,10 +87,7 @@ class VoiceService(
                 audioUrl = audioUrl,
             )
         )
-        return VoiceProfileCreateResult(
-            profile = VoiceProfileResult.from(profile),
-            uploadUrl = presigned.uploadUrl,
-        )
+        return VoiceProfileResult.from(profile)
     }
 
     fun removeVoiceProfile(userId: Long, voiceProfileId: Long) {

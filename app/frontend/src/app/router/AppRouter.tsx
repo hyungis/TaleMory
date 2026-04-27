@@ -3,7 +3,6 @@ import { LogoutCallbackPage, OAuthCallbackPage } from '../../pages/auth'
 import { HomePage } from '../../pages/home'
 import { MainPage } from '../../pages/main'
 import { CreationPage } from '../../pages/creation'
-import { VoiceDevPage } from '../../pages/creation/VoiceDevPage'
 import { ViewerPage, SharedViewerPage } from '../../pages/viewer'
 import { MypagePage, VoiceCloneAddPage } from '../../pages/mypage'
 import { ROUTES } from '../../shared/constants'
@@ -14,7 +13,6 @@ export function AppRouter() {
     <Routes>
       <Route path={ROUTES.home} element={<HomePage />} />
       <Route path={ROUTES.main} element={<MainPage />} />
-      <Route path={ROUTES.creationVoice} element={<VoiceDevPage />} />
       <Route path={ROUTES.creation} element={<CreationPage />} />
       <Route path={ROUTES.viewer} element={<ViewerPage />} />
       <Route path={ROUTES.shared} element={<SharedViewerPage />} />

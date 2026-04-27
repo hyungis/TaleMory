@@ -1,5 +1,11 @@
 import { post, get, deleteRequest } from '../../../../shared/api/client'
 
+export interface VoicePresignDto {
+  uploadUrl: string
+  s3Key: string
+  expiresAt: string
+}
+
 export interface VoiceProfileDto {
   voiceProfileId: number
   userId: number
@@ -8,18 +14,16 @@ export interface VoiceProfileDto {
   ttsVoiceUrl: string | null
   createdAt: string
   updatedAt: string
-  uploadUrl?: string | null
 }
 
-/** POST /api/voice-profiles — DB 저장 + presigned PUT URL 발급 */
-export async function createVoiceProfile(
-  title: string,
+/** Phase 1: POST /api/voice-profiles/presigned-url — presigned PUT URL 발급 (DB 저장 없음) */
+export async function presignVoiceUpload(
   contentType: string = 'audio/webm',
-): Promise<VoiceProfileDto> {
-  return post<VoiceProfileDto>('/voice-profiles', { title, contentType })
+): Promise<VoicePresignDto> {
+  return post<VoicePresignDto>('/voice-profiles/presigned-url', { contentType })
 }
 
-/** presigned URL로 S3에 직접 업로드 */
+/** Phase 2: presigned URL로 S3에 직접 업로드 */
 export async function uploadAudioToS3(uploadUrl: string, audioBlob: Blob): Promise<void> {
   const res = await fetch(uploadUrl, {
     method: 'PUT',
@@ -27,6 +31,14 @@ export async function uploadAudioToS3(uploadUrl: string, audioBlob: Blob): Promi
     body: audioBlob,
   })
   if (!res.ok) throw new Error(`S3 upload failed: ${res.status}`)
+}
+
+/** Phase 3: POST /api/voice-profiles — S3 업로드 완료 후 DB commit */
+export async function commitVoiceProfile(
+  title: string,
+  s3Key: string,
+): Promise<VoiceProfileDto> {
+  return post<VoiceProfileDto>('/voice-profiles', { title, s3Key })
 }
 
 /** GET /api/voice-profiles — 내 보이스 프로필 목록 */

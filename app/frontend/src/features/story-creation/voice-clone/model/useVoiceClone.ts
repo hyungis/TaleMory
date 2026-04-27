@@ -7,7 +7,7 @@ import {
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
 } from '../lib/defaults'
-import { createVoiceProfile, uploadAudioToS3, getVoiceProfiles, getRecordingScript } from '../api/voiceProfileApi'
+import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript } from '../api/voiceProfileApi'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -280,13 +280,10 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   }, [recordedAudioUrl, ttsText])
 
   /**
-   * 녹음을 서버에 업로드하고 보이스 프로필을 생성한다.
-   * 성공 시 저장된 보이스 이름을 반환 (상위 step6.voiceModel 업데이트용).
-   */
-  /**
-   * 녹음 원본을 서버에 업로드한다.
-   * 1) POST /api/voice-profiles → DB 저장 + presigned URL 발급
-   * 2) presigned URL로 S3에 직접 PUT
+   * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).
+   * Phase 1: POST /api/voice-profiles/presigned-url → presigned URL + s3Key 발급
+   * Phase 2: presigned URL 로 S3 에 직접 PUT
+   * Phase 3: POST /api/voice-profiles → s3Key 로 DB commit
    */
   const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
     if (!recordedAudioUrl) {
@@ -298,11 +295,13 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     try {
       const audioBlob = dataUrlToBlob(recordedAudioUrl)
       const autoTitle = `녹음_${new Date().toISOString().slice(0, 19).replace('T', '_')}`
-      const profile = await createVoiceProfile(autoTitle, audioBlob.type || 'audio/webm')
 
-      if (profile.uploadUrl) {
-        await uploadAudioToS3(profile.uploadUrl, audioBlob)
-      }
+      // Phase 1: presign
+      const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
+      // Phase 2: S3 PUT
+      await uploadAudioToS3(presigned.uploadUrl, audioBlob)
+      // Phase 3: DB commit
+      const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
 
       setSavedProfileId(profile.voiceProfileId)
       setStatus('ready')
