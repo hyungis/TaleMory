@@ -3,6 +3,7 @@ package com.s210.backend.common.s3
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest
@@ -109,11 +110,61 @@ class S3Service(
         return presigned.url().toString()
     }
 
+    /**
+     * 서버사이드 직접 업로드. multipart 로 받은 파일을 S3 에 저장한다.
+     * 반환값은 s3Key.
+     */
+    fun uploadFile(s3Key: String, bytes: ByteArray, contentType: String): String {
+        val putRequest = PutObjectRequest.builder()
+            .bucket(bucket)
+            .key(s3Key)
+            .contentType(contentType)
+            .build()
+        s3Client.putObject(putRequest, RequestBody.fromBytes(bytes))
+        return s3Key
+    }
+
+    /**
+     * 음성 녹음 업로드용 presigned PUT URL 발급.
+     * key 규칙: `voice-profiles/{userId}/{uuid}.{ext}`.
+     */
+    fun presignVoicePutUrl(userId: Long, contentType: String): PresignedUpload {
+        val extension = audioExtensionOf(contentType)
+        val key = "stories/voice/$userId/${UUID.randomUUID()}.$extension"
+        val putRequest = PutObjectRequest.builder()
+            .bucket(bucket)
+            .key(key)
+            .contentType(contentType)
+            .build()
+
+        val signatureDuration = Duration.ofMinutes(5)
+        val presigned = s3Presigner.presignPutObject(
+            PutObjectPresignRequest.builder()
+                .signatureDuration(signatureDuration)
+                .putObjectRequest(putRequest)
+                .build()
+        )
+        return PresignedUpload(
+            uploadUrl = presigned.url().toString(),
+            s3Key = key,
+            expiresAt = Instant.now().plus(signatureDuration),
+        )
+    }
+
     private fun extensionOf(contentType: String): String = when (contentType.lowercase()) {
         "image/jpeg", "image/jpg" -> "jpg"
         "image/png" -> "png"
         "image/webp" -> "webp"
         "image/gif" -> "gif"
+        else -> "bin"
+    }
+
+    private fun audioExtensionOf(contentType: String): String = when (contentType.lowercase()) {
+        "audio/webm" -> "webm"
+        "audio/wav" -> "wav"
+        "audio/mpeg" -> "mp3"
+        "audio/mp4" -> "m4a"
+        "audio/ogg" -> "ogg"
         else -> "bin"
     }
 }

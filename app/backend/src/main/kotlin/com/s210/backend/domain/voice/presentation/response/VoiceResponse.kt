@@ -1,7 +1,14 @@
 package com.s210.backend.domain.voice.presentation.response
 
 import com.s210.backend.domain.voice.application.dto.VoiceProfileResult
+import java.time.Instant
 import java.time.LocalDateTime
+
+data class VoicePresignResponse(
+    val uploadUrl: String,
+    val s3Key: String,
+    val expiresAt: Instant,
+)
 
 data class VoiceProfileResponse(
     val voiceProfileId: Long,
