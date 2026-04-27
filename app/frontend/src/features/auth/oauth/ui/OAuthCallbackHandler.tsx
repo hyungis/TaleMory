@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle, LoaderCircle } from 'lucide-react'
-import { post } from '../../../../shared/api'
+import { isApiError, post } from '../../../../shared/api'
 import { ROUTES } from '../../../../shared/constants'
 import { mapLoginResponse, type LoginResponsePayload } from '../../login'
-import { setAuthSession } from '../../model/authSession'
+import { clearAuthSession, setAuthSession } from '../../model/authSession'
 import { parseOauthCallbackPayload } from '../lib/parseOauthCallbackPayload'
 
 export function OAuthCallbackHandler() {
@@ -19,6 +19,7 @@ export function OAuthCallbackHandler() {
     const kakaoCode = searchParams.get('code')
 
     if (kakaoError !== null) {
+      clearAuthSession()
       setError(kakaoError)
       return () => {
         isActive = false
@@ -50,9 +51,10 @@ export function OAuthCallbackHandler() {
             },
           })
         })
-        .catch(() => {
+        .catch(error => {
           if (!isActive) return
-          setError('Kakao login failed. Please try again.')
+          clearAuthSession()
+          setError(isApiError(error) ? error.message : 'Kakao login failed. Please try again.')
         })
 
       return () => {
@@ -63,11 +65,13 @@ export function OAuthCallbackHandler() {
     const callbackResult = parseOauthCallbackPayload(location.hash, location.search)
 
     if (callbackResult.error) {
+      clearAuthSession()
       setError(callbackResult.error)
       return
     }
 
     if (callbackResult.payload === null) {
+      clearAuthSession()
       setError('카카오 로그인 응답이 비어 있어요. 다시 시도해주세요.')
       return
     }
@@ -82,6 +86,7 @@ export function OAuthCallbackHandler() {
         },
       })
     } catch {
+      clearAuthSession()
       setError('카카오 로그인 세션을 저장하지 못했어요. 다시 시도해주세요.')
     }
   }, [location.hash, location.search, navigate])
