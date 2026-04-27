@@ -13,7 +13,12 @@ from app.schemas.mq_storyboard_image import (
     StoryboardImageSuccessPayload,
 )
 from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
+from app.schemas.mq_storyboard_summary import (
+    StorySummaryFailureEnvelope,
+    StorySummarySuccessEnvelope,
+)
 from app.schemas.storyboard import StoryboardGenerateResponse
+from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
 
 
@@ -57,6 +62,38 @@ class StoryResultPublisher:
         )
         self._publish(
             routing_key=_failed_routing_key_for_action(action),
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_summary_result(
+        self,
+        job_id: str,
+        story_id: int | None,
+        payload: StoryboardSummaryGenerateResponse,
+    ) -> None:
+        envelope = StorySummarySuccessEnvelope(
+            jobId=job_id,
+            storyId=story_id,
+            payload=payload,
+        )
+        self._publish(
+            routing_key=settings.RABBITMQ_SUMMARY_GENERATE_COMPLETED_ROUTING_KEY,
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_summary_failure(
+        self,
+        job_id: str,
+        story_id: int | None,
+        error: StoryError,
+    ) -> None:
+        envelope = StorySummaryFailureEnvelope(
+            jobId=job_id,
+            storyId=story_id,
+            error=error,
+        )
+        self._publish(
+            routing_key=settings.RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY,
             message=envelope.model_dump(mode="json"),
         )
 
