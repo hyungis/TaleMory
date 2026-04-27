@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -87,9 +88,12 @@ def _dispatch_summary_generate_message(
 ) -> None:
     try:
         handle_summary_generate_message(body=body, publisher=publisher)
-    except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
+    except Exception as exc:
         logger.exception("Unexpected error while processing generate storyboard summary message")
+        if _publish_unexpected_summary_failure(body=body, publisher=publisher, action="GENERATE", exc=exc):
+            channel.basic_ack(delivery_tag=delivery_tag)
+            return
+        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -117,9 +121,12 @@ def _dispatch_summary_regenerate_message(
 ) -> None:
     try:
         handle_summary_regenerate_message(body=body, publisher=publisher)
-    except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
+    except Exception as exc:
         logger.exception("Unexpected error while processing regenerate storyboard summary message")
+        if _publish_unexpected_summary_failure(body=body, publisher=publisher, action="REGENERATE", exc=exc):
+            channel.basic_ack(delivery_tag=delivery_tag)
+            return
+        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -248,6 +255,47 @@ def handle_regenerate_message(body: bytes, publisher: StoryResultPublisher) -> N
         payload=result,
         action="REGENERATE",
     )
+
+
+def _publish_unexpected_summary_failure(
+    *,
+    body: bytes,
+    publisher: StoryResultPublisher,
+    action: str,
+    exc: Exception,
+) -> bool:
+    try:
+        payload = _extract_job_context(body)
+    except Exception:
+        logger.exception("Failed to extract summary job context while publishing unexpected failure")
+        return False
+
+    job_id = payload.get("jobId")
+    if not isinstance(job_id, str) or not job_id.strip():
+        logger.error("Cannot publish unexpected summary failure without a valid jobId")
+        return False
+
+    story_id = payload.get("storyId")
+    publisher.publish_summary_failure(
+        job_id=job_id,
+        story_id=story_id if isinstance(story_id, int) else None,
+        error=StoryError(
+            code=f"{action}_STORY_SUMMARY_UNEXPECTED_ERROR",
+            message=str(exc),
+        ),
+        action=action,
+    )
+    return True
+
+
+def _extract_job_context(body: bytes) -> dict[str, Any]:
+    parsed = json.loads(body)
+    if not isinstance(parsed, dict):
+        raise ValueError("Summary message body is not a JSON object")
+    return {
+        "jobId": parsed.get("jobId"),
+        "storyId": parsed.get("storyId"),
+    }
 
 
 def _merge_story_id_generate(

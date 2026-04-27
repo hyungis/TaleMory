@@ -40,46 +40,28 @@ def regenerate_storyboard_summary(
 def _generate_with_openai(
     request: StoryboardSummaryGenerateRequest,
 ) -> StoryboardSummaryGenerateResponse:
-    try:
-        from openai import OpenAI
-        from openai import OpenAIError
-    except ImportError as exc:
-        raise RuntimeError("openai package is not installed") from exc
-
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    schema = _to_openai_strict_json_schema(StoryboardSummaryGenerateResponse.model_json_schema())
-    input_content = _build_openai_input_content(request)
-
-    request_args = {
-        "model": settings.STORYBOARD_SUMMARY_MODEL,
-        "input": [
-            {"role": "system", "content": STORYBOARD_SUMMARY_SYSTEM_PROMPT},
-            {"role": "user", "content": input_content},
-        ],
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "storyboard_summary_generation_response",
-                "strict": True,
-                "schema": schema,
-            }
-        },
-    }
-    reasoning = _build_reasoning_config()
-    if reasoning is not None:
-        request_args["reasoning"] = reasoning
-
-    try:
-        response = client.responses.create(**request_args)
-    except OpenAIError as exc:
-        raise ValueError(f"OpenAI storyboard summary generation failed: {exc}") from exc
-
-    parsed = StoryboardSummaryGenerateResponse.model_validate_json(response.output_text)
-    return _apply_usage(parsed, response.usage)
+    return _request_summary_with_openai(
+        input_content=_build_openai_input_content(request),
+        schema_name="storyboard_summary_generation_response",
+        error_label="generation",
+    )
 
 
 def _regenerate_with_openai(
     request: StoryboardSummaryRegenerateRequest,
+) -> StoryboardSummaryGenerateResponse:
+    return _request_summary_with_openai(
+        input_content=_build_openai_regenerate_input_content(request),
+        schema_name="storyboard_summary_regeneration_response",
+        error_label="regeneration",
+    )
+
+
+def _request_summary_with_openai(
+    *,
+    input_content: list[dict[str, str]],
+    schema_name: str,
+    error_label: str,
 ) -> StoryboardSummaryGenerateResponse:
     try:
         from openai import OpenAI
@@ -89,8 +71,6 @@ def _regenerate_with_openai(
 
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     schema = _to_openai_strict_json_schema(StoryboardSummaryGenerateResponse.model_json_schema())
-    input_content = _build_openai_regenerate_input_content(request)
-
     request_args = {
         "model": settings.STORYBOARD_SUMMARY_MODEL,
         "input": [
@@ -100,7 +80,7 @@ def _regenerate_with_openai(
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": "storyboard_summary_regeneration_response",
+                "name": schema_name,
                 "strict": True,
                 "schema": schema,
             }
@@ -113,7 +93,7 @@ def _regenerate_with_openai(
     try:
         response = client.responses.create(**request_args)
     except OpenAIError as exc:
-        raise ValueError(f"OpenAI storyboard summary regeneration failed: {exc}") from exc
+        raise ValueError(f"OpenAI storyboard summary {error_label} failed: {exc}") from exc
 
     parsed = StoryboardSummaryGenerateResponse.model_validate_json(response.output_text)
     return _apply_usage(parsed, response.usage)
