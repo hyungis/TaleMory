@@ -45,6 +45,7 @@ data class StoryboardImageItem(
     val companions: List<String>,
     val referenceImageS3Keys: List<String>,
     val referenceImageUrls: List<String> = emptyList(),
+    val stylePreset: String? = null,
     val additionalInstruction: String? = null,
 )
 

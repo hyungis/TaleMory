@@ -3,7 +3,9 @@ package com.s210.backend.domain.story.presentation
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.StoryProgressService
+import com.s210.backend.domain.story.application.StoryService
 import com.s210.backend.domain.story.presentation.request.ProgressRequest
+import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
 import com.s210.backend.domain.story.presentation.response.OutroResponse
 import com.s210.backend.domain.story.presentation.response.ProgressResponse
 import com.s210.backend.domain.story.presentation.response.SceneResponse
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/stories/{storyId}")
 class SceneController(
     private val storyProgressService: StoryProgressService,
+    private val storyService: StoryService,
 ) {
 
     // 동화 씬(페이지) 목록 조회
@@ -75,10 +78,11 @@ class SceneController(
     @PatchMapping("/style")
     fun storyStyleModify(
         @PathVariable storyId: Long,
-        @RequestBody request: Map<String, Long>
+        @RequestBody request: StyleModifyRequest,
+        @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: StoryService.modifyStyle(storyId, stylePresetId)
-        TODO("Not yet implemented")
+        storyService.modifyStyle(user.userId, storyId, request.stylePresetId)
+        return ResponseEntity.ok(ApiResponse(data = null))
     }
 
     // 보이스 프로필 선택

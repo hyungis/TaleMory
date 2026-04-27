@@ -7,6 +7,7 @@ import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.application.dto.StoryResult
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
+import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.model.StoryStatus
@@ -30,6 +31,7 @@ import java.util.UUID
 class StoryService(
     private val storyRepository: StoryRepository,
     private val sceneRepository: SceneRepository,
+    private val stylePresetRepository: StylePresetRepository,
 ) {
     /**
      * 로그인 유저의 "진행 중인 동화" 1건(최신 DRAFT) 을 반환한다.
@@ -160,6 +162,17 @@ class StoryService(
             shareToken = story.shareToken!!,
             shareUrl = "/shared/${story.shareToken}",
         )
+    }
+
+    /**
+     * 삽화 스타일 프리셋 선택. Story.stylePresetId 를 갱신한다.
+     */
+    fun modifyStyle(userId: Long, storyId: Long, stylePresetId: Long) {
+        val story = ownedStory(userId, storyId)
+        if (!stylePresetRepository.existsById(stylePresetId)) {
+            throw BusinessException(StoryErrorCode.STYLE_PRESET_NOT_FOUND)
+        }
+        story.stylePresetId = stylePresetId
     }
 
     /**

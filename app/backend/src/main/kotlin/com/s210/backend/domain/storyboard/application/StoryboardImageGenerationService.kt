@@ -14,6 +14,7 @@ import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
+import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
@@ -48,6 +49,7 @@ import tools.jackson.databind.ObjectMapper
 @Transactional
 class StoryboardImageGenerationService(
     private val storyRepository: StoryRepository,
+    private val stylePresetRepository: StylePresetRepository,
     private val storyBoardRepository: StoryBoardRepository,
     private val storyboardPageRepository: StoryboardPageRepository,
     private val photoRepository: PhotoAlbumItemRepository,
@@ -59,6 +61,7 @@ class StoryboardImageGenerationService(
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        val stylePreset = resolveStylePreset(story)
 
         // 1) storyboard_pages 가 채워져 있어야 한다 (P2 listener 가 STORY 결과 받을 때 INSERT).
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -93,6 +96,8 @@ class StoryboardImageGenerationService(
                 children = children,
                 companions = companions,
                 referenceImageS3Keys = s3Keys,
+                stylePreset = stylePreset?.code,
+                stylePreviewUrl = stylePreset?.previewUrl,
                 userPromptOverride = null,
             )
         }
@@ -136,6 +141,7 @@ class StoryboardImageGenerationService(
         userPrompt: String,
     ): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        val stylePreset = resolveStylePreset(story)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
@@ -164,6 +170,8 @@ class StoryboardImageGenerationService(
             children = children,
             companions = companions,
             referenceImageS3Keys = s3Keys,
+            stylePreset = stylePreset?.code,
+            stylePreviewUrl = stylePreset?.previewUrl,
             userPromptOverride = null, // userPrompt 는 payload 의 별도 필드로 보낸다 (additionalInstruction X)
         )
 
@@ -216,6 +224,8 @@ class StoryboardImageGenerationService(
         children: List<ChildInfo>,
         companions: List<String>,
         referenceImageS3Keys: List<String>,
+        stylePreset: String?,
+        stylePreviewUrl: String?,
         userPromptOverride: String?,
     ): StoryboardImageItem {
         // AI 측 min_length=1 — 빈 문자열로 보내면 422. listener 가 정상 채웠다면 null/blank 가 아니어야 함.
@@ -241,10 +251,20 @@ class StoryboardImageGenerationService(
             children = children,
             companions = companions,
             referenceImageS3Keys = referenceImageS3Keys,
-            referenceImageUrls = emptyList(),
+            referenceImageUrls = listOfNotNull(stylePreviewUrl),
+            stylePreset = stylePreset,
             additionalInstruction = userPromptOverride,
         )
     }
+
+    private data class StylePresetInfo(val code: String, val previewUrl: String?)
+
+    private fun resolveStylePreset(story: Story): StylePresetInfo? =
+        story.stylePresetId?.let { id ->
+            stylePresetRepository.findById(id).orElse(null)?.let {
+                StylePresetInfo(it.code, it.previewUrl)
+            }
+        }
 
     private fun loadLastSuccessStoryPayload(storyId: Long): StoryboardPayload {
         val storyJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
