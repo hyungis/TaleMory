@@ -1,5 +1,9 @@
 export { useStoryCreationFlow } from './model/useStoryCreationFlow'
 export type { UseStoryCreationFlowInit } from './model/useStoryCreationFlow'
+export {
+  CREATION_PROGRESS_STORAGE_KEY,
+  clearCreationProgressSnapshot,
+} from './lib/progressStorage'
 export type {
   StoryProject,
   StoryChild,

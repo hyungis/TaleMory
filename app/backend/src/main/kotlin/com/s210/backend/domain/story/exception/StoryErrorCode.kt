@@ -12,4 +12,7 @@ enum class StoryErrorCode(
     STORY_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "STORY_002", "스토리 생성에 실패했습니다."),
     INVALID_PHOTO_FORMAT(HttpStatus.BAD_REQUEST, "STORY_003", "지원하지 않는 이미지 형식입니다."),
     PHOTO_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "STORY_004", "사진 업로드에 실패했습니다."),
+    STORY_ACCESS_FORBIDDEN(HttpStatus.FORBIDDEN, "STORY_005", "해당 동화에 접근할 권한이 없습니다."),
+    INVALID_STORY_STATE(HttpStatus.CONFLICT, "STORY_006", "현재 상태에서는 수행할 수 없습니다."),
+    STYLE_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_007", "존재하지 않는 삽화 스타일입니다."),
 }

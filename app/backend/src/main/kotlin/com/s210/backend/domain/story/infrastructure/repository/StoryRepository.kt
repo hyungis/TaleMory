@@ -13,4 +13,8 @@ interface StoryRepository : JpaRepository<Story, Long> {
         userId: Long,
         status: StoryStatus,
     ): Story?
+
+    fun findByShareTokenAndDeletedAtIsNull(shareToken: String): Story?
+
+    fun findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId: Long): List<Story>
 }

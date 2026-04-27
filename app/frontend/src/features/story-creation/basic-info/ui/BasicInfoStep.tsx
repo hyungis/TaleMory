@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react'
 import { AlertCircle, User } from 'lucide-react'
+import { ApiError } from '../../../../shared/api'
 import type { StoryChild, StoryProject } from '../../model/types'
 import { StepHeader } from '../../ui/StepHeader'
 import { NextButton } from '../../ui/NextButton'
+import { clearCreationProgressSnapshot } from '../../lib/progressStorage'
 import { LevelPicker } from './LevelPicker'
 import { ChildrenList } from './ChildrenList'
 import type { PersonResponse } from '../api/types'
@@ -35,6 +37,12 @@ interface BasicInfoStepProps {
   onBack: () => void
   /** POST /api/stories 성공 시 storyId 를 상위로 전달. 상위는 flow.setStoryId + handleNext 수행. */
   onStoryCreated: (storyId: number) => void
+  /**
+   * sessionStorage 에 남아있던 stale storyId 로 PATCH 가 404 받았을 때 호출.
+   * 상위에서 `flow.setStoryId(null)` + `flow.resetProgress()` 로 진행 상태를 비워준다.
+   * 미제공 시 storyId 만 컴포넌트 props 로 다시 null 을 받을 때까지 stale 상태가 유지될 수 있다.
+   */
+  onStaleStoryIdReset?: () => void
 }
 
 /**
@@ -58,6 +66,7 @@ export function BasicInfoStep({
   onChildRemove,
   onBack,
   onStoryCreated,
+  onStaleStoryIdReset,
 }: BasicInfoStepProps) {
   const firstDate = data.travelDates[0] ?? ''
   const lastDate = data.travelDates[data.travelDates.length - 1] ?? ''
@@ -161,6 +170,18 @@ export function BasicInfoStep({
       const response = await storyPost.mutateAsync(storyBody)
       onStoryCreated(response.storyId)
     } catch (err) {
+      // sessionStorage 의 옛 storyId 가 DB 에 없으면 PATCH 가 404. (dev DB 리셋, 다른 사용자 등)
+      // → 진행 snapshot 을 비우고 부모에 storyId 초기화 요청. 사용자가 다시 클릭하면 POST 모드.
+      if (
+        storyId !== null &&
+        err instanceof ApiError &&
+        err.status === 404
+      ) {
+        clearCreationProgressSnapshot()
+        onStaleStoryIdReset?.()
+        setSubmitError('이전 작업 정보를 찾을 수 없어 새로 시작합니다. 다시 시도해 주세요.')
+        return
+      }
       const message = err instanceof Error ? err.message : '저장 중 오류가 발생했습니다.'
       setSubmitError(message)
     } finally {
@@ -171,6 +192,7 @@ export function BasicInfoStep({
     firstDate,
     lastDate,
     onChildUpdate,
+    onStaleStoryIdReset,
     onStoryCreated,
     personPost,
     storyId,

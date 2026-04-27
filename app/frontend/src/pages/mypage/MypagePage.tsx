@@ -1,120 +1,189 @@
-import { useState, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { ROUTES } from '../../shared/constants'
-import type { UserProfile } from '../../entities/user'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Person } from '../../entities/person'
-import type { VoiceProfile } from '../../entities/voice-profile'
+import type { UserProfile } from '../../entities/user'
+import { buildOauthLogoutUrl, clearAuthSession, setAuthSession, useAuthSession } from '../../features/auth'
 import {
-  ProfileSection,
-  ProfileEditModal,
-  mockUser,
-  PersonsSection,
-  PersonEditModal,
-  mockPersons,
-  VoiceProfilesSection,
-  VoiceProfileEditModal,
-  mockVoiceProfiles,
   DangerZone,
+  PersonEditModal,
+  PersonsSection,
+  ProfileEditModal,
+  ProfileSection,
+  VoiceProfilesSection,
   WithdrawDialog,
+  useMeQuery,
+  useMeUpdate,
+  usePersonDelete,
+  usePersonPost,
+  usePersonsQuery,
+  usePersonUpdate,
+  useVoiceProfileDelete,
+  useVoiceProfilesQuery,
+  useWithdraw,
 } from '../../features/mypage'
+import { isApiError } from '../../shared/api'
+import { ROUTES } from '../../shared/constants'
 
-/**
- * 마이페이지 — 세로 스크롤 섹션 구성.
- * 섹션: 프로필 / 인물 / 보이스 프로필.
- *
- * 현재는 모든 CRUD 가 로컬 state 뿐 (mockData 기반). API 연동은 별도 PR 에서.
- * TODO(api):
- *   - GET/PATCH/DELETE /api/me → useMe 훅
- *   - GET/POST/PATCH/DELETE /api/persons → usePersons
- *   - GET/POST/PATCH/DELETE /api/voice-profiles → useVoiceProfiles
- *   - 탈퇴 확정 시 로그아웃 + 홈 이동
- */
+type Modal =
+  | { kind: 'none' }
+  | { kind: 'profile-edit' }
+  | { kind: 'withdraw' }
+  | { kind: 'person-edit'; person?: Person }
+
 export function MypagePage() {
   const navigate = useNavigate()
+  const authSession = useAuthSession()
+  const meQuery = useMeQuery(authSession.isAuthenticated)
+  const meUpdate = useMeUpdate()
+  const hasMissingUserError = isMissingUserError(meQuery.error)
 
-  /** CreationPage.goToBookshelf 패턴 재활용 — 새 MainPage 인스턴스 생성 없이 bookstore 씬으로 복귀. */
-  const goToBookshelf = useCallback(() => {
-    navigate(ROUTES.home, {
-      state: { scene: 'bookstore', skipLanding: true },
-      replace: true,
-    })
-  }, [navigate])
+  useEffect(() => {
+    if (!hasMissingUserError) return
+    clearAuthSession()
+  }, [hasMissingUserError])
 
-  const [user, setUser] = useState<UserProfile>(mockUser)
-  const [persons, setPersons] = useState<Person[]>(mockPersons)
-  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>(mockVoiceProfiles)
+  const currentUser = hasMissingUserError ? null : (meQuery.data ?? authSession.user)
+  const currentUserId = currentUser?.id ?? 0
 
-  // 모달 토글 — 단 하나만 열리도록 단일 상태로 통일.
-  // 보이스 "추가" 는 모달이 아니라 /mypage/voice-clone 전용 라우트로 이동.
-  type Modal =
-    | { kind: 'none' }
-    | { kind: 'profile-edit' }
-    | { kind: 'withdraw' }
-    | { kind: 'person-edit'; person?: Person } // person 없으면 추가
-    | { kind: 'voice-edit'; voice: VoiceProfile } // 편집 전용 (추가는 별도 페이지)
+  const personsQuery = usePersonsQuery(currentUserId)
+  const personPost = usePersonPost(currentUserId)
+  const personUpdate = usePersonUpdate(currentUserId)
+  const personDelete = usePersonDelete(currentUserId)
+
+  const voiceProfilesQuery = useVoiceProfilesQuery(authSession.isAuthenticated)
+  const voiceProfileDelete = useVoiceProfileDelete()
+  const withdraw = useWithdraw()
+
   const [modal, setModal] = useState<Modal>({ kind: 'none' })
+
   const closeModal = () => setModal({ kind: 'none' })
 
-  // ── 프로필 핸들러 ────────────────────────────────────
-  const handleProfileSave = (patch: Pick<UserProfile, 'name' | 'nickname' | 'phone' | 'agreeSms' | 'agreeMarketing'>) => {
-    setUser((prev) => ({ ...prev, ...patch, updatedAt: new Date().toISOString() }))
-    closeModal()
-  }
-  const handleWithdrawConfirm = () => {
-    // TODO: DELETE /api/me + 로그아웃 + 홈 이동
-    console.log('[mypage] withdraw confirmed (mock)')
-    closeModal()
+  const pageError = getFirstErrorMessage(
+    meQuery.error,
+    personsQuery.error,
+    voiceProfilesQuery.error,
+    meUpdate.error,
+    personPost.error,
+    personUpdate.error,
+    personDelete.error,
+    voiceProfileDelete.error,
+    withdraw.error,
+  )
+
+  if (!authSession.isAuthenticated || hasMissingUserError) {
+    return (
+      <div className="h-full overflow-y-auto bg-[#1a0f08]">
+        <main className="max-w-3xl mx-auto px-4 md:px-6 py-16">
+          <section className="rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-8 text-center space-y-3">
+            <h1 className="text-2xl font-bold text-[#e4d4b4]">로그인이 필요한 페이지예요</h1>
+            <p className="text-sm text-[#b4c4a4]">
+              마이페이지는 로그인한 사용자만 확인할 수 있어요.
+            </p>
+            <Link
+              to={ROUTES.home}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#3ca55c] text-[#1a0f08] text-sm font-medium hover:bg-[#4cb56c] transition-colors"
+            >
+              홈으로 이동
+            </Link>
+          </section>
+        </main>
+      </div>
+    )
   }
 
-  // ── 인물 핸들러 ──────────────────────────────────────
-  const handlePersonSave = (draft: Omit<Person, 'id' | 'userId'>) => {
-    if (modal.kind !== 'person-edit') return
-    if (modal.person) {
-      const id = modal.person.id
-      setPersons((prev) => prev.map((p) => (p.id === id ? { ...p, ...draft } : p)))
-    } else {
-      setPersons((prev) => [
-        ...prev,
-        { ...draft, id: Date.now(), userId: user.id } as Person,
-      ])
+  const goToForest = () => {
+    // `/main` 이 라우트로 분리되어 있어 그대로 ForestScene(house.png) 으로 진입.
+    // replace: true 로 `/mypage` 를 히스토리에서 치워 브라우저 뒤로가기가 마이페이지로
+    // 다시 빨려 들어가지 않도록 한다.
+    navigate(ROUTES.main, { replace: true })
+  }
+
+  const handleProfileSave = async (
+    patch: Pick<UserProfile, 'name' | 'nickname' | 'phone' | 'agreeSms' | 'agreeMarketing'>,
+  ) => {
+    const nextUser = await meUpdate.mutateAsync({
+      ...patch,
+      phone: patch.phone ?? null,
+    })
+
+    if (authSession.accessToken) {
+      setAuthSession({
+        accessToken: authSession.accessToken,
+        user: nextUser,
+      })
     }
+
     closeModal()
   }
-  const handlePersonDelete = (target: Person) => {
-    if (!window.confirm(`"${target.name}" 을(를) 삭제하시겠어요?`)) return
-    setPersons((prev) => prev.filter((p) => p.id !== target.id))
-  }
 
-  // ── 보이스 핸들러 ────────────────────────────────────
-  // 추가(녹음)는 /mypage/voice-clone 라우트에서 처리. 여기선 제목 편집만.
-  const handleVoiceSave = (draft: Pick<VoiceProfile, 'title'>) => {
-    if (modal.kind !== 'voice-edit') return
-    const id = modal.voice.id
-    setVoiceProfiles((prev) => prev.map((v) => (v.id === id ? { ...v, ...draft } : v)))
+  const handlePersonSave = async (draft: Omit<Person, 'id' | 'userId'>) => {
+    if (modal.kind !== 'person-edit' || currentUserId <= 0) return
+
+    if (modal.person) {
+      await personUpdate.mutateAsync({
+        personId: modal.person.id,
+        body: {
+          name: draft.name,
+          birthDate: draft.birthDate,
+          gender: mapGenderToApi(draft.gender),
+        },
+      })
+    } else {
+      await personPost.mutateAsync({
+        name: draft.name,
+        birthDate: draft.birthDate ?? '',
+        gender: mapGenderToApi(draft.gender),
+        role: 'CHILD',
+      })
+    }
+
     closeModal()
   }
-  const handleVoiceDelete = (target: VoiceProfile) => {
-    if (!window.confirm(`"${target.title}" 을(를) 삭제하시겠어요?`)) return
-    setVoiceProfiles((prev) => prev.filter((v) => v.id !== target.id))
+
+  const handlePersonDelete = async (person: Person) => {
+    if (!window.confirm(`"${person.name}" 주인공 정보를 삭제할까요?`)) return
+    await personDelete.mutateAsync(person.id)
   }
 
-  // #root 가 height:100% + overflow:hidden 이므로, 마이페이지 컨테이너에서
-  // 자체 스크롤을 만들어야 함 (글로벌 CSS 는 숲/서점 풀스크린 씬 때문에 유지).
-  // 모달은 애니메이션 div 밖(형제)에 렌더링.
-  // 이유: CSS transform(animation forwards)이 걸린 조상은 position:fixed 의
-  // containing block 이 되어, 모달이 스크롤에 따라 잘리는 버그가 발생함.
+  const handleVoiceDelete = async (voiceProfileId: number, title: string) => {
+    if (!window.confirm(`"${title}" 목소리를 삭제할까요?`)) return
+    await voiceProfileDelete.mutateAsync(voiceProfileId)
+  }
+
+  const handleWithdrawConfirm = async () => {
+    const provider = currentUser?.provider ?? authSession.user?.provider ?? null
+
+    try {
+      await withdraw.mutateAsync()
+    } catch (error) {
+      if (!isMissingUserError(error)) {
+        throw error
+      }
+    }
+
+    clearAuthSession()
+    closeModal()
+
+    const oauthLogoutUrl = buildOauthLogoutUrl(provider, window.location.origin)
+    if (oauthLogoutUrl) {
+      window.location.assign(oauthLogoutUrl)
+      return
+    }
+
+    navigate(ROUTES.home, { replace: true })
+  }
+
   return (
     <>
       <div className="h-full overflow-y-auto bg-[#1a0f08] [animation:mypageEntry_0.45s_ease-out_forwards]">
-        {/* 마이페이지 전용 헤더 — ← 돌아가기로 bookstore 씬 복귀 (skipLanding + replace) */}
         <header className="h-14 px-6 bg-[#2a1b12] border-b border-[#4a3a24] flex items-center justify-between sticky top-0 z-50">
           <button
             type="button"
-            onClick={goToBookshelf}
+            onClick={goToForest}
             className="flex items-center gap-2 text-[#b4c4a4] hover:text-[#e4d4b4] transition-colors text-sm font-medium"
           >
-            <span>←</span>
-            <span>돌아가기</span>
+            <span>{'<'}</span>
+            <span>홈으로</span>
           </button>
           <Link
             to={ROUTES.home}
@@ -124,44 +193,97 @@ export function MypagePage() {
             TaleMory
           </Link>
         </header>
+
         <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-10 space-y-6 pb-16">
           <h1 className="text-2xl md:text-3xl font-bold text-[#e4d4b4]">마이페이지</h1>
 
-          <ProfileSection
-            user={user}
-            onEditClick={() => setModal({ kind: 'profile-edit' })}
-          />
+          {pageError && (
+            <div className="bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#f0e6c0] text-sm px-4 py-3 rounded-xl">
+              {pageError}
+            </div>
+          )}
+
+          {currentUser ? (
+            <ProfileSection
+              user={currentUser}
+              onEditClick={() => setModal({ kind: 'profile-edit' })}
+            />
+          ) : (
+            <section className="rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-6 md:p-8">
+              <p className="text-sm text-[#b4c4a4]">내 정보를 불러오는 중이에요.</p>
+            </section>
+          )}
 
           <PersonsSection
-            persons={persons}
+            persons={personsQuery.data ?? []}
             onAddClick={() => setModal({ kind: 'person-edit' })}
-            onEditClick={(person) => setModal({ kind: 'person-edit', person })}
+            onEditClick={person => setModal({ kind: 'person-edit', person })}
             onDeleteClick={handlePersonDelete}
+            isLoading={personsQuery.isPending}
+            isBusy={personPost.isPending || personUpdate.isPending || personDelete.isPending}
           />
 
           <VoiceProfilesSection
-            voiceProfiles={voiceProfiles}
+            voiceProfiles={voiceProfilesQuery.data ?? []}
             onAddClick={() => navigate(ROUTES.mypageVoiceClone)}
-            onEditClick={(voice) => setModal({ kind: 'voice-edit', voice })}
-            onDeleteClick={handleVoiceDelete}
+            onDeleteClick={profile => handleVoiceDelete(profile.id, profile.title)}
+            isLoading={voiceProfilesQuery.isPending}
+            isBusy={voiceProfileDelete.isPending}
           />
 
           <DangerZone onWithdrawClick={() => setModal({ kind: 'withdraw' })} />
         </main>
       </div>
 
-      {modal.kind === 'profile-edit' && (
-        <ProfileEditModal user={user} onClose={closeModal} onSave={handleProfileSave} />
+      {modal.kind === 'profile-edit' && currentUser && (
+        <ProfileEditModal
+          user={currentUser}
+          onClose={closeModal}
+          onSave={handleProfileSave}
+          isPending={meUpdate.isPending}
+        />
       )}
       {modal.kind === 'withdraw' && (
-        <WithdrawDialog onClose={closeModal} onConfirm={handleWithdrawConfirm} />
+        <WithdrawDialog
+          onClose={closeModal}
+          onConfirm={handleWithdrawConfirm}
+          isPending={withdraw.isPending}
+        />
       )}
       {modal.kind === 'person-edit' && (
         <PersonEditModal initial={modal.person} onClose={closeModal} onSave={handlePersonSave} />
       )}
-      {modal.kind === 'voice-edit' && (
-        <VoiceProfileEditModal initial={modal.voice} onClose={closeModal} onSave={handleVoiceSave} />
-      )}
     </>
   )
+}
+
+function mapGenderToApi(gender: Person['gender']): 'MALE' | 'FEMALE' | 'OTHER' {
+  switch (gender) {
+    case 'male':
+      return 'MALE'
+    case 'female':
+      return 'FEMALE'
+    default:
+      return 'OTHER'
+  }
+}
+
+function getFirstErrorMessage(...errors: Array<unknown>): string | null {
+  for (const error of errors) {
+    if (error == null) continue
+
+    if (isApiError(error)) {
+      return error.message
+    }
+
+    if (error instanceof Error) {
+      return error.message
+    }
+  }
+
+  return null
+}
+
+function isMissingUserError(error: unknown): boolean {
+  return isApiError(error) && error.status === 404 && error.code === 'USER_001'
 }

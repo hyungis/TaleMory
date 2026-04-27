@@ -5,29 +5,29 @@ interface Props {
   user: UserProfile
   onClose: () => void
   onSave: (patch: Pick<UserProfile, 'name' | 'nickname' | 'phone' | 'agreeSms' | 'agreeMarketing'>) => void
+  isPending?: boolean
 }
 
-/**
- * 프로필 편집 모달.
- * 편집 가능 필드: name, nickname, phone, agreeSms, agreeMarketing.
- * email / loginId / provider 는 읽기 전용 (변경 불가).
- */
-export function ProfileEditModal({ user, onClose, onSave }: Props) {
+export function ProfileEditModal({ user, onClose, onSave, isPending = false }: Props) {
   const [name, setName] = useState(user.name)
   const [nickname, setNickname] = useState(user.nickname)
   const [phone, setPhone] = useState(user.phone ?? '')
   const [agreeSms, setAgreeSms] = useState(user.agreeSms)
   const [agreeMarketing, setAgreeMarketing] = useState(user.agreeMarketing)
 
-  // Esc 키 닫기.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isPending) {
+        onClose()
+      }
+    }
+
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [isPending, onClose])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
     onSave({
       name: name.trim(),
       nickname: nickname.trim(),
@@ -40,59 +40,80 @@ export function ProfileEditModal({ user, onClose, onSave }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={() => {
+        if (!isPending) {
+          onClose()
+        }
+      }}
       role="presentation"
     >
       <form
         onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
+        onClick={event => event.stopPropagation()}
         className="w-full max-w-md rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-6 space-y-4"
       >
-        <h2 className="text-xl font-bold text-[#e4d4b4]">프로필 편집</h2>
+        <h2 className="text-xl font-bold text-[#e4d4b4]">프로필 수정</h2>
 
         <Field label="이름">
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={event => setName(event.target.value)}
             required
-            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none"
+            disabled={isPending}
+            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </Field>
+
         <Field label="닉네임">
           <input
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={event => setNickname(event.target.value)}
             required
-            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none"
+            disabled={isPending}
+            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </Field>
+
         <Field label="전화번호">
           <input
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={event => setPhone(event.target.value)}
             placeholder="010-0000-0000"
-            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none"
+            disabled={isPending}
+            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </Field>
 
         <div className="space-y-2 pt-2">
-          <Toggle label="SMS 수신 동의" checked={agreeSms} onChange={setAgreeSms} />
-          <Toggle label="마케팅 정보 수신 동의" checked={agreeMarketing} onChange={setAgreeMarketing} />
+          <Toggle
+            label="SMS 수신 동의"
+            checked={agreeSms}
+            onChange={setAgreeSms}
+            isPending={isPending}
+          />
+          <Toggle
+            label="마케팅 정보 수신 동의"
+            checked={agreeMarketing}
+            onChange={setAgreeMarketing}
+            isPending={isPending}
+          />
         </div>
 
         <div className="flex gap-2 pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-[#4a3a24] text-[#b4c4a4] hover:bg-[#4a3a24] transition-colors"
+            disabled={isPending}
+            className="flex-1 px-4 py-2 rounded-lg border border-[#4a3a24] text-[#b4c4a4] hover:bg-[#4a3a24] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             취소
           </button>
           <button
             type="submit"
-            className="flex-1 px-4 py-2 rounded-lg bg-[#3ca55c] text-[#1a0f08] font-medium hover:bg-[#4cb56c] transition-colors"
+            disabled={isPending}
+            className="flex-1 px-4 py-2 rounded-lg bg-[#3ca55c] text-[#1a0f08] font-medium hover:bg-[#4cb56c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            저장
+            {isPending ? '저장 중...' : '저장'}
           </button>
         </div>
       </form>
@@ -113,10 +134,12 @@ function Toggle({
   label,
   checked,
   onChange,
+  isPending = false,
 }: {
   label: string
   checked: boolean
-  onChange: (v: boolean) => void
+  onChange: (value: boolean) => void
+  isPending?: boolean
 }) {
   return (
     <label className="flex items-center justify-between cursor-pointer">
@@ -124,9 +147,10 @@ function Toggle({
       <button
         type="button"
         onClick={() => onChange(!checked)}
+        disabled={isPending}
         className={`relative w-11 h-6 rounded-full transition-colors ${
           checked ? 'bg-[#3ca55c]' : 'bg-[#4a3a24]'
-        }`}
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
         aria-pressed={checked}
       >
         <span

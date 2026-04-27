@@ -35,6 +35,8 @@ class SecurityConfig(
                     "/api/auth/kakao/callback",
                     "/api/auth/refresh",
                     "/api/auth/logout",
+                    "/api/public/**",
+                    "/api/dictionary/**",
                 ).permitAll()
                     .anyRequest().authenticated()
             }

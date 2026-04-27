@@ -61,10 +61,10 @@ export function CreationPage() {
    * 제작 플로우로 다시 빨려 들어가지 않도록 한다.
    */
   const goToBookshelf = useCallback(() => {
-    navigate(ROUTES.home, {
-      state: { scene: 'bookstore', skipLanding: true },
-      replace: true,
-    })
+    // `/main/bookshelf` 가 라우트로 분리되어 있어 바로 진입하면 BookshelfModal 이 열린 상태로 mount.
+    // replace: true 로 `/creation` 을 히스토리에서 치워 브라우저 뒤로가기가 제작 플로우로
+    // 다시 빨려 들어가지 않도록 한다.
+    navigate(ROUTES.mainBookshelf, { replace: true })
   }, [navigate])
 
   const handleBack = useCallback(() => {
@@ -92,6 +92,12 @@ export function CreationPage() {
             flow.setStoryId(storyId)
             flow.handleNext()
           }}
+          onStaleStoryIdReset={() => {
+            // sessionStorage 의 storyId 가 DB 에 없을 때 (dev 리셋 등) 호출됨.
+            // 진행 snapshot 비우고 storyId state 도 null 로 — 다음 클릭은 POST 모드.
+            flow.setStoryId(null)
+            flow.resetProgress()
+          }}
         />
       )}
 
@@ -115,9 +121,7 @@ export function CreationPage() {
 
       {flow.currentStep === 4 && (
         <StoryboardEditorStep
-          storySummary={flow.projectData.step3.story}
-          pages={flow.projectData.step4.pages}
-          onPageUpdate={flow.updateStoryboardPage}
+          storyId={flow.storyId}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
@@ -126,6 +130,7 @@ export function CreationPage() {
       {flow.currentStep === 5 && (
         <StyleSelectorStep
           data={flow.projectData.step5}
+          storyId={flow.storyId}
           onStyleChange={flow.updateStyle}
           onBack={handleBack}
           onNext={flow.handleNext}
@@ -134,6 +139,7 @@ export function CreationPage() {
 
       {flow.currentStep === 6 && (
         <VoiceCloneStep
+          storyId={flow.storyId}
           onBack={handleBack}
           onNext={flow.handleNext}
           onVoiceSaved={flow.updateVoiceModel}

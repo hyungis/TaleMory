@@ -50,6 +50,7 @@ class StoryboardGenerationService(
     private val storyBoardRepository: StoryBoardRepository,
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
+    private val storyParticipantParser: StoryParticipantParser,
 ) {
 
     fun generate(userId: Long, storyId: Long, prompt: String?): StartGenerationResult {
@@ -66,12 +67,12 @@ class StoryboardGenerationService(
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
 
-        val children = parseChildren(story.mainCharacterJson)
+        val children = storyParticipantParser.parseChildren(story.mainCharacterJson)
         if (children.isEmpty()) {
             // 주인공 아이 정보 없이는 AI 가 이야기를 만들 수 없음.
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
-        val companions = parseCompanions(story.companionsJson)
+        val companions = storyParticipantParser.parseCompanions(story.companionsJson)
 
         val payload = StoryGeneratePayload(
             children = children,
@@ -130,45 +131,11 @@ class StoryboardGenerationService(
     }
 
     /**
-     * mainCharacterJson 예시:
-     *   [ { "personId": 5, "name": "지민", "age": 7, "gender": "MALE" }, ... ]
-     * personId 는 AI 에 필요 없으므로 제외하고 name/age/gender 만 추출.
-     */
-    private fun parseChildren(json: String): List<ChildInfo> {
-        val root = parseTreeOrNull(json) ?: return emptyList()
-        if (!root.isArray) return emptyList()
-
-        val list = mutableListOf<ChildInfo>()
-        for (node in root) {
-            val name = node.get("name")?.asString()?.trim()?.takeIf { it.isNotEmpty() } ?: continue
-            val age = extractInt(node.get("age")) ?: continue
-            val gender = node.get("gender")?.asString()?.uppercase()?.takeIf { it.isNotEmpty() } ?: continue
-            list.add(ChildInfo(name, age, gender))
-        }
-        return list
-    }
-
-    /**
-     * companionsJson 은 FE 가 `JSON.stringify(data.companions ?? '')` 로 만든 문자열.
-     * 실제 케이스:
-     *  - 사용자가 자유 입력한 하나의 문자열 ("엄마, 아빠")
-     *  - 배열 ["엄마", "아빠"]
-     *  - 빈 문자열
-     * 세 경우를 모두 List<String> 로 정규화.
-     */
-    private fun parseCompanions(json: String): List<String> {
-        val root = parseTreeOrNull(json) ?: return emptyList()
-        return when {
-            root.isString -> splitFreeText(root.asString())
-            root.isArray -> root.mapNotNull { it.takeIf(JsonNode::isString)?.asString()?.trim()?.takeIf { s -> s.isNotEmpty() } }
-            else -> emptyList()
-        }
-    }
-
-    /**
      * tagsJson 예시:
      *  - `["한라산","등산"]`  — FE 의 태그 편집 UI 최신 포맷
      *  - `"#한라산 #등산"`     — 과거 자유텍스트 입력 호환
+     *
+     * NOTE: photo 도메인 전용이라 StoryParticipantParser 와 분리. 향후 PhotoService 로 이동 검토.
      */
     private fun parseHashtags(tagsJson: String?): List<String> {
         if (tagsJson.isNullOrBlank()) return emptyList()
@@ -185,13 +152,6 @@ class StoryboardGenerationService(
     private fun parseTreeOrNull(json: String): JsonNode? =
         if (json.isBlank()) null
         else try { objectMapper.readTree(json) } catch (_: Exception) { null }
-
-    private fun extractInt(node: JsonNode?): Int? = when {
-        node == null || node.isNull -> null
-        node.isNumber -> node.asInt()
-        node.isString -> node.asString().toIntOrNull()
-        else -> null
-    }
 
     private fun splitFreeText(raw: String): List<String> =
         raw.split(",", ";", " ")

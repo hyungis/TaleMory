@@ -94,3 +94,15 @@ pytest
 docker build -t s210-ai app/ai
 docker run --rm -p 8000:8000 s210-ai
 ```
+
+## Preview TTS
+
+`POST /api/v1/voices/{voiceId}/preview` requires a reachable CosyVoice endpoint.
+
+```powershell
+$env:COSYVOICE_BASE_URL="http://localhost:9880"
+$env:COSYVOICE_INSTRUCT_PATH="/inference_instruct2"
+$env:COSYVOICE_TIMEOUT_SEC="60"
+```
+
+The preview API reads the stored `reference.wav`, builds an instruction from the request, calls CosyVoice, and stores the returned audio under `TTS_STORAGE_ROOT`.

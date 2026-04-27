@@ -1,53 +1,99 @@
 package com.s210.backend.domain.voice.presentation
 
 import com.s210.backend.common.response.ApiResponse
-import com.s210.backend.domain.voice.presentation.request.CreateVoiceProfileRequest
+import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.voice.application.VoiceService
 import com.s210.backend.domain.voice.presentation.response.VoicePreviewResponse
+import com.s210.backend.domain.voice.presentation.response.VoicePresignResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceProfileResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceRecordingScriptResponse
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.*
-import org.springframework.web.multipart.MultipartFile
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api")
-class VoiceController {
+class VoiceController(
+    private val voiceService: VoiceService,
+) {
 
-    // 녹음 스크립트 제공
     @GetMapping("/voice-recording-script")
-    fun voiceRecordingScriptDetails(): ResponseEntity<ApiResponse<VoiceRecordingScriptResponse>> {
-        // TODO: VoiceService.findRecordingScript()
-        TODO("Not yet implemented")
+    fun voiceRecordingScriptDetails(
+        @RequestParam(required = false) storyId: Long?,
+    ): ResponseEntity<ApiResponse<VoiceRecordingScriptResponse>> {
+        val script = voiceService.findRecordingScript(storyId)
+        return ResponseEntity.ok(ApiResponse(data = VoiceRecordingScriptResponse(script)))
     }
 
-    // 음성 프로필 목록 조회
     @GetMapping("/voice-profiles")
-    fun voiceProfileList(): ResponseEntity<ApiResponse<List<VoiceProfileResponse>>> {
-        // TODO: VoiceService.findVoiceProfiles(userId)
-        TODO("Not yet implemented")
+    fun voiceProfileList(
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<List<VoiceProfileResponse>>> =
+        ResponseEntity.ok(
+            ApiResponse(
+                data = voiceService.findVoiceProfiles(user.userId).map(VoiceProfileResponse::from),
+            ),
+        )
+
+    // Phase 1: presigned PUT URL 발급 (DB 저장 없음)
+    @PostMapping("/voice-profiles/presigned-url")
+    fun voiceProfilePresignedUrl(
+        @AuthenticationPrincipal user: CustomUser,
+        @RequestBody body: VoicePresignRequest,
+    ): ResponseEntity<ApiResponse<VoicePresignResponse>> {
+        val presigned = voiceService.presignVoiceUpload(user.userId, body.contentType)
+        return ResponseEntity.ok(
+            ApiResponse(
+                data = VoicePresignResponse(
+                    uploadUrl = presigned.uploadUrl,
+                    s3Key = presigned.s3Key,
+                    expiresAt = presigned.expiresAt,
+                ),
+            ),
+        )
     }
 
-    // 음성 녹음 저장 (multipart)
+    data class VoicePresignRequest(
+        val contentType: String = "audio/webm",
+    )
+
+    // Phase 3: S3 업로드 완료 후 DB commit
     @PostMapping("/voice-profiles")
     fun voiceProfileAdd(
-        @RequestPart("title") title: String,
-        @RequestPart("audio") audio: MultipartFile
+        @AuthenticationPrincipal user: CustomUser,
+        @RequestBody body: VoiceProfileCreateRequest,
     ): ResponseEntity<ApiResponse<VoiceProfileResponse>> {
-        // TODO: VoiceService.addVoiceProfile(userId, title, audio)
-        TODO("Not yet implemented")
+        val result = voiceService.addVoiceProfile(user.userId, body.title, body.s3Key)
+        return ResponseEntity.ok(
+            ApiResponse(data = VoiceProfileResponse.from(result)),
+        )
     }
 
-    // 음성 프로필 삭제
+    data class VoiceProfileCreateRequest(
+        val title: String,
+        val s3Key: String,
+    )
+
     @DeleteMapping("/voice-profiles/{voiceProfileId}")
-    fun voiceProfileRemove(@PathVariable voiceProfileId: Long): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: VoiceService.removeVoiceProfile(voiceProfileId)
-        TODO("Not yet implemented")
+    fun voiceProfileRemove(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable voiceProfileId: Long,
+    ): ResponseEntity<ApiResponse<Unit>> {
+        voiceService.removeVoiceProfile(user.userId, voiceProfileId)
+        return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 
-    // TTS 미리 듣기
     @PostMapping("/voice-profiles/{voiceProfileId}/preview")
-    fun voiceProfilePreview(@PathVariable voiceProfileId: Long): ResponseEntity<ApiResponse<VoicePreviewResponse>> {
-        // TODO: VoiceService.previewVoice(voiceProfileId)
+    fun voiceProfilePreview(
+        @PathVariable voiceProfileId: Long,
+    ): ResponseEntity<ApiResponse<VoicePreviewResponse>> {
         TODO("Not yet implemented")
     }
 }

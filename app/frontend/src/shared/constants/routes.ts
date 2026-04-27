@@ -4,8 +4,10 @@
 export const ROUTES = {
   home: '/',
   main: '/main',
+  mainBookshelf: '/main/bookshelf',
   creation: '/creation',
   viewer: '/viewer/:storyId',
+  shared: '/shared/:shareToken',
   mypage: '/mypage',
   mypageVoiceClone: '/mypage/voice-clone',
   // TODO: oauthCallback
