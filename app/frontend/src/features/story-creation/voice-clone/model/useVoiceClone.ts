@@ -7,6 +7,7 @@ import {
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
 } from '../lib/defaults'
+import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript } from '../api/voiceProfileApi'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -23,13 +24,20 @@ interface SavedTtsRecord {
 }
 
 export interface UseVoiceCloneResult {
+  // 녹음 스크립트 (서버에서 아이 이름 주입)
+  sampleScript: string
+
   // 녹음 상태
   status: RecordingStatus
   statusLabel: string
 
-  // 오디오 리소스 (dataURL 형태 — localStorage 호환)
+  // 오디오 리소스 (dataURL 형태)
   recordedAudioUrl: string | null
   ttsAudioUrl: string | null
+
+  // 서버 저장 결과
+  savedProfileId: number | null
+  isSaving: boolean
 
   // TTS 입력
   ttsText: string
@@ -57,9 +65,9 @@ export interface UseVoiceCloneResult {
   startRecording: () => Promise<void>
   stopRecording: () => void
   rerecord: () => void
-  loadExistingVoice: () => void
+  loadExistingVoice: () => Promise<void>
   previewTts: () => Promise<void>
-  saveVoiceRecording: () => string | null
+  saveVoiceRecording: () => Promise<string | null>
 }
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -93,10 +101,11 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
  *  - 제목 + 저장 (VOICE_STORAGE_KEY + TTS_STORAGE_KEY)
  *  - 저장 상태 요약 문구
  */
-export function useVoiceClone(): UseVoiceCloneResult {
+export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   const [status, setStatus] = useState<RecordingStatus>('idle')
   const [statusLabel, setStatusLabel] = useState('대기 중')
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [sampleScript, setSampleScript] = useState(VOICE_SAMPLE_SCRIPT)
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null)
   const [ttsText, setTtsText] = useState(DEFAULT_TTS_TEXT)
   const [ttsStatusText, setTtsStatusText] = useState(
@@ -105,6 +114,8 @@ export function useVoiceClone(): UseVoiceCloneResult {
   const [isTtsLoading, setIsTtsLoading] = useState(false)
   const [voiceTitle, setVoiceTitle] = useState('')
   const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 음성이 없습니다.')
+  const [savedProfileId, setSavedProfileId] = useState<number | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
@@ -141,6 +152,13 @@ export function useVoiceClone(): UseVoiceCloneResult {
   useEffect(() => {
     updateSavedVoiceSummary()
   }, [updateSavedVoiceSummary])
+
+  // 서버에서 녹음 스크립트 가져오기 (아이 이름 주입)
+  useEffect(() => {
+    getRecordingScript(storyId).then(setSampleScript).catch(() => {
+      // 실패 시 기본 스크립트 유지
+    })
+  }, [storyId])
 
   const cleanupStream = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
@@ -195,26 +213,29 @@ export function useVoiceClone(): UseVoiceCloneResult {
     setAudioDuration(0)
   }, [])
 
-  const loadExistingVoice = useCallback(() => {
+  const loadExistingVoice = useCallback(async () => {
     try {
-      const raw = window.localStorage.getItem(VOICE_STORAGE_KEY)
-      const saved = raw ? (JSON.parse(raw) as SavedVoiceRecord) : null
-      if (saved?.audio) {
-        setRecordedAudioUrl(saved.audio)
-        setVoiceTitle(saved.name || '')
+      const profiles = await getVoiceProfiles()
+      if (profiles.length > 0) {
+        const latest = profiles[0]
+        if (latest.audioUrl) {
+          setRecordedAudioUrl(latest.audioUrl)
+        }
+        setVoiceTitle(latest.title || '')
+        setSavedProfileId(latest.voiceProfileId)
         setStatus('ready')
         setStatusLabel('기존 음성 불러옴')
         setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
+        setSavedVoiceSummary(`저장된 보이스: ${latest.title}`)
       } else {
         setStatus('idle')
         setStatusLabel('저장된 음성 없음')
         setTtsStatusText('녹음하거나 기존 음성을 불러오면 TTS를 만들 수 있어요.')
       }
-      updateSavedVoiceSummary()
     } catch {
       alert('저장된 음성을 불러오지 못했습니다.')
     }
-  }, [updateSavedVoiceSummary])
+  }, [])
 
   const previewTts = useCallback(async () => {
     if (!recordedAudioUrl) {
@@ -259,45 +280,42 @@ export function useVoiceClone(): UseVoiceCloneResult {
   }, [recordedAudioUrl, ttsText])
 
   /**
-   * 녹음 + (있다면)TTS 를 localStorage 에 저장.
-   * 성공 시 저장된 보이스 이름을 반환 (상위 step6.voiceModel 업데이트용).
+   * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).
+   * Phase 1: POST /api/voice-profiles/presigned-url → presigned URL + s3Key 발급
+   * Phase 2: presigned URL 로 S3 에 직접 PUT
+   * Phase 3: POST /api/voice-profiles → s3Key 로 DB commit
    */
-  const saveVoiceRecording = useCallback((): string | null => {
-    const name = voiceTitle.trim()
-    if (!name) {
-      setStatus('idle')
-      setStatusLabel('제목 먼저 입력')
+  const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
+    if (!recordedAudioUrl) {
+      setStatusLabel('녹음이 없습니다')
       return null
     }
+
+    setIsSaving(true)
     try {
-      if (recordedAudioUrl) {
-        const record: SavedVoiceRecord = {
-          name,
-          audio: recordedAudioUrl,
-          savedAt: new Date().toISOString(),
-        }
-        window.localStorage.setItem(VOICE_STORAGE_KEY, JSON.stringify(record))
-      }
-      if (ttsAudioUrl) {
-        const record: SavedTtsRecord = {
-          title: name,
-          text: ttsText.trim(),
-          audio: ttsAudioUrl,
-          savedAt: new Date().toISOString(),
-        }
-        window.localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify(record))
-        setStatusLabel('TTS 음성 저장 완료')
-      } else {
-        setStatusLabel('녹음 저장 완료')
-      }
+      const audioBlob = dataUrlToBlob(recordedAudioUrl)
+      const autoTitle = `녹음_${new Date().toISOString().slice(0, 19).replace('T', '_')}`
+
+      // Phase 1: presign
+      const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
+      // Phase 2: S3 PUT
+      await uploadAudioToS3(presigned.uploadUrl, audioBlob)
+      // Phase 3: DB commit
+      const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
+
+      setSavedProfileId(profile.voiceProfileId)
       setStatus('ready')
-      updateSavedVoiceSummary()
-      return name
+      setStatusLabel('서버에 저장 완료')
+      setSavedVoiceSummary(`녹음이 저장되었습니다. (ID: ${profile.voiceProfileId})`)
+      return autoTitle
     } catch {
-      alert('저장 용량이 초과되었습니다. 녹음이 너무 길 수 있어요.')
+      setStatusLabel('저장 실패')
+      alert('음성 저장에 실패했습니다. 다시 시도해 주세요.')
       return null
+    } finally {
+      setIsSaving(false)
     }
-  }, [voiceTitle, recordedAudioUrl, ttsAudioUrl, ttsText, updateSavedVoiceSummary])
+  }, [recordedAudioUrl])
 
   const toggleAudioPlayback = useCallback(() => {
     const el = audioRef.current
@@ -317,6 +335,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
   useEffect(() => () => cleanupStream(), [cleanupStream])
 
   return {
+    sampleScript,
     status,
     statusLabel,
     recordedAudioUrl,
@@ -328,6 +347,8 @@ export function useVoiceClone(): UseVoiceCloneResult {
     voiceTitle,
     setVoiceTitle,
     savedVoiceSummary,
+    savedProfileId,
+    isSaving,
     audioRef,
     isAudioPlaying,
     audioCurrentTime,
