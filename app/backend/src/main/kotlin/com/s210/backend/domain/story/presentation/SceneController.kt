@@ -1,13 +1,21 @@
 package com.s210.backend.domain.story.presentation
 
 import com.s210.backend.common.response.ApiResponse
+import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.story.application.StoryProgressService
+import com.s210.backend.domain.story.presentation.request.ProgressRequest
+import com.s210.backend.domain.story.presentation.response.OutroResponse
+import com.s210.backend.domain.story.presentation.response.ProgressResponse
 import com.s210.backend.domain.story.presentation.response.SceneResponse
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/stories/{storyId}")
-class SceneController {
+class SceneController(
+    private val storyProgressService: StoryProgressService,
+) {
 
     // 동화 씬(페이지) 목록 조회
     @GetMapping("/scenes")
@@ -105,7 +113,7 @@ class SceneController {
     fun storyOutroModify(
         @PathVariable storyId: Long,
         @RequestBody request: com.s210.backend.domain.story.presentation.request.OutroRequest
-    ): ResponseEntity<ApiResponse<com.s210.backend.domain.story.presentation.response.OutroResponse>> {
+    ): ResponseEntity<ApiResponse<OutroResponse>> {
         // TODO: StoryService.modifyOutro(storyId, command)
         TODO("Not yet implemented")
     }
@@ -117,20 +125,34 @@ class SceneController {
         TODO("Not yet implemented")
     }
 
-    // 책갈피 조회
+    // 책갈피 조회 — 저장된 값이 없으면 data=null 반환
     @GetMapping("/progress")
-    fun storyProgressDetails(@PathVariable storyId: Long): ResponseEntity<ApiResponse<com.s210.backend.domain.story.presentation.response.ProgressResponse>> {
-        // TODO: StoryService.findProgress(userId, storyId)
-        TODO("Not yet implemented")
+    fun storyProgressDetails(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<ProgressResponse?>> {
+        val result = storyProgressService.findProgress(user.username, storyId)
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 
-    // 책갈피 저장
+    // 책갈피 저장/이동 (upsert)
     @PutMapping("/progress")
     fun storyProgressModify(
         @PathVariable storyId: Long,
-        @RequestBody request: com.s210.backend.domain.story.presentation.request.ProgressRequest
-    ): ResponseEntity<ApiResponse<com.s210.backend.domain.story.presentation.response.ProgressResponse>> {
-        // TODO: StoryService.modifyProgress(userId, storyId, lastScenePage)
-        TODO("Not yet implemented")
+        @RequestBody request: ProgressRequest,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<ProgressResponse>> {
+        val result = storyProgressService.saveProgress(user.username, storyId, request.lastScenePage)
+        return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    // 책갈피 해제
+    @DeleteMapping("/progress")
+    fun storyProgressRemove(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<Unit> {
+        storyProgressService.removeProgress(user.username, storyId)
+        return ResponseEntity.noContent().build()
     }
 }
