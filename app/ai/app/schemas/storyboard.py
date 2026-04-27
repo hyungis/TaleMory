@@ -40,6 +40,16 @@ class PhotoInput(BaseModel):
     displayOrder: int = Field(..., ge=1)
 
 
+class ApprovedStorySummary(BaseModel):
+    title: str = Field(..., min_length=1)
+    summary: str = Field(..., min_length=1)
+    summaryKo: str = Field(..., min_length=1)
+    moralTheme: str = Field(..., min_length=1)
+    storyQuest: str = Field(..., min_length=1)
+    recurringMotif: str = Field(..., min_length=1)
+    keyEmotionalBeats: list[str] = Field(..., min_length=3)
+
+
 class StoryboardGenerateRequest(BaseModel):
     storyId: int | None = Field(default=None, ge=1)
     children: list[ChildInfo] = Field(..., min_length=1)
@@ -48,6 +58,7 @@ class StoryboardGenerateRequest(BaseModel):
     photos: list[PhotoInput] = Field(..., min_length=1)
     difficulty: Difficulty = "BEGINNER"
     additionalInstruction: str | None = Field(default=None, max_length=1000)
+    approvedSummary: ApprovedStorySummary | None = None
 
 
 class ReadingLevel(BaseModel):

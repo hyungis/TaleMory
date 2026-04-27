@@ -49,6 +49,11 @@ class Settings(BaseModel):
     OPENAI_API_KEY: str | None = getenv("OPENAI_API_KEY")
     GEMINI_API_KEY: str | None = getenv("GEMINI_API_KEY", getenv("GOOGLE_API_KEY"))
     STORYBOARD_MODEL: str = getenv("STORYBOARD_MODEL", "gpt-4o-mini")
+    STORYBOARD_SUMMARY_MODEL: str = getenv("STORYBOARD_SUMMARY_MODEL", "gpt-5-nano")
+    STORYBOARD_SUMMARY_REASONING_EFFORT: str = getenv(
+        "STORYBOARD_SUMMARY_REASONING_EFFORT",
+        "high",
+    )
     STORYBOARD_IMAGE_MODEL: str = getenv("STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
     STORYBOARD_IMAGE_S3_BUCKET: str | None = getenv("STORYBOARD_IMAGE_S3_BUCKET", getenv("AWS_S3_BUCKET"))
     STORYBOARD_IMAGE_S3_REGION: str | None = getenv("STORYBOARD_IMAGE_S3_REGION", getenv("AWS_REGION"))
@@ -64,6 +69,12 @@ class Settings(BaseModel):
     STORYBOARD_IMAGE_PUBLIC_BASE_URL: str | None = getenv("STORYBOARD_IMAGE_PUBLIC_BASE_URL")
     STORYBOARD_INPUT_COST_PER_1M: float = float(getenv("STORYBOARD_INPUT_COST_PER_1M", "0.15"))
     STORYBOARD_OUTPUT_COST_PER_1M: float = float(getenv("STORYBOARD_OUTPUT_COST_PER_1M", "0.60"))
+    STORYBOARD_SUMMARY_INPUT_COST_PER_1M: float = float(
+        getenv("STORYBOARD_SUMMARY_INPUT_COST_PER_1M", "0.05"),
+    )
+    STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M: float = float(
+        getenv("STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M", "0.40"),
+    )
     AWS_REGION: str | None = getenv("AWS_REGION")
     AWS_S3_BUCKET: str | None = getenv("AWS_S3_BUCKET")
     AWS_ACCESS_KEY_ID: str | None = getenv("AWS_ACCESS_KEY_ID")
@@ -76,10 +87,26 @@ class Settings(BaseModel):
     RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "ai.request")
     RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
     RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.request.queue")
+    RABBITMQ_SUMMARY_GENERATE_QUEUE: str = getenv(
+        "RABBITMQ_SUMMARY_GENERATE_QUEUE",
+        "ai.cpu.story.summary.request.queue",
+    )
+    RABBITMQ_SUMMARY_REGENERATE_QUEUE: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_QUEUE",
+        "ai.cpu.story.summary.regenerate.request.queue",
+    )
     RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.regenerate.queue")
     RABBITMQ_TTS_GENERATE_QUEUE: str = getenv("RABBITMQ_TTS_GENERATE_QUEUE", "ai.gpu.request.queue")
     RABBITMQ_TTS_RESULT_QUEUE: str = getenv("RABBITMQ_TTS_RESULT_QUEUE", "ai.result.tts.queue")
     RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "ai.cpu.story.generate")
+    RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY",
+        "ai.cpu.story.summary.generate",
+    )
+    RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY",
+        "ai.cpu.story.summary.regenerate",
+    )
     RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
     RABBITMQ_TTS_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_TTS_GENERATE_ROUTING_KEY", "ai.gpu.tts.generate")
     RABBITMQ_TTS_RESULT_BINDING_KEY: str = getenv("RABBITMQ_TTS_RESULT_BINDING_KEY", "ai.result.tts.#")
@@ -111,9 +138,25 @@ class Settings(BaseModel):
         "RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY",
         "ai.result.story.generate.completed",
     )
+    RABBITMQ_SUMMARY_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_GENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.story.summary.generate.completed",
+    )
+    RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.story.summary.regenerate.completed",
+    )
     RABBITMQ_GENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.generate.failed",
+    )
+    RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY",
+        "ai.result.story.summary.generate.failed",
+    )
+    RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY",
+        "ai.result.story.summary.regenerate.failed",
     )
     RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY",
