@@ -222,7 +222,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
           setRecordedAudioUrl(latest.audioUrl)
         }
         setVoiceTitle(latest.title || '')
-        setSavedProfileId(latest.id)
+        setSavedProfileId(latest.voiceProfileId)
         setStatus('ready')
         setStatusLabel('기존 음성 불러옴')
         setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
@@ -304,10 +304,10 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         await uploadAudioToS3(profile.uploadUrl, audioBlob)
       }
 
-      setSavedProfileId(profile.id)
+      setSavedProfileId(profile.voiceProfileId)
       setStatus('ready')
       setStatusLabel('서버에 저장 완료')
-      setSavedVoiceSummary(`녹음이 저장되었습니다. (ID: ${profile.id})`)
+      setSavedVoiceSummary(`녹음이 저장되었습니다. (ID: ${profile.voiceProfileId})`)
       return autoTitle
     } catch {
       setStatusLabel('저장 실패')

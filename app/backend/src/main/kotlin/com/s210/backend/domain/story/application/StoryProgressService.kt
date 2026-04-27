@@ -63,7 +63,7 @@ class StoryProgressService(
     }
 
     private fun resolveUserId(loginId: String): Long {
-        val user = memberRepository.findByLoginId(loginId)
+        val user = memberRepository.findByLoginIdAndDeletedAtIsNull(loginId)
             ?: throw BusinessException(CommonErrorCode.USER_NOT_FOUND)
         return user.id
     }

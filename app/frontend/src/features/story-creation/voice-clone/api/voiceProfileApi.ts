@@ -1,11 +1,13 @@
 import { post, get, deleteRequest } from '../../../../shared/api/client'
 
 export interface VoiceProfileDto {
-  id: number
+  voiceProfileId: number
+  userId: number
   title: string
   audioUrl: string | null
   ttsVoiceUrl: string | null
   createdAt: string
+  updatedAt: string
   uploadUrl?: string | null
 }
 

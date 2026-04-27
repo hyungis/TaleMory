@@ -11,5 +11,7 @@ data class UserResult(
     val phone: String?,
     val agreeSms: Boolean,
     val agreeMarketing: Boolean,
-    val createdAt: LocalDateTime
+    val provider: String?,
+    val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime,
 )

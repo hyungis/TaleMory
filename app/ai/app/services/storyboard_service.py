@@ -8,6 +8,7 @@ import boto3
 
 from app.core.config import settings
 from app.schemas.storyboard import (
+    ApprovedStorySummary,
     PhotoInput,
     ReadingLevel,
     StoryboardGenerateRequest,
@@ -146,6 +147,7 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
     )
     content: list[dict[str, str]] = [
         {"type": "input_text", "text": page_directive},
+        *_approved_summary_input_blocks(request.approvedSummary),
         {
             "type": "input_text",
             "text": json.dumps(payload, ensure_ascii=False),
@@ -196,6 +198,7 @@ def _build_openai_regenerate_input_content(
     )
     content: list[dict[str, str]] = [
         {"type": "input_text", "text": page_directive},
+        *_approved_summary_input_blocks(original_request.approvedSummary),
         {"type": "input_text", "text": regenerate_instruction},
         {"type": "input_text", "text": feedback_instruction},
         {
@@ -239,6 +242,27 @@ def _page_directive_for_request(request: StoryboardGenerateRequest) -> str:
         f"at least {min_pages}. Pages without a specific source photo must set sourcePhotoIds "
         "to an empty list [] and still belong to the unified story arc."
     )
+
+
+def _approved_summary_input_blocks(
+    approved_summary: ApprovedStorySummary | None,
+) -> list[dict[str, str]]:
+    if approved_summary is None:
+        return []
+    return [
+        {
+            "type": "input_text",
+            "text": (
+                "APPROVED SUMMARY - FIXED TOP-LEVEL STORY PLAN:\n"
+                "Preserve this emotional arc, moral theme, story quest, recurring motif, "
+                "and key emotional beats while expanding into pages."
+            ),
+        },
+        {
+            "type": "input_text",
+            "text": json.dumps(approved_summary.model_dump(mode="json"), ensure_ascii=False),
+        },
+    ]
 
 
 def _reconcile_derived_counts(parsed: StoryboardGenerateResponse) -> None:
@@ -366,7 +390,7 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
     photo_groups = _group_photos(sorted_photos, page_count)
     main_child = request.children[0].name
     companion_text = _format_companions(request.companions)
-    premise = _build_local_premise(main_child, companion_text, request.travel.place, sorted_photos)
+    premise = _build_local_premise(main_child, companion_text, request.travel.place, sorted_photos, request.approvedSummary)
 
     pages: list[StoryboardPage] = []
     for page_number, photos in enumerate(photo_groups, start=1):
@@ -405,18 +429,34 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
             )
         )
 
-    title = f"{main_child}'s Little Trip to {request.travel.place}"
+    title = request.approvedSummary.title if request.approvedSummary else f"{main_child}'s Little Trip to {request.travel.place}"
     synopsis = (
-        f"{main_child} visits {request.travel.place} with {companion_text}. "
-        "A shy sunbeam seems to guide the family from one small brave step to the next, "
-        "teaching that courage grows through kindness and love."
+        request.approvedSummary.summary
+        if request.approvedSummary
+        else (
+            f"{main_child} visits {request.travel.place} with {companion_text}. "
+            "A shy sunbeam seems to guide the family from one small brave step to the next, "
+            "teaching that courage grows through kindness and love."
+        )
     )
     response = StoryboardGenerateResponse(
         title=title,
         synopsis=synopsis,
-        moralTheme="Courage grows through small kind steps.",
-        storyQuest="Find where courage hides during the family trip.",
-        recurringMotif="A shy sunbeam that appears whenever the child takes a brave or kind step.",
+        moralTheme=(
+            request.approvedSummary.moralTheme
+            if request.approvedSummary
+            else "Courage grows through small kind steps."
+        ),
+        storyQuest=(
+            request.approvedSummary.storyQuest
+            if request.approvedSummary
+            else "Find where courage hides during the family trip."
+        ),
+        recurringMotif=(
+            request.approvedSummary.recurringMotif
+            if request.approvedSummary
+            else "A shy sunbeam that appears whenever the child takes a brave or kind step."
+        ),
         pageCount=len(pages),
         pageCountReason=(
             f"{len(sorted_photos)} photos were arranged into {len(pages)} pages "
@@ -494,7 +534,15 @@ def _group_photos(photos: list, page_count: int) -> list[list]:
     return [[photo] for photo in islice(cycle(photos), page_count)]
 
 
-def _build_local_premise(child_name: str, companion_text: str, travel_place: str, photos: list) -> str:
+def _build_local_premise(
+    child_name: str,
+    companion_text: str,
+    travel_place: str,
+    photos: list,
+    approved_summary: ApprovedStorySummary | None,
+) -> str:
+    if approved_summary:
+        return approved_summary.summary
     memories = ", ".join(photo.description for photo in photos[:5])
     return (
         f"{child_name} travels through {travel_place} with {companion_text}, "

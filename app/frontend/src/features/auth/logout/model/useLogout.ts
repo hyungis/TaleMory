@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../../shared/constants'
 import { clearAuthSession, useAuthSession } from '../../model/authSession'
 import { postLogout } from '../api/postLogout'
@@ -10,32 +9,28 @@ export interface UseLogoutResult {
 }
 
 export function useLogout(): UseLogoutResult {
-  const navigate = useNavigate()
   const { isAuthenticated } = useAuthSession()
   const [isPending, setIsPending] = useState(false)
 
   const logout = useCallback(async () => {
-    if (isPending) return
+    if (isPending) {
+      return
+    }
 
     setIsPending(true)
 
     try {
-      if (!isAuthenticated) {
-        clearAuthSession()
-        navigate(ROUTES.home, { replace: true })
-        return
+      if (isAuthenticated) {
+        await postLogout()
       }
 
-      await postLogout()
       clearAuthSession()
-      navigate(ROUTES.home, { replace: true })
+      window.alert('로그아웃되었습니다.')
+      window.location.assign(ROUTES.home)
     } finally {
       setIsPending(false)
     }
-  }, [isAuthenticated, isPending, navigate])
+  }, [isAuthenticated, isPending])
 
-  return {
-    isPending,
-    logout,
-  }
+  return { isPending, logout }
 }

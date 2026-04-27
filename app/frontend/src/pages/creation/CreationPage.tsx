@@ -92,6 +92,12 @@ export function CreationPage() {
             flow.setStoryId(storyId)
             flow.handleNext()
           }}
+          onStaleStoryIdReset={() => {
+            // sessionStorage 의 storyId 가 DB 에 없을 때 (dev 리셋 등) 호출됨.
+            // 진행 snapshot 비우고 storyId state 도 null 로 — 다음 클릭은 POST 모드.
+            flow.setStoryId(null)
+            flow.resetProgress()
+          }}
         />
       )}
 
@@ -124,6 +130,7 @@ export function CreationPage() {
       {flow.currentStep === 5 && (
         <StyleSelectorStep
           data={flow.projectData.step5}
+          storyId={flow.storyId}
           onStyleChange={flow.updateStyle}
           onBack={handleBack}
           onNext={flow.handleNext}

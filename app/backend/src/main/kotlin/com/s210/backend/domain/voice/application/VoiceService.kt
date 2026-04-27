@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 @Service
-@Transactional(readOnly = true)
+@Transactional
 class VoiceService(
     private val voiceProfileRepository: VoiceProfileRepository,
     private val storyRepository: StoryRepository,
@@ -36,6 +36,7 @@ class VoiceService(
         private const val DEFAULT_CHILD_NAME = "my dear"
     }
 
+    @Transactional(readOnly = true)
     fun findRecordingScript(storyId: Long?): String {
         if (storyId == null) return SCRIPT_TEMPLATE.format(DEFAULT_CHILD_NAME)
 
@@ -47,9 +48,10 @@ class VoiceService(
         return SCRIPT_TEMPLATE.format(firstName)
     }
 
+    @Transactional(readOnly = true)
     fun findVoiceProfiles(userId: Long): List<VoiceProfileResult> =
         voiceProfileRepository.findAllByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
-            .map { it.toResult() }
+            .map(VoiceProfileResult::from)
 
     data class VoiceProfileCreateResult(
         val profile: VoiceProfileResult,
@@ -59,7 +61,6 @@ class VoiceService(
     /**
      * 보이스 프로필을 DB에 저장하고, 프론트가 직접 S3에 PUT할 presigned URL을 발급한다.
      */
-    @Transactional
     fun addVoiceProfile(userId: Long, title: String, contentType: String): VoiceProfileCreateResult {
         val trimmedTitle = title.trim()
         if (trimmedTitle.isBlank()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
@@ -79,35 +80,22 @@ class VoiceService(
             )
         )
         return VoiceProfileCreateResult(
-            profile = profile.toResult(),
+            profile = VoiceProfileResult.from(profile),
             uploadUrl = presigned.uploadUrl,
         )
     }
 
-    @Transactional
     fun removeVoiceProfile(userId: Long, voiceProfileId: Long) {
-        val profile = voiceProfileRepository.findById(voiceProfileId).orElseThrow {
-            BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        val voiceProfile = ownedVoiceProfile(userId, voiceProfileId)
+        voiceProfile.deletedAt = LocalDateTime.now()
+    }
+
+    private fun ownedVoiceProfile(userId: Long, voiceProfileId: Long): VoiceProfile {
+        val voiceProfile = voiceProfileRepository.findByIdAndDeletedAtIsNull(voiceProfileId)
+            ?: throw BusinessException(VoiceErrorCode.VOICE_PROFILE_NOT_FOUND)
+        if (voiceProfile.userId != userId) {
+            throw BusinessException(CommonErrorCode.FORBIDDEN)
         }
-        if (profile.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
-        if (profile.deletedAt != null) throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        profile.deletedAt = LocalDateTime.now()
+        return voiceProfile
     }
-
-    private fun extensionOf(contentType: String): String = when (contentType.lowercase()) {
-        "audio/webm" -> "webm"
-        "audio/wav" -> "wav"
-        "audio/mpeg" -> "mp3"
-        "audio/mp4" -> "m4a"
-        "audio/ogg" -> "ogg"
-        else -> "bin"
-    }
-
-    private fun VoiceProfile.toResult() = VoiceProfileResult(
-        id = id,
-        title = title,
-        audioUrl = audioUrl,
-        ttsVoiceUrl = ttsVoiceUrl,
-        createdAt = createdAt,
-    )
 }

@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { StoryChild, StoryProject, StoryboardPageDraft } from './types'
 import { MAX_STEP } from './types'
 import { DEFAULT_STORYBOARD_PAGES } from '../storyboard-editor/lib/defaults'
+import {
+  CREATION_PROGRESS_STORAGE_KEY,
+  clearCreationProgressSnapshot,
+} from '../lib/progressStorage'
 
 // 레거시 저장 키 (목업 전환 이전 버전에서 localStorage 에 남아있을 수 있어 한 번 정리해준다).
 const LEGACY_STORAGE_KEY_STEP = 'talemory_draft_step'
@@ -16,8 +20,10 @@ const LEGACY_STORAGE_KEY_DATA = 'talemory_draft_project'
  *  - 브라우저 탭마다 독립된 storage 이므로 두 탭에서 서로 다른 DRAFT 를 진행해도 덮어쓰기 없음.
  *  - 탭을 닫으면 날아가지만, 그 시점엔 이미 서버 DB 에 저장 돼 있고 (`step3.story` 는 onBlur
  *    시점에 PATCH 완료) "이어서 작성하기" 플로우로 복원 가능하므로 UX 손실 없음.
+ *
+ * 키 정의와 clear 헬퍼는 `lib/progressStorage` 로 분리되어 있다 — BookstoreScene 등
+ * 외부 진입점에서 "신규 시작" / "stale storyId 회복" 시 명시 reset 호출이 필요하기 때문.
  */
-const PROGRESS_STORAGE_KEY = 'talemory.creation.progress.v1'
 /** 오래된 snapshot 무효화 — 같은 탭을 하루 이상 열어둔 뒤 새로고침한 edge case 대비. */
 const PROGRESS_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -31,7 +37,7 @@ interface CreationProgressSnapshot {
 function readProgressSnapshot(): CreationProgressSnapshot | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.sessionStorage.getItem(PROGRESS_STORAGE_KEY)
+    const raw = window.sessionStorage.getItem(CREATION_PROGRESS_STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<CreationProgressSnapshot>
     if (
@@ -42,7 +48,7 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
       return null
     }
     if (Date.now() - parsed.savedAt > PROGRESS_TTL_MS) {
-      window.sessionStorage.removeItem(PROGRESS_STORAGE_KEY)
+      window.sessionStorage.removeItem(CREATION_PROGRESS_STORAGE_KEY)
       return null
     }
     return {
@@ -60,21 +66,10 @@ function writeProgressSnapshot(snapshot: Omit<CreationProgressSnapshot, 'savedAt
   if (typeof window === 'undefined') return
   try {
     const payload: CreationProgressSnapshot = { ...snapshot, savedAt: Date.now() }
-    window.sessionStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(payload))
+    window.sessionStorage.setItem(CREATION_PROGRESS_STORAGE_KEY, JSON.stringify(payload))
   } catch {
     /* quota exceeded 등 무시 — 핵심 기능 차단 X */
   }
-}
-
-/**
- * 진행 snapshot 제거. 스토리 발행(publish) / 명시적 리셋 시점에 호출해
- * 같은 탭에서 과거 DRAFT 가 남지 않도록 정리. sessionStorage 라 탭을 닫으면
- * 자동 소멸되지만, 같은 탭 내에서 새 스토리 시작 시 명시 초기화가 필요하므로
- * hook return 으로 노출한다.
- */
-function clearProgressSnapshot(): void {
-  if (typeof window === 'undefined') return
-  window.sessionStorage.removeItem(PROGRESS_STORAGE_KEY)
 }
 
 const DEFAULT_DATA: StoryProject = {
@@ -278,7 +273,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
   }, [])
 
   const resetProgress = useCallback(() => {
-    clearProgressSnapshot()
+    clearCreationProgressSnapshot()
   }, [])
 
   return {

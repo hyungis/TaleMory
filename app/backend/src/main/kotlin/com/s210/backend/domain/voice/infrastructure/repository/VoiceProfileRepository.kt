@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface VoiceProfileRepository : JpaRepository<VoiceProfile, Long> {
     fun findAllByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId: Long): List<VoiceProfile>
+
+    fun findByIdAndDeletedAtIsNull(id: Long): VoiceProfile?
 }

@@ -1,3 +1,5 @@
 export { ProfileSection } from './ui/ProfileSection'
 export { ProfileEditModal } from './ui/ProfileEditModal'
 export { mockUser } from './model/mockUser'
+export { useMeQuery } from './model/useMeQuery'
+export { useMeUpdate } from './model/useMeUpdate'
