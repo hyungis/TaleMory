@@ -5,10 +5,19 @@ from app.core.config import settings
 from app.mq.client import create_channel, create_connection, declare_storyboard_topology
 from app.mq.publisher import StoryResultPublisher
 from app.schemas.mq_storyboard import StoryError, StoryGenerateJobMessage, StoryRegenerateJobMessage
-from app.schemas.mq_storyboard_summary import StorySummaryGenerateJobMessage
+from app.schemas.mq_storyboard_summary import (
+    StorySummaryGenerateJobMessage,
+    StorySummaryRegenerateJobMessage,
+)
 from app.schemas.storyboard import StoryboardGenerateRequest, StoryboardRegenerateRequest
-from app.schemas.storyboard_summary import StoryboardSummaryGenerateRequest
-from app.services.storyboard_summary_service import generate_storyboard_summary
+from app.schemas.storyboard_summary import (
+    StoryboardSummaryGenerateRequest,
+    StoryboardSummaryRegenerateRequest,
+)
+from app.services.storyboard_summary_service import (
+    generate_storyboard_summary,
+    regenerate_storyboard_summary,
+)
 from app.services.storyboard_service import generate_storyboard, regenerate_storyboard
 
 logger = logging.getLogger(__name__)
@@ -38,6 +47,12 @@ def register_storyboard_consumers(channel: Any) -> None:
     channel.basic_consume(
         queue=settings.RABBITMQ_SUMMARY_GENERATE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_summary_generate_message(
+            ch, method.delivery_tag, body, publisher
+        ),
+    )
+    channel.basic_consume(
+        queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE,
+        on_message_callback=lambda ch, method, properties, body: _dispatch_summary_regenerate_message(
             ch, method.delivery_tag, body, publisher
         ),
     )
@@ -90,6 +105,21 @@ def _dispatch_regenerate_message(
     except Exception:
         channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
         logger.exception("Unexpected error while processing regenerate storyboard message")
+    else:
+        channel.basic_ack(delivery_tag=delivery_tag)
+
+
+def _dispatch_summary_regenerate_message(
+    channel: Any,
+    delivery_tag: int,
+    body: bytes,
+    publisher: StoryResultPublisher,
+) -> None:
+    try:
+        handle_summary_regenerate_message(body=body, publisher=publisher)
+    except Exception:
+        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
+        logger.exception("Unexpected error while processing regenerate storyboard summary message")
     else:
         channel.basic_ack(delivery_tag=delivery_tag)
 
@@ -152,6 +182,39 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
         job_id=message.jobId,
         story_id=story_id,
         payload=result,
+        action="GENERATE",
+    )
+
+
+def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublisher) -> None:
+    message = StorySummaryRegenerateJobMessage.model_validate_json(body)
+    request = _merge_story_id_summary_regenerate(message.storyId, message.payload)
+    story_id = _story_id_from_summary_regenerate(message.storyId, request)
+
+    try:
+        result = regenerate_storyboard_summary(request)
+    except ValueError as exc:
+        publisher.publish_summary_failure(
+            job_id=message.jobId,
+            story_id=story_id,
+            error=StoryError(code="REGENERATE_STORY_SUMMARY_ERROR", message=str(exc)),
+            action="REGENERATE",
+        )
+        return
+    except RuntimeError as exc:
+        publisher.publish_summary_failure(
+            job_id=message.jobId,
+            story_id=story_id,
+            error=StoryError(code="REGENERATE_STORY_SUMMARY_RUNTIME_ERROR", message=str(exc)),
+            action="REGENERATE",
+        )
+        return
+
+    publisher.publish_summary_result(
+        job_id=message.jobId,
+        story_id=story_id,
+        payload=result,
+        action="REGENERATE",
     )
 
 
@@ -218,6 +281,16 @@ def _merge_story_id_summary(
     return merged
 
 
+def _merge_story_id_summary_regenerate(
+    story_id: int | None,
+    request: StoryboardSummaryRegenerateRequest,
+) -> StoryboardSummaryRegenerateRequest:
+    merged = request.model_copy(deep=True)
+    if story_id is not None:
+        merged.storyId = story_id
+    return merged
+
+
 def _story_id_from_generate(story_id: int | None, request: StoryboardGenerateRequest) -> int | None:
     return story_id if story_id is not None else request.storyId
 
@@ -225,6 +298,13 @@ def _story_id_from_generate(story_id: int | None, request: StoryboardGenerateReq
 def _story_id_from_summary(
     story_id: int | None,
     request: StoryboardSummaryGenerateRequest,
+) -> int | None:
+    return story_id if story_id is not None else request.storyId
+
+
+def _story_id_from_summary_regenerate(
+    story_id: int | None,
+    request: StoryboardSummaryRegenerateRequest,
 ) -> int | None:
     return story_id if story_id is not None else request.storyId
 

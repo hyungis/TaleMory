@@ -13,10 +13,7 @@ from app.schemas.mq_storyboard_image import (
     StoryboardImageSuccessPayload,
 )
 from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
-from app.schemas.mq_storyboard_summary import (
-    StorySummaryFailureEnvelope,
-    StorySummarySuccessEnvelope,
-)
+from app.schemas.mq_storyboard_summary import StorySummaryFailureEnvelope, StorySummarySuccessEnvelope
 from app.schemas.storyboard import StoryboardGenerateResponse
 from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
@@ -70,14 +67,16 @@ class StoryResultPublisher:
         job_id: str,
         story_id: int | None,
         payload: StoryboardSummaryGenerateResponse,
+        action: StoryAction = "GENERATE",
     ) -> None:
         envelope = StorySummarySuccessEnvelope(
             jobId=job_id,
+            type=_summary_completed_type_for_action(action),
             storyId=story_id,
             payload=payload,
         )
         self._publish(
-            routing_key=settings.RABBITMQ_SUMMARY_GENERATE_COMPLETED_ROUTING_KEY,
+            routing_key=_summary_completed_routing_key_for_action(action),
             message=envelope.model_dump(mode="json"),
         )
 
@@ -86,14 +85,16 @@ class StoryResultPublisher:
         job_id: str,
         story_id: int | None,
         error: StoryError,
+        action: StoryAction = "GENERATE",
     ) -> None:
         envelope = StorySummaryFailureEnvelope(
             jobId=job_id,
+            type=_summary_failed_type_for_action(action),
             storyId=story_id,
             error=error,
         )
         self._publish(
-            routing_key=settings.RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY,
+            routing_key=_summary_failed_routing_key_for_action(action),
             message=envelope.model_dump(mode="json"),
         )
 
@@ -130,6 +131,30 @@ def _failed_routing_key_for_action(action: StoryAction) -> str:
         settings.RABBITMQ_GENERATE_FAILED_ROUTING_KEY
         if action == "GENERATE"
         else settings.RABBITMQ_REGENERATE_FAILED_ROUTING_KEY
+    )
+
+
+def _summary_completed_type_for_action(action: StoryAction) -> str:
+    return "GENERATE_STORY_SUMMARY_COMPLETED" if action == "GENERATE" else "REGENERATE_STORY_SUMMARY_COMPLETED"
+
+
+def _summary_failed_type_for_action(action: StoryAction) -> str:
+    return "GENERATE_STORY_SUMMARY_FAILED" if action == "GENERATE" else "REGENERATE_STORY_SUMMARY_FAILED"
+
+
+def _summary_completed_routing_key_for_action(action: StoryAction) -> str:
+    return (
+        settings.RABBITMQ_SUMMARY_GENERATE_COMPLETED_ROUTING_KEY
+        if action == "GENERATE"
+        else settings.RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY
+    )
+
+
+def _summary_failed_routing_key_for_action(action: StoryAction) -> str:
+    return (
+        settings.RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY
+        if action == "GENERATE"
+        else settings.RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY
     )
 
 

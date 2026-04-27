@@ -48,6 +48,13 @@ def declare_storyboard_topology(channel: Any) -> None:
         routing_key=settings.RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY,
     )
 
+    channel.queue_declare(queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY,
+    )
+
     channel.queue_declare(queue=settings.RABBITMQ_REGENERATE_QUEUE, durable=True)
     channel.queue_bind(
         queue=settings.RABBITMQ_REGENERATE_QUEUE,

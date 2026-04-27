@@ -70,11 +70,19 @@ class Settings(BaseModel):
         "RABBITMQ_SUMMARY_GENERATE_QUEUE",
         "ai.cpu.story.summary.request.queue",
     )
+    RABBITMQ_SUMMARY_REGENERATE_QUEUE: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_QUEUE",
+        "ai.cpu.story.summary.regenerate.request.queue",
+    )
     RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.regenerate.queue")
     RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "ai.cpu.story.generate")
     RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY",
         "ai.cpu.story.summary.generate",
+    )
+    RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY",
+        "ai.cpu.story.summary.regenerate",
     )
     RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
     RABBITMQ_IMAGE_GENERATE_QUEUE: str = getenv(
@@ -109,6 +117,10 @@ class Settings(BaseModel):
         "RABBITMQ_SUMMARY_GENERATE_COMPLETED_ROUTING_KEY",
         "ai.result.story.summary.generate.completed",
     )
+    RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY",
+        "ai.result.story.summary.regenerate.completed",
+    )
     RABBITMQ_GENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.generate.failed",
@@ -116,6 +128,10 @@ class Settings(BaseModel):
     RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_GENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.summary.generate.failed",
+    )
+    RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY",
+        "ai.result.story.summary.regenerate.failed",
     )
     RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY",

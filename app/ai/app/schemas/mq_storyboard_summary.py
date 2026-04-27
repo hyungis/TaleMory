@@ -6,13 +6,20 @@ from app.schemas.mq_storyboard import StoryError
 from app.schemas.storyboard_summary import (
     StoryboardSummaryGenerateRequest,
     StoryboardSummaryGenerateResponse,
+    StoryboardSummaryRegenerateRequest,
 )
 
 
-StorySummaryJobType = Literal["STORY_SUMMARY"]
+StorySummaryJobType = Literal["STORY_SUMMARY", "STORY_SUMMARY_REGENERATE"]
 StorySummaryEventStatus = Literal["COMPLETED", "FAILED"]
-StorySummarySuccessType = Literal["GENERATE_STORY_SUMMARY_COMPLETED"]
-StorySummaryFailureType = Literal["GENERATE_STORY_SUMMARY_FAILED"]
+StorySummarySuccessType = Literal[
+    "GENERATE_STORY_SUMMARY_COMPLETED",
+    "REGENERATE_STORY_SUMMARY_COMPLETED",
+]
+StorySummaryFailureType = Literal[
+    "GENERATE_STORY_SUMMARY_FAILED",
+    "REGENERATE_STORY_SUMMARY_FAILED",
+]
 
 
 class StorySummaryGenerateJobMessage(BaseModel):
@@ -20,6 +27,13 @@ class StorySummaryGenerateJobMessage(BaseModel):
     jobType: StorySummaryJobType = "STORY_SUMMARY"
     storyId: int | None = Field(default=None, ge=1)
     payload: StoryboardSummaryGenerateRequest
+
+
+class StorySummaryRegenerateJobMessage(BaseModel):
+    jobId: str = Field(..., min_length=1)
+    jobType: StorySummaryJobType = "STORY_SUMMARY_REGENERATE"
+    storyId: int | None = Field(default=None, ge=1)
+    payload: StoryboardSummaryRegenerateRequest
 
 
 class StorySummarySuccessEnvelope(BaseModel):
