@@ -6,6 +6,7 @@ export const ROUTES = {
   main: '/main',
   creation: '/creation',
   viewer: '/viewer/:storyId',
+  shared: '/shared/:shareToken',
   mypage: '/mypage',
   mypageVoiceClone: '/mypage/voice-clone',
   // TODO: oauthCallback

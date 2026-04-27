@@ -1,7 +1,6 @@
 package com.s210.backend.domain.story.presentation
 
 import com.s210.backend.common.response.ApiResponse
-import com.s210.backend.common.response.PageResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.StoryService
 import com.s210.backend.domain.story.application.StoryViewerService
@@ -24,11 +23,10 @@ class StoryController(
     // 동화 목록 조회
     @GetMapping
     fun storyList(
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
-    ): ResponseEntity<ApiResponse<PageResponse<StoryResponse>>> {
-        // TODO: StoryService.findStories(userId, page, size)
-        TODO("Not yet implemented")
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<List<StoryResponse>>> {
+        val result = storyService.findStories(user.userId)
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 
     @GetMapping("/draft")
@@ -73,10 +71,9 @@ class StoryController(
         return ResponseEntity.ok(ApiResponse(data = StoryCreateResponse(storyId = result.id)))
     }
 
-    // 동화 상세 조회
+    // 동화 상세 조회 (추후 구현)
     @GetMapping("/{storyId}")
     fun storyDetails(@PathVariable storyId: Long): ResponseEntity<ApiResponse<StoryDetailResponse>> {
-        // TODO: StoryService.findStory(storyId)
         TODO("Not yet implemented")
     }
 
@@ -100,25 +97,30 @@ class StoryController(
         return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 
-    // 즐겨찾기 토글
+    // 즐겨찾기 토글 (추후 구현)
     @PatchMapping("/{storyId}/bookmark")
     fun storyBookmarkModify(@PathVariable storyId: Long): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: StoryService.toggleBookmark(storyId)
         TODO("Not yet implemented")
     }
 
     // 최종본 공개
     @PostMapping("/{storyId}/publish")
-    fun storyPublish(@PathVariable storyId: Long): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: StoryService.publishStory(storyId)
-        TODO("Not yet implemented")
+    fun storyPublish(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<ShareLinkResponse>> {
+        val result = storyService.publishStory(user.userId, storyId)
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 
     // 공유 링크 조회
     @GetMapping("/{storyId}/share-link")
-    fun storyShareLinkDetails(@PathVariable storyId: Long): ResponseEntity<ApiResponse<ShareLinkResponse>> {
-        // TODO: StoryService.findShareLink(storyId)
-        TODO("Not yet implemented")
+    fun storyShareLinkDetails(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<ShareLinkResponse>> {
+        val result = storyService.findShareLink(user.userId, storyId)
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 
 }

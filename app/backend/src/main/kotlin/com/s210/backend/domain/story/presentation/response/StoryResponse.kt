@@ -13,7 +13,10 @@ data class StoryResponse(
     val travelStartDate: LocalDate?,
     val travelEndDate: LocalDate?,
     val publishedAt: LocalDateTime?,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val sceneCount: Int = 0,
+    val coverImageUrl: String? = null,
+    val shareToken: String? = null,
 )
 
 data class StoryDetailResponse(
