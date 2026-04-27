@@ -5,6 +5,7 @@ export const ROUTES = {
   home: '/',
   main: '/main',
   creation: '/creation',
+  creationVoice: '/creation/voice',
   viewer: '/viewer/:storyId',
   shared: '/shared/:shareToken',
   mypage: '/mypage',

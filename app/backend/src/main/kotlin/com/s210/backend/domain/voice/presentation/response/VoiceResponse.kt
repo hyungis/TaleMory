@@ -7,7 +7,8 @@ data class VoiceProfileResponse(
     val title: String,
     val audioUrl: String?,
     val ttsVoiceUrl: String?,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val uploadUrl: String? = null,
 )
 
 data class VoicePreviewResponse(
