@@ -7,7 +7,7 @@ class StoryboardSummaryGenerateRequest(StoryboardGenerateRequest):
     """Same input shape as storyboard generation; output is summary-only."""
 
 
-class StoryboardSummaryGenerateResponse(BaseModel):
+class StoryboardSummaryDraft(BaseModel):
     title: str = Field(..., min_length=1)
     summary: str = Field(..., min_length=1)
     summaryKo: str = Field(..., min_length=1)
@@ -15,4 +15,12 @@ class StoryboardSummaryGenerateResponse(BaseModel):
     storyQuest: str = Field(..., min_length=1)
     recurringMotif: str = Field(..., min_length=1)
     keyEmotionalBeats: list[str] = Field(..., min_length=3)
+
+
+class StoryboardSummaryRegenerateRequest(StoryboardSummaryGenerateRequest):
+    previousSummary: StoryboardSummaryDraft
+    userPrompt: str = Field(..., min_length=1, max_length=2000)
+
+
+class StoryboardSummaryGenerateResponse(StoryboardSummaryDraft):
     usage: UsageInfo
