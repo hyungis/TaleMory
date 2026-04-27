@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../../shared/constants'
 import { clearAuthSession, useAuthSession } from '../../model/authSession'
 import { postLogout } from '../api/postLogout'
@@ -10,12 +9,13 @@ export interface UseLogoutResult {
 }
 
 export function useLogout(): UseLogoutResult {
-  const navigate = useNavigate()
   const { isAuthenticated } = useAuthSession()
   const [isPending, setIsPending] = useState(false)
 
   const logout = useCallback(async () => {
-    if (isPending) return
+    if (isPending) {
+      return
+    }
 
     setIsPending(true)
 
@@ -31,17 +31,14 @@ export function useLogout(): UseLogoutResult {
         }
       }
       clearAuthSession()
-      // `/` (HomePage 랜딩) 와 `/main` (MainPage) 가 라우트로 분리되어 있어
-      // SPA navigate 만으로 충분하다. (이전엔 동일 라우트 quirk 회피용 hard reload 가
-      // 필요했으나, 라우트 split 후엔 React Router 가 정상적으로 페이지를 교체한다.)
-      navigate(ROUTES.home, { replace: true })
+      window.alert('로그아웃되었습니다.')
+      // hard reload 로 React Query 캐시 / 메모리 state / 잔여 인증 상태까지 깔끔히 리셋.
+      // 라우트가 split 된 후라 SPA navigate 도 동작하지만, hard reload 가 가장 안전.
+      window.location.assign(ROUTES.home)
     } finally {
       setIsPending(false)
     }
-  }, [isAuthenticated, isPending, navigate])
+  }, [isAuthenticated, isPending])
 
-  return {
-    isPending,
-    logout,
-  }
+  return { isPending, logout }
 }

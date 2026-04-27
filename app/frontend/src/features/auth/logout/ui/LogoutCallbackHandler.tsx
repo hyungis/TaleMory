@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertCircle, LoaderCircle } from 'lucide-react'
 import { ROUTES } from '../../../../shared/constants'
@@ -9,6 +9,7 @@ export function LogoutCallbackHandler() {
   const location = useLocation()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const handledRef = useRef(false)
 
   const callbackResult = useMemo(
     () => parseLogoutCallbackResult(location.hash, location.search),
@@ -16,12 +17,19 @@ export function LogoutCallbackHandler() {
   )
 
   useEffect(() => {
+    if (handledRef.current) {
+      return
+    }
+
     if (callbackResult.error) {
+      handledRef.current = true
       setError(callbackResult.error)
       return
     }
 
+    handledRef.current = true
     clearAuthSession()
+    window.alert('로그아웃되었습니다.')
     // 로그아웃 후엔 랜딩 영상 + "시작하기" 가 있는 첫 페이지(`/` HomePage) 로 이동.
     navigate(ROUTES.home, { replace: true })
   }, [callbackResult.error, navigate])

@@ -2,9 +2,11 @@ package com.s210.backend.domain.user.presentation
 
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.auth.presentation.support.RefreshTokenCookieManager
 import com.s210.backend.domain.user.application.UserService
 import com.s210.backend.domain.user.presentation.request.ModifyUserRequest
 import com.s210.backend.domain.user.presentation.response.UserResponse
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/me")
 class UserController(
     private val userService: UserService,
+    private val refreshTokenCookieManager: RefreshTokenCookieManager,
 ) {
 
     @GetMapping
@@ -40,8 +43,10 @@ class UserController(
     @DeleteMapping
     fun userRemove(
         @AuthenticationPrincipal user: CustomUser,
-    ): ResponseEntity<ApiResponse<Unit>> {
-        userService.removeUser(user.userId)
-        return ResponseEntity.ok(ApiResponse(data = Unit))
+        response: HttpServletResponse,
+    ): ResponseEntity<Void> {
+        userService.removeUser(user.userId, user.username)
+        refreshTokenCookieManager.expireRefreshToken(response)
+        return ResponseEntity.noContent().build()
     }
 }

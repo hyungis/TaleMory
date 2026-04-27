@@ -98,5 +98,4 @@ class AuthController(
         refreshTokenCookieManager.expireRefreshToken(response)
         return ResponseEntity.ok(ApiResponse(success = true))
     }
-
 }

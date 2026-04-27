@@ -130,6 +130,7 @@ export function CreationPage() {
       {flow.currentStep === 5 && (
         <StyleSelectorStep
           data={flow.projectData.step5}
+          storyId={flow.storyId}
           onStyleChange={flow.updateStyle}
           onBack={handleBack}
           onNext={flow.handleNext}

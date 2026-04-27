@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Person } from '../../entities/person'
 import type { UserProfile } from '../../entities/user'
-import { clearAuthSession, setAuthSession, useAuthSession } from '../../features/auth'
+import { buildOauthLogoutUrl, clearAuthSession, setAuthSession, useAuthSession } from '../../features/auth'
 import {
   DangerZone,
   PersonEditModal,
@@ -35,8 +35,14 @@ export function MypagePage() {
   const authSession = useAuthSession()
   const meQuery = useMeQuery(authSession.isAuthenticated)
   const meUpdate = useMeUpdate()
+  const hasMissingUserError = isMissingUserError(meQuery.error)
 
-  const currentUser = meQuery.data ?? authSession.user
+  useEffect(() => {
+    if (!hasMissingUserError) return
+    clearAuthSession()
+  }, [hasMissingUserError])
+
+  const currentUser = hasMissingUserError ? null : (meQuery.data ?? authSession.user)
   const currentUserId = currentUser?.id ?? 0
 
   const personsQuery = usePersonsQuery(currentUserId)
@@ -64,7 +70,7 @@ export function MypagePage() {
     withdraw.error,
   )
 
-  if (!authSession.isAuthenticated) {
+  if (!authSession.isAuthenticated || hasMissingUserError) {
     return (
       <div className="h-full overflow-y-auto bg-[#1a0f08]">
         <main className="max-w-3xl mx-auto px-4 md:px-6 py-16">
@@ -145,9 +151,25 @@ export function MypagePage() {
   }
 
   const handleWithdrawConfirm = async () => {
-    await withdraw.mutateAsync()
+    const provider = currentUser?.provider ?? authSession.user?.provider ?? null
+
+    try {
+      await withdraw.mutateAsync()
+    } catch (error) {
+      if (!isMissingUserError(error)) {
+        throw error
+      }
+    }
+
     clearAuthSession()
     closeModal()
+
+    const oauthLogoutUrl = buildOauthLogoutUrl(provider, window.location.origin)
+    if (oauthLogoutUrl) {
+      window.location.assign(oauthLogoutUrl)
+      return
+    }
+
     navigate(ROUTES.home, { replace: true })
   }
 
@@ -214,10 +236,19 @@ export function MypagePage() {
       </div>
 
       {modal.kind === 'profile-edit' && currentUser && (
-        <ProfileEditModal user={currentUser} onClose={closeModal} onSave={handleProfileSave} />
+        <ProfileEditModal
+          user={currentUser}
+          onClose={closeModal}
+          onSave={handleProfileSave}
+          isPending={meUpdate.isPending}
+        />
       )}
       {modal.kind === 'withdraw' && (
-        <WithdrawDialog onClose={closeModal} onConfirm={handleWithdrawConfirm} />
+        <WithdrawDialog
+          onClose={closeModal}
+          onConfirm={handleWithdrawConfirm}
+          isPending={withdraw.isPending}
+        />
       )}
       {modal.kind === 'person-edit' && (
         <PersonEditModal initial={modal.person} onClose={closeModal} onSave={handlePersonSave} />
@@ -251,4 +282,8 @@ function getFirstErrorMessage(...errors: Array<unknown>): string | null {
   }
 
   return null
+}
+
+function isMissingUserError(error: unknown): boolean {
+  return isApiError(error) && error.status === 404 && error.code === 'USER_001'
 }

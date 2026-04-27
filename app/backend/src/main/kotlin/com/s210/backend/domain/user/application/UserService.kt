@@ -1,6 +1,7 @@
 package com.s210.backend.domain.user.application
 
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
 import com.s210.backend.domain.user.application.dto.ModifyUserCommand
 import com.s210.backend.domain.user.application.dto.UserResult
 import com.s210.backend.domain.user.entity.User
@@ -16,6 +17,7 @@ import java.time.LocalDateTime
 class UserService(
     private val userRepository: UserRepository,
     private val oauthAccountRepository: OauthAccountRepository,
+    private val refreshTokenInfoRepositoryRedis: RefreshTokenInfoRepositoryRedis,
 ) {
     @Transactional(readOnly = true)
     fun findUser(userId: Long): UserResult = ownedUser(userId).toResult()
@@ -31,15 +33,19 @@ class UserService(
             }
             user.nickname = nickname
         }
-        command.phone?.let { user.phone = it }
+        user.phone = command.phone
         command.agreeSms?.let { user.agreeSms = it }
         command.agreeMarketing?.let { user.agreeMarketing = it }
         return user.toResult()
     }
 
-    fun removeUser(userId: Long) {
+    fun removeUser(userId: Long, principalId: String) {
         val user = ownedUser(userId)
-        user.deletedAt = LocalDateTime.now()
+        val deletedAt = LocalDateTime.now()
+        user.deletedAt = deletedAt
+        oauthAccountRepository.findAllByUser_IdAndDeletedAtIsNull(user.id)
+            .forEach { oauthAccount -> oauthAccount.deletedAt = deletedAt }
+        refreshTokenInfoRepositoryRedis.deleteByUserId(principalId)
     }
 
     private fun ownedUser(userId: Long): User =

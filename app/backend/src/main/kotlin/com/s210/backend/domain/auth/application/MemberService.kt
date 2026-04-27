@@ -38,10 +38,10 @@ class MemberService(
     private val oauthRedirectUriResolver: OauthRedirectUriResolver,
 ) {
     fun signUp(command: SignupCommand): ApiResponse<Unit> {
-        if (memberRepository.existsByLoginId(command.loginId)) {
+        if (memberRepository.existsByLoginIdAndDeletedAtIsNull(command.loginId)) {
             throw BusinessException(CommonErrorCode.DUPLICATE_LOGIN_ID)
         }
-        if (memberRepository.existsByEmail(command.email)) {
+        if (memberRepository.existsByEmailAndDeletedAtIsNull(command.email)) {
             throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
 
@@ -72,7 +72,7 @@ class MemberService(
 
         refreshTokenInfoRepositoryRedis.save(command.loginId, tokenInfo.refreshToken)
 
-        val user = memberRepository.findByLoginId(command.loginId)
+        val user = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
             ?: throw BusinessException(CommonErrorCode.USER_NOT_FOUND)
 
         return AuthResult(tokenInfo.grantType, tokenInfo.accessToken, tokenInfo.refreshToken, user)
@@ -168,37 +168,47 @@ class MemberService(
     }
 
     private fun findOrCreateOauthUser(profile: OauthUserProfile): User {
-        val oauthAccount = oauthAccountRepository.findByProviderAndProviderUserIdAndDeletedAtIsNull(
+        val oauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(
             profile.provider,
             profile.providerUserId,
         )
         if (oauthAccount != null) {
+            if (oauthAccount.deletedAt != null || oauthAccount.user.deletedAt != null) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
             return oauthAccount.user
         }
 
-        val user = memberRepository.findByEmail(profile.email)
-            ?: memberRepository.save(
-                User(
-                    loginId = null,
-                    passwordHash = null,
-                    email = profile.email,
-                    name = profile.name,
-                    nickname = profile.nickname,
-                    phone = profile.phone,
-                    agreeSms = false,
-                    agreeMarketing = false,
-                )
+        val existingUser = memberRepository.findByEmail(profile.email)
+        if (existingUser != null) {
+            if (existingUser.deletedAt != null) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
+            return existingUser
+        }
+
+        val createdUser = memberRepository.save(
+            User(
+                loginId = null,
+                passwordHash = null,
+                email = profile.email,
+                name = profile.name,
+                nickname = profile.nickname,
+                phone = profile.phone,
+                agreeSms = false,
+                agreeMarketing = false,
             )
+        )
 
         oauthAccountRepository.save(
             OauthAccount(
-                user = user,
+                user = createdUser,
                 provider = profile.provider,
                 providerUserId = profile.providerUserId,
             )
         )
 
-        return user
+        return createdUser
     }
 
     private fun createOauthPrincipal(user: User, provider: String): CustomUser {
