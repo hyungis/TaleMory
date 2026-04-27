@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface OauthAccountRepository : JpaRepository<OauthAccount, Long> {
     fun findByProviderAndProviderUserIdAndDeletedAtIsNull(provider: String, providerUserId: String): OauthAccount?
+
+    fun findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(userId: Long): OauthAccount?
 }
