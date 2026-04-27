@@ -85,11 +85,11 @@ export function MypagePage() {
     )
   }
 
-  const goToBookshelf = () => {
-    navigate(ROUTES.home, {
-      state: { scene: 'bookstore', skipLanding: true },
-      replace: true,
-    })
+  const goToForest = () => {
+    // `/main` 이 라우트로 분리되어 있어 그대로 ForestScene(house.png) 으로 진입.
+    // replace: true 로 `/mypage` 를 히스토리에서 치워 브라우저 뒤로가기가 마이페이지로
+    // 다시 빨려 들어가지 않도록 한다.
+    navigate(ROUTES.main, { replace: true })
   }
 
   const handleProfileSave = async (
@@ -157,11 +157,11 @@ export function MypagePage() {
         <header className="h-14 px-6 bg-[#2a1b12] border-b border-[#4a3a24] flex items-center justify-between sticky top-0 z-50">
           <button
             type="button"
-            onClick={goToBookshelf}
+            onClick={goToForest}
             className="flex items-center gap-2 text-[#b4c4a4] hover:text-[#e4d4b4] transition-colors text-sm font-medium"
           >
             <span>{'<'}</span>
-            <span>책장으로</span>
+            <span>홈으로</span>
           </button>
           <Link
             to={ROUTES.home}

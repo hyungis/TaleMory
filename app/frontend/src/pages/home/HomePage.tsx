@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AuthModal, useAuthModal, useAuthSession } from '../../features/auth'
 import { MainPage } from '../main'
+import { ROUTES } from '../../shared/constants'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
 import { useButterflyAnim } from './model/useButterflyAnim'
 import './styles/landing.css'
@@ -29,6 +30,7 @@ const LANDING_EXIT_DURATION_MS = 6000
  */
 export function HomePage() {
   const location = useLocation()
+  const navigate = useNavigate()
   /**
    * 제작 플로우 완료/이탈에서 `navigate('/', { state: { skipLanding: true } })` 로
    * 돌아오면 이미 인증된 유저이므로 랜딩 영상·나비 떼·디졸브 마스크를 전부 생략하고
@@ -45,8 +47,14 @@ export function HomePage() {
   const startLandingExit = useCallback(() => {
     auth.close()
     setIsExiting(true)
-    setTimeout(() => setIsLandingDone(true), LANDING_EXIT_DURATION_MS)
-  }, [auth])
+    // 디졸브 애니메이션 길이만큼 대기 후 랜딩 DOM 제거 + URL 을 /main 으로 동기화.
+    // /main 은 라우트로 분리된 MainPage — 이렇게 해야 이후 마이페이지/로그아웃 등에서
+    // URL 흐름이 일관되게 동작한다.
+    setTimeout(() => {
+      setIsLandingDone(true)
+      navigate(ROUTES.main, { replace: true })
+    }, LANDING_EXIT_DURATION_MS)
+  }, [auth, navigate])
 
   const handleStart = useCallback(() => {
     if (isExiting) return

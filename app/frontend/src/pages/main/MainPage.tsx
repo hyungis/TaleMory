@@ -1,38 +1,45 @@
-import { useLocation } from 'react-router-dom'
+import { useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../shared/constants'
 import { ForestScene } from './ui/ForestScene'
 import { BookstoreScene } from './ui/BookstoreScene'
-import { useSceneTransition, type Scene } from './model/useSceneTransition'
 import './styles/main.css'
 
 /**
- * 로그인 직후 진입하는 페이지. 숲 씬과 서점 씬을 내부에서 opacity crossfade 로 전환.
+ * 인증 후 진입하는 메인 페이지 (`/main`).
  *
- * 구조:
- *   .scene-container  (forest) — .active/.inactive 로 opacity 토글
- *   .bookstore-scene  (bookstore) — 동일
+ * 라우팅 구조:
+ *   /main             → ForestScene (house.png) 만 표시
+ *   /main/bookshelf   → ForestScene + 그 위에 BookshelfModal (BookstoreScene 호스트)
  *
- * 전환 트리거:
- *   - ForestScene 의 집 클릭 → 아이 걷기 → 문 앞 도착 → onEnterBookstore()
- *   - BookstoreScene 의 ← 버튼 → backToForest()
+ * AppRouter 가 `/main/*` 와일드카드로 두 경로를 모두 매칭하므로 URL 이 바뀌어도
+ * MainPage 자체는 mount 유지된다 → ForestScene 의 파티클/애니메이션 리셋 없음.
  *
- * 초기 씬은 기본 'forest'. 다른 라우트(예: CreationPage 의 "내 책장 보관하기")에서
- * `navigate('/main', { state: { scene: 'bookstore' } })` 로 진입하면 숲 재생 없이 바로 책장을 연다.
+ * 새로고침 시: `/main/bookshelf` 라면 그대로 BookshelfModal 이 열린 상태로 시작.
+ * 즉 책장 화면도 URL 로 표현되어 새로고침/직접 링크가 가능하다.
  */
 export function MainPage() {
   const location = useLocation()
-  const initialScene: Scene =
-    (location.state as { scene?: Scene } | null)?.scene === 'bookstore' ? 'bookstore' : 'forest'
-  const { currentScene, enterBookstore, backToForest } = useSceneTransition(initialScene)
+  const navigate = useNavigate()
+
+  const isBookshelfOpen = location.pathname === ROUTES.mainBookshelf
+
+  /** 집 문 클릭 → ForestScene zoom 종료 직전 호출되어 책장 라우트로 이동. */
+  const handleEnterBookshelf = useCallback(() => {
+    navigate(ROUTES.mainBookshelf)
+  }, [navigate])
+
+  /** 책장 모달 닫기 / 외부 클릭 시 forest 라우트로 복귀. */
+  const handleCloseBookshelf = useCallback(() => {
+    navigate(ROUTES.main)
+  }, [navigate])
 
   return (
     <>
-      <div className={`scene-container ${currentScene === 'forest' ? 'active' : 'inactive'}`}>
-        <ForestScene onEnterBookstore={enterBookstore} />
-      </div>
-
-      <div className={`bookstore-scene ${currentScene === 'bookstore' ? 'active' : 'inactive'}`}>
-        <BookstoreScene onBackToForest={backToForest} />
-      </div>
+      <ForestScene onEnterBookstore={handleEnterBookshelf} />
+      {isBookshelfOpen && (
+        <BookstoreScene isActive onBackToForest={handleCloseBookshelf} />
+      )}
     </>
   )
 }
