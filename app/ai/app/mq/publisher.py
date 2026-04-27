@@ -5,6 +5,14 @@ from typing import Any
 import pika
 
 from app.core.config import settings
+from app.schemas.final_illustration import FinalIllustrationGenerateResult
+from app.schemas.mq_final_illustration import (
+    FinalIllustrationError,
+    FinalIllustrationFailureEnvelope,
+    FinalIllustrationGenerateItemJobMessage,
+    FinalIllustrationSuccessEnvelope,
+    FinalIllustrationSuccessPayload,
+)
 from app.schemas.mq_storyboard_image import (
     StoryboardImageError,
     StoryboardImageFailureEnvelope,
@@ -193,4 +201,104 @@ def _image_failed_routing_key_for_action(action: StoryboardImageAction) -> str:
         settings.RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY
         if action == "GENERATE"
         else settings.RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY
+    )
+
+
+FinalIllustrationAction = Literal["GENERATE", "REGENERATE"]
+
+
+class FinalIllustrationJobPublisher:
+    def __init__(self, channel: Any):
+        self._channel = channel
+
+    def publish_generate_item_job(self, message: FinalIllustrationGenerateItemJobMessage) -> None:
+        self._publish(
+            exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+            routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY,
+            message=message.model_dump(mode="json"),
+        )
+
+    def publish_result(
+        self,
+        job_id: str,
+        story_id: int,
+        seed: int,
+        result: FinalIllustrationGenerateResult,
+        action: FinalIllustrationAction,
+    ) -> None:
+        envelope = FinalIllustrationSuccessEnvelope(
+            jobId=job_id,
+            type=_final_illustration_completed_type_for_action(action),
+            storyId=story_id,
+            pageNumber=result.pageNumber,
+            payload=FinalIllustrationSuccessPayload(seed=seed, result=result),
+        )
+        self._publish(
+            exchange=settings.RABBITMQ_RESULT_EXCHANGE,
+            routing_key=_final_illustration_completed_routing_key_for_action(action),
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_failure(
+        self,
+        job_id: str,
+        story_id: int,
+        error: FinalIllustrationError,
+        action: FinalIllustrationAction,
+        page_number: int | None = None,
+    ) -> None:
+        envelope = FinalIllustrationFailureEnvelope(
+            jobId=job_id,
+            type=_final_illustration_failed_type_for_action(action),
+            storyId=story_id,
+            pageNumber=page_number,
+            error=error,
+        )
+        self._publish(
+            exchange=settings.RABBITMQ_RESULT_EXCHANGE,
+            routing_key=_final_illustration_failed_routing_key_for_action(action),
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def _publish(self, exchange: str, routing_key: str, message: dict) -> None:
+        self._channel.basic_publish(
+            exchange=exchange,
+            routing_key=routing_key,
+            body=json.dumps(message, ensure_ascii=False).encode("utf-8"),
+            properties=pika.BasicProperties(
+                content_type="application/json",
+                delivery_mode=2,
+            ),
+        )
+
+
+def _final_illustration_completed_type_for_action(action: FinalIllustrationAction) -> str:
+    return (
+        "GENERATE_FINAL_ILLUSTRATION_COMPLETED"
+        if action == "GENERATE"
+        else "REGENERATE_FINAL_ILLUSTRATION_COMPLETED"
+    )
+
+
+def _final_illustration_failed_type_for_action(action: FinalIllustrationAction) -> str:
+    return (
+        "GENERATE_FINAL_ILLUSTRATION_FAILED"
+        if action == "GENERATE"
+        else "REGENERATE_FINAL_ILLUSTRATION_FAILED"
+    )
+
+
+def _final_illustration_completed_routing_key_for_action(action: FinalIllustrationAction) -> str:
+    return (
+        settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY
+        if action == "GENERATE"
+        else settings.RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_COMPLETED_ROUTING_KEY
+    )
+
+
+def _final_illustration_failed_routing_key_for_action(action: FinalIllustrationAction) -> str:
+    return (
+        settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY
+        if action == "GENERATE"
+        else settings.RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_FAILED_ROUTING_KEY
     )
