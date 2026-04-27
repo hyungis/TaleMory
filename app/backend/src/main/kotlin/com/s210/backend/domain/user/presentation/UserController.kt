@@ -1,33 +1,47 @@
 package com.s210.backend.domain.user.presentation
 
 import com.s210.backend.common.response.ApiResponse
+import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.user.application.UserService
 import com.s210.backend.domain.user.presentation.request.ModifyUserRequest
 import com.s210.backend.domain.user.presentation.response.UserResponse
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.*
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/me")
-class UserController {
+class UserController(
+    private val userService: UserService,
+) {
 
-    // 사용자 정보 조회
     @GetMapping
-    fun userDetails(): ResponseEntity<ApiResponse<UserResponse>> {
-        // TODO: UserService.findUser(userId)
-        TODO("Not yet implemented")
-    }
+    fun userDetails(
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<UserResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(data = UserResponse.from(userService.findUser(user.userId))),
+        )
 
-    // 사용자 정보 수정
     @PatchMapping
-    fun userModify(@RequestBody request: ModifyUserRequest): ResponseEntity<ApiResponse<UserResponse>> {
-        // TODO: UserService.modifyUser(userId, command)
-        TODO("Not yet implemented")
-    }
+    fun userModify(
+        @AuthenticationPrincipal user: CustomUser,
+        @RequestBody request: ModifyUserRequest,
+    ): ResponseEntity<ApiResponse<UserResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(data = UserResponse.from(userService.modifyUser(user.userId, request.toCommand()))),
+        )
 
-    // 사용자 탈퇴
     @DeleteMapping
-    fun userRemove(): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: UserService.removeUser(userId)
-        TODO("Not yet implemented")
+    fun userRemove(
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<Unit>> {
+        userService.removeUser(user.userId)
+        return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 }
