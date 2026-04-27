@@ -134,9 +134,9 @@ stories/tts/generated/story-tts/1201/full-book/full-book.wav
 ```env
 COSYVOICE_BASE_URL=http://localhost:8001
 COSYVOICE_CROSS_LINGUAL_PATH=/inference_cross_lingual
-COSYVOICE_TIMEOUT_SEC=60
+COSYVOICE_TIMEOUT_SEC=180
 
-TTS_STORAGE_MODE=local
+TTS_STORAGE_MODE=s3
 TTS_PUBLIC_BASE_URL=/static
 TTS_STORAGE_ROOT=app/ai/.runtime/storage
 TTS_MANIFEST_ROOT=app/ai/.runtime/manifests
@@ -144,7 +144,7 @@ TTS_MANIFEST_ROOT=app/ai/.runtime/manifests
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 AWS_REGION=ap-northeast-2
-AWS_S3_BUCKET=
+AWS_S3_BUCKET=s210-iportfolio-dev
 AWS_S3_PREFIX=stories/tts
 AWS_S3_PUBLIC_BASE_URL=
 ```
