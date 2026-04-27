@@ -24,6 +24,7 @@ class StoryboardImageGenerateItemRequest(BaseModel):
     companions: list[str] = Field(default_factory=list)
     referenceImageUrls: list[str] = Field(default_factory=list, max_length=3)
     referenceImageS3Keys: list[str] = Field(default_factory=list, max_length=3)
+    stylePreset: str | None = Field(default=None, max_length=50)
     additionalInstruction: str | None = Field(default=None, max_length=2000)
 
 
