@@ -30,6 +30,7 @@ export function LogoutCallbackHandler() {
     handledRef.current = true
     clearAuthSession()
     window.alert('로그아웃되었습니다.')
+    // 로그아웃 후엔 랜딩 영상 + "시작하기" 가 있는 첫 페이지(`/` HomePage) 로 이동.
     navigate(ROUTES.home, { replace: true })
   }, [callbackResult.error, navigate])
 
