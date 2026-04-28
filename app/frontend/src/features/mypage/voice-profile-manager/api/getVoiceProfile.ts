@@ -4,7 +4,7 @@ import { mapVoiceProfile, type VoiceProfileResponse } from './types'
 
 const VOICE_PROFILES_ENDPOINT = '/v1/voice-profiles'
 
-export async function getVoiceProfiles(): Promise<VoiceProfile[]> {
-  const payload = await get<VoiceProfileResponse[]>(VOICE_PROFILES_ENDPOINT)
-  return payload.map(mapVoiceProfile)
+export async function getVoiceProfile(voiceProfileId: number): Promise<VoiceProfile> {
+  const payload = await get<VoiceProfileResponse>(`${VOICE_PROFILES_ENDPOINT}/${voiceProfileId}`)
+  return mapVoiceProfile(payload)
 }

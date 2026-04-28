@@ -53,6 +53,10 @@ class VoiceService(
         voiceProfileRepository.findAllByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
             .map(VoiceProfileResult::from)
 
+    @Transactional(readOnly = true)
+    fun findVoiceProfile(userId: Long, voiceProfileId: Long): VoiceProfileResult =
+        ownedVoiceProfile(userId, voiceProfileId).let(VoiceProfileResult::from)
+
     /**
      * Phase 1: presigned PUT URL 발급만 수행 (DB 저장 없음).
      * FE 가 이 URL 로 S3 에 직접 PUT 한 뒤, addVoiceProfile 로 commit.

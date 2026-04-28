@@ -281,9 +281,9 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
 
   /**
    * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).
-   * Phase 1: POST /api/voice-profiles/presigned-url → presigned URL + s3Key 발급
+   * Phase 1: POST /api/v1/voice-profiles/presigned-url → presigned URL + s3Key 발급
    * Phase 2: presigned URL 로 S3 에 직접 PUT
-   * Phase 3: POST /api/voice-profiles → s3Key 로 DB commit
+   * Phase 3: POST /api/v1/voice-profiles → s3Key 로 DB commit
    */
   const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
     if (!recordedAudioUrl) {

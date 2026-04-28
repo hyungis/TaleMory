@@ -16,12 +16,14 @@ export {
 } from './child-manager'
 export {
   VoiceProfilesSection,
+  VoiceProfileDetailsModal,
   VoiceProfileEditModal,
   useVoiceClone,
   formatAudioTime,
   VOICE_SAMPLE_SCRIPT,
   DEFAULT_TTS_TEXT,
   mockVoiceProfiles,
+  useVoiceProfileQuery,
   useVoiceProfilesQuery,
   useVoiceProfileDelete,
 } from './voice-profile-manager'

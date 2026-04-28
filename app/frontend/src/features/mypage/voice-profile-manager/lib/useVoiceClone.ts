@@ -1,40 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_TTS_TEXT,
   TTS_API_BASE,
   TTS_API_URL,
-  TTS_STORAGE_KEY,
   VOICE_SAMPLE_SCRIPT,
-  VOICE_STORAGE_KEY,
 } from './voiceDefaults'
-
-/**
- * 마이페이지 목소리 추가 전용 훅.
- * 동화 생성 플로우의 `features/story-creation/voice-clone/model/useVoiceClone.ts` 에서
- * 복사 — localStorage 키만 분리되어 두 플로우가 서로 간섭하지 않음.
- *
- * 기능:
- *  - 녹음 (MediaRecorder → dataURL)
- *  - 기존 음성 localStorage 에서 불러오기
- *  - TTS 미리듣기 (멀티파트 POST → download_url fetch → dataURL 로 재생)
- *  - 커스텀 오디오 플레이어 (play/pause + seek + 현재/총 시간)
- *  - 제목 + 저장 (VOICE_STORAGE_KEY + TTS_STORAGE_KEY)
- *  - 저장 상태 요약 문구
- */
+import { createVoiceProfile } from '../api/createVoiceProfile'
+import { getVoiceProfiles } from '../api/getVoiceProfiles'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
-
-interface SavedVoiceRecord {
-  name: string
-  audio: string
-  savedAt: string
-}
-interface SavedTtsRecord {
-  title: string
-  text: string
-  audio: string
-  savedAt: string
-}
 
 export interface UseVoiceCloneResult {
   status: RecordingStatus
@@ -45,10 +20,11 @@ export interface UseVoiceCloneResult {
   setTtsText: (value: string) => void
   ttsStatusText: string
   isTtsLoading: boolean
+  isSaving: boolean
   voiceTitle: string
   setVoiceTitle: (value: string) => void
   savedVoiceSummary: string
-  audioRef: React.RefObject<HTMLAudioElement | null>
+  audioRef: RefObject<HTMLAudioElement | null>
   isAudioPlaying: boolean
   audioCurrentTime: number
   audioDuration: number
@@ -60,9 +36,9 @@ export interface UseVoiceCloneResult {
   startRecording: () => Promise<void>
   stopRecording: () => void
   rerecord: () => void
-  loadExistingVoice: () => void
+  loadExistingVoice: () => Promise<void>
   previewTts: () => Promise<void>
-  saveVoiceRecording: () => string | null
+  saveVoiceRecording: () => Promise<string | null>
 }
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -77,26 +53,40 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
   })
 
 const dataUrlToBlob = (dataUrl: string): Blob => {
-  const parts = dataUrl.split(',')
-  const mime = parts[0].match(/:(.*?);/)?.[1] ?? 'audio/webm'
-  const binary = atob(parts[1])
+  const [meta = '', data = ''] = dataUrl.split(',')
+  const mime = meta.match(/:(.*?);/)?.[1] ?? 'audio/webm'
+  const binary = atob(data)
   const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+
   return new Blob([bytes], { type: mime })
 }
 
+const audioUrlToBlob = async (audioUrl: string): Promise<Blob> => {
+  if (audioUrl.startsWith('data:')) return dataUrlToBlob(audioUrl)
+
+  const response = await fetch(audioUrl)
+  if (!response.ok) throw new Error(`Audio fetch failed: ${response.status}`)
+  return response.blob()
+}
+
 export function useVoiceClone(): UseVoiceCloneResult {
+  const queryClient = useQueryClient()
   const [status, setStatus] = useState<RecordingStatus>('idle')
   const [statusLabel, setStatusLabel] = useState('대기 중')
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null)
   const [ttsText, setTtsText] = useState(DEFAULT_TTS_TEXT)
   const [ttsStatusText, setTtsStatusText] = useState(
-    '녹음하거나 기존 음성을 불러오면 TTS를 만들 수 있어요.',
+    '녹음하거나 기존 목소리를 불러오면 TTS를 만들어볼 수 있어요.',
   )
   const [isTtsLoading, setIsTtsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [voiceTitle, setVoiceTitle] = useState('')
-  const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 음성이 없습니다.')
+  const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 목소리가 없습니다.')
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
@@ -107,34 +97,24 @@ export function useVoiceClone(): UseVoiceCloneResult {
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  const updateSavedVoiceSummary = useCallback(() => {
+  const refreshSavedVoiceSummary = useCallback(async () => {
     try {
-      const savedVoiceRaw = window.localStorage.getItem(VOICE_STORAGE_KEY)
-      const savedTtsRaw = window.localStorage.getItem(TTS_STORAGE_KEY)
-      const savedVoice = savedVoiceRaw ? (JSON.parse(savedVoiceRaw) as SavedVoiceRecord) : null
-      const savedTts = savedTtsRaw ? (JSON.parse(savedTtsRaw) as SavedTtsRecord) : null
-      if (savedTts) {
-        setSavedVoiceSummary(
-          `저장된 TTS: ${savedTts.title}. 마이페이지 목소리 목록에 추가되었습니다.`,
-        )
-      } else if (savedVoice) {
-        setSavedVoiceSummary(
-          `저장된 보이스: ${savedVoice.name}. TTS 들어보기 후 제목과 함께 저장하세요.`,
-        )
-      } else {
-        setSavedVoiceSummary('아직 저장된 음성이 없습니다.')
-      }
+      const profiles = await getVoiceProfiles()
+      const latest = profiles[0]
+      setSavedVoiceSummary(
+        latest ? `저장된 보이스: ${latest.title}` : '아직 저장된 목소리가 없습니다.',
+      )
     } catch {
-      setSavedVoiceSummary('아직 저장된 음성이 없습니다.')
+      setSavedVoiceSummary('저장된 목소리 정보를 불러오지 못했습니다.')
     }
   }, [])
 
   useEffect(() => {
-    updateSavedVoiceSummary()
-  }, [updateSavedVoiceSummary])
+    void refreshSavedVoiceSummary()
+  }, [refreshSavedVoiceSummary])
 
   const cleanupStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current?.getTracks().forEach(track => track.stop())
     streamRef.current = null
   }, [])
 
@@ -142,25 +122,27 @@ export function useVoiceClone(): UseVoiceCloneResult {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      const rec = new MediaRecorder(stream)
-      recorderRef.current = rec
+
+      const recorder = new MediaRecorder(stream)
+      recorderRef.current = recorder
       chunksRef.current = []
 
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) chunksRef.current.push(event.data)
       }
-      rec.onstop = async () => {
+
+      recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         const url = await blobToDataUrl(blob)
         setRecordedAudioUrl(url)
         setTtsAudioUrl(null)
         setStatus('ready')
-        setStatusLabel('새 녹음 준비 완료')
+        setStatusLabel('녹음 준비 완료')
         setTtsStatusText('이 녹음으로 TTS를 미리 들어볼 수 있어요.')
         cleanupStream()
       }
 
-      rec.start()
+      recorder.start()
       setStatus('recording')
       setStatusLabel('녹음 중')
     } catch {
@@ -171,8 +153,8 @@ export function useVoiceClone(): UseVoiceCloneResult {
   }, [cleanupStream])
 
   const stopRecording = useCallback(() => {
-    const rec = recorderRef.current
-    if (rec && rec.state !== 'inactive') rec.stop()
+    const recorder = recorderRef.current
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
   }, [])
 
   const rerecord = useCallback(() => {
@@ -180,38 +162,42 @@ export function useVoiceClone(): UseVoiceCloneResult {
     setTtsAudioUrl(null)
     setStatus('idle')
     setStatusLabel('다시 녹음 준비')
-    setTtsStatusText('새로 녹음한 뒤 TTS를 들어볼 수 있어요.')
+    setTtsStatusText('새로 녹음하면 TTS를 들어볼 수 있어요.')
     setIsAudioPlaying(false)
     setAudioCurrentTime(0)
     setAudioDuration(0)
   }, [])
 
-  const loadExistingVoice = useCallback(() => {
+  const loadExistingVoice = useCallback(async () => {
     try {
-      const raw = window.localStorage.getItem(VOICE_STORAGE_KEY)
-      const saved = raw ? (JSON.parse(raw) as SavedVoiceRecord) : null
-      if (saved?.audio) {
-        setRecordedAudioUrl(saved.audio)
-        setVoiceTitle(saved.name || '')
-        setStatus('ready')
-        setStatusLabel('기존 음성 불러옴')
-        setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
-      } else {
+      const profiles = await getVoiceProfiles()
+      const latest = profiles[0]
+
+      if (!latest) {
         setStatus('idle')
-        setStatusLabel('저장된 음성 없음')
-        setTtsStatusText('녹음하거나 기존 음성을 불러오면 TTS를 만들 수 있어요.')
+        setStatusLabel('저장된 목소리 없음')
+        setTtsStatusText('녹음하거나 기존 목소리를 불러오면 TTS를 만들어볼 수 있어요.')
+        setSavedVoiceSummary('아직 저장된 목소리가 없습니다.')
+        return
       }
-      updateSavedVoiceSummary()
+
+      setRecordedAudioUrl(latest.audioUrl || null)
+      setVoiceTitle(latest.title)
+      setStatus('ready')
+      setStatusLabel('기존 목소리 불러옴')
+      setTtsStatusText('기존 목소리로 TTS를 만들어볼 수 있어요.')
+      setSavedVoiceSummary(`저장된 보이스: ${latest.title}`)
     } catch {
-      alert('저장된 음성을 불러오지 못했습니다.')
+      alert('저장된 목소리를 불러오지 못했습니다.')
     }
-  }, [updateSavedVoiceSummary])
+  }, [])
 
   const previewTts = useCallback(async () => {
     if (!recordedAudioUrl) {
-      setTtsStatusText('먼저 음성을 녹음하거나 불러와 주세요.')
+      setTtsStatusText('먼저 목소리를 녹음하거나 불러와 주세요.')
       return
     }
+
     const text = ttsText.trim()
     if (!text) {
       setTtsStatusText('TTS로 들어볼 문장을 입력해 주세요.')
@@ -219,10 +205,10 @@ export function useVoiceClone(): UseVoiceCloneResult {
     }
 
     setIsTtsLoading(true)
-    setTtsStatusText('보이스 클론 TTS를 만드는 중입니다. CPU 환경에서는 시간이 걸릴 수 있어요.')
+    setTtsStatusText('보이스 클론 TTS를 만드는 중입니다.')
 
     try {
-      const voiceBlob = dataUrlToBlob(recordedAudioUrl)
+      const voiceBlob = await audioUrlToBlob(recordedAudioUrl)
       const formData = new FormData()
       formData.append('text', text)
       formData.append('ref_text', VOICE_SAMPLE_SCRIPT.replaceAll('"', '').trim())
@@ -238,66 +224,64 @@ export function useVoiceClone(): UseVoiceCloneResult {
       const dataUrl = await blobToDataUrl(audioBlob)
 
       setTtsAudioUrl(dataUrl)
-      setTtsStatusText('TTS가 준비됐어요. 재생 후 제목을 입력하고 저장하세요.')
+      setTtsStatusText('TTS가 준비됐어요. 재생 후 제목과 함께 저장하세요.')
     } catch {
       setTtsAudioUrl(null)
-      setTtsStatusText(
-        `TTS 생성에 실패했습니다. ${TTS_API_BASE} 서버가 켜져 있는지 확인해 주세요.`,
-      )
+      setTtsStatusText(`TTS 생성에 실패했습니다. ${TTS_API_BASE} 서버가 켜져 있는지 확인해 주세요.`)
     } finally {
       setIsTtsLoading(false)
     }
   }, [recordedAudioUrl, ttsText])
 
-  const saveVoiceRecording = useCallback((): string | null => {
-    const name = voiceTitle.trim()
-    if (!name) {
+  const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
+    const title = voiceTitle.trim()
+
+    if (!title) {
       setStatus('idle')
       setStatusLabel('제목 먼저 입력')
       return null
     }
-    try {
-      if (recordedAudioUrl) {
-        const record: SavedVoiceRecord = {
-          name,
-          audio: recordedAudioUrl,
-          savedAt: new Date().toISOString(),
-        }
-        window.localStorage.setItem(VOICE_STORAGE_KEY, JSON.stringify(record))
-      }
-      if (ttsAudioUrl) {
-        const record: SavedTtsRecord = {
-          title: name,
-          text: ttsText.trim(),
-          audio: ttsAudioUrl,
-          savedAt: new Date().toISOString(),
-        }
-        window.localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify(record))
-        setStatusLabel('TTS 음성 저장 완료')
-      } else {
-        setStatusLabel('녹음 저장 완료')
-      }
-      setStatus('ready')
-      updateSavedVoiceSummary()
-      return name
-    } catch {
-      alert('저장 용량이 초과되었습니다. 녹음이 너무 길 수 있어요.')
+
+    if (!recordedAudioUrl) {
+      setStatusLabel('녹음 먼저 필요')
       return null
     }
-  }, [voiceTitle, recordedAudioUrl, ttsAudioUrl, ttsText, updateSavedVoiceSummary])
+
+    setIsSaving(true)
+
+    try {
+      const audioBlob = await audioUrlToBlob(recordedAudioUrl)
+      const profile = await createVoiceProfile({ title, audioBlob })
+
+      setStatus('ready')
+      setStatusLabel('서버 저장 완료')
+      setSavedVoiceSummary(`저장된 보이스: ${profile.title}`)
+      await queryClient.invalidateQueries({ queryKey: ['voiceProfiles'] })
+      await queryClient.invalidateQueries({ queryKey: ['voiceProfile', profile.id] })
+      return profile.title
+    } catch {
+      setStatusLabel('저장 실패')
+      alert('목소리 저장에 실패했습니다. 다시 시도해 주세요.')
+      return null
+    } finally {
+      setIsSaving(false)
+    }
+  }, [voiceTitle, recordedAudioUrl, queryClient])
 
   const toggleAudioPlayback = useCallback(() => {
-    const el = audioRef.current
-    if (!el || !el.src) return
-    if (el.paused) void el.play()
-    else el.pause()
+    const element = audioRef.current
+    if (!element || !element.src) return
+
+    if (element.paused) void element.play()
+    else element.pause()
   }, [])
 
   const seekAudio = useCallback((percent: number) => {
-    const el = audioRef.current
-    if (!el || !el.duration) return
-    el.currentTime = (percent / 100) * el.duration
-    setAudioCurrentTime(el.currentTime)
+    const element = audioRef.current
+    if (!element || !element.duration) return
+
+    element.currentTime = (percent / 100) * element.duration
+    setAudioCurrentTime(element.currentTime)
   }, [])
 
   useEffect(() => () => cleanupStream(), [cleanupStream])
@@ -311,6 +295,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
     setTtsText,
     ttsStatusText,
     isTtsLoading,
+    isSaving,
     voiceTitle,
     setVoiceTitle,
     savedVoiceSummary,
@@ -332,11 +317,13 @@ export function useVoiceClone(): UseVoiceCloneResult {
   }
 }
 
-export function formatAudioTime(t: number): string {
-  if (!Number.isFinite(t)) return '0:00'
-  const m = Math.floor(t / 60)
-  const s = Math.floor(t % 60)
+export function formatAudioTime(time: number): string {
+  if (!Number.isFinite(time)) return '0:00'
+
+  const minutes = Math.floor(time / 60)
+  const seconds = Math.floor(time % 60)
     .toString()
     .padStart(2, '0')
-  return `${m}:${s}`
+
+  return `${minutes}:${seconds}`
 }

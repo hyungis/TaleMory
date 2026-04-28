@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping(value = ["/api", "/api/v1"])
 class VoiceController(
     private val voiceService: VoiceService,
 ) {
@@ -39,6 +39,19 @@ class VoiceController(
         ResponseEntity.ok(
             ApiResponse(
                 data = voiceService.findVoiceProfiles(user.userId).map(VoiceProfileResponse::from),
+            ),
+        )
+
+    @GetMapping("/voice-profiles/{voiceProfileId}")
+    fun voiceProfileDetails(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable voiceProfileId: Long,
+    ): ResponseEntity<ApiResponse<VoiceProfileResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(
+                data = VoiceProfileResponse.from(
+                    voiceService.findVoiceProfile(user.userId, voiceProfileId),
+                ),
             ),
         )
 
