@@ -7,4 +7,6 @@ interface SceneRepository : JpaRepository<Scene, Long> {
     fun findByStoryIdOrderByPageNumberAsc(storyId: Long): List<Scene>
     fun findByStoryIdInOrderByStoryIdAscPageNumberAsc(storyIds: List<Long>): List<Scene>
     fun findAllByStoryId(storyId: Long): List<Scene>
+
+    fun countByStoryId(storyId: Long): Long
 }
