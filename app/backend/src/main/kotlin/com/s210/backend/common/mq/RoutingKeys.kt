@@ -16,6 +16,7 @@ package com.s210.backend.common.mq
 object RoutingKeys {
     // ---------- 스토리(동화 본문) 생성 ----------
     const val STORY_GENERATE = "ai.cpu.story.generate"
+    const val STORY_REGENERATE = "ai.cpu.story.regenerate"
 
     // ---------- 스토리보드 이미지 생성 ----------
     // AI 팀 스펙은 hardware prefix 를 생략하고 `ai.image.*` 로 통일했다.
@@ -24,7 +25,10 @@ object RoutingKeys {
     const val IMAGE_GENERATE = "ai.image.generate"
     const val IMAGE_REGENERATE = "ai.image.regenerate"
 
+    // ---------- 스토리(동화) 줄거리(요약) 생성 ----------
+    const val STORY_SUMMARY_GENERATE = "ai.cpu.story.summary.generate"
+    const val STORY_SUMMARY_REGENERATE = "ai.cpu.story.summary.regenerate"
+
     // ---------- 후속 이슈에서 추가 예정 ----------
-    // const val STORY_REGENERATE = "ai.cpu.story.regenerate"
     // const val TTS_GENERATE = "ai.gpu.tts.generate"
 }

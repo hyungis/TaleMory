@@ -115,6 +115,9 @@ export function CreationPage() {
           storyId={flow.storyId}
           data={flow.projectData.step3}
           onStoryChange={flow.updateStoryText}
+          onStoryJobStarted={flow.setStoryGenerationJobId}
+          lastConfirmedSummaryJobId={flow.lastConfirmedSummaryJobId}
+          onSummaryConfirmed={flow.setLastConfirmedSummaryJobId}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
@@ -123,6 +126,8 @@ export function CreationPage() {
       {flow.currentStep === 4 && (
         <StoryboardEditorStep
           storyId={flow.storyId}
+          storyGenerationJobId={flow.storyGenerationJobId}
+          onStoryJobFinished={() => flow.setStoryGenerationJobId(null)}
           onBack={handleBack}
           onNext={flow.handleNext}
         />

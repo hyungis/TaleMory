@@ -32,6 +32,13 @@ interface CreationProgressSnapshot {
   currentStep: number
   storyId: number | null
   step3Story: string
+  /**
+   * 본문(STORY) 발행이 한 번이라도 트리거된 후의 SUMMARY 잡 id.
+   * 새로고침을 거쳐 Step 3 으로 돌아오는 경우에도 락을 유지하기 위해 sessionStorage 에 보존.
+   * BE 의 storyboard-pages 쿼리로 페이지 존재 여부를 확인해 락을 derive 하는 1차 방어선과
+   * 더불어, STORY 잡이 진행 중이라 페이지가 아직 INSERT 되지 않은 짧은 구간을 메우는 2차 안전장치.
+   */
+  lastConfirmedSummaryJobId: string | null
 }
 
 function readProgressSnapshot(): CreationProgressSnapshot | null {
@@ -56,6 +63,10 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
       currentStep: Math.max(1, Math.min(MAX_STEP, parsed.currentStep)),
       storyId: typeof parsed.storyId === 'number' ? parsed.storyId : null,
       step3Story: parsed.step3Story,
+      lastConfirmedSummaryJobId:
+        typeof parsed.lastConfirmedSummaryJobId === 'string'
+          ? parsed.lastConfirmedSummaryJobId
+          : null,
     }
   } catch {
     return null
@@ -92,10 +103,25 @@ export interface UseStoryCreationFlowResult {
   projectData: StoryProject
   /** POST /api/stories 성공 후 set. step 2~8 에서 리소스 FK 로 사용. */
   storyId: number | null
+  /**
+   * Step 3 의 "스토리 확정하고 다음" 클릭으로 발행된 본문(STORY) 잡 id.
+   * Step 4 가 마운트되면 이 jobId 로 폴링하여 PENDING/RUNNING 동안 "본문 생성 중" 화면을 표시.
+   * 잡 종결 또는 step 1 로 돌아가면 setter 로 null 처리.
+   */
+  storyGenerationJobId: number | null
+  /**
+   * 마지막으로 사용자가 "스토리 확정하고 다음" 으로 본문 발행에 사용한 SUMMARY 잡의 id (string).
+   * Step 3 으로 돌아와서 confirm 다시 누를 때 이 값과 현재 summary jobId 를 비교해
+   * 같으면 본문 재발행을 skip (불필요한 OpenAI 호출 + 페이지 통째 교체 방지).
+   * 다르면 줄거리가 새로 만들어진 것이므로 본문 재발행 트리거.
+   */
+  lastConfirmedSummaryJobId: string | null
   setCurrentStep: (step: number) => void
   handleNext: () => void
   handlePrev: () => void
   setStoryId: (id: number | null) => void
+  setStoryGenerationJobId: (jobId: number | null) => void
+  setLastConfirmedSummaryJobId: (jobId: string | null) => void
   updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   updateStep2: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   updateStoryText: (story: string) => void
@@ -159,6 +185,26 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
   const [storyId, setStoryIdState] = useState<number | null>(
     init?.storyId ?? restored?.storyId ?? null,
   )
+  /**
+   * Step 3 의 본문 발행 mutation 성공 시 set, Step 4 폴링 종결 또는 step 후퇴 시 null.
+   * 새로고침으로 sessionStorage 에서 복원되는 다른 state 와 달리 메모리 한정 — 새로고침 후에는
+   * Step 4 가 storyboard-pages 캐시 기반으로 동작 (pages.length > 0 이면 정상 표시).
+   */
+  const [storyGenerationJobId, setStoryGenerationJobIdState] = useState<number | null>(null)
+  /**
+   * 마지막으로 본문 발행에 사용된 SUMMARY 잡 id. PromptStep 에서 confirm 시 비교 → 재발행 skip 판단.
+   *
+   * sessionStorage 로 영속화하는 이유:
+   *  - 본문(STORY) 잡이 SUCCESS 되어 page row 가 INSERT 되기 전에 사용자가 새로고침하면,
+   *    storyboard-pages 쿼리에서도 락을 derive 할 수 없게 되어 Step 3 의 줄거리 재생성을
+   *    허용해버리는 race window 가 생긴다.
+   *  - 이 값이 sessionStorage 에 남아있으면 그 짧은 구간에도 락이 유지된다.
+   *  - 락의 1차 방어선은 BE 의 page 존재 여부 (PromptStep 의 useStoryboardPagesQuery) 이며,
+   *    이 값은 본문 발행 직후 ~ page INSERT 직전 의 짧은 구간을 메우는 2차 안전장치.
+   */
+  const [lastConfirmedSummaryJobId, setLastConfirmedSummaryJobIdState] = useState<string | null>(
+    restored?.lastConfirmedSummaryJobId ?? null,
+  )
 
   // 레거시 키 정리 (과거 빌드에서 남겼을 수 있는 stale draft 삭제).
   useEffect(() => {
@@ -167,18 +213,23 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     window.localStorage.removeItem(LEGACY_STORAGE_KEY_DATA)
   }, [])
 
-  // currentStep / storyId / step3.story 변경 시마다 snapshot 갱신.
-  // step 1 + storyId=null + 빈 story 인 "아무것도 안 한 상태" 는 저장할 이유 없어 건너뜀.
+  // currentStep / storyId / step3.story / lastConfirmedSummaryJobId 변경 시마다 snapshot 갱신.
+  // step 1 + storyId=null + 빈 story + 락 미설정 인 "아무것도 안 한 상태" 는 저장할 이유 없어 건너뜀.
   useEffect(() => {
-    const meaningful = currentStep > 1 || storyId !== null || projectData.step3.story.length > 0
+    const meaningful =
+      currentStep > 1 ||
+      storyId !== null ||
+      projectData.step3.story.length > 0 ||
+      lastConfirmedSummaryJobId !== null
     if (meaningful) {
       writeProgressSnapshot({
         currentStep,
         storyId,
         step3Story: projectData.step3.story,
+        lastConfirmedSummaryJobId,
       })
     }
-  }, [currentStep, storyId, projectData.step3.story])
+  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))
@@ -259,6 +310,14 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     setStoryIdState(id)
   }, [])
 
+  const setStoryGenerationJobId = useCallback((jobId: number | null) => {
+    setStoryGenerationJobIdState(jobId)
+  }, [])
+
+  const setLastConfirmedSummaryJobId = useCallback((jobId: string | null) => {
+    setLastConfirmedSummaryJobIdState(jobId)
+  }, [])
+
   const removeChildAt = useCallback((index: number) => {
     setStoryProject(prev => {
       const children = prev.step1.children.filter((_, i) => i !== index)
@@ -280,10 +339,14 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     currentStep,
     projectData,
     storyId,
+    storyGenerationJobId,
+    lastConfirmedSummaryJobId,
     setCurrentStep,
     handleNext,
     handlePrev,
     setStoryId,
+    setStoryGenerationJobId,
+    setLastConfirmedSummaryJobId,
     updateStep1,
     updateStep2,
     updateStoryText,

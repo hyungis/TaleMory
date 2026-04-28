@@ -10,6 +10,8 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
+import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
+import com.s210.backend.domain.storyboard.application.dto.StorySummaryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.slf4j.LoggerFactory
@@ -47,17 +49,36 @@ class StoryboardResultListener(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    companion object {
+        /**
+         * 자료구조 차원에서 dispatch 함정 영구 차단 (Principle 4).
+         * - `contains` / `firstOrNull` / 순서 의존 0개.
+         * - AI 측 합의 type 만 정확히 enumerate. 미지의 type 은 WARN + silent drop.
+         * - 단위 테스트에서 직접 검증 가능하도록 internal 노출.
+         */
+        internal object EnvelopeTypes {
+            val STORY_SUMMARY = setOf(
+                "GENERATE_STORY_SUMMARY_COMPLETED", "GENERATE_STORY_SUMMARY_FAILED",
+                "REGENERATE_STORY_SUMMARY_COMPLETED", "REGENERATE_STORY_SUMMARY_FAILED",
+            )
+            val STORYBOARD_IMAGE = setOf(
+                "GENERATE_STORYBOARD_IMAGE_COMPLETED", "GENERATE_STORYBOARD_IMAGE_FAILED",
+                "REGENERATE_STORYBOARD_IMAGE_COMPLETED", "REGENERATE_STORYBOARD_IMAGE_FAILED",
+            )
+            val STORY = setOf("GENERATE_STORY_COMPLETED", "GENERATE_STORY_FAILED")
+        }
+    }
+
     /**
-     * 통합 결과 큐 진입점. STORY / STORYBOARD_IMAGE envelope 가 같은 큐로 들어오므로
-     * raw Message body 의 `type` 필드를 보고 분기한다.
+     * 통합 결과 큐 진입점. STORY_SUMMARY / STORY / STORYBOARD_IMAGE envelope 가 같은 큐로 들어오므로
+     * raw Message body 의 `type` 필드를 Set exact-match 로 분기한다.
      *
-     * 분기 방식:
-     *  - "STORYBOARD_IMAGE" 가 포함된 type → 이미지 결과
-     *  - "STORY" 가 포함된 type           → 줄거리(STORY) 결과
-     *  - 그 외                             → warn 로그 후 무시
+     * ack 정책:
+     *  @Transactional commit → Spring AMQP 가 ack 자동. markFailed 도 commit → ack.
+     *  DB 가 진실원이므로 메시지 재전달 불요. 예외 발생 시 트랜잭션 롤백 → nack with requeue.
      *
-     * Jackson `treeToValue` 로 각 타입에 맞춰 deserialize 하므로,
-     * STORY 메시지가 IMAGE envelope 으로 잘못 매핑되거나 vice versa 하는 일은 없다.
+     * 미지의 type 은 WARN 로깅 후 트랜잭션 commit → ack (silent drop).
+     * AI schema 변경에 따른 unknown type alerting 은 별도 lane (Follow-up).
      */
     @RabbitListener(queues = [RabbitMQConfig.RESULT_QUEUE])
     @Transactional
@@ -71,17 +92,119 @@ class StoryboardResultListener(
         }
         val type = tree.get("type")?.asString().orEmpty()
 
-        when {
-            type.contains("STORYBOARD_IMAGE") -> {
+        when (type) {
+            in EnvelopeTypes.STORY_SUMMARY -> {
+                val envelope = objectMapper.treeToValue(tree, StorySummaryResultEnvelope::class.java)
+                log.info(
+                    "[SUMMARY:RES] received — type={}, jobId={}, status={}",
+                    type, envelope.jobId, envelope.status,
+                )
+                handleStorySummaryResult(envelope)
+            }
+            in EnvelopeTypes.STORYBOARD_IMAGE -> {
                 val envelope = objectMapper.treeToValue(tree, StoryboardImageResultEnvelope::class.java)
                 handleImageResult(envelope)
             }
-            type.contains("STORY") -> {
+            in EnvelopeTypes.STORY -> {
                 val envelope = objectMapper.treeToValue(tree, StoryResultEnvelope::class.java)
+                log.info(
+                    "[STORY:RES] received — type={}, jobId={}, storyId={}, status={}",
+                    type, envelope.jobId, envelope.storyId, envelope.status,
+                )
                 handleStoryResult(envelope)
             }
             else -> log.warn("Unknown envelope type='{}', body={}", type, body)
         }
+    }
+
+    /**
+     * 줄거리(요약) 결과 한 건 처리 (GENERATE/REGENERATE × COMPLETED/FAILED 4종 동일 처리).
+     *
+     * COMPLETED:
+     *  - Job UPDATE (status=SUCCESS, resultPayload, costUsd, finishedAt)
+     *  - story_boards upsert: 같은 storyId 기존 row 가 있으면 `story=summaryKo` 로 갱신,
+     *    없으면 신규 INSERT. 본문 잡 SUCCESS 가 그 사이 도착해서 `story` 컬럼이 본문 한글로 갱신됐더라도
+     *    줄거리 SUCCESS 수신 시 다시 줄거리로 덮어씀 (의도된 동작, plan §1.3 D6-A).
+     * FAILED:
+     *  - Job UPDATE (status=FAILED, errorMessage). resultPayload 는 직전 SUCCESS 보존을 위해 갱신 안 함.
+     */
+    private fun handleStorySummaryResult(envelope: StorySummaryResultEnvelope) {
+        val jobIdLong = envelope.jobId.toLongOrNull()
+        if (jobIdLong == null) {
+            log.warn("Invalid jobId format from AI summary result: {} (not a Long)", envelope.jobId)
+            return
+        }
+
+        val job = jobRepository.findById(jobIdLong).orElse(null)
+        if (job == null) {
+            log.warn("Unknown summary jobId from AI: {} (status={})", envelope.jobId, envelope.status)
+            return
+        }
+
+        if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) {
+            log.info("Summary job {} already finalized ({}), skip duplicate", job.id, job.status)
+            return
+        }
+
+        when (envelope.status.uppercase()) {
+            "COMPLETED" -> {
+                val payload = envelope.payload
+                if (payload == null) {
+                    log.warn("Summary COMPLETED envelope has no payload for jobId {}", envelope.jobId)
+                    markFailed(job, "PAYLOAD_MISSING", "AI 응답에 payload 가 없습니다.")
+                    return
+                }
+                handleSummarySuccess(job, payload)
+            }
+            "FAILED" -> {
+                val code = envelope.error?.code ?: "UNKNOWN"
+                val message = envelope.error?.message ?: envelope.error?.code ?: "(unknown)"
+                markFailed(job, code, message)
+            }
+            else -> {
+                log.warn("Unknown summary envelope status '{}' for jobId {}", envelope.status, envelope.jobId)
+            }
+        }
+    }
+
+    private fun handleSummarySuccess(job: StoryGenerationJob, payload: StorySummaryPayload) {
+        // 1) Job 이력 업데이트
+        job.status = JobStatus.SUCCESS
+        job.resultPayload = objectMapper.writeValueAsString(payload)
+        job.costUsd = payload.usage.costUsd?.let { BigDecimal.valueOf(it) }
+        job.finishedAt = LocalDateTime.now()
+
+        // 2) story_boards upsert — V6 마이그레이션으로 story 컬럼이 TEXT 라 길이 제한 없음.
+        //    historic upsert pattern 유지 (재생성 시 row 새로 안 만들고 동일 row 만 갱신).
+        //    stories.synopsis 와 본질적으로 같은 한글 줄거리를 들고 있는 backup 사본.
+        val existing = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
+        if (existing != null) {
+            existing.story = payload.summaryKo
+            existing.updateAt = LocalDate.now()
+        } else {
+            storyBoardRepository.save(
+                StoryBoard(
+                    storyId = job.storyId,
+                    prompt = "",
+                    story = payload.summaryKo,
+                    createAt = LocalDate.now(),
+                ),
+            )
+        }
+
+        // 3) Story.synopsis (TEXT) 에 한글 줄거리 저장 — 본문 grounding 의 단일 source.
+        //    옵션 ② 디자인:
+        //     - 사용자가 Step 3 에서 편집하면 PATCH 로 이 컬럼 갱신.
+        //     - StoryboardGenerationService.generate 가 본문 발행 시 이 컬럼을 우선 읽음.
+        //     - STORY 잡 SUCCESS 가 더 이상 이 컬럼을 덮어쓰지 않음 (handleSuccess 참고).
+        storyRepository.findById(job.storyId).ifPresent { story ->
+            story.synopsis = payload.summaryKo
+        }
+
+        log.info(
+            "Summary job {} SUCCESS — storyId={}, summaryKoLen={}, costUsd={}",
+            job.id, job.storyId, payload.summaryKo.length, payload.usage.costUsd,
+        )
     }
 
     private fun handleStoryResult(envelope: StoryResultEnvelope) {
@@ -272,26 +395,20 @@ class StoryboardResultListener(
             .joinToString(separator = "\n\n") { it.koreanText.trim() }
             .ifBlank { payload.synopsis }   // 극단적으로 pages 비었을 때 fallback.
 
-        // 3) 동화 메타 row — upsert: 같은 storyId 의 story_board 가 있으면 내용만 교체.
-        //    (재생성해도 row 가 새로 생기지 않도록. story_generation_jobs 는 이력용으로 쌓임.)
-        //    이후 storyboard_pages 갈아끼우기에 storyBoard.id 를 사용해야 하므로 한 변수로 묶어둔다.
-        val storyBoard = run {
-            val existing = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
-            if (existing != null) {
-                existing.story = koreanBody
-                existing.updateAt = LocalDate.now()
-                existing
-            } else {
-                storyBoardRepository.save(
-                    StoryBoard(
-                        storyId = job.storyId,
-                        prompt = "",
-                        story = koreanBody,
-                        createAt = LocalDate.now(),
-                    ),
-                )
-            }
-        }
+        // 3) 동화 메타 row — SUMMARY 잡 SUCCESS 시 이미 한글 줄거리(summaryKo) 로 만들어져 있어야 한다.
+        //    옵션 ② 디자인 변경 (사용자 줄거리 직접 편집 허용):
+        //     - story_board.story = 한글 줄거리 (사용자 편집 대상). 본문 합본으로 덮어쓰지 않는다.
+        //     - 본문은 storyboard_pages 가 단일 source — Step 4 가 페이지별로 표시.
+        //     - 전체 본문이 필요한 곳은 storyboard_pages.korean_text 를 page_number 순으로 join.
+        //    storyBoard 가 없는 케이스는 SUMMARY 가 선행되지 않았다는 뜻이라 STORY 가 발행 자체가
+        //    안 됐어야 한다 (StoryboardGenerationService.generate 의 SUMMARY_REQUIRED guard).
+        //    여기까지 도달했다면 데이터 부정합이므로 IllegalStateException 으로 명시.
+        val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
+            ?: throw IllegalStateException(
+                "STORY 잡 SUCCESS 처리 중 storyBoard 가 없음 — SUMMARY 가 선행돼야 함. storyId=${job.storyId}"
+            )
+        storyBoard.updateAt = LocalDate.now()
+        // storyBoard.story 는 SUMMARY 시점에 들어간 한글 줄거리를 그대로 유지 (옵션 ②).
 
         // 4) 페이지 단위 진실 테이블(storyboard_pages) 갈아끼우기.
         //    - 줄거리 재생성 시 페이지 수가 바뀔 수 있으므로 delete-then-insert.
@@ -313,10 +430,11 @@ class StoryboardResultListener(
             },
         )
 
-        // 5) FE Step 3 가 즉시 보여줄 수 있도록 Story 엔티티에도 한글 본문 반영.
+        // 5) Story 엔티티: 제목은 본문 결과로 갱신, synopsis 는 줄거리 그대로 보존 (옵션 ②).
+        //    synopsis 는 Step 3 에서 사용자가 편집 가능한 한글 줄거리이며 본문 grounding 의 한글 source.
+        //    본문 합본 텍스트가 필요하면 storyboard_pages.korean_text 를 join 해서 산출.
         storyRepository.findById(job.storyId).ifPresent { story ->
             story.title = payload.title
-            story.synopsis = koreanBody
         }
 
         log.info(

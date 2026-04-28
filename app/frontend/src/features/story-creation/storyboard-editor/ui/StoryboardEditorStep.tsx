@@ -21,6 +21,13 @@ import { useGenerationJobQuery } from '../../storyboard-prompt'
 
 interface StoryboardEditorStepProps {
   storyId: number | null
+  /**
+   * Step 3 의 "스토리 확정하고 다음" 클릭으로 막 발행된 본문(STORY) 잡 id.
+   * null 이면 storyboard-pages 캐시 기반 fallback 동작 (새로고침 후 재진입 등).
+   */
+  storyGenerationJobId: number | null
+  /** STORY 잡이 종결(SUCCESS/FAILED/CANCELLED/타임아웃) 시 호출 — 부모 flow 의 jobId 를 null 로. */
+  onStoryJobFinished: () => void
   onBack: () => void
   onNext: () => void
 }
@@ -39,13 +46,89 @@ interface StoryboardEditorStepProps {
  *  - 모든 페이지에 image_url 이 있으면 "다음" 버튼 활성. (없어도 다음 가능 — 단순화)
  *  - 진행 중에는 전체 생성 버튼 disabled, 페이지별 재생성 버튼도 disabled (동시 폭주 방지).
  */
-export function StoryboardEditorStep({ storyId, onBack, onNext }: StoryboardEditorStepProps) {
+export function StoryboardEditorStep({
+  storyId,
+  storyGenerationJobId,
+  onStoryJobFinished,
+  onBack,
+  onNext,
+}: StoryboardEditorStepProps) {
   const queryClient = useQueryClient()
 
   const pagesQuery = useStoryboardPagesQuery(storyId)
   const patchMut = useStoryboardPagePatch(storyId)
   const generateImagesMut = useGenerateStoryboardImagesPost(storyId)
   const regenerateImageMut = useRegenerateStoryboardImagePost(storyId)
+
+  // ────────────────────────────────────────────────────────────
+  // 본문(STORY) 잡 폴링 — Step 3 의 "스토리 확정하고 다음" 클릭으로 발행된 잡.
+  // PENDING/RUNNING 동안 "본문 생성 중" 화면을 띄우고, SUCCESS 시 페이지 캐시 invalidate.
+  // ────────────────────────────────────────────────────────────
+  const storyJobQuery = useGenerationJobQuery(storyGenerationJobId)
+  const storyJobStatus = storyJobQuery.data?.status
+  const isStoryJobInProgress =
+    storyGenerationJobId !== null &&
+    !storyJobQuery.isTimedOut &&
+    storyJobStatus !== 'SUCCESS' &&
+    storyJobStatus !== 'FAILED' &&
+    storyJobStatus !== 'CANCELLED'
+  const isStoryJobFailed =
+    storyGenerationJobId !== null &&
+    (storyJobStatus === 'FAILED' || storyJobStatus === 'CANCELLED' || storyJobQuery.isTimedOut)
+
+  // Step 4 진입 시점에 한 번은 강제 refetch — PromptStep 이 staleTime: 30s 로 들고 있던
+  // "0 pages" 캐시가 박제되는 걸 방어. STORY 잡이 직전에 SUCCESS 해 페이지가 BE 에 이미 있어도
+  // FE 는 stale 캐시 때문에 "본문 없음" 화면을 띄우고 새로고침 전엔 못 빠져나오는 사고가 있었음.
+  useEffect(() => {
+    if (storyId !== null) {
+      void queryClient.refetchQueries({ queryKey: ['storyboard-pages', storyId] })
+    }
+    // storyId 변경 / 컴포넌트 mount 단위로만 동작 — polling 갱신 noise 와 분리.
+  }, [storyId, queryClient])
+
+  // STORY 잡 폴링 중 매 갱신마다 storyboard-pages 캐시 invalidate
+  // (listener 가 SUCCESS 직후 페이지 row INSERT 하므로, 다음 polling tick 의 invalidate 가
+  //  pagesQuery refetch 를 트리거 → 페이지 즉시 렌더).
+  useEffect(() => {
+    if (storyGenerationJobId !== null && storyId !== null) {
+      void queryClient.invalidateQueries({ queryKey: ['storyboard-pages', storyId] })
+    }
+  }, [storyJobQuery.dataUpdatedAt, storyGenerationJobId, queryClient, storyId])
+
+  // STORY 잡 종결 시 부모 flow 의 jobId 를 null 로 → UI 가 정상 모드로 전환.
+  // SUCCESS 케이스는 폴링이 더 이상 필요 없지만 그 직후 페이지가 화면에 보장되어야 한다.
+  // invalidate(fire-and-forget) 만 하면 onStoryJobFinished 가 storyGenerationJobId 를 null 로
+  // 떨어뜨리는 동기 step 이 refetch 보다 먼저 commit 되어 잠깐 "아직 본문이 만들어지지 않았어요"
+  // empty state 가 노출된 뒤 refetch 결과가 도착하면서 점프하는 어색한 UX 가 생긴다.
+  // 더 나쁜 경우엔 PromptStep 이 미리 캐싱해 둔 0-pages stale 데이터가 30s staleTime 동안
+  // 박제되어 새로고침 전엔 영영 페이지가 안 보이는 사고로 이어진다.
+  // → refetchQueries 로 명시적으로 await 한 다음 onStoryJobFinished 를 호출.
+  useEffect(() => {
+    if (
+      storyGenerationJobId !== null &&
+      (storyJobStatus === 'SUCCESS' ||
+        storyJobStatus === 'FAILED' ||
+        storyJobStatus === 'CANCELLED' ||
+        storyJobQuery.isTimedOut)
+    ) {
+      if (storyJobStatus === 'SUCCESS' && storyId !== null) {
+        // refetch 를 await — 페이지 데이터가 캐시에 도착한 다음에야 jobId 를 null 로 떨어뜨려
+        // empty-state flicker / 새로고침 의존 사고를 동시에 봉인.
+        queryClient
+          .refetchQueries({ queryKey: ['storyboard-pages', storyId] })
+          .finally(() => onStoryJobFinished())
+        return
+      }
+      onStoryJobFinished()
+    }
+  }, [
+    storyJobStatus,
+    storyJobQuery.isTimedOut,
+    storyGenerationJobId,
+    onStoryJobFinished,
+    queryClient,
+    storyId,
+  ])
 
   // 진행 중인 이미지 잡 (배치 생성 / 재생성 중 하나).
   // 잡이 SUCCESS/FAILED/타임아웃 도달하면 null 로 되돌려 UI 풀림.
@@ -59,7 +142,7 @@ export function StoryboardEditorStep({ storyId, onBack, onNext }: StoryboardEdit
     }
   }, [imageJobQuery.dataUpdatedAt, currentImageJobId, queryClient, storyId])
 
-  // 잡 마무리(SUCCESS/FAILED/타임아웃) 처리.
+  // 잡 마무리(SUCCESS/FAILED/CANCELLED/타임아웃) 처리.
   useEffect(() => {
     const status = imageJobQuery.data?.status
     if (
@@ -234,20 +317,53 @@ export function StoryboardEditorStep({ storyId, onBack, onNext }: StoryboardEdit
               </div>
             )}
 
-            {/* 페이지 카드 list */}
-            {pagesQuery.isLoading && (
+            {/* STORY 잡 진행 중 — 페이지 카드 대신 큰 로딩 카드를 표시.
+                Step 3 에서 "스토리 확정하고 다음" 직후 도달하는 정상 케이스. */}
+            {isStoryJobInProgress && pages.length === 0 && (
+              <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+                <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
+                <p className="text-[#2d5a27] font-bold mb-2">동화 본문을 만들고 있어요</p>
+                <p className="text-[#8b7a52]">
+                  AI 가 페이지별 글을 쓰고 있어요. 보통 30초 ~ 1분 정도 걸려요.
+                </p>
+              </div>
+            )}
+
+            {/* STORY 잡 실패/타임아웃 — 사용자에게 명확한 메시지 + 이전 단계 복귀 안내. */}
+            {isStoryJobFailed && pages.length === 0 && (
+              <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+                <p className="text-[#a3413f] font-bold mb-2">본문 생성에 실패했어요</p>
+                <p className="text-[#8b7a52] mb-4">
+                  잠시 후 이전 단계로 돌아가 다시 시도해주세요.
+                </p>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="bg-[#2d5a27] text-[#f0e6c0] px-6 py-2.5 rounded-full font-bold hover:bg-[#3d6f34] transition-colors"
+                >
+                  이전 단계로
+                </button>
+              </div>
+            )}
+
+            {/* 페이지 캐시 자체 로딩 — 위 두 케이스가 모두 false 일 때만. */}
+            {!isStoryJobInProgress && !isStoryJobFailed && pagesQuery.isLoading && (
               <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
                 <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
                 <p className="text-[#2d5a27] font-bold">페이지를 불러오는 중...</p>
               </div>
             )}
 
-            {!pagesQuery.isLoading && pages.length === 0 && (
-              <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
-                <p className="text-[#2d5a27] font-bold mb-2">아직 줄거리가 만들어지지 않았어요</p>
-                <p className="text-[#8b7a52]">이전 단계에서 줄거리를 먼저 만들어주세요.</p>
-              </div>
-            )}
+            {/* 잡도 없고 페이지도 없는 진짜 "Step 3 이전" 상태 (직접 진입 또는 stale URL). */}
+            {!isStoryJobInProgress &&
+              !isStoryJobFailed &&
+              !pagesQuery.isLoading &&
+              pages.length === 0 && (
+                <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+                  <p className="text-[#2d5a27] font-bold mb-2">아직 동화 본문이 만들어지지 않았어요</p>
+                  <p className="text-[#8b7a52]">이전 단계에서 줄거리를 만들고 본문을 확정해주세요.</p>
+                </div>
+              )}
 
             {/* 페이지 카드 — 한 줄에 1 개씩. 양옆을 max-w-7xl 로 넓혀 이미지가 충분히 크게. */}
             <div className="space-y-6">
