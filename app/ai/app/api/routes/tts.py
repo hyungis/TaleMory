@@ -13,7 +13,7 @@ from app.services.dev_tts_service import (
 from app.services.storage_service import StorageConfigurationError, StorageUploadError
 
 
-router = APIRouter(prefix="/api/v1", tags=["tts"])
+router = APIRouter(prefix="/api", tags=["tts"])
 
 
 @router.post("/voices/{voiceId}/preview", response_model=ApiSuccessResponse)
