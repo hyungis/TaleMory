@@ -58,11 +58,13 @@ def revise_final_illustration(
     request_model: FinalIllustrationReviseRequest,
 ) -> FinalIllustrationReviseResponse:
     revise_item = _build_revise_item(request_model.item, request_model.userPrompt)
+    revise_prompt = _build_revise_prompt(request_model.item.stylePrompt, request_model.userPrompt)
     result = generate_final_illustration_item(
         story_id=request_model.storyId,
         item=revise_item,
         seed=request_model.seed,
         render_options=request_model.renderOptions,
+        final_prompt_override=revise_prompt,
     )
     return FinalIllustrationReviseResponse(
         storyId=request_model.storyId,
@@ -76,9 +78,10 @@ def generate_final_illustration_item(
     item: FinalIllustrationGenerateItemRequest,
     seed: int,
     render_options: FinalIllustrationRenderOptions,
+    final_prompt_override: str | None = None,
 ) -> FinalIllustrationGenerateResult:
     if settings.REPLICATE_API_TOKEN:
-        return _generate_item_with_replicate(story_id, item, seed, render_options)
+        return _generate_item_with_replicate(story_id, item, seed, render_options, final_prompt_override)
     return _generate_item_locally(story_id, item)
 
 
@@ -87,8 +90,9 @@ def _generate_item_with_replicate(
     item: FinalIllustrationGenerateItemRequest,
     seed: int,
     render_options: FinalIllustrationRenderOptions,
+    final_prompt_override: str | None = None,
 ) -> FinalIllustrationGenerateResult:
-    final_prompt = _build_final_prompt(item)
+    final_prompt = final_prompt_override or _build_final_prompt(item)
     replicate_input = _build_replicate_input(item, seed, render_options, final_prompt)
     prediction = _create_and_wait_for_prediction(replicate_input)
     output_urls = _extract_prediction_output_urls(prediction)
@@ -160,6 +164,28 @@ def _build_final_prompt(item: FinalIllustrationGenerateItemRequest) -> str:
             f"Scene summary: {item.page.sceneSummary}",
             f"Scene intent: {item.page.imagePrompt}",
             f"Additional instruction: {additional_instruction}",
+        ]
+    )
+
+
+def _build_revise_prompt(style_prompt: str, user_prompt: str) -> str:
+    return "\n".join(
+        [
+            "Style prompt:",
+            style_prompt,
+            "",
+            "Revise image 1 into an updated final children's book illustration.",
+            "Use image 1 as the base illustration.",
+            "The requested revision below has higher priority than the original pose, gesture, or local composition in image 1.",
+            "Apply the requested revision clearly and visibly.",
+            "Change any part of image 1 that is necessary to satisfy the request.",
+            "If the request asks for a pose change, expression change, or body position change, the final image must visibly show that change.",
+            "Keep the overall character identity, color treatment, and visual style consistent unless the request explicitly requires otherwise.",
+            "Do not add or remove unrelated visual elements.",
+            "Absolutely no visible text anywhere in the image.",
+            "",
+            "Requested revision:",
+            user_prompt.strip(),
         ]
     )
 
