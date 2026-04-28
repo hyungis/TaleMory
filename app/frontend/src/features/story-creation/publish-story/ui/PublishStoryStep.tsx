@@ -8,7 +8,7 @@ interface PublishStoryStepProps {
 }
 
 /**
- * STEP 08 — 동화책 발행 완료 화면.
+ * STEP 09 — 동화책 발행 완료 화면.
  *
  * 현재(Task 8)는 축하 화면 + 가짜 shareToken 발급 + 복사 UX.
  * 실제 백엔드 publish API 호출은 후속 커밋에서 onConfirm 훅으로 주입.
@@ -30,7 +30,7 @@ export function PublishStoryStep({ onBack, onExit }: PublishStoryStepProps) {
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={8} stepTitle="동화책 발행 완료" onBack={onBack} />
+      <StepHeader stepNumber={9} stepTitle="동화책 발행 완료" onBack={onBack} />
       <div className="bookshelf-scroll">
         <main className="py-12 px-6 bookshelf-fade-in">
           <div className="max-w-2xl mx-auto bg-[#f0e6c0] p-8 md:p-12 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-2 border-[#2a1b12] text-center">

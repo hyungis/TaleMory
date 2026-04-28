@@ -23,7 +23,7 @@ interface FinalPreviewStepProps {
 }
 
 /**
- * STEP 07 — "완성된 동화책"
+ * STEP 08 — "완성된 동화책"
  *
  * 구조:
  *  - 성공 배지 "🎉 세상에 하나뿐인 동화책 완성!"
@@ -94,7 +94,7 @@ export function FinalPreviewStep({
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">STEP 07 / 08</span>
+          <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">STEP 08 / 09</span>
           <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">
             완성된 동화책
           </span>

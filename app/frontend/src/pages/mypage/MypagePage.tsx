@@ -9,6 +9,7 @@ import {
   PersonsSection,
   ProfileEditModal,
   ProfileSection,
+  VoiceProfileDetailsModal,
   VoiceProfilesSection,
   WithdrawDialog,
   useMeQuery,
@@ -18,6 +19,7 @@ import {
   usePersonsQuery,
   usePersonUpdate,
   useVoiceProfileDelete,
+  useVoiceProfileQuery,
   useVoiceProfilesQuery,
   useWithdraw,
 } from '../../features/mypage'
@@ -29,6 +31,7 @@ type Modal =
   | { kind: 'profile-edit' }
   | { kind: 'withdraw' }
   | { kind: 'person-edit'; person?: Person }
+  | { kind: 'voice-detail'; voiceProfileId: number }
 
 export function MypagePage() {
   const navigate = useNavigate()
@@ -50,11 +53,12 @@ export function MypagePage() {
   const personUpdate = usePersonUpdate(currentUserId)
   const personDelete = usePersonDelete(currentUserId)
 
+  const [modal, setModal] = useState<Modal>({ kind: 'none' })
   const voiceProfilesQuery = useVoiceProfilesQuery(authSession.isAuthenticated)
+  const selectedVoiceProfileId = modal.kind === 'voice-detail' ? modal.voiceProfileId : null
+  const voiceProfileQuery = useVoiceProfileQuery(selectedVoiceProfileId, authSession.isAuthenticated)
   const voiceProfileDelete = useVoiceProfileDelete()
   const withdraw = useWithdraw()
-
-  const [modal, setModal] = useState<Modal>({ kind: 'none' })
 
   const closeModal = () => setModal({ kind: 'none' })
 
@@ -226,6 +230,7 @@ export function MypagePage() {
           <VoiceProfilesSection
             voiceProfiles={voiceProfilesQuery.data ?? []}
             onAddClick={() => navigate(ROUTES.mypageVoiceClone)}
+            onDetailsClick={profile => setModal({ kind: 'voice-detail', voiceProfileId: profile.id })}
             onDeleteClick={profile => handleVoiceDelete(profile.id, profile.title)}
             isLoading={voiceProfilesQuery.isPending}
             isBusy={voiceProfileDelete.isPending}
@@ -252,6 +257,14 @@ export function MypagePage() {
       )}
       {modal.kind === 'person-edit' && (
         <PersonEditModal initial={modal.person} onClose={closeModal} onSave={handlePersonSave} />
+      )}
+      {modal.kind === 'voice-detail' && (
+        <VoiceProfileDetailsModal
+          profile={voiceProfileQuery.data}
+          isLoading={voiceProfileQuery.isPending}
+          errorMessage={getFirstErrorMessage(voiceProfileQuery.error)}
+          onClose={closeModal}
+        />
       )}
     </>
   )

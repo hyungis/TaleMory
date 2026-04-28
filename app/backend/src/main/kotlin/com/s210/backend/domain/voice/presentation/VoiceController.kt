@@ -42,6 +42,19 @@ class VoiceController(
             ),
         )
 
+    @GetMapping("/voice-profiles/{voiceProfileId}")
+    fun voiceProfileDetails(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable voiceProfileId: Long,
+    ): ResponseEntity<ApiResponse<VoiceProfileResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(
+                data = VoiceProfileResponse.from(
+                    voiceService.findVoiceProfile(user.userId, voiceProfileId),
+                ),
+            ),
+        )
+
     // Phase 1: presigned PUT URL 발급 (DB 저장 없음)
     @PostMapping("/voice-profiles/presigned-url")
     fun voiceProfilePresignedUrl(

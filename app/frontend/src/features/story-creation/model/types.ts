@@ -68,4 +68,4 @@ export interface StoryProject {
 }
 
 /** 마지막 step index (0..N) — 원본은 0..8 (책장, 1~5 제작, 6 보이스, 7 미리보기, 8 공개). */
-export const MAX_STEP = 8
+export const MAX_STEP = 9

@@ -99,6 +99,18 @@ data class OutroResponse(
     val signature: String?
 )
 
+data class HighlightVoiceResponse(
+    val highlightVoiceId: Long,
+    val sentenceId: Long,
+    val audioUrl: String,
+)
+
+data class PresignedUrlResponse(
+    val uploadUrl: String,
+    val s3Key: String,
+    val expiresAt: String,
+)
+
 data class ProgressResponse(
     val storyId: Long,
     val lastScenePage: Int
