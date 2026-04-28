@@ -1,10 +1,13 @@
 import json
 import base64
+import logging
 import mimetypes
 from functools import lru_cache
 from itertools import cycle, islice
 
 import boto3
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.schemas.storyboard import (
@@ -31,13 +34,23 @@ FIXED_VISION_DETAIL = "low"
 
 
 def generate_storyboard(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
-    if settings.OPENAI_API_KEY:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[STORY:GEN] service entry — useOpenAI=%s, photos=%d, children=%d, place=%s",
+        use_openai, len(request.photos), len(request.children), request.travel.place,
+    )
+    if use_openai:
         return _generate_with_openai(request)
     return _generate_locally(request)
 
 
 def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
-    if settings.OPENAI_API_KEY:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[STORY:REGEN] service entry — useOpenAI=%s, feedbackLen=%d",
+        use_openai, len(request.feedbackInstruction or ""),
+    )
+    if use_openai:
         return _regenerate_with_openai(request)
     return _generate_locally(_build_regenerate_fallback_request(request))
 
@@ -53,6 +66,10 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
     schema = _to_openai_strict_json_schema(StoryboardGenerateResponse.model_json_schema())
     payload = request.model_dump(mode="json")
     input_content = _build_openai_input_content(request, payload)
+    logger.info(
+        "[STORY:GEN] OpenAI call start — model=%s, contentBlocks=%d",
+        settings.STORYBOARD_MODEL, len(input_content),
+    )
 
     try:
         response = client.responses.create(
@@ -71,6 +88,7 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
             },
         )
     except OpenAIError as exc:
+        logger.exception("[STORY:GEN] OpenAI call failed")
         raise ValueError(f"OpenAI storyboard generation failed: {exc}") from exc
 
     parsed = StoryboardGenerateResponse.model_validate_json(response.output_text)
@@ -85,6 +103,11 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
         output_tokens=token_usage["output_tokens"],
     )
     parsed.usage.promptTemplateVersion = STORYBOARD_PROMPT_TEMPLATE_VERSION
+    logger.info(
+        "[STORY:GEN] OpenAI call done — pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        len(parsed.pages), parsed.totalWordCount,
+        token_usage["input_tokens"], token_usage["output_tokens"], parsed.usage.costUsd,
+    )
     return parsed
 
 

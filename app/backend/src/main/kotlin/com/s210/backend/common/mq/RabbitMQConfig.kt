@@ -14,16 +14,16 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 /**
- * AI 서비스 (스토리 / 장차 일러스트 / TTS 등) 와의 RabbitMQ 통신 토폴로지.
+ * AI 서비스 (스토리 / 일러스트 / TTS 등) 와의 RabbitMQ 통신 토폴로지.
  *
  * 설계 원칙:
  *  - Exchange 는 방향별로 분리 (request / result) — Spring 이 자기 응답을 다시 consume 하지 않도록.
- *  - Queue 는 "워커 능력(하드웨어) 경계" 로만 분리. 같은 CPU 에서 처리 가능한 작업들은 한 큐에 모으고,
- *    AI 워커가 envelope 의 jobType + action 으로 분기 처리한다.
+ *  - 요청 큐(CPU/GPU/IMAGE) 는 AI 워커가 (jobType, action) 별로 자체 declare/bind 한다.
+ *    BE 는 라우팅 키만 알고 publish 만 신경쓰면 된다 (IMAGE 와 동일한 패턴).
+ *  - 결과 큐(`ai.result.queue`) 만 BE 가 consume 하므로 여기서 declare 한다.
  *  - Routing key 규약: "ai.{hardware}.{jobType}.{action}"  (예: ai.cpu.story.generate)
- *
- * 지금은 CPU 요청 + 공용 결과 각 1개. 장차 TTS 등 GPU 워커 필요 시
- * ai.gpu.request.queue 와 해당 binding 만 @Bean 으로 추가하면 된다.
+ *  - Queue 명명 규약: "ai.{hardware}.{jobType}.{action}.request.queue"
+ *    → routing key 와 큐 이름이 거울 대응 → 디버그 용이.
  */
 @Configuration
 class RabbitMQConfig {
@@ -34,11 +34,11 @@ class RabbitMQConfig {
         const val RESULT_EXCHANGE = "ai.result"     // AI → Spring
 
         // ---------- Queue ----------
-        const val CPU_REQUEST_QUEUE = "ai.cpu.request.queue"
+        // 요청 큐는 AI 워커가 owner — 여기서 declare 하지 않는다.
         const val RESULT_QUEUE = "ai.result.queue"
 
         // ---------- Binding 패턴 ----------
-        private const val CPU_REQUEST_PATTERN = "ai.cpu.#"
+        // 결과 envelope 만 BE 가 구독한다. (`ai.result.story.*`, `ai.result.image.*`, `ai.result.tts.*` 모두 매칭)
         private const val RESULT_PATTERN = "ai.result.#"
     }
 
@@ -56,10 +56,10 @@ class RabbitMQConfig {
 
     // =====================================================================
     // Queue  (durable = true : RabbitMQ 재시작해도 큐 유지, 메시지 유실 방지)
+    //  - BE 가 consume 하는 결과 큐만 여기서 declare.
+    //  - 요청 큐들(`ai.cpu.story.*.request.queue`, `ai.image.*.request.queue` 등)은
+    //    AI 워커(`app/ai/app/mq/client.py`)가 env 기반으로 declare/bind 한다.
     // =====================================================================
-
-    @Bean
-    fun cpuRequestQueue(): Queue = Queue(CPU_REQUEST_QUEUE, /* durable = */ true)
 
     @Bean
     fun resultQueue(): Queue = Queue(RESULT_QUEUE, true)
@@ -67,12 +67,6 @@ class RabbitMQConfig {
     // =====================================================================
     // Binding  (같은 타입 빈 다수이므로 @Qualifier 로 명시)
     // =====================================================================
-
-    @Bean
-    fun cpuRequestBinding(
-        @Qualifier("cpuRequestQueue") queue: Queue,
-        @Qualifier("requestExchange") exchange: TopicExchange,
-    ): Binding = BindingBuilder.bind(queue).to(exchange).with(CPU_REQUEST_PATTERN)
 
     @Bean
     fun resultBinding(
