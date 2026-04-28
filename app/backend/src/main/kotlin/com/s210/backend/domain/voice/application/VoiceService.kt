@@ -51,11 +51,11 @@ class VoiceService(
     @Transactional(readOnly = true)
     fun findVoiceProfiles(userId: Long): List<VoiceProfileResult> =
         voiceProfileRepository.findAllByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId)
-            .map(VoiceProfileResult::from)
+            .map(::toResult)
 
     @Transactional(readOnly = true)
     fun findVoiceProfile(userId: Long, voiceProfileId: Long): VoiceProfileResult =
-        ownedVoiceProfile(userId, voiceProfileId).let(VoiceProfileResult::from)
+        ownedVoiceProfile(userId, voiceProfileId).let(::toResult)
 
     /**
      * Phase 1: presigned PUT URL 발급만 수행 (DB 저장 없음).
@@ -82,16 +82,14 @@ class VoiceService(
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
 
-        val audioUrl = s3Service.buildPublicImageUrl(s3Key)
-
         val profile = voiceProfileRepository.save(
             VoiceProfile(
                 userId = userId,
                 title = trimmedTitle,
-                audioUrl = audioUrl,
+                audioUrl = s3Key,
             )
         )
-        return VoiceProfileResult.from(profile)
+        return toResult(profile)
     }
 
     fun removeVoiceProfile(userId: Long, voiceProfileId: Long) {
@@ -106,5 +104,30 @@ class VoiceService(
             throw BusinessException(CommonErrorCode.FORBIDDEN)
         }
         return voiceProfile
+    }
+
+    private fun toResult(voiceProfile: VoiceProfile): VoiceProfileResult {
+        val result = VoiceProfileResult.from(voiceProfile)
+        return result.copy(
+            audioUrl = result.audioUrl.toPresignedAudioUrl(),
+            ttsVoiceUrl = result.ttsVoiceUrl.toPresignedAudioUrl(),
+        )
+    }
+
+    private fun String?.toPresignedAudioUrl(): String? {
+        if (this.isNullOrBlank()) return null
+
+        val s3Key = extractS3Key(this) ?: return this
+        return s3Service.presignGetUrl(s3Key)
+    }
+
+    private fun extractS3Key(storedReference: String): String? {
+        val withoutQuery = storedReference.substringBefore("?")
+        if (withoutQuery.startsWith("stories/")) return withoutQuery
+
+        val marker = "/stories/"
+        val markerIndex = withoutQuery.indexOf(marker)
+        if (markerIndex < 0) return null
+        return withoutQuery.substring(markerIndex + 1)
     }
 }
