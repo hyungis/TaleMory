@@ -96,3 +96,24 @@ def declare_storyboard_topology(channel: Any) -> None:
         exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
         routing_key=settings.RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY,
     )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY,
+    )
