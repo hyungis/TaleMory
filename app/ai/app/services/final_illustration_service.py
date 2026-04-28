@@ -137,53 +137,21 @@ def _build_regenerate_item(
 
 
 def _build_final_prompt(item: FinalIllustrationGenerateItemRequest) -> str:
-    child_descriptions = ", ".join(
-        f"{child.name} ({child.age}, {child.gender.lower()})" for child in item.children
-    )
-    companions = ", ".join(item.companions) if item.companions else "family"
     additional_instruction = item.additionalInstruction.strip() if item.additionalInstruction else "None"
 
     return "\n".join(
         [
-            "You are generating a final illustrated children's book image from a rough storyboard image and style references.",
-            "Your job is to transform the rough storyboard into a polished final illustration while preserving the original storytelling composition.",
-            "The rough storyboard image is a loose composition blueprint.",
-            "Preserve the overall narrative composition, camera intent, subject hierarchy, and core story beat from the rough storyboard.",
-            "Do not copy the rough storyboard literally pixel-by-pixel.",
-            "You may naturally reinterpret pose details, line of action, environmental shapes, lighting distribution, and painterly staging as long as the same scene intent is preserved.",
-            "The style reference image(s) and style prompt control the rendering style only.",
-            "Apply color language, brushwork feel, texture, lighting mood, detail density, and finish quality from the style references.",
-            "Do not copy unrelated composition or objects from the style references.",
-            "Reference image role mapping:",
-            "- Image 1 is the rough storyboard composition reference. Use it for broad layout, framing, camera angle, subject hierarchy, pose intent, and scene staging.",
-            "- Image 2 and any following images are style references. Use them only for color palette, brushwork, texture, lighting mood, finish quality, and overall rendering style.",
-            "- Do not copy composition from style reference images.",
-            "- Do not let style reference images override the composition in image 1.",
-            "Keep character consistency and maintain a warm, child-safe picture-book tone.",
-            "Do not include text, captions, letters, speech bubbles, logos, or watermarks.",
-            "This must look like a premium finished picture-book illustration, not a sketch, thumbnail, draft, storyboard, or unfinished render.",
-            f"Story title: {item.storyboard.title}",
-            f"Story synopsis: {item.storyboard.synopsis}",
-            f"Page number: {item.pageNumber}",
+            "Style prompt:",
+            item.stylePrompt,
+            "",
+            "Create a finished full-color children's book illustration.",
+            "Follow image 1 as closely as possible without changing the scene, composition, framing, camera angle, character placement, pose, scale, object placement, or story action.",
+            "Apply only the rendering style from the style prompt.",
+            "Do not add or remove visual elements.",
+            "Absolutely no visible text anywhere in the image.",
             f"Scene summary: {item.page.sceneSummary}",
-            f"Page English text: {item.page.englishText}",
-            f"Page Korean text: {item.page.koreanText}",
-            f"Base scene prompt: {item.page.imagePrompt}",
-            f"Main children: {child_descriptions}",
-            f"Companions in scene: {companions}",
-            f"Style direction prompt: {item.stylePrompt}",
+            f"Scene intent: {item.page.imagePrompt}",
             f"Additional instruction: {additional_instruction}",
-            "Rendering goals:",
-            "- preserve storyboard composition broadly, not rigidly",
-            "- apply style references only to final rendering style",
-            "- emotionally clear acting and readable silhouettes",
-            "- cohesive lighting and color harmony",
-            "- rich but controlled environmental detail",
-            "- no extra characters",
-            "- no major composition drift",
-            "- absolutely no visible text anywhere in the image",
-            "- no letters, words, captions, typography, signage, labels, title text, subtitles, or speech bubbles",
-            "- if any object would normally contain text, render it as blank abstract texture with no readable characters",
         ]
     )
 
@@ -216,14 +184,6 @@ def _collect_reference_images(item: FinalIllustrationGenerateItemRequest) -> lis
     rough_reference = _resolve_reference_string(item.roughStoryboardImageUrl, item.roughStoryboardImageS3Key)
     if rough_reference:
         images.append(rough_reference)
-
-    for s3_key in item.styleImageS3Keys[:3]:
-        resolved = _resolve_reference_string(None, s3_key)
-        if resolved:
-            images.append(resolved)
-    for url in item.styleImageUrls[:3]:
-        if url:
-            images.append(url)
 
     if not images:
         raise ValueError("At least one rough storyboard reference image is required.")

@@ -35,8 +35,6 @@ class FinalIllustrationGenerateItemRequest(BaseModel):
     companions: list[str] = Field(default_factory=list)
     roughStoryboardImageUrl: str | None = Field(default=None, max_length=2000)
     roughStoryboardImageS3Key: str | None = Field(default=None, max_length=1000)
-    styleImageUrls: list[str] = Field(default_factory=list, max_length=3)
-    styleImageS3Keys: list[str] = Field(default_factory=list, max_length=3)
     stylePrompt: str = Field(..., min_length=1, max_length=2000)
     additionalInstruction: str | None = Field(default=None, max_length=2000)
 

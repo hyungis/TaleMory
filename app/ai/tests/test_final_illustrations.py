@@ -24,7 +24,6 @@ def _sample_item() -> FinalIllustrationGenerateItemRequest:
         children=[{"name": "Lina", "age": 7, "gender": "FEMALE"}],
         companions=["mom", "dad"],
         roughStoryboardImageUrl="https://example.com/rough.png",
-        styleImageUrls=["https://example.com/style.png"],
         stylePrompt="Soft watercolor picture-book illustration with warm sunlight.",
         additionalInstruction="Keep Lina centered.",
     )
@@ -35,11 +34,12 @@ def test_build_final_prompt_separates_composition_and_style_roles() -> None:
 
     assert "The rough storyboard image is the composition blueprint." in prompt
     assert "Do not redesign the scene from scratch." in prompt
+    assert "There are no style reference images in this workflow. Derive style only from the style prompt." in prompt
     assert "Style direction prompt: Soft watercolor picture-book illustration with warm sunlight." in prompt
     assert "Additional instruction: Keep Lina centered." in prompt
 
 
-def test_build_replicate_input_orders_references_with_rough_first() -> None:
+def test_build_replicate_input_uses_only_rough_storyboard_reference() -> None:
     payload = _build_replicate_input(
         item=_sample_item(),
         seed=1234,
@@ -48,6 +48,5 @@ def test_build_replicate_input_orders_references_with_rough_first() -> None:
     )
 
     assert payload["prompt"] == "test prompt"
-    assert payload["images"][0] == "https://example.com/rough.png"
-    assert payload["images"][1] == "https://example.com/style.png"
+    assert payload["images"] == ["https://example.com/rough.png"]
     assert payload["seed"] == 1234
