@@ -23,12 +23,14 @@ import {
   commitOutroVoice,
   type SceneDto,
 } from '../api/highlightOutroApi'
+import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 
 interface HighlightOutroStepProps {
   storyId?: number | null
   projectData: StoryProject
   onBack: () => void
   onNext: () => void
+  setStoryGenerationJobId: (jobId: number | null) => void
 }
 
 interface HighlightSentence {
@@ -70,7 +72,10 @@ export function HighlightOutroStep({
   projectData,
   onBack,
   onNext,
+  setStoryGenerationJobId,
 }: HighlightOutroStepProps) {
+  const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
+  const [confirmError, setConfirmError] = useState<string | null>(null)
   // --- 씬 데이터 (백엔드 연동 시 사용) ---
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(false)
@@ -299,6 +304,30 @@ export function HighlightOutroStep({
       setOutroSaving(false)
     }
   }, [storyId, outroText, outroSignature])
+
+  const handleNext = useCallback(async () => {
+    if (!storyId) return
+    setConfirmError(null)
+    try {
+      // 1) 아웃트로 저장 (텍스트가 있는 경우)
+      if (outroText.trim()) {
+        await saveOutro(storyId, outroText.trim(), outroSignature.trim() || null)
+      }
+      // 2) storyboard confirm → TTS 잡 시작
+      const job = await confirmStoryboard(storyId)
+      // 3) jobId 부모로 전달
+      setStoryGenerationJobId(job.jobId)
+      // 4) Step 8 진입
+      onNext()
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string }
+      if (apiErr?.status === 409) {
+        setConfirmError('선행 단계가 완료되지 않았습니다. 이전 단계를 확인해 주세요.')
+      } else {
+        setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했습니다.')
+      }
+    }
+  }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, onNext])
 
   const playAudio = useCallback((url: string) => {
     if (audioRef.current) {
@@ -641,20 +670,31 @@ export function HighlightOutroStep({
             </div>
 
             {/* 하단 네비 */}
-            <div className="mt-10 flex justify-between items-center w-full bg-[#2a1b12]/70 p-4 rounded-full shadow-sm border-2 border-[#4a3a24]">
+            {confirmError && (
+              <p className="mt-4 text-center text-sm font-bold text-[#8b3a2a] bg-[#f0e6c0] rounded-2xl px-4 py-3 border-2 border-[#8b3a2a]/40">
+                {confirmError}
+              </p>
+            )}
+            <div className="mt-4 flex justify-between items-center w-full bg-[#2a1b12]/70 p-4 rounded-full shadow-sm border-2 border-[#4a3a24]">
               <button
                 type="button"
                 onClick={onBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors"
+                disabled={isConfirming}
+                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 이전 단계
               </button>
               <button
                 type="button"
-                onClick={onNext}
-                className="bg-[#2d5a27] text-[#f0e6c0] text-xl px-10 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all flex items-center gap-2 font-bold"
+                onClick={() => void handleNext()}
+                disabled={isConfirming}
+                className="bg-[#2d5a27] text-[#f0e6c0] text-xl px-10 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all flex items-center gap-2 font-bold disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)]"
               >
-                완성 미리보기 <ArrowRight className="w-5 h-5" />
+                {isConfirming ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> 동화책 만드는 중...</>
+                ) : (
+                  <>완성 미리보기 <ArrowRight className="w-5 h-5" /></>
+                )}
               </button>
             </div>
           </div>

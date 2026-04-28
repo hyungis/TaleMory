@@ -157,6 +157,7 @@ export function CreationPage() {
           projectData={flow.projectData}
           onBack={handleBack}
           onNext={flow.handleNext}
+          setStoryGenerationJobId={flow.setStoryGenerationJobId}
         />
       )}
 
