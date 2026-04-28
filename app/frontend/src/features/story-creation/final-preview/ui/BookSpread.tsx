@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImageOff, Pause, Play, Quote, Volume2 } from 'lucide-react'
 import type { SceneDto } from '../../highlight-outro/api/highlightOutroApi'
 
@@ -79,6 +79,11 @@ export function BookSpread({ scene, pageIndex }: BookSpreadProps) {
 function TtsPlayer({ src }: { src: string }) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
+
+  useEffect(() => {
+    audioRef.current?.pause()
+    setPlaying(false)
+  }, [src])
 
   const toggle = useCallback(() => {
     const audio = audioRef.current
