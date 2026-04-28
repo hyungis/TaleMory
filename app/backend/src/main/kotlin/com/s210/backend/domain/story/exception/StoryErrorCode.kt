@@ -15,4 +15,7 @@ enum class StoryErrorCode(
     STORY_ACCESS_FORBIDDEN(HttpStatus.FORBIDDEN, "STORY_005", "해당 동화에 접근할 권한이 없습니다."),
     INVALID_STORY_STATE(HttpStatus.CONFLICT, "STORY_006", "현재 상태에서는 수행할 수 없습니다."),
     STYLE_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_007", "존재하지 않는 삽화 스타일입니다."),
+    SUMMARY_REQUIRED(HttpStatus.BAD_REQUEST, "STORY_008", "줄거리(요약) 생성을 먼저 완료해야 합니다."),
+    SUMMARY_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_009", "재생성할 직전 줄거리(요약)가 없습니다."),
+    STORY_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "STORY_010", "본문 생성이 이미 진행 중입니다."),
 }

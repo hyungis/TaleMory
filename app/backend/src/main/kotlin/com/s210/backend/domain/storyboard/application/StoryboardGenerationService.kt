@@ -19,13 +19,17 @@ import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
 import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.application.dto.StoryGenerateJobMessage
 import com.s210.backend.domain.storyboard.application.dto.StoryGeneratePayload
+import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
+import com.s210.backend.domain.storyboard.application.dto.SummaryMeta
 import com.s210.backend.domain.storyboard.application.dto.TravelInfo
 import java.time.LocalDate
+import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ObjectNode
 /**
  * 동화 본문(텍스트) 생성 요청을 MQ 로 비동기 발송하는 유스케이스.
  * API 명세 #28 `POST /api/stories/{storyId}/storyboard/story` 의 서비스 레이어.
@@ -52,9 +56,49 @@ class StoryboardGenerationService(
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     fun generate(userId: Long, storyId: Long, prompt: String?): StartGenerationResult {
+        log.info(
+            "[STORY:GEN] entry — userId={}, storyId={}, hasPrompt={}",
+            userId, storyId, !prompt.isNullOrBlank(),
+        )
         val story = ownedStory(userId, storyId)
+
+        // [본문 발행 가드 1 — race 차단, plan D7-A]
+        // 활성 본문 잡(PENDING/RUNNING) 이 존재하면 즉시 거부 (race 가 더 일찍 cheap 한 fail).
+        val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeStoryJob != null) {
+            log.warn("[STORY:GEN] blocked — active job exists jobId={}", activeStoryJob.id)
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
+        // [본문 발행 가드 2 — SUMMARY 선결]
+        // SUCCESS 줄거리 잡 존재 검증 + result_payload(영문 메타) 로드.
+        val summaryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS,
+        ) ?: throw BusinessException(StoryErrorCode.SUMMARY_REQUIRED)
+        val summaryPayload = objectMapper.readValue(
+            summaryJob.resultPayload!!,
+            StorySummaryPayload::class.java,
+        )
+        // 옵션 ② — 사용자가 Step 3 에서 편집한 한글 줄거리(stories.synopsis)를 우선 source 로.
+        // synopsis 가 비어있으면 (옛날 데이터 또는 생성 직후) result_payload.summaryKo 로 fallback.
+        // AI 워커는 ApprovedStorySummary.summary 와 .summaryKo 둘 다 required 라 schema 통과를 위해
+        // 한글 줄거리를 양쪽 필드에 동일하게 복사 — AI 가 자연스럽게 한글을 ground 로 본문 생성.
+        val canonicalSummaryKo = story.synopsis?.takeIf { it.isNotBlank() }
+            ?: summaryPayload.summaryKo
+        val summaryMeta = SummaryMeta(
+            title = summaryPayload.title,
+            summary = canonicalSummaryKo,
+            summaryKo = canonicalSummaryKo,
+            moralTheme = summaryPayload.moralTheme,
+            storyQuest = summaryPayload.storyQuest,
+            recurringMotif = summaryPayload.recurringMotif,
+            keyEmotionalBeats = summaryPayload.keyEmotionalBeats,
+        )
 
         // Step 1 이 완료되지 않은 스토리는 AI 에 유의미한 payload 를 만들 수 없음.
         val travelPlace = story.travelPlace?.takeIf { it.isNotBlank() }
@@ -97,6 +141,7 @@ class StoryboardGenerationService(
             },
             difficulty = story.difficulty.name,
             additionalInstruction = prompt?.trim()?.takeIf { it.isNotEmpty() },
+            approvedSummary = summaryMeta,
         )
 
         // request_payload 컬럼에는 AI 에 보낸 페이로드를 그대로 저장 — 재생성/디버깅/재현성 확보.
@@ -121,6 +166,11 @@ class StoryboardGenerationService(
             RabbitMQConfig.REQUEST_EXCHANGE,
             RoutingKeys.STORY_GENERATE,
             envelope,
+        )
+        log.info(
+            "[STORY:GEN] published — jobId={}, storyId={}, routingKey={}, photos={}, children={}, summarySrcJobId={}",
+            job.id, storyId, RoutingKeys.STORY_GENERATE,
+            photos.size, children.size, summaryJob.id,
         )
 
         return StartGenerationResult(
@@ -158,20 +208,22 @@ class StoryboardGenerationService(
             .mapNotNull { it.trim().takeIf { t -> t.isNotEmpty() } }
 
     /**
-     * 유저가 편집한 스토리(줄거리)를 저장한다 — API 명세 #29.
+     * 유저가 Step 3 에서 편집한 한글 줄거리(summary) 를 저장한다 — 옵션 ② 디자인.
      *
-     *  - 같은 storyId 에 story_board 가 여러 건 있을 수 있으므로 (재생성 이력),
-     *    가장 최근 row 를 대상으로 업데이트한다.
-     *  - `story_board.story` 는 VARCHAR(255) 라 길면 잘리지만, 전체 원문은
-     *    `stories.synopsis` (TEXT) 에 그대로 보존한다.
-     *  - `updateAt` 을 오늘 날짜로 갱신.
+     * 세 곳을 모두 sync 해야 본문 generate 와 summary 조회가 일관됨:
+     *  1. `stories.synopsis` (TEXT) — 본문 generate 의 한글 grounding source.
+     *  2. `story_board.story` (TEXT, V6 이전엔 VARCHAR 255) — backup 사본.
+     *  3. `story_generation_jobs.result_payload.summaryKo` (JSON) — generate 가 fallback 으로 읽으니
+     *     동기화하지 않으면 stories.synopsis 비었을 때 옛 한글이 본문 grounding 으로 들어감.
+     *
+     *  `updateAt` 을 오늘 날짜로 갱신. 빈 입력 → INVALID_INPUT.
      */
-    fun editStory(userId: Long, storyId: Long, newStory: String): StoryBoardResult {
+    fun editSummary(userId: Long, storyId: Long, newSummaryKo: String): StoryBoardResult {
         ownedStory(userId, storyId)
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
-        val trimmed = newStory.trim()
+        val trimmed = newSummaryKo.trim()
         if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
         storyBoard.story = trimmed
@@ -179,6 +231,26 @@ class StoryboardGenerationService(
 
         storyRepository.findById(storyId).ifPresent { story ->
             story.synopsis = trimmed
+        }
+
+        // 가장 최근 SUMMARY SUCCESS 잡의 result_payload.summaryKo 를 JSON_SET 으로 동기화.
+        // generate() 의 fallback (stories.synopsis 가 비어있을 때) 경로와 일치시킴.
+        jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS,
+        )?.let { latestSummaryJob ->
+            val rawJson = latestSummaryJob.resultPayload
+            if (!rawJson.isNullOrBlank()) {
+                runCatching {
+                    val tree = objectMapper.readTree(rawJson) as ObjectNode
+                    tree.put("summaryKo", trimmed)
+                    latestSummaryJob.resultPayload = objectMapper.writeValueAsString(tree)
+                }.onFailure { e ->
+                    log.warn(
+                        "Failed to JSON_SET summaryKo on summary job {}: {}",
+                        latestSummaryJob.id, e.message,
+                    )
+                }
+            }
         }
 
         return StoryBoardResult.from(storyBoard)

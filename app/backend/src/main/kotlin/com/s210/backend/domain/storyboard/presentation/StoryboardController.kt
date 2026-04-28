@@ -5,14 +5,17 @@ import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.storyboard.application.StoryboardGenerationService
 import com.s210.backend.domain.storyboard.application.StoryboardImageGenerationService
 import com.s210.backend.domain.storyboard.application.StoryboardPageService
+import com.s210.backend.domain.storyboard.application.StoryboardSummaryService
+import com.s210.backend.domain.storyboard.application.SummaryResponseData
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
 import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPageResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPagesResult
 import com.s210.backend.domain.storyboard.presentation.request.GenerateStoryRequest
 import com.s210.backend.domain.storyboard.presentation.request.RegenerateStoryboardImageRequest
-import com.s210.backend.domain.storyboard.presentation.request.UpdateStoryRequest
+import com.s210.backend.domain.storyboard.presentation.request.RegenerateSummaryRequest
 import com.s210.backend.domain.storyboard.presentation.request.UpdateStoryboardPageRequest
+import com.s210.backend.domain.storyboard.presentation.request.UpdateStoryboardSummaryRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -38,6 +41,7 @@ class StoryboardController(
     private val storyboardGenerationService: StoryboardGenerationService,
     private val storyboardPageService: StoryboardPageService,
     private val storyboardImageGenerationService: StoryboardImageGenerationService,
+    private val storyboardSummaryService: StoryboardSummaryService,
 ) {
 
     /**
@@ -60,20 +64,26 @@ class StoryboardController(
     }
 
     /**
-     * API 명세 #29 — 스토리보드 줄거리(본문) 직접 수정.
-     * 유저가 Step 3 result 화면에서 textarea 를 편집한 뒤 onBlur 시점에 호출된다.
-     * 동기 처리 — 즉시 DB 에 반영된 메타를 반환.
+     * 스토리보드 줄거리(요약) 직접 수정 — 옵션 ② 디자인.
+     *
+     * 유저가 Step 3 result 화면에서 한글 줄거리(summaryKo) textarea 를 편집한 뒤 onBlur 호출.
+     * 동기 처리 — 즉시 DB(stories.synopsis / story_board.story / latest summary job's result_payload)
+     * 세 곳에 sync 후 반영된 메타 반환.
+     *
+     * NOTE: 옛 endpoint `PATCH /storyboard/story` 는 "본문 직접 수정" 의미였는데,
+     * 옵션 ② 디자인에서 본문은 storyboard_pages 단일 source 가 됐으므로 의미가 사라짐 →
+     * 이 endpoint 가 실질적으로 그 역할을 대체하며 의미를 "줄거리(summary) 편집" 으로 명확화.
      */
-    @PatchMapping("/story")
-    fun storyboardStoryUpdate(
+    @PatchMapping("/summary")
+    fun storyboardSummaryUpdate(
         @AuthenticationPrincipal user: CustomUser,
         @PathVariable storyId: Long,
-        @Valid @RequestBody request: UpdateStoryRequest,
+        @Valid @RequestBody request: UpdateStoryboardSummaryRequest,
     ): ResponseEntity<ApiResponse<StoryBoardResult>> {
-        val result = storyboardGenerationService.editStory(
+        val result = storyboardGenerationService.editSummary(
             userId = user.userId,
             storyId = storyId,
-            newStory = request.story,
+            newSummaryKo = request.summaryKo,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
     }
@@ -153,5 +163,68 @@ class StoryboardController(
             userPrompt = request.userPrompt,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
+    }
+
+    /**
+     * 스토리보드 줄거리(요약) 생성 요청.
+     *
+     * 본문 생성과 동일하게 사진/주인공/여행정보를 DB 에서 조립해 AI 로 보낸다.
+     * request body 는 옵션 — 사용자 자유 프롬프트가 있으면 `additionalInstruction` 으로 전달.
+     * HTTP 202 Accepted — FE 는 응답 jobId 로 `/api/generation-jobs/{jobId}` polling.
+     */
+    @PostMapping("/summary")
+    fun storyboardSummaryGenerate(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @RequestBody(required = false) request: GenerateStoryRequest?,
+    ): ResponseEntity<ApiResponse<StartGenerationResult>> {
+        val result = storyboardSummaryService.generateSummary(
+            userId = user.userId,
+            storyId = storyId,
+            prompt = request?.prompt,
+        )
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
+    }
+
+    /**
+     * 스토리보드 줄거리(요약) 재생성 요청.
+     *
+     * 직전 SUCCESS payload + 사용자 자유 프롬프트로 새 잡을 발행.
+     * 직전 SUCCESS 가 없으면 404 (`SUMMARY_NOT_FOUND`).
+     * HTTP 202 Accepted.
+     */
+    @PostMapping("/summary/regenerate")
+    fun storyboardSummaryRegenerate(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @Valid @RequestBody request: RegenerateSummaryRequest,
+    ): ResponseEntity<ApiResponse<StartGenerationResult>> {
+        val result = storyboardSummaryService.regenerateSummary(
+            userId = user.userId,
+            storyId = storyId,
+            userPrompt = request.userPrompt,
+        )
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
+    }
+
+    /**
+     * 스토리보드 줄거리(요약) 조회.
+     *
+     * 가장 최근 STORYBOARD_STORY_SUMMARY 잡 1건 (status 무관) 을 보고 응답.
+     * - 잡 없음        → `(null, null, null)`
+     * - PENDING/RUNNING → `(null, status, jobId)`
+     * - SUCCESS        → `(storyBoard.story, "SUCCESS", jobId)`
+     * - FAILED         → `(직전 SUCCESS storyBoard.story 또는 null, "FAILED", jobId)`
+     */
+    @GetMapping("/summary")
+    fun storyboardSummaryGet(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<SummaryResponseData>> {
+        val result = storyboardSummaryService.findSummary(
+            userId = user.userId,
+            storyId = storyId,
+        )
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 }
