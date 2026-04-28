@@ -246,11 +246,7 @@ def _create_and_wait_for_prediction(replicate_input: dict) -> dict:
 
 def _create_prediction(replicate_input: dict) -> dict:
     payload = {"input": replicate_input}
-    if settings.FINAL_ILLUSTRATION_REPLICATE_VERSION:
-        api_url = f"{_REPLICATE_API_BASE}/predictions"
-        payload["version"] = settings.FINAL_ILLUSTRATION_REPLICATE_VERSION
-    else:
-        api_url = f"{_REPLICATE_API_BASE}/models/{_quote_model_path(settings.FINAL_ILLUSTRATION_MODEL)}/predictions"
+    api_url = f"{_REPLICATE_API_BASE}/models/{_quote_model_path(settings.FINAL_ILLUSTRATION_MODEL)}/predictions"
     return _replicate_request(api_url, payload, method="POST")
 
 
@@ -316,15 +312,15 @@ def _upload_and_resolve_url(story_id: int, item: FinalIllustrationGenerateItemRe
         _upload_to_s3(object_path, image_bytes)
         return _resolve_final_public_url(object_path)
 
-    public_url = _join_base_url(settings.FINAL_ILLUSTRATION_PUBLIC_BASE_URL, object_path)
+    public_url = _join_base_url(settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL, object_path)
     if public_url:
         return public_url
     return f"local://final-illustrations/{object_path}"
 
 
 def _resolve_final_public_url(object_path: str) -> str:
-    if settings.FINAL_ILLUSTRATION_PUBLIC_BASE_URL:
-        return _join_base_url(settings.FINAL_ILLUSTRATION_PUBLIC_BASE_URL, object_path) or object_path
+    if settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL:
+        return _join_base_url(settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL, object_path) or object_path
     return _resolve_public_url(object_path)
 
 
