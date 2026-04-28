@@ -22,7 +22,6 @@ import {
   presignOutroVoice,
   commitOutroVoice,
   type SceneDto,
-  type SentenceDto,
 } from '../api/highlightOutroApi'
 
 interface HighlightOutroStepProps {
