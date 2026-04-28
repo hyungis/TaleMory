@@ -151,6 +151,46 @@ class S3Service(
         )
     }
 
+    /**
+     * 강조 녹음 업로드용 presigned PUT URL 발급.
+     * key 규칙: `stories/{storyId}/highlight-voices/{sentenceId}/{uuid}.{ext}`.
+     */
+    fun presignHighlightVoicePutUrl(storyId: Long, sentenceId: Long, contentType: String): PresignedUpload {
+        val extension = audioExtensionOf(contentType)
+        val key = "stories/$storyId/highlight-voices/$sentenceId/${UUID.randomUUID()}.$extension"
+        return presignAudioPutUrl(key, contentType)
+    }
+
+    /**
+     * 아웃트로 녹음 업로드용 presigned PUT URL 발급.
+     * key 규칙: `stories/{storyId}/outro-voice/{uuid}.{ext}`.
+     */
+    fun presignOutroVoicePutUrl(storyId: Long, contentType: String): PresignedUpload {
+        val extension = audioExtensionOf(contentType)
+        val key = "stories/$storyId/outro-voice/${UUID.randomUUID()}.$extension"
+        return presignAudioPutUrl(key, contentType)
+    }
+
+    private fun presignAudioPutUrl(key: String, contentType: String): PresignedUpload {
+        val putRequest = PutObjectRequest.builder()
+            .bucket(bucket)
+            .key(key)
+            .contentType(contentType)
+            .build()
+        val signatureDuration = Duration.ofMinutes(5)
+        val presigned = s3Presigner.presignPutObject(
+            PutObjectPresignRequest.builder()
+                .signatureDuration(signatureDuration)
+                .putObjectRequest(putRequest)
+                .build()
+        )
+        return PresignedUpload(
+            uploadUrl = presigned.url().toString(),
+            s3Key = key,
+            expiresAt = Instant.now().plus(signatureDuration),
+        )
+    }
+
     private fun extensionOf(contentType: String): String = when (contentType.lowercase()) {
         "image/jpeg", "image/jpg" -> "jpg"
         "image/png" -> "png"
