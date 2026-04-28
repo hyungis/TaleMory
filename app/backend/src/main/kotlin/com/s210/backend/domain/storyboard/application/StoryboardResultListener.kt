@@ -14,6 +14,8 @@ import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
+import com.s210.backend.domain.tts.application.TtsResultHandler
+import com.s210.backend.domain.tts.application.dto.StoryTtsResultEnvelope
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
 import org.springframework.amqp.rabbit.annotation.RabbitListener
@@ -46,6 +48,7 @@ class StoryboardResultListener(
     private val storyboardPageRepository: StoryboardPageRepository,
     private val storyRepository: StoryRepository,
     private val objectMapper: ObjectMapper,
+    private val ttsResultHandler: TtsResultHandler,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -66,6 +69,7 @@ class StoryboardResultListener(
                 "REGENERATE_STORYBOARD_IMAGE_COMPLETED", "REGENERATE_STORYBOARD_IMAGE_FAILED",
             )
             val STORY = setOf("GENERATE_STORY_COMPLETED", "GENERATE_STORY_FAILED")
+            val TTS = setOf("GENERATE_TTS_COMPLETED", "GENERATE_TTS_FAILED")
         }
     }
 
@@ -112,6 +116,14 @@ class StoryboardResultListener(
                     type, envelope.jobId, envelope.storyId, envelope.status,
                 )
                 handleStoryResult(envelope)
+            }
+            in EnvelopeTypes.TTS -> {
+                val envelope = objectMapper.treeToValue(tree, StoryTtsResultEnvelope::class.java)
+                log.info(
+                    "[TTS:RES] received — type={}, jobId={}, storyId={}, status={}",
+                    type, envelope.jobId, envelope.storyId, envelope.status,
+                )
+                ttsResultHandler.handle(envelope)
             }
             else -> log.warn("Unknown envelope type='{}', body={}", type, body)
         }
