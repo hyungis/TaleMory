@@ -124,6 +124,18 @@ class HighlightOutroService(
 
     // ── 아웃트로 ──
 
+    @Transactional(readOnly = true)
+    fun findOutro(storyId: Long): OutroResponse? {
+        verifyStoryExists(storyId)
+        val outro = storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId) ?: return null
+        return OutroResponse(
+            id = outro.id,
+            outroText = outro.outroText,
+            audioUrl = outro.audioUrl,
+            signature = outro.signature,
+        )
+    }
+
     fun modifyOutro(storyId: Long, outroText: String, signature: String?): OutroResponse {
         verifyStoryExists(storyId)
 

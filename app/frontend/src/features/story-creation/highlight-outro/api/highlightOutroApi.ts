@@ -46,6 +46,11 @@ export async function getScenes(storyId: number): Promise<SceneDto[]> {
   return get<SceneDto[]>(`/stories/${storyId}/scenes`)
 }
 
+/** GET /api/stories/{storyId}/outro */
+export async function getOutro(storyId: number): Promise<OutroDto | null> {
+  return get<OutroDto | null>(`/stories/${storyId}/outro`)
+}
+
 // ── Highlight Voice (3-phase) ──
 
 /** Phase 1: presigned PUT URL 발급 */
