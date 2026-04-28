@@ -16,4 +16,7 @@ enum class JobType {
      * AI 워커가 페이지당 1장씩 비동기로 생성 → ai.result.image.* 라우팅키로 결과 수신.
      */
     STORYBOARD_IMAGE,
+
+    /** 스토리보드 줄거리(요약) 생성 작업 — V9 ENUM 추가. */
+    STORYBOARD_STORY_SUMMARY,
 }
