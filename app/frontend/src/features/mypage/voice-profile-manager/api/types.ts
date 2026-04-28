@@ -7,6 +7,8 @@ export interface VoiceProfileResponse {
   title?: string
   audioUrl?: string | null
   ttsVoiceUrl?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export function mapVoiceProfile(payload: VoiceProfileResponse): VoiceProfile {
@@ -16,5 +18,7 @@ export function mapVoiceProfile(payload: VoiceProfileResponse): VoiceProfile {
     title: typeof payload.title === 'string' ? payload.title : '',
     audioUrl: typeof payload.audioUrl === 'string' ? payload.audioUrl : '',
     ttsVoiceUrl: typeof payload.ttsVoiceUrl === 'string' ? payload.ttsVoiceUrl : undefined,
+    createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : undefined,
+    updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : undefined,
   }
 }

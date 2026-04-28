@@ -30,11 +30,8 @@ import '../../features/bookshelf/styles/bookshelf.css'
  *
  * 동화 생성 플로우의 `VoiceCloneStep` UI 를 기반으로 하되, 문맥에 맞춰 포팅:
  *  - "STEP 06" 스텝 카운터 헤더 → "마이페이지로" back 버튼 + "목소리 추가" 타이틀
- *  - "동화책 만들기" CTA → 저장 후 자동으로 /mypage 복귀
- *  - localStorage 키 분리 (useVoiceClone 이 'talemory_mypage_*' 키 사용)
- *
- * 훅(useVoiceClone)과 상수(voiceDefaults)는 동화 생성 플로우의 동명 파일을 복사한 것.
- * 향후 API 연동 시 POST /api/voice-profiles 호출로 localStorage 저장을 대체.
+ *  - "동화책 만들기" CTA → 서버 저장 후 자동으로 /mypage 복귀
+ *  - POST /api/voice-profiles/presigned-url → S3 PUT → POST /api/voice-profiles 저장
  */
 export function VoiceCloneAddPage() {
   const navigate = useNavigate()
@@ -54,8 +51,8 @@ export function VoiceCloneAddPage() {
 
   const goBack = () => navigate(ROUTES.mypage)
 
-  const handleSave = () => {
-    const name = vc.saveVoiceRecording()
+  const handleSave = async () => {
+    const name = await vc.saveVoiceRecording()
     if (name) goBack() // 저장 성공 시 마이페이지 복귀
   }
 
@@ -298,11 +295,11 @@ export function VoiceCloneAddPage() {
                     />
                     <button
                       type="button"
-                      onClick={handleSave}
-                      disabled={!vc.recordedAudioUrl}
+                      onClick={() => void handleSave()}
+                      disabled={!vc.recordedAudioUrl || vc.isSaving}
                       className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all flex items-center justify-center gap-2 font-bold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#1a3a14]"
                     >
-                      <Save className="w-4 h-4" /> 저장하고 돌아가기
+                      <Save className="w-4 h-4" /> {vc.isSaving ? '저장 중...' : '저장하고 돌아가기'}
                     </button>
                   </div>
 

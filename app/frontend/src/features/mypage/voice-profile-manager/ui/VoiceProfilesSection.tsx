@@ -4,6 +4,7 @@ import type { VoiceProfile } from '../../../../entities/voice-profile'
 interface Props {
   voiceProfiles: VoiceProfile[]
   onAddClick: () => void
+  onDetailsClick?: (profile: VoiceProfile) => void
   onEditClick?: (profile: VoiceProfile) => void
   onDeleteClick?: (profile: VoiceProfile) => void
   isLoading?: boolean
@@ -13,6 +14,7 @@ interface Props {
 export function VoiceProfilesSection({
   voiceProfiles,
   onAddClick,
+  onDetailsClick,
   onEditClick,
   onDeleteClick,
   isLoading = false,
@@ -45,6 +47,7 @@ export function VoiceProfilesSection({
             <VoiceProfileCard
               key={profile.id}
               profile={profile}
+              onDetails={onDetailsClick}
               onEdit={onEditClick}
               onDelete={onDeleteClick}
               isBusy={isBusy}
@@ -58,11 +61,13 @@ export function VoiceProfilesSection({
 
 function VoiceProfileCard({
   profile,
+  onDetails,
   onEdit,
   onDelete,
   isBusy,
 }: {
   profile: VoiceProfile
+  onDetails?: (profile: VoiceProfile) => void
   onEdit?: (profile: VoiceProfile) => void
   onDelete?: (profile: VoiceProfile) => void
   isBusy: boolean
@@ -84,6 +89,16 @@ function VoiceProfileCard({
           </p>
         </div>
         <div className="flex gap-1 shrink-0">
+          {onDetails && (
+            <button
+              type="button"
+              onClick={() => onDetails(profile)}
+              disabled={isBusy}
+              className="px-2 py-1 rounded-md text-xs text-[#b4c4a4] hover:bg-[#4a3a24] hover:text-[#e4d4b4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              상세
+            </button>
+          )}
           {onEdit && (
             <button
               type="button"

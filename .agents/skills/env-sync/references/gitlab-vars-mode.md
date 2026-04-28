@@ -302,3 +302,29 @@ RABBITMQ_IMAGE_GENERATE_QUEUE=ai.image.generate.request.queue
 - **체크박스 무단 수정 금지** — "**실제 등록 완료한 사람이 commit**" 규칙 유지.
 - **ENV_BASE_* 판정은 수동** — 스킬은 환경별 분리만 하고 BASE 는 빈 섹션 유지. 공통값 생기면 사용자가 README 수정 후 재생성.
 - **하이브리드 키(`ENV_<TARGET>_<SCOPE>_ENV_FILE`) 는 자동 생성 대상 아님** — 사용자가 GitLab UI 에 직접 등록. 스킬은 어떤 값을 코드 블록에 넣을지 안내만.
+
+## Mandatory formatting invariant
+
+`gitlab-vars` MUST treat newly added non-sensitive File Variable keys as an append-only visual group in `docs/gitlab-variables.md`.
+
+- Determine `new_lines` by comparing each generated File Variable env block with the previous `docs/gitlab-variables.md` env block for the same target/scope.
+- Emit all existing non-sensitive keys first.
+- If `new_lines` is non-empty, insert exactly one blank line after the final existing key.
+- Emit `new_lines` after that blank line, with no blank lines between new keys.
+- Do not place a newly added non-sensitive key directly adjacent to existing keys, even when it is semantically related.
+- This invariant is verified by the visible shape of the env block: `existing keys`, then one empty line, then `new keys`.
+
+Bad:
+
+```env
+AI_WORKER_REPLICAS=1
+STORYBOARD_SUMMARY_MODEL=gpt-5-nano
+```
+
+Good:
+
+```env
+AI_WORKER_REPLICAS=1
+
+STORYBOARD_SUMMARY_MODEL=gpt-5-nano
+```

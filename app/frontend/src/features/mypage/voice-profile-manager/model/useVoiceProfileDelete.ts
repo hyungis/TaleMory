@@ -7,8 +7,9 @@ export function useVoiceProfileDelete() {
 
   return useMutation<void, ApiError, number>({
     mutationFn: deleteVoiceProfile,
-    onSuccess: () => {
+    onSuccess: (_data, voiceProfileId) => {
       queryClient.invalidateQueries({ queryKey: ['voiceProfiles'] })
+      queryClient.removeQueries({ queryKey: ['voiceProfile', voiceProfileId] })
     },
   })
 }

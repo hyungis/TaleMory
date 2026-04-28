@@ -34,6 +34,7 @@ export {
 } from './storyboard-editor'
 export { StyleSelectorStep } from './style-selector'
 export { VoiceCloneStep } from './voice-clone'
+export { HighlightOutroStep } from './highlight-outro'
 export { FinalPreviewStep } from './final-preview'
 export { PublishStoryStep } from './publish-story'
 export { StepHeader } from './ui/StepHeader'

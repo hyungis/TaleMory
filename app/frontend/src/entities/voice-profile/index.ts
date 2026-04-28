@@ -8,4 +8,6 @@ export interface VoiceProfile {
   title: string
   audioUrl: string
   ttsVoiceUrl?: string
+  createdAt?: string
+  updatedAt?: string
 }

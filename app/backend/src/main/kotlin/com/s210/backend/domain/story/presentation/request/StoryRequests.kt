@@ -69,6 +69,18 @@ data class OutroRequest(
     val signature: String?
 )
 
+data class PresignedUrlRequest(
+    val contentType: String = "audio/webm",
+)
+
+data class HighlightVoiceCommitRequest(
+    val s3Key: String,
+)
+
+data class OutroVoiceCommitRequest(
+    val s3Key: String,
+)
+
 data class ProgressRequest(
     val lastScenePage: Int
 )

@@ -15,4 +15,6 @@ enum class StoryErrorCode(
     STORY_ACCESS_FORBIDDEN(HttpStatus.FORBIDDEN, "STORY_005", "해당 동화에 접근할 권한이 없습니다."),
     INVALID_STORY_STATE(HttpStatus.CONFLICT, "STORY_006", "현재 상태에서는 수행할 수 없습니다."),
     STYLE_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_007", "존재하지 않는 삽화 스타일입니다."),
+    SENTENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_008", "문장을 찾을 수 없습니다."),
+    HIGHLIGHT_VOICE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_009", "강조 녹음을 찾을 수 없습니다."),
 }
