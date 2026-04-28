@@ -6,19 +6,19 @@ from app.schemas.final_illustration import (
     FinalIllustrationGenerateItemRequest,
     FinalIllustrationGenerateRequest,
     FinalIllustrationGenerateResult,
-    FinalIllustrationRegenerateRequest,
     FinalIllustrationRenderOptions,
+    FinalIllustrationReviseRequest,
 )
 
 
 FinalIllustrationJobType = Literal["FINAL_ILLUSTRATION"]
 FinalIllustrationSuccessType = Literal[
     "GENERATE_FINAL_ILLUSTRATION_COMPLETED",
-    "REGENERATE_FINAL_ILLUSTRATION_COMPLETED",
+    "REVISE_FINAL_ILLUSTRATION_COMPLETED",
 ]
 FinalIllustrationFailureType = Literal[
     "GENERATE_FINAL_ILLUSTRATION_FAILED",
-    "REGENERATE_FINAL_ILLUSTRATION_FAILED",
+    "REVISE_FINAL_ILLUSTRATION_FAILED",
 ]
 
 
@@ -42,11 +42,11 @@ class FinalIllustrationGenerateItemJobMessage(BaseModel):
     payload: FinalIllustrationGenerateItemJobPayload
 
 
-class FinalIllustrationRegenerateJobMessage(BaseModel):
+class FinalIllustrationReviseJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: FinalIllustrationJobType = "FINAL_ILLUSTRATION"
     storyId: int = Field(..., ge=1)
-    payload: FinalIllustrationRegenerateRequest
+    payload: FinalIllustrationReviseRequest
 
 
 class FinalIllustrationError(BaseModel):

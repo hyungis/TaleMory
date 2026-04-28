@@ -60,22 +60,6 @@ class FinalIllustrationGenerateRequest(BaseModel):
     items: list[FinalIllustrationGenerateItemRequest] = Field(..., min_length=1, max_length=20)
 
 
-class FinalIllustrationRegenerateRequest(BaseModel):
-    storyId: int = Field(..., ge=1)
-    seed: int = Field(..., ge=0)
-    renderOptions: FinalIllustrationRenderOptions = Field(default_factory=FinalIllustrationRenderOptions)
-    userPrompt: str = Field(..., min_length=1, max_length=2000)
-    item: FinalIllustrationGenerateItemRequest
-
-    @field_validator("userPrompt")
-    @classmethod
-    def validate_user_prompt(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("userPrompt must not be blank")
-        return normalized
-
-
 class FinalIllustrationReviseRequest(BaseModel):
     storyId: int = Field(..., ge=1)
     seed: int = Field(..., ge=0)
@@ -123,12 +107,6 @@ class FinalIllustrationGenerateResponse(BaseModel):
     seed: int
     results: list[FinalIllustrationGenerateResult]
     usage: FinalIllustrationBatchUsage
-
-
-class FinalIllustrationRegenerateResponse(BaseModel):
-    storyId: int
-    seed: int
-    result: FinalIllustrationGenerateResult
 
 
 class FinalIllustrationReviseResponse(BaseModel):

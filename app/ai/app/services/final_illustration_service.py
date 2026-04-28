@@ -10,8 +10,6 @@ from app.schemas.final_illustration import (
     FinalIllustrationGenerateRequest,
     FinalIllustrationGenerateResponse,
     FinalIllustrationGenerateResult,
-    FinalIllustrationRegenerateRequest,
-    FinalIllustrationRegenerateResponse,
     FinalIllustrationRenderOptions,
     FinalIllustrationReviseRequest,
     FinalIllustrationReviseResponse,
@@ -53,23 +51,6 @@ def generate_final_illustrations(request_model: FinalIllustrationGenerateRequest
         seed=request_model.seed,
         results=results,
         usage=_aggregate_usage(results),
-    )
-
-
-def regenerate_final_illustration(
-    request_model: FinalIllustrationRegenerateRequest,
-) -> FinalIllustrationRegenerateResponse:
-    regenerate_item = _build_regenerate_item(request_model.item, request_model.userPrompt)
-    result = generate_final_illustration_item(
-        story_id=request_model.storyId,
-        item=regenerate_item,
-        seed=request_model.seed,
-        render_options=request_model.renderOptions,
-    )
-    return FinalIllustrationRegenerateResponse(
-        storyId=request_model.storyId,
-        seed=request_model.seed,
-        result=result,
     )
 
 
@@ -142,17 +123,6 @@ def _generate_item_locally(
             costUsd=0.0,
         ),
     )
-
-
-def _build_regenerate_item(
-    item: FinalIllustrationGenerateItemRequest,
-    user_prompt: str,
-) -> FinalIllustrationGenerateItemRequest:
-    instruction_parts: list[str] = []
-    if item.additionalInstruction:
-        instruction_parts.append(item.additionalInstruction.strip())
-    instruction_parts.append(f"User regeneration request: {user_prompt.strip()}")
-    return item.model_copy(update={"additionalInstruction": "\n".join(instruction_parts)})
 
 
 def _build_revise_item(

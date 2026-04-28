@@ -149,9 +149,9 @@ class Settings(BaseModel):
         "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE",
         "ai.final-illustration.generate.item.request.queue",
     )
-    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_QUEUE: str = getenv(
-        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_QUEUE",
-        "ai.final-illustration.regenerate.request.queue",
+    RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE",
+        "ai.final-illustration.revise.request.queue",
     )
     RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY: str = getenv(
         "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY",
@@ -161,9 +161,9 @@ class Settings(BaseModel):
         "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY",
         "ai.image.final-illustration.generate.item",
     )
-    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_ROUTING_KEY: str = getenv(
-        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_ROUTING_KEY",
-        "ai.image.final-illustration.regenerate",
+    RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY",
+        "ai.image.final-illustration.revise",
     )
     RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY",
@@ -229,13 +229,13 @@ class Settings(BaseModel):
         "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY",
         "ai.result.final-illustration.generate.failed",
     )
-    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
-        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_COMPLETED_ROUTING_KEY",
-        "ai.result.final-illustration.regenerate.completed",
+    RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY",
+        "ai.result.final-illustration.revise.completed",
     )
-    RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
-        "RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_FAILED_ROUTING_KEY",
-        "ai.result.final-illustration.regenerate.failed",
+    RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY",
+        "ai.result.final-illustration.revise.failed",
     )
 
 

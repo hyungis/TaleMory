@@ -315,7 +315,7 @@ def _image_failed_routing_key_for_action(action: StoryboardImageAction) -> str:
     )
 
 
-FinalIllustrationAction = Literal["GENERATE", "REGENERATE"]
+FinalIllustrationAction = Literal["GENERATE", "REVISE"]
 
 
 class FinalIllustrationJobPublisher:
@@ -384,32 +384,24 @@ class FinalIllustrationJobPublisher:
 
 
 def _final_illustration_completed_type_for_action(action: FinalIllustrationAction) -> str:
-    return (
-        "GENERATE_FINAL_ILLUSTRATION_COMPLETED"
-        if action == "GENERATE"
-        else "REGENERATE_FINAL_ILLUSTRATION_COMPLETED"
-    )
+    if action == "GENERATE":
+        return "GENERATE_FINAL_ILLUSTRATION_COMPLETED"
+    return "REVISE_FINAL_ILLUSTRATION_COMPLETED"
 
 
 def _final_illustration_failed_type_for_action(action: FinalIllustrationAction) -> str:
-    return (
-        "GENERATE_FINAL_ILLUSTRATION_FAILED"
-        if action == "GENERATE"
-        else "REGENERATE_FINAL_ILLUSTRATION_FAILED"
-    )
+    if action == "GENERATE":
+        return "GENERATE_FINAL_ILLUSTRATION_FAILED"
+    return "REVISE_FINAL_ILLUSTRATION_FAILED"
 
 
 def _final_illustration_completed_routing_key_for_action(action: FinalIllustrationAction) -> str:
-    return (
-        settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY
-        if action == "GENERATE"
-        else settings.RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_COMPLETED_ROUTING_KEY
-    )
+    if action == "GENERATE":
+        return settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY
+    return settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY
 
 
 def _final_illustration_failed_routing_key_for_action(action: FinalIllustrationAction) -> str:
-    return (
-        settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY
-        if action == "GENERATE"
-        else settings.RABBITMQ_FINAL_ILLUSTRATION_REGENERATE_FAILED_ROUTING_KEY
-    )
+    if action == "GENERATE":
+        return settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY
+    return settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY

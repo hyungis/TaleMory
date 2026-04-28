@@ -6,7 +6,6 @@ from app.schemas.final_illustration import (
 )
 from app.services.final_illustration_service import (
     _build_final_prompt,
-    _build_regenerate_item,
     _build_replicate_input,
     _build_revise_item,
 )
@@ -57,14 +56,6 @@ def test_build_replicate_input_uses_only_primary_reference_image() -> None:
     assert payload["prompt"] == "test prompt"
     assert payload["images"] == ["https://example.com/rough.png"]
     assert payload["seed"] == 1234
-
-
-def test_build_regenerate_item_appends_user_request() -> None:
-    item = _build_regenerate_item(_sample_item(), "Make the colors warmer.")
-
-    assert item.additionalInstruction is not None
-    assert "Keep Lina centered." in item.additionalInstruction
-    assert "User regeneration request: Make the colors warmer." in item.additionalInstruction
 
 
 def test_build_revise_item_uses_current_illustration_as_primary_image() -> None:
