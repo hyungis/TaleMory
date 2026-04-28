@@ -28,6 +28,270 @@
   }
 }
 
+/* ===== Fairy Transition — "새 동화책 만들기" 시작 연출 =====
+   우상단에서 요정이 비스듬히 화면을 가로지르며 별가루를 흩뿌림.
+   끝날 즈음 화면이 amber 빛으로 차오르며 페이지가 /creation 으로 이동. */
+.fairy-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fairy-transition__sprite {
+  position: absolute;
+  top: -40vh;
+  right: -12vw;
+  /* clamp 빼고 viewport 비례만 — 별 spawn 위치(vw/vh) 와 단위 일치시켜 모든 화면 크기에서 봉 위치 일관 */
+  width: 20vw;
+  height: auto;
+  filter: drop-shadow(0 0 28px rgba(255, 230, 180, 0.65));
+  animation: fairyFly 4s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+/* 요정이 화면 중앙으로 진입 → 정지(살짝 흔들림) → 마지막에 fade-out.
+   별 폭포가 진행되는 동안 요정은 그 자리에서 봉을 휘두르듯 머무름. */
+@keyframes fairyFly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  22% {
+    transform: translate(-45vw, 32vh) rotate(-8deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-45vw, 30vh) rotate(-10deg) scale(1.02);
+    opacity: 1;
+  }
+  85% {
+    transform: translate(-45vw, 32vh) rotate(-8deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-45vw, 32vh) rotate(-8deg) scale(0.95);
+    opacity: 0;
+  }
+}
+
+/* 별 한 알 — 두 phase 로 동작:
+   1) 봉에서 spawn → 바닥(--fall-x, --fall-y)으로 떨어져 잠깐 머무름 (쌓이는 느낌)
+   2) 그 자리에서 사방(--spread-x, --spread-y)으로 퍼지며 화면 전체로 확산
+   inline 으로 4개 CSS 변수 주입되어 별마다 random 궤적. */
+.fairy-transition__stardust {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 245, 200, 1),
+    rgba(255, 210, 130, 0.6) 50%,
+    transparent
+  );
+  box-shadow: 0 0 10px rgba(255, 220, 150, 0.9);
+  opacity: 0;
+  animation: stardustRain 2.5s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+@keyframes stardustRain {
+  /* spawn at wand */
+  0% {
+    transform: translate(0, 0) scale(0);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(0, 0) scale(1.3);
+    opacity: 1;
+  }
+  /* fall phase — 바닥에 도착해서 잠깐 머무름 */
+  45% {
+    transform: translate(var(--fall-x), var(--fall-y)) scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(var(--fall-x), var(--fall-y)) scale(1.15);
+    opacity: 1;
+  }
+  /* spread phase — 사방으로 멀리 퍼지며 화면 전체로 확산 */
+  100% {
+    transform: translate(var(--spread-x), var(--spread-y)) scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* ===== 책 등장 + 펼침 =====
+   요정봉 위치에서 작은 SVG 책이 솟아오르듯 등장 → 화면 중앙으로 떠오름 +
+   perspective rotateY 로 펼치는 듯 회전 → 화면 전체로 scale up 되며 빛에 묻혀 사라짐. */
+.fairy-transition__book {
+  position: absolute;
+  left: 42vw;
+  top: 40vh;
+  width: 14vw;
+  height: auto; /* PNG 자체 비율 유지 */
+  transform-origin: center center;
+  perspective: 1000px;
+  pointer-events: none;
+  opacity: 0;
+  animation: bookAppear 4s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.55));
+}
+
+.fairy-transition__book-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  transform-origin: left center;
+  animation: bookOpen 4s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+/* 책의 등장 + 이동 + scale up.
+   타이밍: 요정 휘두름이 끝나는 시점(~2.3s = 57%) 까지 숨겨져 있다가 그 후 등장. */
+@keyframes bookAppear {
+  0% {
+    transform: translate(0, 0) scale(0);
+    opacity: 0;
+  }
+  /* 요정 휘두름 끝날 때까지 책 숨김 */
+  57% {
+    transform: translate(0, 0) scale(0);
+    opacity: 0;
+  }
+  /* 봉 끝에서 책이 솟아남 */
+  63% {
+    transform: translate(0, -2vh) scale(1.1);
+    opacity: 1;
+  }
+  68% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  /* 화면 중앙으로 이동하며 점점 커짐 */
+  82% {
+    transform: translate(2vw, -8vh) scale(2.5);
+    opacity: 1;
+  }
+  /* 펼치며 화면 가득 차오름 */
+  93% {
+    transform: translate(2vw, -10vh) scale(7);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(2vw, -10vh) scale(12);
+    opacity: 0;
+  }
+}
+
+/* 책 펼침 — perspective rotateY 로 표지가 좌측으로 열리는 듯 */
+@keyframes bookOpen {
+  0%,
+  82% {
+    transform: rotateY(0deg);
+  }
+  93% {
+    transform: rotateY(-55deg);
+  }
+  100% {
+    transform: rotateY(-78deg);
+  }
+}
+
+/* 마지막에 화면이 amber 빛으로 차오르며 페이지 전환과 이어짐. */
+.fairy-transition__flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 240, 200, 0.85),
+    rgba(255, 220, 160, 0.55) 40%,
+    rgba(255, 200, 130, 0.2) 70%,
+    transparent 90%
+  );
+  opacity: 0;
+  animation: fairyFlash 4s ease-in forwards;
+}
+
+@keyframes fairyFlash {
+  0%,
+  60% {
+    opacity: 0;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fairy-transition__sprite,
+  .fairy-transition__stardust,
+  .fairy-transition__flash {
+    animation-duration: 0.4s;
+  }
+}
+
+/* ===== Floating Particles (햇살 먼지 / 반딧불 톤) =====
+   ForestScene 의 떠다니는 입자와 동일한 패턴, 책장 분위기에 맞춰 amber/gold 톤.
+   .bookshelf-modal 안 absolute 로 배치되어 모든 책장 콘텐츠 뒤에서 부유. */
+.bookshelf-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bookshelf-particle {
+  position: absolute;
+  bottom: -10px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(248, 220, 150, 0.9), rgba(240, 200, 120, 0.2) 60%, transparent);
+  animation: floatUpBookshelf var(--duration) var(--delay) ease-in-out infinite;
+  opacity: 0;
+}
+
+@keyframes floatUpBookshelf {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-110vh) translateX(var(--drift));
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookshelf-particle {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ===== Top-right Slot (외부 메뉴 주입 자리) =====
+   features/bookshelf 가 외부 컴포넌트(햄버거 메뉴 등)를 직접 import 하지 않고
+   slot 으로 받아 close 버튼 왼쪽에 absolute 배치한다. */
+.bookshelf-modal__top-right-slot {
+  position: absolute;
+  top: 25px;
+  right: 85px; /* close 버튼(width 44 + right 25 + gap 16) 왼쪽 */
+  z-index: 5100;
+}
+
 /* ===== Close Button (Antique Circular) ===== */
 .modal-close-btn {
   position: absolute;
@@ -55,26 +319,36 @@
   transform: rotate(90deg) scale(1.1);
 }
 
-/* ===== Forest Library Theme (우리가족 책장 컨테이너) ===== */
+/* ===== Forest Library Theme (우리가족 책장 컨테이너) =====
+   풀스크린 패널 — viewport 전체를 책장 배경으로 채운다.
+   메인(/main) ForestScene 의 따뜻한 동화 일러스트 톤과 매칭하기 위해:
+   - 베이스: 차가운 올리브 → 따뜻한 다크 브라운/탠
+   - 우상단: 황금빛 햇살 spotlight (메인의 빛줄기 모티프)
+   - 좌하단: 청록빛 hint (메인의 폭포 모티프)
+   - 전반: 옅은 이끼 그린 wash 유지 */
 .bookshelf-modal {
-  width: 95%;
-  height: 92%;
-  max-width: 1400px;
+  width: 100%;
+  height: 100%;
+  max-width: none;
   background:
-    radial-gradient(ellipse at 20% 0%, rgba(180, 220, 140, 0.08), transparent 60%),
-    radial-gradient(ellipse at 80% 100%, rgba(240, 230, 192, 0.05), transparent 60%),
-    linear-gradient(160deg, #1a2414 0%, #2a1f14 100%);
+    /* 우상단 햇살 — amber spotlight */
+    radial-gradient(ellipse at 88% 0%, rgba(240, 200, 120, 0.16), transparent 55%),
+    /* 좌하단 폭포 hint — cool teal */
+    radial-gradient(ellipse at 0% 100%, rgba(136, 200, 216, 0.07), transparent 50%),
+    /* 전반 이끼 그린 wash */
+    radial-gradient(ellipse at 20% 0%, rgba(180, 220, 140, 0.06), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(240, 230, 192, 0.04), transparent 60%),
+    /* 따뜻한 다크 브라운 베이스 */
+    linear-gradient(160deg, #2c2218 0%, #3a2a1c 60%, #2a1f14 100%);
   color: #f0e6c0;
-  border: 12px solid #2a1b12;
-  border-radius: 14px;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
   font-family: var(--font-body);
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.8),
-    inset 0 0 120px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.5);
 }
 
 .bookshelf-modal .bookshelf-title-display {
@@ -159,21 +433,170 @@
 }
 
 /* ===== 나무 텍스처 (선반 상판/앞면) ===== */
+/* ===== 진짜 나무 같은 결 + 옹이 + 톤 변화 =====
+   layered background:
+   1) 옹이(knot) — 진한 radial-gradient ellipse 몇 개
+   2) 외부 PNG 패턴 (있으면 grain 보강)
+   각 layer 는 multiply 로 baseline color 위에 어두운 결을 새김. */
 .bookshelf-modal .wood-texture {
-  background-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+  background-image:
+    radial-gradient(ellipse 10px 6px at 18% 55%, rgba(40, 18, 6, 0.55), transparent 70%),
+    radial-gradient(ellipse 7px 5px at 47% 25%, rgba(40, 18, 6, 0.45), transparent 70%),
+    radial-gradient(ellipse 12px 7px at 76% 65%, rgba(40, 18, 6, 0.5), transparent 70%),
+    radial-gradient(ellipse 6px 4px at 92% 30%, rgba(40, 18, 6, 0.4), transparent 70%),
+    url('https://www.transparenttextures.com/patterns/wood-pattern.png');
   background-blend-mode: multiply;
+  /* position 은 BookshelfRow 가 이미 Tailwind `absolute` 로 잡고 있으므로 여기서 강제 X.
+     (예전에 position: relative 를 박았다가 absolute 가 override 되어 선반 위치가 깨졌음.) */
 }
 
-/* ===== 책 카드 hover 연출 ===== */
+/* 결 강화 — multi-frequency vertical grain.
+   - 굵은 결(저주파, 28px) + 가는 결(고주파, 4px) + 미세 highlight 라인.
+   - mix-blend-mode: multiply 로 어두운 결만 자연스럽게 새겨지고, highlight 는 overlay 로 살짝 빛난 효과.
+   - 외부 PNG 못 받아도 fallback 으로 결이 보이도록. */
+.bookshelf-modal .wood-texture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    /* 굵은 결 (~28px 간격, 살짝 굵음) */
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 22px,
+      rgba(0, 0, 0, 0.18) 22px,
+      rgba(0, 0, 0, 0.18) 24px,
+      transparent 24px,
+      transparent 50px,
+      rgba(0, 0, 0, 0.12) 50px,
+      rgba(0, 0, 0, 0.12) 51px
+    ),
+    /* 가는 결 (~4px 간격, 미세 grain) */
+    repeating-linear-gradient(
+      88deg,
+      transparent 0,
+      transparent 3px,
+      rgba(0, 0, 0, 0.07) 3px,
+      rgba(0, 0, 0, 0.07) 4px,
+      transparent 4px,
+      transparent 7px,
+      rgba(255, 235, 200, 0.05) 7px,
+      rgba(255, 235, 200, 0.05) 8px
+    );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* 추가 layer — 좌/우 edge shadow + 위→아래 미세 톤 변화.
+   nesting 한계로 ::before 에 wash 가 이미 잡힌 윗면 외엔 별도 layer 가 필요한데
+   여기선 box-shadow inset 으로 처리. */
+.bookshelf-modal .wood-texture--shelf-top,
+.bookshelf-modal .wood-texture--shelf-front {
+  box-shadow:
+    inset 8px 0 12px -8px rgba(0, 0, 0, 0.4),
+    inset -8px 0 12px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* 선반 윗면 — 위 가장자리에 이끼 wash + 작은 이끼 점 cluster.
+   메인 ForestScene 의 집 위 자라난 이끼 모티프와 매칭. */
+.bookshelf-modal .wood-texture--shelf-top::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background:
+    /* 작은 이끼 점들 — 가장자리 따라 산포 */
+    radial-gradient(circle at 8% 40%, rgba(122, 160, 90, 0.85) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 22% 30%, rgba(106, 140, 74, 0.8) 2px, transparent 3px),
+    radial-gradient(circle at 38% 55%, rgba(136, 168, 120, 0.75) 1px, transparent 2px),
+    radial-gradient(circle at 56% 35%, rgba(122, 160, 90, 0.8) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 73% 50%, rgba(106, 140, 74, 0.75) 1px, transparent 2px),
+    radial-gradient(circle at 88% 25%, rgba(136, 168, 120, 0.8) 2px, transparent 3px),
+    /* 위 가장자리 wash */
+    linear-gradient(
+      to bottom,
+      rgba(106, 140, 74, 0.55) 0%,
+      rgba(106, 140, 74, 0.25) 35%,
+      transparent 75%
+    );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ===== 책 카드 — 가죽 장정 표지 + 페이지 두께(3D) =====
+   sharp box-shadow stack 으로 우측/하단에 페이지 한 장 한 장이 쌓인 두께감을 흉내내,
+   평면 카드를 "두꺼운 진짜 책" 으로 보이게 한다. perspective rotate 살짝 더해 입체감 ↑. */
 .bookshelf-modal .book-card {
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
   transform-origin: bottom center;
-  box-shadow: -15px 15px 15px -5px rgba(0, 0, 0, 0.4);
+  /* 살짝 기울여 좌측 책등이 가까워 보이게 */
+  transform: perspective(900px) rotateY(-3deg);
+  box-shadow:
+    /* === 우측 페이지 두께 (베이지 페이지 + 어두운 라인 사이사이) === */
+    2px 0 0 #ebe0b6,
+    3px 0 0 rgba(0, 0, 0, 0.18),
+    4px 0 0 #f0e6c0,
+    5px 0 0 rgba(0, 0, 0, 0.12),
+    6px 0 0 #ebe0b6,
+    7px 0 0 rgba(0, 0, 0, 0.18),
+    8px 0 0 #f0e6c0,
+    /* === 하단 페이지 두께 === */
+    0 2px 0 #ebe0b6,
+    0 3px 0 rgba(0, 0, 0, 0.15),
+    0 4px 0 #f0e6c0,
+    0 5px 0 rgba(0, 0, 0, 0.1),
+    0 6px 0 #ebe0b6,
+    /* === 책장 안쪽 깊이 그림자 === */
+    -12px 14px 22px -6px rgba(0, 0, 0, 0.55),
+    14px 18px 22px -8px rgba(0, 0, 0, 0.4),
+    /* === 좌측 책등 inner shadow === */
+    inset 8px 0 8px -4px rgba(0, 0, 0, 0.35),
+    /* === 우측 amber inner highlight === */
+    inset -2px 0 0 rgba(212, 184, 106, 0.4);
 }
 
 .bookshelf-modal .book-card:hover {
-  transform: translateY(-10px) scale(1.02) rotate(-1deg);
-  box-shadow: -20px 25px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  transform: perspective(900px) rotateY(-3deg) translateY(-14px) scale(1.04);
+  box-shadow:
+    /* hover 시에도 페이지 두께 유지 */
+    2px 0 0 #ebe0b6,
+    3px 0 0 rgba(0, 0, 0, 0.18),
+    4px 0 0 #f0e6c0,
+    5px 0 0 rgba(0, 0, 0, 0.12),
+    6px 0 0 #ebe0b6,
+    7px 0 0 rgba(0, 0, 0, 0.18),
+    8px 0 0 #f0e6c0,
+    0 2px 0 #ebe0b6,
+    0 3px 0 rgba(0, 0, 0, 0.15),
+    0 4px 0 #f0e6c0,
+    0 5px 0 rgba(0, 0, 0, 0.1),
+    0 6px 0 #ebe0b6,
+    /* 그림자만 더 진하게 */
+    -16px 24px 30px -4px rgba(0, 0, 0, 0.6),
+    18px 26px 28px -6px rgba(0, 0, 0, 0.45),
+    inset 8px 0 8px -4px rgba(0, 0, 0, 0.35),
+    inset -2px 0 0 rgba(212, 184, 106, 0.45) !important;
+}
+
+/* 표지(.vintage-cover) 좌상단에 따뜻한 빛 spotlight — 책장 햇살이 닿은 느낌. */
+.bookshelf-modal .vintage-cover {
+  position: relative;
+}
+
+.bookshelf-modal .vintage-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 25% 20%,
+    rgba(255, 220, 150, 0.16),
+    transparent 55%
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .bookshelf-modal .book-card:hover .book-cover-overlay {
