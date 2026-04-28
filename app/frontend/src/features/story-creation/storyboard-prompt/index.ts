@@ -7,6 +7,7 @@
  * - useStoryboardSummaryQuery: 줄거리(요약) 상태 polling 훅 (storyId 단위)
  * - useGenerateSummary / useRegenerateSummary: 줄거리 1차 생성 / 자연어 재생성 mutation
  * - useStoryboardSummaryPatch: 줄거리 직접 편집(onBlur) mutation — 옵션 ② 디자인
+ * - useStoryboardStateQuery: 본문(STORY) 잡 상태 1회 조회 훅 — Step 4 mount recovery / Step 3 락 회복
  */
 export { PromptStep } from './ui/PromptStep'
 export { useGenerationJobQuery } from './model/useGenerationJobQuery'
@@ -16,6 +17,7 @@ export type { StoryboardSummaryQueryResult } from './model/useStoryboardSummaryQ
 export { useGenerateSummary } from './model/useGenerateSummary'
 export { useRegenerateSummary } from './model/useRegenerateSummary'
 export { useStoryboardSummaryPatch } from './model/useStoryboardSummaryPatch'
+export { useStoryboardStateQuery } from './model/useStoryboardStateQuery'
 export type {
   SummaryResponseData,
   SummaryJobStatus,
@@ -24,4 +26,5 @@ export type {
   UpdateStoryboardSummaryRequest,
   StoryBoardSnapshot,
   StartGenerationResult,
+  StoryboardStateResponse,
 } from './api/types'

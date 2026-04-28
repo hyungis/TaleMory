@@ -65,6 +65,27 @@ export interface UpdateStoryboardSummaryRequest {
   summaryKo: string
 }
 
+/**
+ * `GET /api/stories/{storyId}/storyboard/state` 응답.
+ *
+ * Step 4 mount 시 1회 호출 — sessionStorage 가 비어있는 엣지케이스 (탭 닫고 재진입) 에서도
+ * 본문(STORY) 잡 상태를 BE 진실로부터 알아내기 위함.
+ *
+ *  - activeJob 가 있으면 polling 재개
+ *  - 없고 latestFinalStatus=FAILED + failedCountSinceLastSuccess<3 → "다시 시도" UI
+ *  - failedCountSinceLastSuccess>=3 → 한도 초과 — story soft-delete 후 메인 페이지 이동
+ */
+export interface StoryboardStateResponse {
+  activeJob: {
+    jobId: number
+    status: 'PENDING' | 'RUNNING'
+    /** ISO-8601 LocalDateTime — FE 가 polling timeout 카운트 보정에 활용. */
+    createdAt: string
+  } | null
+  latestFinalStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED' | null
+  failedCountSinceLastSuccess: number
+}
+
 /** `PATCH /api/stories/{storyId}/storyboard/summary` 응답 — 저장된 story_board 스냅샷. */
 export interface StoryBoardSnapshot {
   storyBoardId: number

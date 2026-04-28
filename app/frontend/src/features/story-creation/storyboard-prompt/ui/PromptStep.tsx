@@ -15,6 +15,7 @@ import { useStoryboardPagesQuery } from '../../storyboard-pages'
 import { useGenerateStoryboardStoryPost } from '../model/useGenerateStoryboardStoryPost'
 import { useGenerateSummary } from '../model/useGenerateSummary'
 import { useRegenerateSummary } from '../model/useRegenerateSummary'
+import { useStoryboardStateQuery } from '../model/useStoryboardStateQuery'
 import { useStoryboardSummaryPatch } from '../model/useStoryboardSummaryPatch'
 import { useStoryboardSummaryQuery } from '../model/useStoryboardSummaryQuery'
 
@@ -89,6 +90,24 @@ export function PromptStep({
   const pagesQuery = useStoryboardPagesQuery(storyId)
   const hasGeneratedPages = (pagesQuery.data?.pages?.length ?? 0) > 0
 
+  /**
+   * 본문(STORY) 잡 BE state — proactive lock 의 새 1차 방어선.
+   *
+   * 기존 락은 (a) 페이지 INSERT 후 (`hasGeneratedPages`) (b) sessionStorage 의 confirm 마커
+   * 두 갈래로 동작했지만, 탭 닫고 재진입했을 때 sessionStorage 가 비어있고 페이지도 아직 안 만들어진
+   * PENDING/RUNNING 윈도우에선 락이 풀려 보이는 빈틈이 있었다 (사용자가 클릭하면 BE STORY_012 가
+   * catch 되며 reactive 잠금 — 한 번 깜빡 노출됨).
+   *
+   * Step 4 의 recovery 와 같은 endpoint 를 재활용해 mount 시 1회 조회로:
+   *   - activeJob (PENDING/RUNNING) 있음 → 곧장 락
+   *   - latestFinalStatus === 'SUCCESS' → 페이지 INSERT 직전 race 윈도우도 사전 락
+   * 만약 BE 가 FAILED/CANCELLED 만 보고하면 락 안 함 (사용자가 재생성/편집해서 다시 publish 가능).
+   */
+  const stateQuery = useStoryboardStateQuery(storyId)
+  const hasActiveOrCompletedStoryJob =
+    stateQuery.data?.activeJob != null ||
+    stateQuery.data?.latestFinalStatus === 'SUCCESS'
+
   const summary = summaryQuery.data
   const status = summary?.jobStatus ?? null
   const summaryKo = summary?.summaryKo ?? null
@@ -119,11 +138,17 @@ export function PromptStep({
       if (trimmed.length === 0) return
       try {
         await regenerateMut.mutateAsync({ userPrompt: trimmed })
-      } catch {
-        /* ApiError 는 UI 에서 표시 */
+      } catch (err) {
+        // STORY_012 — 활성 본문 잡 도는 동안엔 BE 가 거부.
+        // sessionStorage 가 비어 락이 풀려있던 엣지케이스 (탭 닫고 재진입) 에서 발생 가능.
+        // 현재 SUMMARY jobId 로 confirm 표시 → isLocked 가 true 가 되어 UI 가 잠금 상태로 회복.
+        if (isApiError(err) && err.code === 'STORY_012' && summary?.jobId) {
+          onSummaryConfirmed(summary.jobId)
+        }
+        /* 그 외 ApiError 는 UI 에서 표시 */
       }
     },
-    [regenerateMut],
+    [regenerateMut, summary?.jobId, onSummaryConfirmed],
   )
 
   const retryAfterFail = useCallback(async () => {
@@ -143,10 +168,13 @@ export function PromptStep({
   }, [generateMut, regenerateMut, summaryQuery, triggerGenerate])
 
   // Step 3 잠금 신호 — 본문이 한 번이라도 발행됐으면 줄거리 변경 봉인.
-  // 두 갈래 중 하나라도 true 면 락:
-  //  1) BE 진실: storyboard-pages 가 이미 INSERT 되어 있음 (본문 생성 완료/진행 후 page row 존재)
+  // 세 갈래 중 하나라도 true 면 락:
+  //  1) BE 진실 (페이지 row 존재): 본문 생성 완료 후 storyboard_pages INSERT 됨
   //     → 새로고침을 거쳐도 BE 데이터로 즉시 복원되는 안정적 락.
-  //  2) FE 메모리/스냅샷: 마지막 confirm 시점의 SUMMARY jobId 가 *현재 SUMMARY jobId 와 같음*.
+  //  2) BE 진실 (잡 상태): 본문 잡이 PENDING/RUNNING/SUCCESS 중 하나
+  //     → 탭 닫고 재진입한 엣지케이스에서도 mount 즉시 proactive 락 (사용자가 편집/재생성을
+  //       시도해서 BE 가 STORY_012 로 거부하기 전에 미리 UI 비활성화).
+  //  3) FE 메모리/스냅샷: 마지막 confirm 시점의 SUMMARY jobId 가 *현재 SUMMARY jobId 와 같음*.
   //     단순 non-null 이 아니라 jobId 동치 비교를 쓰는 이유:
   //      - sessionStorage 에 남은 옛 jobId 가 BE 데이터 초기화 / 재생성 후에도 살아남아
   //        무관한 SUMMARY 를 잠가버리는 사고 방지 (false-positive lock).
@@ -156,7 +184,8 @@ export function PromptStep({
     lastConfirmedSummaryJobId !== null &&
     summary?.jobId !== undefined &&
     lastConfirmedSummaryJobId === summary.jobId
-  const isLocked = hasGeneratedPages || hasMatchingConfirmedJob
+  const isLocked =
+    hasGeneratedPages || hasActiveOrCompletedStoryJob || hasMatchingConfirmedJob
 
   const handleConfirmAndNext = useCallback(async () => {
     const currentSummaryJobId = summary?.jobId ?? null
@@ -307,7 +336,19 @@ export function PromptStep({
                   const trimmed = summaryKoEdited.trim()
                   if (trimmed.length === 0) return
                   if (trimmed === summaryKo) return
-                  summaryPatchMut.mutate({ summaryKo: trimmed })
+                  summaryPatchMut.mutate(
+                    { summaryKo: trimmed },
+                    {
+                      onError: err => {
+                        // STORY_012 — 활성 본문 잡 도는 동안 PATCH 거부.
+                        // sessionStorage 가 비어 락이 풀려있던 엣지케이스 회복:
+                        // 현재 SUMMARY jobId 를 confirm 으로 표시 → isLocked=true 로 textarea 잠금.
+                        if (isApiError(err) && err.code === 'STORY_012' && summary?.jobId) {
+                          onSummaryConfirmed(summary.jobId)
+                        }
+                      },
+                    },
+                  )
                 }}
                 editPending={summaryPatchMut.isPending}
               />
