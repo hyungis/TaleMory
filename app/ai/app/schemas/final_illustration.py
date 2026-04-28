@@ -35,14 +35,22 @@ class FinalIllustrationGenerateItemRequest(BaseModel):
     companions: list[str] = Field(default_factory=list)
     roughStoryboardImageUrl: str | None = Field(default=None, max_length=2000)
     roughStoryboardImageS3Key: str | None = Field(default=None, max_length=1000)
+    currentIllustrationImageS3Key: str | None = Field(default=None, max_length=1000)
     stylePrompt: str = Field(..., min_length=1, max_length=2000)
     additionalInstruction: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
     def validate_rough_storyboard_reference(self) -> "FinalIllustrationGenerateItemRequest":
-        if self.roughStoryboardImageUrl or self.roughStoryboardImageS3Key:
+        if (
+            self.roughStoryboardImageUrl
+            or self.roughStoryboardImageS3Key
+            or self.currentIllustrationImageS3Key
+        ):
             return self
-        raise ValueError("roughStoryboardImageUrl or roughStoryboardImageS3Key is required")
+        raise ValueError(
+            "roughStoryboardImageUrl, roughStoryboardImageS3Key, "
+            "or currentIllustrationImageS3Key is required"
+        )
 
 
 class FinalIllustrationGenerateRequest(BaseModel):
@@ -53,6 +61,22 @@ class FinalIllustrationGenerateRequest(BaseModel):
 
 
 class FinalIllustrationRegenerateRequest(BaseModel):
+    storyId: int = Field(..., ge=1)
+    seed: int = Field(..., ge=0)
+    renderOptions: FinalIllustrationRenderOptions = Field(default_factory=FinalIllustrationRenderOptions)
+    userPrompt: str = Field(..., min_length=1, max_length=2000)
+    item: FinalIllustrationGenerateItemRequest
+
+    @field_validator("userPrompt")
+    @classmethod
+    def validate_user_prompt(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("userPrompt must not be blank")
+        return normalized
+
+
+class FinalIllustrationReviseRequest(BaseModel):
     storyId: int = Field(..., ge=1)
     seed: int = Field(..., ge=0)
     renderOptions: FinalIllustrationRenderOptions = Field(default_factory=FinalIllustrationRenderOptions)
@@ -102,6 +126,12 @@ class FinalIllustrationGenerateResponse(BaseModel):
 
 
 class FinalIllustrationRegenerateResponse(BaseModel):
+    storyId: int
+    seed: int
+    result: FinalIllustrationGenerateResult
+
+
+class FinalIllustrationReviseResponse(BaseModel):
     storyId: int
     seed: int
     result: FinalIllustrationGenerateResult

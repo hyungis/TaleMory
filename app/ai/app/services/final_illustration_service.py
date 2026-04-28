@@ -13,6 +13,8 @@ from app.schemas.final_illustration import (
     FinalIllustrationRegenerateRequest,
     FinalIllustrationRegenerateResponse,
     FinalIllustrationRenderOptions,
+    FinalIllustrationReviseRequest,
+    FinalIllustrationReviseResponse,
     FinalIllustrationUsage,
 )
 from app.services.storyboard_image_service import (
@@ -65,6 +67,23 @@ def regenerate_final_illustration(
         render_options=request_model.renderOptions,
     )
     return FinalIllustrationRegenerateResponse(
+        storyId=request_model.storyId,
+        seed=request_model.seed,
+        result=result,
+    )
+
+
+def revise_final_illustration(
+    request_model: FinalIllustrationReviseRequest,
+) -> FinalIllustrationReviseResponse:
+    revise_item = _build_revise_item(request_model.item, request_model.userPrompt)
+    result = generate_final_illustration_item(
+        story_id=request_model.storyId,
+        item=revise_item,
+        seed=request_model.seed,
+        render_options=request_model.renderOptions,
+    )
+    return FinalIllustrationReviseResponse(
         storyId=request_model.storyId,
         seed=request_model.seed,
         result=result,
@@ -134,6 +153,25 @@ def _build_regenerate_item(
         instruction_parts.append(item.additionalInstruction.strip())
     instruction_parts.append(f"User regeneration request: {user_prompt.strip()}")
     return item.model_copy(update={"additionalInstruction": "\n".join(instruction_parts)})
+
+
+def _build_revise_item(
+    item: FinalIllustrationGenerateItemRequest,
+    user_prompt: str,
+) -> FinalIllustrationGenerateItemRequest:
+    instruction_parts: list[str] = []
+    if item.additionalInstruction:
+        instruction_parts.append(item.additionalInstruction.strip())
+    instruction_parts.append(f"User revision request: {user_prompt.strip()}")
+    base_image_s3_key = item.currentIllustrationImageS3Key or item.roughStoryboardImageS3Key
+    base_image_url = item.roughStoryboardImageUrl if base_image_s3_key is None else None
+    return item.model_copy(
+        update={
+            "roughStoryboardImageS3Key": base_image_s3_key,
+            "roughStoryboardImageUrl": base_image_url,
+            "additionalInstruction": "\n".join(instruction_parts),
+        }
+    )
 
 
 def _build_final_prompt(item: FinalIllustrationGenerateItemRequest) -> str:

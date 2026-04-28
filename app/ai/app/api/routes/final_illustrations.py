@@ -5,8 +5,14 @@ from app.schemas.final_illustration import (
     FinalIllustrationGenerateResponse,
     FinalIllustrationRegenerateRequest,
     FinalIllustrationRegenerateResponse,
+    FinalIllustrationReviseRequest,
+    FinalIllustrationReviseResponse,
 )
-from app.services.final_illustration_service import generate_final_illustrations, regenerate_final_illustration
+from app.services.final_illustration_service import (
+    generate_final_illustrations,
+    regenerate_final_illustration,
+    revise_final_illustration,
+)
 
 
 router = APIRouter(prefix="/internal/final-illustrations", tags=["final-illustrations"])
@@ -30,6 +36,18 @@ def regenerate_final_illustration_endpoint(
 ) -> FinalIllustrationRegenerateResponse:
     try:
         return regenerate_final_illustration(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/revise", response_model=FinalIllustrationReviseResponse)
+def revise_final_illustration_endpoint(
+    request: FinalIllustrationReviseRequest,
+) -> FinalIllustrationReviseResponse:
+    try:
+        return revise_final_illustration(request)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:
