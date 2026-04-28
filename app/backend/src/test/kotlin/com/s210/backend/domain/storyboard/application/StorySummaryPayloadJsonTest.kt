@@ -39,7 +39,7 @@ class StorySummaryPayloadJsonTest {
                 "moralTheme": "courage",
                 "storyQuest": "find the hidden treasure",
                 "recurringMotif": "rainbow bridge",
-                "readingLevel": "BEGINNER",
+                "keyEmotionalBeats": ["hopeful", "warm", "playful"],
                 "usage": {
                     "model": "gpt-4o",
                     "inputTokens": 500,
@@ -79,7 +79,7 @@ class StorySummaryPayloadJsonTest {
                 "moralTheme": "bravery",
                 "storyQuest": "defeat the dark shadow",
                 "recurringMotif": "shooting star",
-                "readingLevel": "INTERMEDIATE",
+                "keyEmotionalBeats": ["brave", "hopeful", "triumphant"],
                 "usage": {
                     "model": "gpt-4o",
                     "inputTokens": 600,
@@ -223,7 +223,7 @@ class StorySummaryPayloadJsonTest {
                 "moralTheme": "hope",
                 "storyQuest": "quest",
                 "recurringMotif": "motif",
-                "readingLevel": "BEGINNER",
+                "keyEmotionalBeats": ["calm"],
                 "usage": {
                     "model": "gpt-4",
                     "promptTemplateVersion": "v1"
@@ -254,7 +254,7 @@ class StorySummaryPayloadJsonTest {
                 "payload": {
                     "title": "T", "summary": "S", "summaryKo": "요",
                     "moralTheme": "m", "storyQuest": "q", "recurringMotif": "r",
-                    "readingLevel": "BEGINNER",
+                    "keyEmotionalBeats": ["calm"],
                     "usage": { "model": "gpt-4", "promptTemplateVersion": "v1" }
                 }
             """.trimIndent() else """

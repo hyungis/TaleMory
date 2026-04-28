@@ -140,6 +140,8 @@ class StoryboardSummaryServiceTest {
     @Test
     fun `regenerateSummary inserts new job and publishes on STORY_SUMMARY_REGENERATE when prior SUCCESS exists`() {
         stubOwnedStory()
+        stubPhotos()
+        stubParticipants()
 
         val previousPayload = buildSummaryPayload()
         val previousPayloadJson = objectMapper.writeValueAsString(previousPayload)
@@ -180,6 +182,92 @@ class StoryboardSummaryServiceTest {
         }
 
         assertEquals(StoryErrorCode.SUMMARY_NOT_FOUND, ex.errorCode)
+    }
+
+    // -----------------------------------------------------------------------
+    // generateSummary / regenerateSummary — STORY_ALREADY_IN_PROGRESS guard
+    // (활성 본문 잡 도는 동안엔 줄거리 생성/재생성 거부 — 진행 중 본문이 stale grounding 받지 않도록)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `generateSummary throws STORY_ALREADY_IN_PROGRESS when active PENDING story job exists`() {
+        stubOwnedStory()
+
+        val activePendingJob = buildJob(60L, JobType.STORYBOARD_STORY, JobStatus.PENDING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activePendingJob)
+
+        val ex = assertThrows<BusinessException> {
+            service.generateSummary(userId, storyId, null)
+        }
+
+        assertEquals(StoryErrorCode.STORY_ALREADY_IN_PROGRESS, ex.errorCode)
+        // 가드에서 즉시 차단 — payload 빌드 / publish 모두 일어나지 않아야 함
+        verify(jobRepository, never()).save(any())
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Any::class.java))
+    }
+
+    @Test
+    fun `generateSummary throws STORY_ALREADY_IN_PROGRESS when active RUNNING story job exists`() {
+        stubOwnedStory()
+
+        val activeRunningJob = buildJob(61L, JobType.STORYBOARD_STORY, JobStatus.RUNNING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activeRunningJob)
+
+        val ex = assertThrows<BusinessException> {
+            service.generateSummary(userId, storyId, null)
+        }
+
+        assertEquals(StoryErrorCode.STORY_ALREADY_IN_PROGRESS, ex.errorCode)
+    }
+
+    @Test
+    fun `regenerateSummary throws STORY_ALREADY_IN_PROGRESS when active PENDING story job exists`() {
+        stubOwnedStory()
+
+        val activePendingJob = buildJob(70L, JobType.STORYBOARD_STORY, JobStatus.PENDING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activePendingJob)
+
+        val ex = assertThrows<BusinessException> {
+            service.regenerateSummary(userId, storyId, "더 밝게 써줘")
+        }
+
+        assertEquals(StoryErrorCode.STORY_ALREADY_IN_PROGRESS, ex.errorCode)
+        // 활성 본문 잡 가드에서 즉시 차단 — 직전 SUMMARY SUCCESS 조회조차 일어나지 않아야 함
+        verify(jobRepository, never()).findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS
+        )
+        verify(jobRepository, never()).save(any())
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Any::class.java))
+    }
+
+    @Test
+    fun `regenerateSummary throws STORY_ALREADY_IN_PROGRESS when active RUNNING story job exists`() {
+        stubOwnedStory()
+
+        val activeRunningJob = buildJob(71L, JobType.STORYBOARD_STORY, JobStatus.RUNNING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activeRunningJob)
+
+        val ex = assertThrows<BusinessException> {
+            service.regenerateSummary(userId, storyId, "프롬프트")
+        }
+
+        assertEquals(StoryErrorCode.STORY_ALREADY_IN_PROGRESS, ex.errorCode)
     }
 
     // -----------------------------------------------------------------------
@@ -234,17 +322,17 @@ class StoryboardSummaryServiceTest {
     }
 
     @Test
-    fun `findSummary returns summaryKo from storyBoard and SUCCESS status when latest job is SUCCESS`() {
+    fun `findSummary returns summaryKo from job resultPayload and SUCCESS status when latest job is SUCCESS`() {
         stubOwnedStory()
 
-        val successJob = buildJob(12L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS, null)
+        // SUMMARY 의 진실원은 잡 자신의 result_payload (StorySummaryPayload JSON).
+        val payloadJson = objectMapper.writeValueAsString(
+            buildSummaryPayload().copy(summaryKo = "한글 요약 내용"),
+        )
+        val successJob = buildJob(12L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS, payloadJson)
         `when`(
             jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY_SUMMARY)
         ).thenReturn(successJob)
-
-        val board = buildStoryBoard("한글 요약 내용")
-        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId))
-            .thenReturn(board)
 
         val result = service.findSummary(userId, storyId)
 
@@ -276,7 +364,7 @@ class StoryboardSummaryServiceTest {
     }
 
     @Test
-    fun `findSummary returns prior SUCCESS summaryKo and FAILED status when latest job is FAILED and prior SUCCESS exists`() {
+    fun `findSummary returns prior SUCCESS summaryKo from its resultPayload and FAILED status when latest is FAILED`() {
         stubOwnedStory()
 
         val failedJob = buildJob(14L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.FAILED, null)
@@ -284,16 +372,16 @@ class StoryboardSummaryServiceTest {
             jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY_SUMMARY)
         ).thenReturn(failedJob)
 
-        val priorSuccessJob = buildJob(9L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS, null)
+        // 직전 SUCCESS 잡의 result_payload 에서 summaryKo 추출.
+        val priorPayloadJson = objectMapper.writeValueAsString(
+            buildSummaryPayload().copy(summaryKo = "이전 성공 요약"),
+        )
+        val priorSuccessJob = buildJob(9L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS, priorPayloadJson)
         `when`(
             jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
                 storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS
             )
         ).thenReturn(priorSuccessJob)
-
-        val board = buildStoryBoard("이전 성공 요약")
-        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId))
-            .thenReturn(board)
 
         val result = service.findSummary(userId, storyId)
 
@@ -344,7 +432,7 @@ class StoryboardSummaryServiceTest {
         moralTheme = "courage",
         storyQuest = "find treasure",
         recurringMotif = "rainbow",
-        readingLevel = "BEGINNER",
+        keyEmotionalBeats = listOf("hopeful", "warm", "playful"),
         usage = UsageInfo(
             model = "gpt-4",
             inputTokens = 100,

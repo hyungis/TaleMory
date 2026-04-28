@@ -11,6 +11,7 @@ import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
 import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPageResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPagesResult
+import com.s210.backend.domain.storyboard.application.dto.StoryboardStateResult
 import com.s210.backend.domain.storyboard.presentation.request.GenerateStoryRequest
 import com.s210.backend.domain.storyboard.presentation.request.RegenerateStoryboardImageRequest
 import com.s210.backend.domain.storyboard.presentation.request.RegenerateSummaryRequest
@@ -222,6 +223,29 @@ class StoryboardController(
         @PathVariable storyId: Long,
     ): ResponseEntity<ApiResponse<SummaryResponseData>> {
         val result = storyboardSummaryService.findSummary(
+            userId = user.userId,
+            storyId = storyId,
+        )
+        return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    /**
+     * 스토리보드 본문(STORY) 잡 상태 조회 — Step 4 mount 시 호출.
+     *
+     * sessionStorage 가 비어있는 엣지케이스 (탭 닫고 Step 4 재진입) 에서도 FE 가 정확한
+     * 화면을 그릴 수 있도록 활성 잡 / 직전 terminal 상태 / 마지막 SUCCESS 이후 FAILED
+     * 카운트를 한 번에 반환.
+     *
+     * - activeJob 가 있으면 FE 는 그 jobId 로 polling 재개.
+     * - activeJob 없고 latestFinalStatus=FAILED + failedCountSinceLastSuccess<3 → "다시 시도".
+     * - failedCountSinceLastSuccess>=3 → 한도 초과 안내 + story soft-delete + 메인 이동.
+     */
+    @GetMapping("/state")
+    fun storyboardStateGet(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<StoryboardStateResult>> {
+        val result = storyboardGenerationService.findStoryboardState(
             userId = user.userId,
             storyId = storyId,
         )

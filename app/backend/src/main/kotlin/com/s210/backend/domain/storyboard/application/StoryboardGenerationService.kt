@@ -13,6 +13,7 @@ import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.storyboard.application.dto.ActiveStoryJob
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
@@ -20,6 +21,7 @@ import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.application.dto.StoryGenerateJobMessage
 import com.s210.backend.domain.storyboard.application.dto.StoryGeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
+import com.s210.backend.domain.storyboard.application.dto.StoryboardStateResult
 import com.s210.backend.domain.storyboard.application.dto.SummaryMeta
 import com.s210.backend.domain.storyboard.application.dto.TravelInfo
 import java.time.LocalDate
@@ -29,7 +31,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
-import tools.jackson.databind.node.ObjectNode
 /**
  * 동화 본문(텍스트) 생성 요청을 MQ 로 비동기 발송하는 유스케이스.
  * API 명세 #28 `POST /api/stories/{storyId}/storyboard/story` 의 서비스 레이어.
@@ -210,16 +211,29 @@ class StoryboardGenerationService(
     /**
      * 유저가 Step 3 에서 편집한 한글 줄거리(summary) 를 저장한다 — 옵션 ② 디자인.
      *
-     * 세 곳을 모두 sync 해야 본문 generate 와 summary 조회가 일관됨:
-     *  1. `stories.synopsis` (TEXT) — 본문 generate 의 한글 grounding source.
-     *  2. `story_board.story` (TEXT, V6 이전엔 VARCHAR 255) — backup 사본.
-     *  3. `story_generation_jobs.result_payload.summaryKo` (JSON) — generate 가 fallback 으로 읽으니
-     *     동기화하지 않으면 stories.synopsis 비었을 때 옛 한글이 본문 grounding 으로 들어감.
+     * 두 곳을 sync (단, 잡 결과 페이로드는 immutable 로 보존):
+     *  1. `stories.synopsis` (TEXT) — 본문 generate 의 한글 grounding source-of-truth.
+     *  2. `story_board.story` (TEXT) — backup 사본.
      *
-     *  `updateAt` 을 오늘 날짜로 갱신. 빈 입력 → INVALID_INPUT.
+     * `story_generation_jobs.result_payload` 는 의도적으로 건드리지 않는다.
+     * 잡 테이블은 "그 시점 AI 가 만든 것" 의 immutable history 로 두고, 사용자 편집은
+     * stories.synopsis 만 진실로 한다 (generate 가 synopsis 를 우선 읽도록 보장).
+     *
+     * 본문 잡(STORY) 이 PENDING/RUNNING 인 동안에는 줄거리 편집 거부 (STORY_ALREADY_IN_PROGRESS).
+     * `updateAt` 을 오늘 날짜로 갱신. 빈 입력 → INVALID_INPUT.
      */
     fun editSummary(userId: Long, storyId: Long, newSummaryKo: String): StoryBoardResult {
         ownedStory(userId, storyId)
+
+        // 활성 본문 잡이 있는 동안엔 줄거리 변경 거부 — 진행 중 본문이 stale grounding 으로 가는 것 차단.
+        val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeStoryJob != null) {
+            log.warn("[SUMMARY:EDIT] blocked — active story job exists jobId={}", activeStoryJob.id)
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
@@ -233,27 +247,54 @@ class StoryboardGenerationService(
             story.synopsis = trimmed
         }
 
-        // 가장 최근 SUMMARY SUCCESS 잡의 result_payload.summaryKo 를 JSON_SET 으로 동기화.
-        // generate() 의 fallback (stories.synopsis 가 비어있을 때) 경로와 일치시킴.
-        jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
-            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS,
-        )?.let { latestSummaryJob ->
-            val rawJson = latestSummaryJob.resultPayload
-            if (!rawJson.isNullOrBlank()) {
-                runCatching {
-                    val tree = objectMapper.readTree(rawJson) as ObjectNode
-                    tree.put("summaryKo", trimmed)
-                    latestSummaryJob.resultPayload = objectMapper.writeValueAsString(tree)
-                }.onFailure { e ->
-                    log.warn(
-                        "Failed to JSON_SET summaryKo on summary job {}: {}",
-                        latestSummaryJob.id, e.message,
-                    )
-                }
-            }
+        return StoryBoardResult.from(storyBoard)
+    }
+
+    /**
+     * `GET /storyboard/state` — Step 4 mount 시 본문(STORY) 잡 상태를 한 번에 조회.
+     *
+     * sessionStorage 가 비어있는 엣지케이스 (탭 닫고 재진입) 에서도 FE 가 정확한 화면을
+     * 표시할 수 있도록 활성 잡 / 직전 terminal 상태 / 마지막 SUCCESS 이후 FAILED 카운트 셋
+     * 을 묶어서 반환.
+     *
+     * 카운트 정의 — "마지막 SUCCESS 이후 FAILED" :
+     *  - SUCCESS 잡이 한 번이라도 있으면 그 이후의 FAILED 만 카운트
+     *  - SUCCESS 가 없으면 누적 FAILED 전부 카운트
+     *  → 사용자가 한 번 성공한 뒤 새로 만들기 시도에서 실패한 경우엔 카운터 초기화 효과.
+     */
+    @Transactional(readOnly = true)
+    fun findStoryboardState(userId: Long, storyId: Long): StoryboardStateResult {
+        ownedStory(userId, storyId)
+
+        val activeJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+
+        // 활성 잡이 있으면 latestFinalStatus 는 의미 없음 → null. failedCount 는 그래도 같이 보내준다
+        // (UI 가 활성 잡 polling 중에도 백그라운드로 카운트 표시할 수 있게).
+        val lastSuccessJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS,
+        )
+        val failedCount = jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+            storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, lastSuccessJob?.id ?: 0L,
+        )
+
+        val latestFinalStatus = if (activeJob != null) {
+            null
+        } else {
+            // 활성 잡 없을 때만 의미 있음 — 가장 최근 STORY 잡의 status 가 곧 latestFinalStatus.
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY,
+            )?.status
         }
 
-        return StoryBoardResult.from(storyBoard)
+        return StoryboardStateResult(
+            activeJob = activeJob?.let {
+                ActiveStoryJob(jobId = it.id, status = it.status, createdAt = it.createdAt)
+            },
+            latestFinalStatus = latestFinalStatus,
+            failedCountSinceLastSuccess = failedCount,
+        )
     }
 
     private fun ownedStory(userId: Long, storyId: Long): Story {

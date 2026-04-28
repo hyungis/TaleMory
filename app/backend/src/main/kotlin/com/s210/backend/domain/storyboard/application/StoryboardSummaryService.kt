@@ -68,6 +68,17 @@ class StoryboardSummaryService(
         )
         val story = ownedStory(userId, storyId)
 
+        // 활성 본문 잡(STORY) 이 PENDING/RUNNING 이면 줄거리 새로 생성 거부.
+        // 진행 중인 본문이 stale grounding 을 받지 않도록 차단 + sessionStorage 비어 락이 풀린
+        // 엣지케이스(탭 닫고 재진입)에서도 BE 가 단단히 막아준다.
+        val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeStoryJob != null) {
+            log.warn("[SUMMARY:GEN] blocked — active story job exists jobId={}", activeStoryJob.id)
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
         val payload = buildPayload(story, prompt)
         val requestPayloadJson = objectMapper.writeValueAsString(payload)
 
@@ -118,6 +129,15 @@ class StoryboardSummaryService(
             userId, storyId, userPrompt.length,
         )
         val story = ownedStory(userId, storyId)
+
+        // 활성 본문 잡(STORY) 이 PENDING/RUNNING 이면 줄거리 재생성 거부 (generateSummary 와 동일 정책).
+        val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeStoryJob != null) {
+            log.warn("[SUMMARY:REGEN] blocked — active story job exists jobId={}", activeStoryJob.id)
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
 
         val previousJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
             storyId = storyId,

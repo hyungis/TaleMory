@@ -6,6 +6,7 @@ import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobR
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.entity.Story
+import com.s210.backend.domain.story.entity.StoryBoard
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
@@ -21,6 +22,7 @@ import org.mockito.Mockito.*
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import java.time.LocalDate
 import java.util.Optional
 
 /**
@@ -203,6 +205,279 @@ class StoryboardGenerationServiceGuardTest {
     }
 
     // -----------------------------------------------------------------------
+    // editSummary — STORY_ALREADY_IN_PROGRESS guard + immutability of summary job
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `editSummary throws STORY_ALREADY_IN_PROGRESS when active PENDING story job exists`() {
+        stubOwnedStory()
+
+        val activePendingJob = buildJob(80L, JobType.STORYBOARD_STORY, JobStatus.PENDING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activePendingJob)
+
+        val ex = assertThrows<BusinessException> {
+            service.editSummary(userId, storyId, "사용자 편집 줄거리")
+        }
+
+        assertEquals(StoryErrorCode.STORY_ALREADY_IN_PROGRESS, ex.errorCode)
+        // 가드에서 즉시 차단 — storyBoard / story 어떤 write 도 일어나지 않아야 함
+        verify(storyBoardRepository, never()).findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
+    }
+
+    @Test
+    fun `editSummary throws STORY_ALREADY_IN_PROGRESS when active RUNNING story job exists`() {
+        stubOwnedStory()
+
+        val activeRunningJob = buildJob(81L, JobType.STORYBOARD_STORY, JobStatus.RUNNING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activeRunningJob)
+
+        val ex = assertThrows<BusinessException> {
+            service.editSummary(userId, storyId, "사용자 편집 줄거리")
+        }
+
+        assertEquals(StoryErrorCode.STORY_ALREADY_IN_PROGRESS, ex.errorCode)
+    }
+
+    @Test
+    fun `editSummary updates synopsis and storyBoard story but does NOT mutate summary job result payload`() {
+        // immutability 보장: 잡 테이블은 history 로 둔다.
+        stubOwnedStory()
+
+        // 활성 본문 잡 없음
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+
+        val storyBoard = StoryBoard(
+            storyId = storyId,
+            prompt = "",
+            story = "기존 한글 줄거리",
+            createAt = LocalDate.now(),
+        )
+        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId))
+            .thenReturn(storyBoard)
+
+        val edited = "사용자가 직접 다듬은 줄거리"
+        service.editSummary(userId, storyId, edited)
+
+        // story_board.story 갱신 검증
+        assertEquals(edited, storyBoard.story)
+        // 잡 결과 페이로드를 건드리지 않아야 — 이전 디자인의 JSON_SET 회귀 방지.
+        // editSummary 가 더 이상 SUMMARY SUCCESS 잡을 조회조차 하지 않음을 검증.
+        verify(jobRepository, never()).findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS
+        )
+    }
+
+    @Test
+    fun `editSummary throws on blank input`() {
+        stubOwnedStory()
+
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+
+        val storyBoard = StoryBoard(
+            storyId = storyId,
+            prompt = "",
+            story = "기존",
+            createAt = LocalDate.now(),
+        )
+        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId))
+            .thenReturn(storyBoard)
+
+        val ex = assertThrows<BusinessException> {
+            service.editSummary(userId, storyId, "   ")
+        }
+        // INVALID_INPUT — 잡 페이로드 건드리지 않는 것은 위 테스트가 보장.
+        assertNotNull(ex.errorCode)
+    }
+
+    // -----------------------------------------------------------------------
+    // findStoryboardState — Step 4 mount recovery + 한도 초과 분기 데이터
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `findStoryboardState returns activeJob when PENDING story job exists`() {
+        stubOwnedStory()
+
+        val activeJob = buildJob(100L, JobType.STORYBOARD_STORY, JobStatus.PENDING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activeJob)
+        // 마지막 SUCCESS 잡 — 없음
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(null)
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 0L
+            )
+        ).thenReturn(0L)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNotNull(result.activeJob)
+        assertEquals(100L, result.activeJob!!.jobId)
+        assertEquals(JobStatus.PENDING, result.activeJob.status)
+        // 활성 잡 있을 땐 latestFinalStatus 는 의미 없음 → null
+        assertNull(result.latestFinalStatus)
+        assertEquals(0L, result.failedCountSinceLastSuccess)
+        // 활성 잡 있으면 latest 잡 조회는 일어나지 않아야 함 (불필요 쿼리 방지)
+        verify(jobRepository, never()).findFirstByStoryIdAndJobTypeOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY
+        )
+    }
+
+    @Test
+    fun `findStoryboardState returns FAILED latestFinalStatus and counts failures since last SUCCESS`() {
+        stubOwnedStory()
+
+        // 활성 잡 없음
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+        // 마지막 SUCCESS 잡: id=50
+        val lastSuccess = buildJob(50L, JobType.STORYBOARD_STORY, JobStatus.SUCCESS, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(lastSuccess)
+        // SUCCESS 이후 FAILED 가 2건
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 50L
+            )
+        ).thenReturn(2L)
+        // 가장 최근 STORY 잡 (status 무관) — FAILED
+        val latestFailed = buildJob(70L, JobType.STORYBOARD_STORY, JobStatus.FAILED, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY)
+        ).thenReturn(latestFailed)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.activeJob)
+        assertEquals(JobStatus.FAILED, result.latestFinalStatus)
+        assertEquals(2L, result.failedCountSinceLastSuccess)
+    }
+
+    @Test
+    fun `findStoryboardState counts all FAILED when no SUCCESS exists`() {
+        stubOwnedStory()
+
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+        // SUCCESS 없음
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(null)
+        // 누적 FAILED 3 건 (한도 초과 케이스)
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 0L
+            )
+        ).thenReturn(3L)
+        val latestFailed = buildJob(33L, JobType.STORYBOARD_STORY, JobStatus.FAILED, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY)
+        ).thenReturn(latestFailed)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.activeJob)
+        assertEquals(JobStatus.FAILED, result.latestFinalStatus)
+        assertEquals(3L, result.failedCountSinceLastSuccess)
+    }
+
+    @Test
+    fun `findStoryboardState returns SUCCESS latestFinalStatus and 0 failedCount after fresh success`() {
+        stubOwnedStory()
+
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+        val lastSuccess = buildJob(80L, JobType.STORYBOARD_STORY, JobStatus.SUCCESS, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(lastSuccess)
+        // SUCCESS 이후 FAILED 없음 — 카운터 0
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 80L
+            )
+        ).thenReturn(0L)
+        // latest = SUCCESS
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY)
+        ).thenReturn(lastSuccess)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.activeJob)
+        assertEquals(JobStatus.SUCCESS, result.latestFinalStatus)
+        assertEquals(0L, result.failedCountSinceLastSuccess)
+    }
+
+    @Test
+    fun `findStoryboardState returns null latestFinalStatus when no STORY jobs exist`() {
+        stubOwnedStory()
+
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(null)
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 0L
+            )
+        ).thenReturn(0L)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY)
+        ).thenReturn(null)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.activeJob)
+        assertNull(result.latestFinalStatus)
+        assertEquals(0L, result.failedCountSinceLastSuccess)
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
@@ -225,7 +500,7 @@ class StoryboardGenerationServiceGuardTest {
         moralTheme = "courage",
         storyQuest = "find treasure",
         recurringMotif = "rainbow",
-        readingLevel = "BEGINNER",
+        keyEmotionalBeats = listOf("hopeful", "warm", "playful"),
         usage = UsageInfo(
             model = "gpt-4",
             inputTokens = 100,

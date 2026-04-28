@@ -42,4 +42,17 @@ interface StoryGenerationJobRepository : JpaRepository<StoryGenerationJob, Long>
         storyId: Long,
         jobType: JobType,
     ): StoryGenerationJob?
+
+    /**
+     * 한 storyId 의 특정 jobType + status 조합에서 id 가 주어진 임계값보다 큰 잡 개수.
+     *
+     * "마지막 SUCCESS 이후 FAILED 개수" 카운트에 사용. lastSuccessJobId 가 없으면 0 을 넣어
+     * 모든 FAILED 를 카운트, 있으면 그 id 보다 큰 FAILED 만 카운트.
+     */
+    fun countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+        storyId: Long,
+        jobType: JobType,
+        status: JobStatus,
+        id: Long,
+    ): Long
 }

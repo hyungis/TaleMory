@@ -229,7 +229,7 @@ class StoryboardResultListenerTest {
                 "moralTheme": "courage",
                 "storyQuest": "find treasure",
                 "recurringMotif": "rainbow",
-                "readingLevel": "BEGINNER",
+                "keyEmotionalBeats": ["hopeful", "warm", "playful"],
                 "usage": {
                     "model": "gpt-4",
                     "inputTokens": 100,
