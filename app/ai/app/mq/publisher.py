@@ -1,8 +1,11 @@
 import json
+import logging
 from typing import Literal
 from typing import Any
 
 import pika
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.schemas.mq_storyboard_image import (
@@ -100,6 +103,14 @@ class StoryResultPublisher:
         )
 
     def _publish(self, routing_key: str, message: dict) -> None:
+        logger.info(
+            "[STORY/SUMMARY:PUB] exchange=%s, routingKey=%s, type=%s, jobId=%s, storyId=%s",
+            settings.RABBITMQ_RESULT_EXCHANGE,
+            routing_key,
+            message.get("type"),
+            message.get("jobId"),
+            message.get("storyId"),
+        )
         self._channel.basic_publish(
             exchange=settings.RABBITMQ_RESULT_EXCHANGE,
             routing_key=routing_key,

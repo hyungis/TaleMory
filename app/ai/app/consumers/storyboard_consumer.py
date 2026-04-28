@@ -71,6 +71,10 @@ def _dispatch_generate_message(
     body: bytes,
     publisher: StoryResultPublisher,
 ) -> None:
+    logger.info(
+        "[STORY:GEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
+        delivery_tag, settings.RABBITMQ_GENERATE_QUEUE, len(body),
+    )
     try:
         handle_generate_message(body=body, publisher=publisher)
     except Exception:
@@ -86,6 +90,10 @@ def _dispatch_summary_generate_message(
     body: bytes,
     publisher: StoryResultPublisher,
 ) -> None:
+    logger.info(
+        "[SUMMARY:GEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
+        delivery_tag, settings.RABBITMQ_SUMMARY_GENERATE_QUEUE, len(body),
+    )
     try:
         handle_summary_generate_message(body=body, publisher=publisher)
     except Exception as exc:
@@ -104,6 +112,10 @@ def _dispatch_regenerate_message(
     body: bytes,
     publisher: StoryResultPublisher,
 ) -> None:
+    logger.info(
+        "[STORY:REGEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
+        delivery_tag, settings.RABBITMQ_REGENERATE_QUEUE, len(body),
+    )
     try:
         handle_regenerate_message(body=body, publisher=publisher)
     except Exception:
@@ -119,6 +131,10 @@ def _dispatch_summary_regenerate_message(
     body: bytes,
     publisher: StoryResultPublisher,
 ) -> None:
+    logger.info(
+        "[SUMMARY:REGEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
+        delivery_tag, settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE, len(body),
+    )
     try:
         handle_summary_regenerate_message(body=body, publisher=publisher)
     except Exception as exc:
@@ -135,6 +151,10 @@ def handle_generate_message(body: bytes, publisher: StoryResultPublisher) -> Non
     message = StoryGenerateJobMessage.model_validate_json(body)
     request = _merge_story_id_generate(message.storyId, message.payload)
     story_id = _story_id_from_generate(message.storyId, request)
+    logger.info(
+        "[STORY:GEN] received — jobId=%s, storyId=%s, photos=%d, children=%d",
+        message.jobId, story_id, len(request.photos), len(request.children),
+    )
 
     try:
         result = generate_storyboard(request)
@@ -161,12 +181,20 @@ def handle_generate_message(body: bytes, publisher: StoryResultPublisher) -> Non
         payload=result,
         action="GENERATE",
     )
+    logger.info(
+        "[STORY:GEN] published result — jobId=%s, pages=%d, totalWords=%s, costUsd=%s",
+        message.jobId, len(result.pages), result.totalWordCount, result.usage.costUsd,
+    )
 
 
 def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher) -> None:
     message = StorySummaryGenerateJobMessage.model_validate_json(body)
     request = _merge_story_id_summary(message.storyId, message.payload)
     story_id = _story_id_from_summary(message.storyId, request)
+    logger.info(
+        "[SUMMARY:GEN] received — jobId=%s, storyId=%s, photos=%d, children=%d",
+        message.jobId, story_id, len(request.photos), len(request.children),
+    )
 
     try:
         result = generate_storyboard_summary(request)
@@ -191,12 +219,20 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
         payload=result,
         action="GENERATE",
     )
+    logger.info(
+        "[SUMMARY:GEN] published result — jobId=%s, summaryKoLen=%d, costUsd=%s",
+        message.jobId, len(result.summaryKo), result.usage.costUsd,
+    )
 
 
 def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublisher) -> None:
     message = StorySummaryRegenerateJobMessage.model_validate_json(body)
     request = _merge_story_id_summary_regenerate(message.storyId, message.payload)
     story_id = _story_id_from_summary_regenerate(message.storyId, request)
+    logger.info(
+        "[SUMMARY:REGEN] received — jobId=%s, storyId=%s, userPromptLen=%d",
+        message.jobId, story_id, len(request.userPrompt or ""),
+    )
 
     try:
         result = regenerate_storyboard_summary(request)
@@ -223,12 +259,20 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
         payload=result,
         action="REGENERATE",
     )
+    logger.info(
+        "[SUMMARY:REGEN] published result — jobId=%s, summaryKoLen=%d, costUsd=%s",
+        message.jobId, len(result.summaryKo), result.usage.costUsd,
+    )
 
 
 def handle_regenerate_message(body: bytes, publisher: StoryResultPublisher) -> None:
     message = StoryRegenerateJobMessage.model_validate_json(body)
     request = _merge_story_id_regenerate(message.storyId, message.payload)
     story_id = _story_id_from_regenerate(message.storyId, request)
+    logger.info(
+        "[STORY:REGEN] received — jobId=%s, storyId=%s",
+        message.jobId, story_id,
+    )
 
     try:
         result = regenerate_storyboard(request)
@@ -254,6 +298,10 @@ def handle_regenerate_message(body: bytes, publisher: StoryResultPublisher) -> N
         story_id=story_id,
         payload=result,
         action="REGENERATE",
+    )
+    logger.info(
+        "[STORY:REGEN] published result — jobId=%s, pages=%d, costUsd=%s",
+        message.jobId, len(result.pages), result.usage.costUsd,
     )
 
 
