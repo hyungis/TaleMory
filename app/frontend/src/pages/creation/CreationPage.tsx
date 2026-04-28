@@ -7,6 +7,7 @@ import {
   StoryboardEditorStep,
   StyleSelectorStep,
   VoiceCloneStep,
+  HighlightOutroStep,
   FinalPreviewStep,
   PublishStoryStep,
   useStoryCreationFlow,
@@ -147,6 +148,15 @@ export function CreationPage() {
       )}
 
       {flow.currentStep === 7 && (
+        <HighlightOutroStep
+          storyId={flow.storyId}
+          projectData={flow.projectData}
+          onBack={handleBack}
+          onNext={flow.handleNext}
+        />
+      )}
+
+      {flow.currentStep === 8 && (
         <FinalPreviewStep
           projectData={flow.projectData}
           onBack={handleBack}
@@ -155,7 +165,7 @@ export function CreationPage() {
         />
       )}
 
-      {flow.currentStep === 8 && (
+      {flow.currentStep === 9 && (
         <PublishStoryStep onBack={handleBack} onExit={goToBookshelf} />
       )}
     </div>

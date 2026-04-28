@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface StoryOutroRepository : JpaRepository<StoryOutro, Long> {
     fun findByStoryId(storyId: Long): StoryOutro?
+    fun findByStoryIdAndDeletedAtIsNull(storyId: Long): StoryOutro?
 }
