@@ -1,6 +1,7 @@
 package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -17,6 +18,7 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryOutroReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.story.model.StoryStatus
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -43,11 +45,12 @@ class StoryConfirmService(
     private val storyboardPageRepository: StoryboardPageRepository,
     private val sceneSentenceRepository: SceneSentenceRepository,
     private val storyOutroRepository: StoryOutroRepository,
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val objectMapper: ObjectMapper,
-    // Task 13-14 에서 추가될 의존성:
-    //   IllustrationVersionRedisRepository, TtsCacheService, TtsService,
-    //   JobStatusRedisRepository
+    // Task 14 에서 추가될 의존성:
+    //   TtsCacheService, TtsService, JobStatusRedisRepository
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     @Transactional
     fun confirmStoryboard(storyId: Long, userId: Long): ConfirmStoryboardResult {
         // 1) Story row 락 + 소유권/상태 검증
@@ -159,7 +162,22 @@ class StoryConfirmService(
             )
         )
 
-        // 9) 결과 반환 — Task 13 Redis versions init, Task 14 cacheHits/cacheMisses/MQ publish 추가
+        // 9) Redis versions 초기화 — best-effort, 실패해도 응답은 정상
+        createdScenes.forEach { scene ->
+            try {
+                illustrationVersionRedisRepository.pushVersion(
+                    sceneId = scene.id,
+                    version = 1,
+                    url = scene.illustrationUrl ?: "",
+                    prompt = null,
+                    jobId = imageJob.id,
+                )
+            } catch (e: Exception) {
+                log.warn("Redis versions init failed for scene {}: {}", scene.id, e.message)
+            }
+        }
+
+        // 10) 결과 반환 — Task 14 cacheHits/cacheMisses/MQ publish 추가
         return ConfirmStoryboardResult(
             jobId = ttsJob.id,
             jobType = "TTS",

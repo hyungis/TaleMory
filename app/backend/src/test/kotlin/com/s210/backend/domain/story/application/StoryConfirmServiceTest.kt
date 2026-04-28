@@ -1,6 +1,7 @@
 package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -29,6 +30,7 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.doThrow
 import org.mockito.junit.jupiter.MockitoExtension
 import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
@@ -48,6 +50,7 @@ class StoryConfirmServiceTest {
     private val storyboardPageRepository: StoryboardPageRepository = mock(StoryboardPageRepository::class.java)
     private val sceneSentenceRepository: SceneSentenceRepository = mock(SceneSentenceRepository::class.java)
     private val storyOutroRepository: StoryOutroRepository = mock(StoryOutroRepository::class.java)
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository = mock(IllustrationVersionRedisRepository::class.java)
     private val objectMapper: ObjectMapper = ObjectMapper()
 
     private val service = StoryConfirmService(
@@ -58,6 +61,7 @@ class StoryConfirmServiceTest {
         storyboardPageRepository = storyboardPageRepository,
         sceneSentenceRepository = sceneSentenceRepository,
         storyOutroRepository = storyOutroRepository,
+        illustrationVersionRedisRepository = illustrationVersionRedisRepository,
         objectMapper = objectMapper,
     )
 
@@ -282,6 +286,135 @@ class StoryConfirmServiceTest {
     }
 
     // -----------------------------------------------------------------------
+    // 9. Redis versions init on confirm (Task 13)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `confirm initializes redis versions for each scene`() {
+        // Setup validation pass (3 scenes)
+        val story = createStory(status = StoryStatus.DRAFT, voiceProfileId = 5L)
+        `when`(storyRepository.findByIdAndUserId(storyId, userId)).thenReturn(story)
+
+        val resultPayload = minimalPayload(pageCount = 3)
+        val storyJob = createJob(storyId = storyId, jobType = JobType.STORYBOARD_STORY,
+            status = JobStatus.SUCCESS, resultPayload = resultPayload)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY))
+            .thenReturn(storyJob)
+
+        val imageJob = createJob(storyId = storyId, jobType = JobType.STORYBOARD_IMAGE, status = JobStatus.SUCCESS)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE))
+            .thenReturn(imageJob)
+
+        `when`(sceneRepository.countByStoryId(storyId)).thenReturn(0L)
+
+        val storyBoard = StoryBoard(id = 300L, storyId = storyId, prompt = "p", story = "s",
+            createAt = LocalDate.now())
+        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId))
+            .thenReturn(storyBoard)
+
+        val pages = (1..3).map { n ->
+            StoryboardPage(id = n.toLong(), storyBoardId = 300L, pageNumber = n,
+                imageUrl = "https://img/$n.png")
+        }
+        `when`(storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(300L)).thenReturn(pages)
+
+        `when`(sceneRepository.save(org.mockito.ArgumentMatchers.any(Scene::class.java))).thenAnswer { invocation ->
+            val s = invocation.getArgument<Scene>(0)
+            Scene(id = s.pageNumber.toLong(), storyId = s.storyId, pageNumber = s.pageNumber,
+                illustrationUrl = s.illustrationUrl)
+        }
+
+        val ttsJob = createJob(storyId = storyId, jobType = JobType.TTS, status = JobStatus.PENDING)
+        `when`(jobRepository.save(org.mockito.ArgumentMatchers.argThat { j: StoryGenerationJob ->
+            j.jobType == JobType.TTS
+        })).thenReturn(ttsJob)
+
+        `when`(storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId)).thenReturn(null)
+        `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
+            .thenAnswer { it.getArgument(0) }
+
+        service.confirmStoryboard(storyId, userId)
+
+        // pushVersion called 3 times (once per scene)
+        verify(illustrationVersionRedisRepository, times(3)).pushVersion(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.eq(1),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.eq(null),
+            org.mockito.ArgumentMatchers.anyLong()
+        )
+    }
+
+    @Test
+    fun `confirm continues even if redis push fails`() {
+        // Setup validation pass (3 scenes)
+        val story = createStory(status = StoryStatus.DRAFT, voiceProfileId = 5L)
+        `when`(storyRepository.findByIdAndUserId(storyId, userId)).thenReturn(story)
+
+        val resultPayload = minimalPayload(pageCount = 3)
+        val storyJob = createJob(storyId = storyId, jobType = JobType.STORYBOARD_STORY,
+            status = JobStatus.SUCCESS, resultPayload = resultPayload)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY))
+            .thenReturn(storyJob)
+
+        val imageJob = createJob(storyId = storyId, jobType = JobType.STORYBOARD_IMAGE, status = JobStatus.SUCCESS)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE))
+            .thenReturn(imageJob)
+
+        `when`(sceneRepository.countByStoryId(storyId)).thenReturn(0L)
+
+        val storyBoard = StoryBoard(id = 300L, storyId = storyId, prompt = "p", story = "s",
+            createAt = LocalDate.now())
+        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId))
+            .thenReturn(storyBoard)
+
+        val pages = (1..3).map { n ->
+            StoryboardPage(id = n.toLong(), storyBoardId = 300L, pageNumber = n,
+                imageUrl = "https://img/$n.png")
+        }
+        `when`(storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(300L)).thenReturn(pages)
+
+        `when`(sceneRepository.save(org.mockito.ArgumentMatchers.any(Scene::class.java))).thenAnswer { invocation ->
+            val s = invocation.getArgument<Scene>(0)
+            Scene(id = s.pageNumber.toLong(), storyId = s.storyId, pageNumber = s.pageNumber,
+                illustrationUrl = s.illustrationUrl)
+        }
+
+        val ttsJob = createJob(storyId = storyId, jobType = JobType.TTS, status = JobStatus.PENDING)
+        `when`(jobRepository.save(org.mockito.ArgumentMatchers.argThat { j: StoryGenerationJob ->
+            j.jobType == JobType.TTS
+        })).thenReturn(ttsJob)
+
+        `when`(storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId)).thenReturn(null)
+        `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
+            .thenAnswer { it.getArgument(0) }
+
+        // Mock pushVersion to throw on first call, succeed on rest
+        var callCount = 0
+        doThrow(RuntimeException("Redis connection failed"))
+            .`when`(illustrationVersionRedisRepository).pushVersion(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+            )
+
+        // Should complete successfully despite first Redis call throwing
+        val result = service.confirmStoryboard(storyId, userId)
+        assertEquals(3, result.sceneCount)
+
+        // All 3 pushVersion calls attempted (best-effort, no early exit)
+        verify(illustrationVersionRedisRepository, times(3)).pushVersion(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyInt(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        )
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
@@ -359,5 +492,10 @@ class StoryConfirmServiceTest {
         `when`(jobRepository.save(org.mockito.ArgumentMatchers.argThat { j: StoryGenerationJob ->
             j.jobType == JobType.TTS
         })).thenReturn(ttsJob)
+
+        // Task 13: Redis versions init (best-effort, default to no-op)
+        `when`(storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId)).thenReturn(null)
+        `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
+            .thenAnswer { it.getArgument(0) }
     }
 }
