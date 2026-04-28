@@ -1,9 +1,11 @@
+import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import { Library, PlusCircle } from 'lucide-react'
 import { DUMMY_STORIES, type Story } from '../../../entities/story'
 import { StoryGrid } from '../story-list'
 import { StoryFilter } from '../story-filter'
 import { StorySort } from '../story-sort'
 import { useBookshelf } from '../model/useBookshelf'
+import { generateBookshelfParticles } from '../lib/generateBookshelfParticles'
 import { BookshelfPagination } from './BookshelfPagination'
 import '../styles/bookshelf.css'
 
@@ -22,6 +24,12 @@ interface BookshelfModalProps {
   stories?: Story[]
   /** 목록 로딩 중 여부. */
   isLoading?: boolean
+  /**
+   * 우상단 close 버튼 옆에 추가로 띄울 메뉴 / 액션 슬롯.
+   * features/bookshelf 가 외부 컴포넌트(예: pages/main 의 햄버거 메뉴) 를 직접 import 하지 않도록
+   * slot 으로 받는다. 호출자가 `<TopRightMenu />` 등을 그대로 넣어주면 된다.
+   */
+  topRightMenu?: ReactNode
 }
 
 /**
@@ -41,15 +49,47 @@ export function BookshelfModal({
   onDeleteStory,
   stories = DUMMY_STORIES,
   isLoading = false,
+  topRightMenu,
 }: BookshelfModalProps) {
   const { paged, filtered, activeFilters, toggleFilter, sort, updateSort, page, setPage, totalPages } =
     useBookshelf(stories)
+
+  /**
+   * 책장 배경 위로 부유하는 amber/gold 입자. 매 마운트마다 random 으로 한 번 생성하면
+   * 충분 (CSS 키프레임만으로 무한 반복). 모달이 닫혔다 다시 열리면 새 좌표가 생성된다.
+   */
+  const particles = useMemo(() => generateBookshelfParticles(), [])
 
   if (!isOpen) return null
 
   return (
     <div className="library-modal-overlay" onClick={onClose}>
       <div className="bookshelf-modal" onClick={e => e.stopPropagation()}>
+        {/* 배경 부유 입자 — amber/gold 톤 햇살 먼지. pointer-events: none 으로 모든 인터랙션 통과. */}
+        <div className="bookshelf-particles" aria-hidden="true">
+          {particles.map(p => (
+            <span
+              key={p.id}
+              className="bookshelf-particle"
+              style={
+                {
+                  left: p.left,
+                  width: p.size,
+                  height: p.size,
+                  '--duration': p.duration,
+                  '--delay': p.delay,
+                  '--drift': p.drift,
+                } as unknown as CSSProperties
+              }
+            />
+          ))}
+        </div>
+
+        {/* 우상단 외부 슬롯 (햄버거 메뉴 등). close 버튼 왼쪽에 위치. */}
+        {topRightMenu && (
+          <div className="bookshelf-modal__top-right-slot">{topRightMenu}</div>
+        )}
+
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="닫기">
           ×
         </button>

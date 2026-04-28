@@ -22,6 +22,8 @@ export function mapApiToStory(api: StoryApiResponse): Story {
     id: api.id,
     title: api.title ?? '제목 없는 동화',
     date: api.createdAt.split('T')[0],
+    // 정렬용 — 시간 정밀도까지 보존된 datetime ISO 원본.
+    createdAt: api.createdAt,
     style: '동화',
     pages: api.sceneCount,
     level: DIFFICULTY_MAP[api.difficulty] ?? '초급',

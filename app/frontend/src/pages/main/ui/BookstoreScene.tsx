@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+// (요정 전환 연출은 일시적으로 비활성화 — 추후 Lottie 로 교체 예정.
+//  관련 CSS / public/fairy*.png / public/book.png 는 그대로 두어 손쉽게 재활성화 가능.)
 import { useNavigate } from 'react-router-dom'
 import { BookshelfModal, getMyStories, deleteStoryById, getShareLink, publishStory, mapApiToStory } from '../../../features/bookshelf'
 import type { Story } from '../../../entities/story'
@@ -10,6 +12,7 @@ import {
   clearCreationProgressSnapshot,
 } from '../../../features/story-creation'
 import type { StoryDraftResponse } from '../../../features/story-creation'
+import { TopRightMenu } from './TopRightMenu'
 
 interface BookstoreSceneProps {
   /**
@@ -103,36 +106,31 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
    *  2) 있으면 DraftResumeModal 오픈 → onResume / onStartNew 에서 실제 네비게이션
    *  3) 없으면 빈 상태로 바로 /creation 진입
    *
-   * 네트워크 실패 시엔 빈 상태로 진입하는 것이 최악의 UX 이므로,
-   * 에러 뱃지를 노출하고 기존(empty) 플로우로 폴백한다.
+   * 네트워크 실패 시엔 에러 뱃지 + 빈 상태로 폴백 (최악의 UX 회피).
    */
   const handleCreateStory = useCallback(async () => {
     if (isResolvingDraft) return
     setDraftError(null)
     setIsResolvingDraft(true)
+
     try {
-      const result = await getDraftStory()
-      if (result) {
-        setDraft(result)
+      const draftResult = await getDraftStory()
+      if (draftResult) {
+        setDraft(draftResult)
         setIsLibraryOpen(false)
         return
       }
-      // DRAFT 없음 — 바로 진입 (empty state).
-      // sessionStorage 의 이전 작업 snapshot 을 비워 stale storyId 가 PATCH 모드를
-      // 트리거하지 않도록 명시 reset (특히 dev DB 리셋 후 새 동화 시작 케이스).
-      setIsLibraryOpen(false)
-      clearCreationProgressSnapshot()
-      navigate(ROUTES.creation)
-    } catch (err) {
-      // 조회 실패 → 기존 동작(빈 상태 진입) 으로 폴백.
-      const message = err instanceof Error ? err.message : '초안 조회에 실패했습니다.'
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '초안 조회에 실패했습니다.'
       setDraftError(message)
-      setIsLibraryOpen(false)
-      clearCreationProgressSnapshot()
-      navigate(ROUTES.creation)
     } finally {
       setIsResolvingDraft(false)
     }
+
+    // draft 없음 또는 조회 실패 → navigate. (sessionStorage stale storyId 정리 포함)
+    clearCreationProgressSnapshot()
+    navigate(ROUTES.creation)
   }, [isResolvingDraft, navigate])
 
   /** 이어서 작성 — location state 로 draft 넘겨 CreationPage 가 rehydrate. */
@@ -142,7 +140,7 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
     navigate(ROUTES.creation, { state: { draft } })
   }, [draft, navigate])
 
-  /** 새로 시작 — 기존 DRAFT soft delete 후 빈 상태로 진입. */
+  /** 새로 시작 — 기존 DRAFT soft delete 후 즉시 navigate (요정 연출 없음). */
   const handleStartNew = useCallback(async () => {
     if (!draft || isResolvingDraft) return
     setIsResolvingDraft(true)
@@ -212,6 +210,7 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
         onDeleteStory={handleDeleteStory}
         stories={stories}
         isLoading={storiesLoading}
+        topRightMenu={<TopRightMenu />}
       />
 
       {draft && (
@@ -235,6 +234,9 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
           {toastMessage}
         </div>
       )}
+
+      {/* (요정 / 책 등장 전환 연출은 일시 비활성화 — 추후 Lottie 로 부활 예정.
+           관련 CSS(.fairy-transition*) / public assets 는 그대로 보존.) */}
     </>
   )
 }

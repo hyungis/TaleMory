@@ -17,9 +17,14 @@ import type { SVGProps } from 'react'
  */
 interface IllustrationMockupProps extends SVGProps<SVGSVGElement> {
   variant?: 'scenery' | 'minimal'
+  /**
+   * 우상단 달/해 원을 표시할지. 'scenery' variant 에서만 의미 있음. 기본 true.
+   * 책장 카드처럼 표지가 좁아 원이 거슬리는 경우 false 로 끈다.
+   */
+  showMoon?: boolean
 }
 
-export function IllustrationMockup({ variant = 'scenery', ...rest }: IllustrationMockupProps) {
+export function IllustrationMockup({ variant = 'scenery', showMoon = true, ...rest }: IllustrationMockupProps) {
   if (variant === 'minimal') {
     return (
       <svg
@@ -54,9 +59,13 @@ export function IllustrationMockup({ variant = 'scenery', ...rest }: Illustratio
         <circle cx="186" cy="28" r="1" />
       </g>
 
-      {/* 달/해 */}
-      <circle cx="150" cy="28" r="11" fill="currentColor" opacity="0.35" />
-      <circle cx="150" cy="28" r="11" fill="none" stroke="currentColor" strokeWidth="0.4" opacity="0.5" />
+      {/* 달/해 — showMoon=false 일 때 숨김 */}
+      {showMoon && (
+        <>
+          <circle cx="150" cy="28" r="11" fill="currentColor" opacity="0.35" />
+          <circle cx="150" cy="28" r="11" fill="none" stroke="currentColor" strokeWidth="0.4" opacity="0.5" />
+        </>
+      )}
 
       {/* 먼 산 (뒤) */}
       <path
