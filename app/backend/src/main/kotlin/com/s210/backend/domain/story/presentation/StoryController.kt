@@ -2,6 +2,7 @@ package com.s210.backend.domain.story.presentation
 
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.story.application.StoryConfirmService
 import com.s210.backend.domain.story.application.StoryService
 import com.s210.backend.domain.story.application.StoryViewerService
 import com.s210.backend.domain.story.presentation.request.CreateStoryRequest
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*
 class StoryController(
     private val storyService: StoryService,
     private val storyViewerService: StoryViewerService,
+    private val storyConfirmService: StoryConfirmService,
 ) {
 
     // 동화 목록 조회
@@ -121,6 +123,27 @@ class StoryController(
     ): ResponseEntity<ApiResponse<ShareLinkResponse>> {
         val result = storyService.findShareLink(user.userId, storyId)
         return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    // 스토리보드 확정 — TTS Job 시작 (비동기 202 Accepted)
+    @PostMapping("/{storyId}/storyboard/confirm")
+    fun storyboardConfirm(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<ConfirmStoryboardResponse>> {
+        val result = storyConfirmService.confirmStoryboard(
+            storyId = storyId,
+            userId = user.userId,
+        )
+        return ResponseEntity.accepted().body(ApiResponse(data = ConfirmStoryboardResponse(
+            jobId = result.jobId,
+            jobType = result.jobType,
+            status = result.status,
+            sceneCount = result.sceneCount,
+            sentenceCount = result.sentenceCount,
+            cacheHits = result.cacheHits,
+            cacheMisses = result.cacheMisses,
+        )))
     }
 
 }

@@ -169,3 +169,18 @@ data class CharacterAnchorView(
     val y: Double?,
     val scale: Double?
 )
+
+/**
+ * POST /api/stories/{storyId}/storyboard/confirm 응답.
+ * TTS Job 을 큐에 넣고 즉시 반환 (비동기 시작 = 202 Accepted).
+ * 전부 캐시 적중(status=SUCCESS)인 경우도 202 로 통일.
+ */
+data class ConfirmStoryboardResponse(
+    val jobId: Long,
+    val jobType: String,
+    val status: String,
+    val sceneCount: Int,
+    val sentenceCount: Int,
+    val cacheHits: Int,
+    val cacheMisses: Int,
+)
