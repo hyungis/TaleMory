@@ -157,6 +157,15 @@ class SceneController(
 
     // ── 아웃트로 ──
 
+    // 아웃트로 조회
+    @GetMapping("/outro")
+    fun outroDetails(
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<OutroResponse?>> {
+        val result = highlightOutroService.findOutro(storyId)
+        return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
     // 마무리 멘트 텍스트 저장
     @PutMapping("/outro")
     fun outroModify(

@@ -18,7 +18,6 @@ import type {
   StoryDraftResponse,
 } from '../../features/story-creation'
 import { ROUTES, buildViewerPath } from '../../shared/constants'
-import { DUMMY_STORIES } from '../../entities/story'
 // bookshelf 모달과 동일 테마(step-forest-modal / bookshelf-scroll / bookshelf-fade-in)를 재사용하므로
 // 해당 CSS 가 import 되어야 한다.
 import '../../features/bookshelf/styles/bookshelf.css'
@@ -158,15 +157,21 @@ export function CreationPage() {
 
       {flow.currentStep === 8 && (
         <FinalPreviewStep
-          projectData={flow.projectData}
+          storyId={flow.storyId}
           onBack={handleBack}
           onSaveToBookshelf={goToBookshelf}
-          onOpenViewer={() => navigate(buildViewerPath(DUMMY_STORIES[0]?.id ?? 1))}
+          onOpenViewer={() => {
+            if (flow.storyId) navigate(buildViewerPath(flow.storyId))
+          }}
         />
       )}
 
       {flow.currentStep === 9 && (
-        <PublishStoryStep onBack={handleBack} onExit={goToBookshelf} />
+        <PublishStoryStep
+          storyId={flow.storyId}
+          onBack={handleBack}
+          onExit={goToBookshelf}
+        />
       )}
     </div>
   )
