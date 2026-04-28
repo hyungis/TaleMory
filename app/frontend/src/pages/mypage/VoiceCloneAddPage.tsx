@@ -31,7 +31,7 @@ import '../../features/bookshelf/styles/bookshelf.css'
  * 동화 생성 플로우의 `VoiceCloneStep` UI 를 기반으로 하되, 문맥에 맞춰 포팅:
  *  - "STEP 06" 스텝 카운터 헤더 → "마이페이지로" back 버튼 + "목소리 추가" 타이틀
  *  - "동화책 만들기" CTA → 서버 저장 후 자동으로 /mypage 복귀
- *  - POST /api/v1/voice-profiles/presigned-url → S3 PUT → POST /api/v1/voice-profiles 저장
+ *  - POST /api/voice-profiles/presigned-url → S3 PUT → POST /api/voice-profiles 저장
  */
 export function VoiceCloneAddPage() {
   const navigate = useNavigate()

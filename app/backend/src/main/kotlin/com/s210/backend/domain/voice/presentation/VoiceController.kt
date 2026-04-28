@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping(value = ["/api", "/api/v1"])
+@RequestMapping("/api")
 class VoiceController(
     private val voiceService: VoiceService,
 ) {
