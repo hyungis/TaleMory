@@ -171,6 +171,17 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY` | — | `ai.result.image.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.image.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | — | `ai.result.image.regenerate.failed` |
+| `ENV_DEV_APP_FINAL_ILLUSTRATION_MODEL` | — | `black-forest-labs/flux-2-klein-9b` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | — | `ai.final-illustration.generate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | — | `ai.final-illustration.generate.item.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | — | `ai.final-illustration.revise.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY` | — | `ai.image.final-illustration.generate` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY` | — | `ai.image.final-illustration.generate.item` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY` | — | `ai.image.final-illustration.revise` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.final-illustration.generate.completed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY` | — | `ai.result.final-illustration.generate.failed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | — | `ai.result.final-illustration.revise.completed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | — | `ai.result.final-illustration.revise.failed` |
 | `ENV_DEV_APP_PROJECT_NAME` | — | `S210 AI API` |
 | `ENV_DEV_APP_APP_VERSION` | — | `0.1.0` |
 | `ENV_DEV_APP_ENVIRONMENT` | — | `local` |
@@ -327,6 +338,17 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.regenerate.failed` |
+| `ENV_DEV_APP_FINAL_ILLUSTRATION_MODEL` | no | `black-forest-labs/flux-2-klein-9b` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | no | `ai.final-illustration.generate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | no | `ai.final-illustration.generate.item.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | no | `ai.final-illustration.revise.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY` | no | `ai.image.final-illustration.generate` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY` | no | `ai.image.final-illustration.generate.item` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY` | no | `ai.image.final-illustration.revise` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.completed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.failed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.completed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.failed` |
 | `ENV_DEV_APP_VITE_TTS_API_BASE` | no | TTS API base URL (마이페이지 voice-profile) |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
 
@@ -363,5 +385,16 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.generate.failed` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.regenerate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.regenerate.failed` |
+| `ENV_MASTER_APP_FINAL_ILLUSTRATION_MODEL` | no | `black-forest-labs/flux-2-klein-9b` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | no | `ai.final-illustration.generate.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | no | `ai.final-illustration.generate.item.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | no | `ai.final-illustration.revise.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY` | no | `ai.image.final-illustration.generate` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY` | no | `ai.image.final-illustration.generate.item` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY` | no | `ai.image.final-illustration.revise` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.completed` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.failed` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.completed` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.failed` |
 | `ENV_MASTER_APP_VITE_TTS_API_BASE` | no | TTS API base URL (마이페이지 voice-profile) |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |

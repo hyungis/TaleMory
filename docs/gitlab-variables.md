@@ -109,7 +109,6 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AWS_S3_PREFIX=stories/tts
 AWS_S3_PUBLIC_BASE_URL=
 AI_WORKER_REPLICAS=1
-
 RABBITMQ_SUMMARY_GENERATE_QUEUE=ai.cpu.story.summary.request.queue
 RABBITMQ_SUMMARY_REGENERATE_QUEUE=ai.cpu.story.summary.regenerate.request.queue
 RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY=ai.cpu.story.summary.generate
@@ -122,6 +121,18 @@ STORYBOARD_SUMMARY_MODEL=gpt-5-nano
 STORYBOARD_SUMMARY_REASONING_EFFORT=high
 STORYBOARD_SUMMARY_INPUT_COST_PER_1M=0.05
 STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M=0.40
+
+FINAL_ILLUSTRATION_MODEL=black-forest-labs/flux-2-klein-9b
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE=ai.final-illustration.generate.request.queue
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE=ai.final-illustration.generate.item.request.queue
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE=ai.final-illustration.revise.request.queue
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY=ai.image.final-illustration.generate
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY=ai.image.final-illustration.generate.item
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY=ai.image.final-illustration.revise
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY=ai.result.final-illustration.generate.completed
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY=ai.result.final-illustration.generate.failed
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY=ai.result.final-illustration.revise.completed
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY=ai.result.final-illustration.revise.failed
 ```
 
 - [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
@@ -243,7 +254,6 @@ STORYBOARD_OUTPUT_COST_PER_1M=0.60
 AWS_S3_PREFIX=stories/tts
 AWS_S3_PUBLIC_BASE_URL=
 AI_WORKER_REPLICAS=2
-
 RABBITMQ_SUMMARY_GENERATE_QUEUE=ai.cpu.story.summary.request.queue
 RABBITMQ_SUMMARY_REGENERATE_QUEUE=ai.cpu.story.summary.regenerate.request.queue
 RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY=ai.cpu.story.summary.generate
@@ -256,6 +266,18 @@ STORYBOARD_SUMMARY_MODEL=gpt-5-nano
 STORYBOARD_SUMMARY_REASONING_EFFORT=high
 STORYBOARD_SUMMARY_INPUT_COST_PER_1M=0.05
 STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M=0.40
+
+FINAL_ILLUSTRATION_MODEL=black-forest-labs/flux-2-klein-9b
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE=ai.final-illustration.generate.request.queue
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE=ai.final-illustration.generate.item.request.queue
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE=ai.final-illustration.revise.request.queue
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY=ai.image.final-illustration.generate
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY=ai.image.final-illustration.generate.item
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY=ai.image.final-illustration.revise
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY=ai.result.final-illustration.generate.completed
+RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY=ai.result.final-illustration.generate.failed
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY=ai.result.final-illustration.revise.completed
+RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY=ai.result.final-illustration.revise.failed
 ```
 
 - [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료
