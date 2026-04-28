@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { isApiError } from '../../../../shared/api'
 import {
   DEFAULT_TTS_TEXT,
   TTS_API_BASE,
@@ -71,6 +72,12 @@ const audioUrlToBlob = async (audioUrl: string): Promise<Blob> => {
   const response = await fetch(audioUrl)
   if (!response.ok) throw new Error(`Audio fetch failed: ${response.status}`)
   return response.blob()
+}
+
+function getVoiceSaveErrorMessage(error: unknown): string {
+  if (isApiError(error)) return error.message
+  if (error instanceof Error) return error.message
+  return '목소리 저장에 실패했습니다. 다시 시도해 주세요.'
 }
 
 export function useVoiceClone(): UseVoiceCloneResult {
@@ -259,9 +266,10 @@ export function useVoiceClone(): UseVoiceCloneResult {
       await queryClient.invalidateQueries({ queryKey: ['voiceProfiles'] })
       await queryClient.invalidateQueries({ queryKey: ['voiceProfile', profile.id] })
       return profile.title
-    } catch {
+    } catch (error) {
+      const message = getVoiceSaveErrorMessage(error)
       setStatusLabel('저장 실패')
-      alert('목소리 저장에 실패했습니다. 다시 시도해 주세요.')
+      alert(message)
       return null
     } finally {
       setIsSaving(false)
