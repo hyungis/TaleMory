@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface SceneSentenceRepository : JpaRepository<SceneSentence, Long> {
     fun findBySceneIdInOrderBySceneIdAscSentenceOrderAsc(sceneIds: List<Long>): List<SceneSentence>
     fun findAllBySceneIdIn(sceneIds: Collection<Long>): List<SceneSentence>
+    fun findAllBySceneId(sceneId: Long): List<SceneSentence>
 }

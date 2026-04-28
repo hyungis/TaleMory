@@ -2,6 +2,7 @@ package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -18,6 +19,13 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryOutroReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.story.model.StoryStatus
+import com.s210.backend.domain.tts.application.TtsCacheService
+import com.s210.backend.domain.tts.application.TtsService
+import com.s210.backend.domain.tts.application.dto.StoryTtsJobMessage
+import com.s210.backend.domain.tts.application.dto.StoryTtsPayload
+import com.s210.backend.domain.tts.application.dto.TtsOptions
+import com.s210.backend.domain.tts.application.dto.TtsSentenceItem
+import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -47,8 +55,10 @@ class StoryConfirmService(
     private val storyOutroRepository: StoryOutroRepository,
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val objectMapper: ObjectMapper,
-    // Task 14 에서 추가될 의존성:
-    //   TtsCacheService, TtsService, JobStatusRedisRepository
+    private val voiceProfileRepository: VoiceProfileRepository,
+    private val ttsCacheService: TtsCacheService,
+    private val ttsService: TtsService,
+    private val jobStatusRedisRepo: JobStatusRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     @Transactional
@@ -177,15 +187,97 @@ class StoryConfirmService(
             }
         }
 
-        // 10) 결과 반환 — Task 14 cacheHits/cacheMisses/MQ publish 추가
+        // 10) TTS 사전 캐시 조회 — 모든 SceneSentence 에 대해
+        val voiceProfileId = story.voiceProfileId!!
+        val voiceProfile = voiceProfileRepository.findById(voiceProfileId).orElseThrow {
+            BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        }
+        val referenceAudioUrl = voiceProfile.audioUrl
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+
+        val allSentences = createdScenes.flatMap { scene ->
+            sceneSentenceRepository.findAllBySceneId(scene.id)
+        }
+        var cacheHits = 0
+        val missSentences = mutableListOf<TtsSentenceItem>()
+
+        allSentences.forEach { sentence ->
+            val cachedUrl = try {
+                ttsCacheService.lookup(voiceProfileId, sentence.englishText)
+            } catch (e: Exception) {
+                log.warn("TTS cache lookup failed for sentence {}: {}", sentence.id, e.message)
+                null
+            }
+            if (cachedUrl != null) {
+                sentence.ttsAudioUrl = cachedUrl
+                cacheHits++
+            } else {
+                missSentences.add(
+                    TtsSentenceItem(
+                        sentenceId = sentence.id,
+                        text = sentence.englishText,
+                    )
+                )
+            }
+        }
+
+        val sentenceCount = allSentences.size
+        val cacheMisses = missSentences.size
+
+        // 11) Job status Redis HSET (best-effort)
+        try {
+            jobStatusRedisRepo.setStatus(
+                storyId = storyId,
+                stage = "tts",
+                progress = if (sentenceCount > 0) (cacheHits * 100 / sentenceCount) else 100,
+                currentStep = "TTS 생성 중 ($cacheHits/$sentenceCount)",
+            )
+        } catch (e: Exception) {
+            log.warn("Redis status init failed for story {}: {}", storyId, e.message)
+        }
+
+        // 12) MQ publish (cache miss 있을 때만) 또는 즉시 SUCCESS
+        val finalStatus = if (cacheMisses > 0) {
+            ttsService.publish(
+                StoryTtsJobMessage(
+                    jobId = ttsJob.id.toString(),
+                    storyId = storyId,
+                    payload = StoryTtsPayload(
+                        storyId = storyId,
+                        voiceId = voiceProfileId.toString(),
+                        referenceAudioUrl = referenceAudioUrl,
+                        options = TtsOptions(),
+                        sentences = missSentences,
+                    ),
+                )
+            )
+            JobStatus.PENDING
+        } else {
+            // 모두 캐시 적중 — 즉시 SUCCESS
+            ttsJob.status = JobStatus.SUCCESS
+            ttsJob.finishedAt = java.time.LocalDateTime.now()
+            try {
+                jobStatusRedisRepo.setStatus(
+                    storyId = storyId,
+                    stage = "done",
+                    progress = 100,
+                    currentStep = "TTS 완료 (전부 캐시 적중)",
+                )
+            } catch (e: Exception) {
+                log.warn("Redis status finalize failed: {}", e.message)
+            }
+            JobStatus.SUCCESS
+        }
+
+        // 13) 결과 반환
         return ConfirmStoryboardResult(
             jobId = ttsJob.id,
             jobType = "TTS",
-            status = JobStatus.PENDING.name,
+            status = finalStatus.name,
             sceneCount = createdScenes.size,
-            sentenceCount = totalSentences,
-            cacheHits = 0,
-            cacheMisses = totalSentences,
+            sentenceCount = sentenceCount,
+            cacheHits = cacheHits,
+            cacheMisses = cacheMisses,
         )
     }
 }

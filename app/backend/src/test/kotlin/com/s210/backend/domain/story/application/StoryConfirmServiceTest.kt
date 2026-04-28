@@ -2,11 +2,13 @@ package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.entity.Scene
+import com.s210.backend.domain.story.entity.SceneSentence
 import com.s210.backend.domain.story.entity.StoryBoard
 import com.s210.backend.domain.story.entity.StoryOutro
 import com.s210.backend.domain.story.entity.StoryboardPage
@@ -20,7 +22,13 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.story.model.Difficulty
 import com.s210.backend.domain.story.model.StoryStatus
+import com.s210.backend.domain.tts.application.TtsCacheService
+import com.s210.backend.domain.tts.application.TtsService
+import com.s210.backend.domain.tts.application.dto.StoryTtsJobMessage
+import com.s210.backend.domain.voice.entity.VoiceProfile
+import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
@@ -31,9 +39,12 @@ import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.doAnswer
+import org.mockito.invocation.InvocationOnMock
 import org.mockito.junit.jupiter.MockitoExtension
 import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
+import java.util.Optional
 
 /**
  * Unit tests for StoryConfirmService validation logic (Task 11)
@@ -52,6 +63,10 @@ class StoryConfirmServiceTest {
     private val storyOutroRepository: StoryOutroRepository = mock(StoryOutroRepository::class.java)
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository = mock(IllustrationVersionRedisRepository::class.java)
     private val objectMapper: ObjectMapper = ObjectMapper()
+    private val voiceProfileRepository: VoiceProfileRepository = mock(VoiceProfileRepository::class.java)
+    private val ttsCacheService: TtsCacheService = mock(TtsCacheService::class.java)
+    private val ttsService: TtsService = mock(TtsService::class.java)
+    private val jobStatusRedisRepo: JobStatusRedisRepository = mock(JobStatusRedisRepository::class.java)
 
     private val service = StoryConfirmService(
         storyRepository = storyRepository,
@@ -63,6 +78,10 @@ class StoryConfirmServiceTest {
         storyOutroRepository = storyOutroRepository,
         illustrationVersionRedisRepository = illustrationVersionRedisRepository,
         objectMapper = objectMapper,
+        voiceProfileRepository = voiceProfileRepository,
+        ttsCacheService = ttsCacheService,
+        ttsService = ttsService,
+        jobStatusRedisRepo = jobStatusRedisRepo,
     )
 
     private val userId = 1L
@@ -234,6 +253,23 @@ class StoryConfirmServiceTest {
         `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
             .thenAnswer { it.getArgument(0) }
 
+        // Task 14: TTS mocks — 2 sentences per scene (matches 3 pages × 2 = 6)
+        val voiceProfile6 = VoiceProfile(id = 5L, userId = userId, title = "test voice",
+            audioUrl = "https://s3/ref.wav")
+        `when`(voiceProfileRepository.findById(5L)).thenReturn(Optional.of(voiceProfile6))
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(
+                    SceneSentence(id = sceneId * 10 + 1, sceneId = sceneId, sentenceOrder = 1,
+                        englishText = "Text ${sceneId}a."),
+                    SceneSentence(id = sceneId * 10 + 2, sceneId = sceneId, sentenceOrder = 2,
+                        englishText = "Text ${sceneId}b."),
+                )
+            }
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString())).thenReturn(null)
+
         val result = service.confirmStoryboard(storyId, userId)
 
         // scene saved 3 times
@@ -333,6 +369,19 @@ class StoryConfirmServiceTest {
         `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
             .thenAnswer { it.getArgument(0) }
 
+        // Task 14: TTS mocks (all cache misses)
+        val voiceProfile9 = VoiceProfile(id = 5L, userId = userId, title = "test voice",
+            audioUrl = "https://s3/ref.wav")
+        `when`(voiceProfileRepository.findById(5L)).thenReturn(Optional.of(voiceProfile9))
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(SceneSentence(id = sceneId * 10, sceneId = sceneId, sentenceOrder = 1,
+                    englishText = "Text $sceneId."))
+            }
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString())).thenReturn(null)
+
         service.confirmStoryboard(storyId, userId)
 
         // pushVersion called 3 times (once per scene)
@@ -388,6 +437,19 @@ class StoryConfirmServiceTest {
         `when`(storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId)).thenReturn(null)
         `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
             .thenAnswer { it.getArgument(0) }
+
+        // Task 14: TTS mocks (all cache misses)
+        val voiceProfile10 = VoiceProfile(id = 5L, userId = userId, title = "test voice",
+            audioUrl = "https://s3/ref.wav")
+        `when`(voiceProfileRepository.findById(5L)).thenReturn(Optional.of(voiceProfile10))
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(SceneSentence(id = sceneId * 10, sceneId = sceneId, sentenceOrder = 1,
+                    englishText = "Text $sceneId."))
+            }
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString())).thenReturn(null)
 
         // Mock pushVersion to throw on first call, succeed on rest
         var callCount = 0
@@ -455,6 +517,9 @@ class StoryConfirmServiceTest {
     /**
      * Sets up all mocks needed to pass validation and enter conversion logic,
      * with [pageCount] storyboard pages each containing 1 sentence.
+     *
+     * Default TTS behavior: voiceProfile with audioUrl set, all sentences are cache misses
+     * (ttsCacheService.lookup returns null by default).
      */
     private fun setupValidationPassMocks(resultPayload: String, pageCount: Int = 1) {
         val story = createStory(status = StoryStatus.DRAFT, voiceProfileId = 5L)
@@ -497,5 +562,196 @@ class StoryConfirmServiceTest {
         `when`(storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId)).thenReturn(null)
         `when`(storyOutroRepository.save(org.mockito.ArgumentMatchers.any(StoryOutro::class.java)))
             .thenAnswer { it.getArgument(0) }
+
+        // Task 14: VoiceProfile + TTS cache (default: all misses → MQ publish)
+        val voiceProfile = VoiceProfile(id = 5L, userId = userId, title = "test voice",
+            audioUrl = "https://s3/ref.wav")
+        `when`(voiceProfileRepository.findById(5L)).thenReturn(Optional.of(voiceProfile))
+        // sceneSentenceRepository.findAllBySceneId returns sentences for each scene
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(
+                    SceneSentence(id = sceneId * 10, sceneId = sceneId, sentenceOrder = 1,
+                        englishText = "Text $sceneId.")
+                )
+            }
+        // Default: all cache misses
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString())).thenReturn(null)
+    }
+
+    // -----------------------------------------------------------------------
+    // 11. All cache hits → skips MQ publish, finalizes job immediately (Task 14)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `confirm with all cache hits skips MQ publish and finalizes job immediately`() {
+        val payload = """
+            {
+              "pages": [
+                { "pageNumber": 1, "sentences": [
+                    { "englishText": "A walks.", "koreanText": "A가 걷는다." },
+                    { "englishText": "B runs.", "koreanText": "B가 달린다." }
+                ]},
+                { "pageNumber": 2, "sentences": [
+                    { "englishText": "C swims.", "koreanText": "C가 수영한다." },
+                    { "englishText": "D flies.", "koreanText": "D가 난다." }
+                ]},
+                { "pageNumber": 3, "sentences": [
+                    { "englishText": "E sings.", "koreanText": "E가 노래한다." },
+                    { "englishText": "F dances.", "koreanText": "F가 춤춘다." }
+                ]}
+              ]
+            }
+        """.trimIndent()
+        setupValidationPassMocks(resultPayload = payload, pageCount = 3)
+
+        // Override: 6 sentences across 3 scenes — all cache hits
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(
+                    SceneSentence(id = sceneId * 10 + 1, sceneId = sceneId, sentenceOrder = 1,
+                        englishText = "Text ${sceneId}a."),
+                    SceneSentence(id = sceneId * 10 + 2, sceneId = sceneId, sentenceOrder = 2,
+                        englishText = "Text ${sceneId}b."),
+                )
+            }
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString())).thenReturn("https://s3/cached.wav")
+
+        // Capture Redis setStatus calls via doAnswer (avoids Kotlin non-null argThat NPE)
+        val capturedStages = mutableListOf<String>()
+        doAnswer { invocation: InvocationOnMock ->
+            capturedStages.add(invocation.getArgument<String>(1))
+            null
+        }.`when`(jobStatusRedisRepo).setStatus(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyInt(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.isNull(),
+        )
+
+        val result = service.confirmStoryboard(storyId, userId)
+
+        // ttsService.publish never called — verify call count via mockingDetails (no argThat NPE)
+        assertEquals(0, org.mockito.Mockito.mockingDetails(ttsService).invocations
+            .count { it.method.name == "publish" },
+            "Expected ttsService.publish to not be called")
+        // status is SUCCESS, counts correct
+        assertEquals("SUCCESS", result.status)
+        assertEquals(6, result.cacheHits)
+        assertEquals(0, result.cacheMisses)
+        // Redis finalized with stage="done"
+        assertTrue(capturedStages.contains("done"), "Expected setStatus to be called with stage='done', got: $capturedStages")
+    }
+
+    // -----------------------------------------------------------------------
+    // 12. Partial cache hits → publishes only miss sentences (Task 14)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `confirm with cache misses publishes batch with miss sentences only`() {
+        val payload = """
+            {
+              "pages": [
+                { "pageNumber": 1, "sentences": [
+                    { "englishText": "A walks.", "koreanText": "A가 걷는다." },
+                    { "englishText": "B runs.", "koreanText": "B가 달린다." }
+                ]},
+                { "pageNumber": 2, "sentences": [
+                    { "englishText": "C swims.", "koreanText": "C가 수영한다." },
+                    { "englishText": "D flies.", "koreanText": "D가 난다." }
+                ]},
+                { "pageNumber": 3, "sentences": [
+                    { "englishText": "E sings.", "koreanText": "E가 노래한다." },
+                    { "englishText": "F dances.", "koreanText": "F가 춤춘다." }
+                ]}
+              ]
+            }
+        """.trimIndent()
+        setupValidationPassMocks(resultPayload = payload, pageCount = 3)
+
+        // 6 sentences total: sentenceOrder==1 → hit, sentenceOrder==2 → miss
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(
+                    SceneSentence(id = sceneId * 10 + 1, sceneId = sceneId, sentenceOrder = 1,
+                        englishText = "Hit text $sceneId."),
+                    SceneSentence(id = sceneId * 10 + 2, sceneId = sceneId, sentenceOrder = 2,
+                        englishText = "Miss text $sceneId."),
+                )
+            }
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.contains("Hit"))).thenReturn("https://s3/cached.wav")
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.contains("Miss"))).thenReturn(null)
+
+        val result = service.confirmStoryboard(storyId, userId)
+
+        // ttsService.publish called exactly once — capture via mockingDetails to avoid Kotlin @NotNull argThat NPE
+        val publishInvocations = org.mockito.Mockito.mockingDetails(ttsService).invocations
+            .filter { it.method.name == "publish" }
+        assertEquals(1, publishInvocations.size, "Expected ttsService.publish to be called once")
+        // payload.sentences should only include miss sentences (3)
+        val publishedMsg = publishInvocations.first().getArgument<StoryTtsJobMessage>(0)
+        assertEquals(3, publishedMsg.payload.sentences.size)
+        // status=PENDING, counts correct
+        assertEquals("PENDING", result.status)
+        assertEquals(3, result.cacheHits)
+        assertEquals(3, result.cacheMisses)
+    }
+
+    // -----------------------------------------------------------------------
+    // 13. Redis job status hash is set on confirm (Task 14)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `confirm sets redis job status hash`() {
+        setupValidationPassMocks(resultPayload = minimalPayload(pageCount = 3), pageCount = 3)
+
+        // 3 scenes, 1 sentence each — 1 hit, 2 miss (scene ids 1, 2, 3)
+        `when`(sceneSentenceRepository.findAllBySceneId(org.mockito.ArgumentMatchers.anyLong()))
+            .thenAnswer { invocation ->
+                val sceneId = invocation.getArgument<Long>(0)
+                listOf(SceneSentence(id = sceneId * 10, sceneId = sceneId, sentenceOrder = 1,
+                    englishText = "Sentence $sceneId."))
+            }
+        // scene 1 → hit; scene 2, 3 → miss
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.contains("Sentence 1"))).thenReturn("https://s3/hit.wav")
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.contains("Sentence 2"))).thenReturn(null)
+        `when`(ttsCacheService.lookup(org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.contains("Sentence 3"))).thenReturn(null)
+
+        // Capture Redis setStatus calls via doAnswer (avoids Kotlin non-null argThat NPE in verify)
+        val capturedStages = mutableListOf<String>()
+        val capturedSteps = mutableListOf<String>()
+        doAnswer { invocation: InvocationOnMock ->
+            capturedStages.add(invocation.getArgument<String>(1))
+            capturedSteps.add(invocation.getArgument<String>(3))
+            null
+        }.`when`(jobStatusRedisRepo).setStatus(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyInt(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.isNull(),
+        )
+
+        service.confirmStoryboard(storyId, userId)
+
+        // jobStatusRedisRepo.setStatus called with stage="tts"
+        assertTrue(capturedStages.contains("tts"),
+            "Expected setStatus to be called with stage='tts', got: $capturedStages")
+        // currentStep message should contain "(hits/total)" pattern
+        val ttsStageIdx = capturedStages.indexOf("tts")
+        val ttsStep = capturedSteps[ttsStageIdx]
+        assertTrue(ttsStep.matches(Regex(".*\\(\\d+/\\d+\\).*")),
+            "Expected currentStep to contain '(hits/total)' pattern, got: '$ttsStep'")
     }
 }
