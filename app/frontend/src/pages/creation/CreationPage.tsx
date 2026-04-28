@@ -164,6 +164,7 @@ export function CreationPage() {
       {flow.currentStep === 8 && (
         <FinalPreviewStep
           storyId={flow.storyId}
+          storyGenerationJobId={flow.storyGenerationJobId}
           onBack={handleBack}
           onSaveToBookshelf={goToBookshelf}
           onOpenViewer={() => {
