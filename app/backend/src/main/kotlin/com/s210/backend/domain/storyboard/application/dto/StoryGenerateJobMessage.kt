@@ -39,6 +39,31 @@ data class StoryGeneratePayload(
      * AI 스키마의 `additionalInstruction` 필드에 대응.
      */
     val additionalInstruction: String? = null,
+    /**
+     * 직전 SUCCESS 줄거리 잡(`STORYBOARD_STORY_SUMMARY`)의 영문 메타.
+     * 본문(STORY) 발행 시에만 동봉되며, 줄거리 발행 시에는 null.
+     * 비파괴(point compatibility): nullable + default null.
+     *
+     * NOTE: 필드명은 AI 스키마 (`StoryboardGenerateRequest.approvedSummary`) 와 동일해야
+     * AI 가 인식한다. 과거 `summary` 로 직렬화되어 AI 가 silently drop 하던 버그 수정.
+     */
+    val approvedSummary: SummaryMeta? = null,
+)
+
+/**
+ * 본문(STORY) 발행 envelope 에 동봉되는 줄거리 메타.
+ *
+ * `StorySummaryPayload` 의 필드 + AI 의 `ApprovedStorySummary` 스키마를 그대로 mirror.
+ * `usage` (비용/토큰) 는 제외 — 비용 정보는 BE 가 따로 관리하며 AI 본문 워커에 노출 불필요.
+ */
+data class SummaryMeta(
+    val title: String,
+    val summary: String,
+    val summaryKo: String,
+    val moralTheme: String,
+    val storyQuest: String,
+    val recurringMotif: String,
+    val keyEmotionalBeats: List<String>,
 )
 
 /** 동화 주인공 아이 정보. gender 는 "MALE" / "FEMALE". */

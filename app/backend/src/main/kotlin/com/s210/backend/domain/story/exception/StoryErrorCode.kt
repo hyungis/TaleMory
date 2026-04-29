@@ -17,4 +17,7 @@ enum class StoryErrorCode(
     STYLE_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_007", "존재하지 않는 삽화 스타일입니다."),
     SENTENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_008", "문장을 찾을 수 없습니다."),
     HIGHLIGHT_VOICE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_009", "강조 녹음을 찾을 수 없습니다."),
+    SUMMARY_REQUIRED(HttpStatus.BAD_REQUEST, "STORY_010", "줄거리(요약) 생성을 먼저 완료해야 합니다."),
+    SUMMARY_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_011", "재생성할 직전 줄거리(요약)가 없습니다."),
+    STORY_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "STORY_012", "본문 생성이 이미 진행 중입니다."),
 }

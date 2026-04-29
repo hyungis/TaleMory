@@ -1,6 +1,9 @@
 import json
+import logging
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from app.schemas.storyboard import UsageInfo
 from app.schemas.storyboard_summary import (
     StoryboardSummaryDraft,
@@ -24,7 +27,12 @@ from app.services.storyboard_service import (
 def generate_storyboard_summary(
     request: StoryboardSummaryGenerateRequest,
 ) -> StoryboardSummaryGenerateResponse:
-    if settings.OPENAI_API_KEY:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[SUMMARY:GEN] service entry — useOpenAI=%s, photos=%d, children=%d, place=%s",
+        use_openai, len(request.photos), len(request.children), request.travel.place,
+    )
+    if use_openai:
         return _generate_with_openai(request)
     return _generate_locally(request)
 
@@ -32,7 +40,12 @@ def generate_storyboard_summary(
 def regenerate_storyboard_summary(
     request: StoryboardSummaryRegenerateRequest,
 ) -> StoryboardSummaryGenerateResponse:
-    if settings.OPENAI_API_KEY:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[SUMMARY:REGEN] service entry — useOpenAI=%s, userPromptLen=%d",
+        use_openai, len(request.userPrompt or ""),
+    )
+    if use_openai:
         return _regenerate_with_openai(request)
     return _generate_locally(request)
 
@@ -90,13 +103,25 @@ def _request_summary_with_openai(
     if reasoning is not None:
         request_args["reasoning"] = reasoning
 
+    logger.info(
+        "[SUMMARY] OpenAI call start — model=%s, contentBlocks=%d, label=%s",
+        settings.STORYBOARD_SUMMARY_MODEL, len(input_content), error_label,
+    )
     try:
         response = client.responses.create(**request_args)
     except OpenAIError as exc:
+        logger.exception("[SUMMARY] OpenAI call failed (%s)", error_label)
         raise ValueError(f"OpenAI storyboard summary {error_label} failed: {exc}") from exc
 
     parsed = StoryboardSummaryGenerateResponse.model_validate_json(response.output_text)
-    return _apply_usage(parsed, response.usage)
+    parsed_with_usage = _apply_usage(parsed, response.usage)
+    logger.info(
+        "[SUMMARY] OpenAI call done — label=%s, summaryKoLen=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        error_label, len(parsed_with_usage.summaryKo),
+        parsed_with_usage.usage.inputTokens, parsed_with_usage.usage.outputTokens,
+        parsed_with_usage.usage.costUsd,
+    )
+    return parsed_with_usage
 
 
 def _apply_usage(

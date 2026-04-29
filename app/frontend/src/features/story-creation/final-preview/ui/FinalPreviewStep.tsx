@@ -1,18 +1,24 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft,
   BookOpen,
   ChevronLeft,
   ChevronRight,
   Library,
+  Loader2,
   Maximize,
   Share2,
 } from 'lucide-react'
-import type { StoryProject } from '../../model/types'
 import { BookSpread } from './BookSpread'
+import {
+  getScenes,
+  getOutro,
+  type SceneDto,
+  type OutroDto,
+} from '../../highlight-outro/api/highlightOutroApi'
 
 interface FinalPreviewStepProps {
-  projectData: StoryProject
+  storyId: number | null
   onBack: () => void
   /** "내 책장 보관하기" — 제작 플로우 종료 후 메인(서점) 으로 복귀. */
   onSaveToBookshelf: () => void
@@ -25,39 +31,64 @@ interface FinalPreviewStepProps {
 /**
  * STEP 08 — "완성된 동화책"
  *
- * 구조:
- *  - 성공 배지 "🎉 세상에 하나뿐인 동화책 완성!"
- *  - 펼쳐진 책 스프레드 (좌: 삽화 / 우: 본문 + 보이스 플레이어)
- *  - 좌우 chevron 네비 (책 양쪽 끝 돌출)
- *  - 하단 Page N / Total 뱃지
- *  - 3 개 액션: 내 책장 보관하기 / 뷰어로 열기 / 링크 공유하기
+ * 서버에서 scenes + outro 를 조회하여 실제 삽화/본문/TTS 를 표시한다.
  */
 export function FinalPreviewStep({
-  projectData,
+  storyId,
   onBack,
   onSaveToBookshelf,
   onOpenViewer,
   onShare,
 }: FinalPreviewStepProps) {
-  const pages = projectData.step4.pages
+  const [scenes, setScenes] = useState<SceneDto[]>([])
+  const [outro, setOutro] = useState<OutroDto | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
-  const currentPage = pages[resultPageIndex] ?? pages[0]
+  useEffect(() => {
+    if (!storyId) {
+      setLoading(false)
+      setError('스토리 ID가 없습니다.')
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    Promise.all([getScenes(storyId), getOutro(storyId)])
+      .then(([scenesData, outroData]) => {
+        if (cancelled) return
+        setScenes(scenesData)
+        setOutro(outroData)
+        setError(null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError('동화 데이터를 불러오지 못했습니다.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [storyId])
+
+  const totalPages = scenes.length
+  const currentScene = scenes[resultPageIndex] ?? null
 
   const prevPage = useCallback(() => {
     setResultPageIndex(i => Math.max(0, i - 1))
   }, [])
 
   const nextPage = useCallback(() => {
-    setResultPageIndex(i => Math.min(pages.length - 1, i + 1))
-  }, [pages.length])
+    setResultPageIndex(i => Math.min(totalPages - 1, i + 1))
+  }, [totalPages])
 
   const handleShareFallback = useCallback(() => {
     if (onShare) {
       onShare()
       return
     }
-    // Navigator.share API fallback (데스크톱에서 미지원 시)
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       navigator
         .share({
@@ -65,18 +96,26 @@ export function FinalPreviewStep({
           text: 'TaleMory 로 만든 동화책을 확인해보세요!',
           url: window.location.origin,
         })
-        .catch(() => {
-          /* 사용자 취소 */
-        })
+        .catch(() => {})
     } else {
-      alert('공유 링크 생성은 발행(publish) 후 사용 가능합니다. Task 8 에서 연결됩니다.')
+      alert('공유 링크 생성은 발행(publish) 후 사용 가능합니다.')
     }
   }, [onShare])
 
-  if (!currentPage) {
+  if (loading) {
     return (
       <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
-        <p className="text-[#f0e6c0] text-lg">스토리보드 페이지가 없습니다. step 4 로 돌아가세요.</p>
+        <Loader2 className="w-10 h-10 text-[#b4dc8c] animate-spin" />
+      </div>
+    )
+  }
+
+  if (error || !currentScene) {
+    return (
+      <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
+        <p className="text-[#f0e6c0] text-lg">
+          {error ?? '씬 데이터가 없습니다. 이전 단계를 확인하세요.'}
+        </p>
       </div>
     )
   }
@@ -107,19 +146,14 @@ export function FinalPreviewStep({
             {/* 성공 배지 */}
             <div className="text-center mb-8">
               <div className="inline-block bg-[#2d5a27] text-[#b4dc8c] px-5 py-2 rounded-full text-base mb-4 border border-[#b4dc8c]/50 shadow-[0_0_20px_rgba(180,220,140,0.4)] font-bold">
-                🎉 세상에 하나뿐인 동화책 완성!
+                세상에 하나뿐인 동화책 완성!
               </div>
             </div>
 
-            {/* 펼쳐진 책 + 좌우 chevron (책 외곽에 돌출) */}
+            {/* 펼쳐진 책 + 좌우 chevron */}
             <div className="relative">
-              <BookSpread
-                page={currentPage}
-                pageIndex={resultPageIndex}
-                voiceModel={projectData.step6.voiceModel}
-              />
+              <BookSpread scene={currentScene} pageIndex={resultPageIndex} />
 
-              {/* 페이지 넘김 화살표 */}
               <button
                 type="button"
                 onClick={prevPage}
@@ -132,7 +166,7 @@ export function FinalPreviewStep({
               <button
                 type="button"
                 onClick={nextPage}
-                disabled={resultPageIndex >= pages.length - 1}
+                disabled={resultPageIndex >= totalPages - 1}
                 aria-label="다음 페이지"
                 className="absolute right-[-18px] md:right-[-24px] top-1/2 -translate-y-1/2 bg-[#f0e6c0] text-[#2d5a27] p-3 md:p-4 rounded-full shadow-lg border-2 border-[#2d5a27] transition-all z-30 hover:scale-110 hover:bg-[#b4dc8c] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
@@ -144,11 +178,23 @@ export function FinalPreviewStep({
             <div className="text-center mt-6">
               <span className="inline-flex items-center gap-2 bg-[#2a1b12]/70 text-[#b4dc8c] px-4 py-1.5 rounded-full text-sm font-bold border border-[#4a3a24]">
                 <BookOpen className="w-4 h-4" />
-                Page {resultPageIndex + 1} / {pages.length}
+                Page {resultPageIndex + 1} / {totalPages}
               </span>
             </div>
 
-            {/* 하단 공유 액션 */}
+            {/* 아웃트로 표시 (있을 때만) */}
+            {outro && (
+              <div className="mt-8 max-w-2xl mx-auto bg-[#f0e6c0]/90 rounded-2xl p-6 border border-[#8b7a52]/30 shadow-inner">
+                <p className="text-[#2a1b12] text-lg leading-relaxed text-center italic">
+                  {outro.outroText}
+                </p>
+                {outro.signature && (
+                  <p className="text-right text-[#8b7a52] mt-3 font-bold">— {outro.signature}</p>
+                )}
+              </div>
+            )}
+
+            {/* 하단 액션 */}
             <div className="mt-12 flex flex-col sm:flex-row flex-wrap justify-center gap-4">
               <button
                 type="button"

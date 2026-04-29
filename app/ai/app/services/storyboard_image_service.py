@@ -192,8 +192,10 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         f"Companions in scene: {companions}",
         visual_direction,
         (
+            "Absolutely no visible text anywhere in the image. "
             "Do not render any words, letters, captions, subtitles, speech bubbles, sound effects, "
-            "or typographic elements inside the image."
+            "typographic elements, signage, labels, logos, packaging text, poster text, UI text, or watermarks. "
+            "If an object would normally contain text, render it as blank abstract shapes or texture with no readable characters."
         ),
     ]
     if item.referenceImageUrls or item.referenceImageS3Keys:

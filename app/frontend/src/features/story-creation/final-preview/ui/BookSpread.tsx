@@ -1,24 +1,24 @@
-import { Quote } from 'lucide-react'
-import type { StoryboardPageDraft } from '../../model/types'
-import { getPageIcon } from '../../../../shared/lib'
-import { IllustrationMockup } from '../../../../shared/ui'
-import { VoicePlayerMock } from './VoicePlayerMock'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ImageOff, Pause, Play, Quote, Volume2 } from 'lucide-react'
+import type { SceneDto } from '../../highlight-outro/api/highlightOutroApi'
 
 interface BookSpreadProps {
-  page: StoryboardPageDraft
+  scene: SceneDto
   /** 0-based 페이지 인덱스. 표시용 페이지 번호는 idx*2+1 / idx*2+2. */
   pageIndex: number
-  voiceModel: string | null
 }
 
 /**
  * 펼쳐진 동화책 1 스프레드(좌/우 2페이지).
- * - 중앙 접힘선 그림자
- * - 왼쪽: 삽화 목업 (gradient + vintage 내부 프레임 + 아이콘 + sketch 텍스트)
- * - 오른쪽: 인용 아이콘 + 영문 본문(큰 글씨) + divider + 한글 본문 + 보이스 플레이어
+ * - 왼쪽: 실제 삽화 이미지 (illustrationUrl)
+ * - 오른쪽: 영문/한글 본문 + TTS 오디오 플레이어
  */
-export function BookSpread({ page, pageIndex, voiceModel }: BookSpreadProps) {
-  const Icon = getPageIcon(page.icon)
+export function BookSpread({ scene, pageIndex }: BookSpreadProps) {
+  const firstSentence = scene.sentences[0]
+  const englishText = scene.sentences.map(s => s.englishText).join(' ')
+  const koreanText = scene.sentences.map(s => s.koreanText ?? '').join(' ')
+  const ttsUrl = firstSentence?.ttsAudioUrl ?? null
+
   return (
     <div className="w-full aspect-auto md:aspect-[2/1.1] bg-[#fff9dd] rounded-xl md:rounded-3xl flex flex-col md:flex-row relative border-2 border-[#2a1b12] shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden">
       {/* 중앙 접힘선 */}
@@ -35,24 +35,19 @@ export function BookSpread({ page, pageIndex, voiceModel }: BookSpreadProps) {
         <div className="absolute bottom-4 left-8 text-[#8b7a52] font-sans text-sm">
           {pageIndex * 2 + 1}
         </div>
-        <div className="w-full h-full bg-gradient-to-br from-[#e8ddb4] to-[#b4dc8c]/60 rounded-2xl p-4 md:p-6 shadow-inner border border-[#f0e6c0]/70 relative group">
-          <div className="w-full h-full bg-[#fff9dd]/60 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center border-2 border-[#f0e6c0] relative overflow-hidden">
-            {/* 배경 풍경 목업 (약하게) */}
-            <IllustrationMockup
-              variant="scenery"
-              className="absolute inset-0 w-full h-full text-[#2d5a27] opacity-70"
+        <div className="w-full h-full rounded-2xl overflow-hidden shadow-inner border border-[#f0e6c0]/70 relative">
+          {scene.illustrationUrl ? (
+            <img
+              src={scene.illustrationUrl}
+              alt={`씬 ${scene.pageNumber} 삽화`}
+              className="w-full h-full object-cover"
             />
-            {/* 중앙 아이콘 + 스케치 텍스트 */}
-            <div className="relative z-10 flex flex-col items-center">
-              <Icon
-                className="w-24 h-24 text-[#2d5a27] opacity-80 mb-4 transform group-hover:scale-110 transition-transform duration-700"
-                strokeWidth={2}
-              />
-              <p className="text-[#2d5a27] text-xl opacity-80 font-bold text-center px-4">
-                {page.sketch}
-              </p>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#e8ddb4] to-[#b4dc8c]/60 flex flex-col items-center justify-center">
+              <ImageOff className="w-16 h-16 text-[#8b7a52] opacity-50 mb-3" />
+              <p className="text-[#8b7a52] text-sm">삽화 생성 중...</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -65,18 +60,79 @@ export function BookSpread({ page, pageIndex, voiceModel }: BookSpreadProps) {
         <Quote className="w-10 h-10 text-[#b4dc8c] opacity-60 mb-4" />
 
         <p className="text-2xl md:text-3xl lg:text-[2.2rem] text-[#2a1b12] leading-[1.5] font-sans font-medium">
-          {page.en}
+          {englishText}
         </p>
 
         <div className="w-16 h-1 bg-[#b4dc8c] rounded-full my-6" />
 
-        <p className="text-lg md:text-xl text-[#8b7a52] leading-relaxed">{page.ko}</p>
+        <p className="text-lg md:text-xl text-[#8b7a52] leading-relaxed">{koreanText}</p>
 
-        {/* 음성 플레이어 */}
+        {/* TTS 오디오 플레이어 */}
         <div className="mt-auto pt-6">
-          <VoicePlayerMock voiceModel={voiceModel} />
+          {ttsUrl ? <TtsPlayer src={ttsUrl} /> : <TtsPlayerDisabled />}
         </div>
       </div>
+    </div>
+  )
+}
+
+function TtsPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+
+  useEffect(() => {
+    audioRef.current?.pause()
+    setPlaying(false)
+  }, [src])
+
+  const toggle = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) {
+      audio.pause()
+    } else {
+      audio.play().catch(() => {})
+    }
+    setPlaying(!playing)
+  }, [playing])
+
+  const handleEnded = useCallback(() => setPlaying(false), [])
+
+  return (
+    <div className="bg-[#f0e6c0] border-2 border-[#8b7a52]/40 rounded-full p-2.5 flex items-center gap-4 shadow-sm max-w-sm">
+      <audio ref={audioRef} src={src} onEnded={handleEnded} preload="none" />
+      <button
+        type="button"
+        aria-label={playing ? '정지' : '재생'}
+        onClick={toggle}
+        className="bg-[#2d5a27] text-[#f0e6c0] w-12 h-12 rounded-full flex items-center justify-center hover:bg-[#3d6f34] hover:shadow-[0_0_14px_rgba(180,220,140,0.5)] transition-all"
+      >
+        {playing ? (
+          <Pause className="w-5 h-5" />
+        ) : (
+          <Play className="w-5 h-5 ml-1" />
+        )}
+      </button>
+      <div className="flex-1">
+        <div className="flex justify-between text-xs text-[#8b7a52] font-sans mb-1 font-bold">
+          <span>TTS</span>
+        </div>
+        <div className="h-2.5 bg-[#e8ddb4] rounded-full overflow-hidden" />
+      </div>
+      <span className="text-[#8b7a52] pr-3">
+        <Volume2 className="w-5 h-5" />
+      </span>
+    </div>
+  )
+}
+
+function TtsPlayerDisabled() {
+  return (
+    <div className="bg-[#f0e6c0]/60 border-2 border-[#8b7a52]/20 rounded-full p-2.5 flex items-center gap-4 shadow-sm max-w-sm opacity-50">
+      <div className="bg-[#8b7a52] text-[#f0e6c0] w-12 h-12 rounded-full flex items-center justify-center">
+        <Play className="w-5 h-5 ml-1" />
+      </div>
+      <span className="text-[#8b7a52] text-sm font-bold">음성 없음</span>
     </div>
   )
 }

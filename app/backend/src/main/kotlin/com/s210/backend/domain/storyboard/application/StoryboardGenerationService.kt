@@ -13,14 +13,19 @@ import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.storyboard.application.dto.ActiveStoryJob
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
 import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
 import com.s210.backend.domain.storyboard.application.dto.StoryGenerateJobMessage
 import com.s210.backend.domain.storyboard.application.dto.StoryGeneratePayload
+import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
+import com.s210.backend.domain.storyboard.application.dto.StoryboardStateResult
+import com.s210.backend.domain.storyboard.application.dto.SummaryMeta
 import com.s210.backend.domain.storyboard.application.dto.TravelInfo
 import java.time.LocalDate
+import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -52,9 +57,49 @@ class StoryboardGenerationService(
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     fun generate(userId: Long, storyId: Long, prompt: String?): StartGenerationResult {
+        log.info(
+            "[STORY:GEN] entry — userId={}, storyId={}, hasPrompt={}",
+            userId, storyId, !prompt.isNullOrBlank(),
+        )
         val story = ownedStory(userId, storyId)
+
+        // [본문 발행 가드 1 — race 차단, plan D7-A]
+        // 활성 본문 잡(PENDING/RUNNING) 이 존재하면 즉시 거부 (race 가 더 일찍 cheap 한 fail).
+        val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeStoryJob != null) {
+            log.warn("[STORY:GEN] blocked — active job exists jobId={}", activeStoryJob.id)
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
+        // [본문 발행 가드 2 — SUMMARY 선결]
+        // SUCCESS 줄거리 잡 존재 검증 + result_payload(영문 메타) 로드.
+        val summaryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS,
+        ) ?: throw BusinessException(StoryErrorCode.SUMMARY_REQUIRED)
+        val summaryPayload = objectMapper.readValue(
+            summaryJob.resultPayload!!,
+            StorySummaryPayload::class.java,
+        )
+        // 옵션 ② — 사용자가 Step 3 에서 편집한 한글 줄거리(stories.synopsis)를 우선 source 로.
+        // synopsis 가 비어있으면 (옛날 데이터 또는 생성 직후) result_payload.summaryKo 로 fallback.
+        // AI 워커는 ApprovedStorySummary.summary 와 .summaryKo 둘 다 required 라 schema 통과를 위해
+        // 한글 줄거리를 양쪽 필드에 동일하게 복사 — AI 가 자연스럽게 한글을 ground 로 본문 생성.
+        val canonicalSummaryKo = story.synopsis?.takeIf { it.isNotBlank() }
+            ?: summaryPayload.summaryKo
+        val summaryMeta = SummaryMeta(
+            title = summaryPayload.title,
+            summary = canonicalSummaryKo,
+            summaryKo = canonicalSummaryKo,
+            moralTheme = summaryPayload.moralTheme,
+            storyQuest = summaryPayload.storyQuest,
+            recurringMotif = summaryPayload.recurringMotif,
+            keyEmotionalBeats = summaryPayload.keyEmotionalBeats,
+        )
 
         // Step 1 이 완료되지 않은 스토리는 AI 에 유의미한 payload 를 만들 수 없음.
         val travelPlace = story.travelPlace?.takeIf { it.isNotBlank() }
@@ -97,6 +142,7 @@ class StoryboardGenerationService(
             },
             difficulty = story.difficulty.name,
             additionalInstruction = prompt?.trim()?.takeIf { it.isNotEmpty() },
+            approvedSummary = summaryMeta,
         )
 
         // request_payload 컬럼에는 AI 에 보낸 페이로드를 그대로 저장 — 재생성/디버깅/재현성 확보.
@@ -121,6 +167,11 @@ class StoryboardGenerationService(
             RabbitMQConfig.REQUEST_EXCHANGE,
             RoutingKeys.STORY_GENERATE,
             envelope,
+        )
+        log.info(
+            "[STORY:GEN] published — jobId={}, storyId={}, routingKey={}, photos={}, children={}, summarySrcJobId={}",
+            job.id, storyId, RoutingKeys.STORY_GENERATE,
+            photos.size, children.size, summaryJob.id,
         )
 
         return StartGenerationResult(
@@ -158,20 +209,35 @@ class StoryboardGenerationService(
             .mapNotNull { it.trim().takeIf { t -> t.isNotEmpty() } }
 
     /**
-     * 유저가 편집한 스토리(줄거리)를 저장한다 — API 명세 #29.
+     * 유저가 Step 3 에서 편집한 한글 줄거리(summary) 를 저장한다 — 옵션 ② 디자인.
      *
-     *  - 같은 storyId 에 story_board 가 여러 건 있을 수 있으므로 (재생성 이력),
-     *    가장 최근 row 를 대상으로 업데이트한다.
-     *  - `story_board.story` 는 VARCHAR(255) 라 길면 잘리지만, 전체 원문은
-     *    `stories.synopsis` (TEXT) 에 그대로 보존한다.
-     *  - `updateAt` 을 오늘 날짜로 갱신.
+     * 두 곳을 sync (단, 잡 결과 페이로드는 immutable 로 보존):
+     *  1. `stories.synopsis` (TEXT) — 본문 generate 의 한글 grounding source-of-truth.
+     *  2. `story_board.story` (TEXT) — backup 사본.
+     *
+     * `story_generation_jobs.result_payload` 는 의도적으로 건드리지 않는다.
+     * 잡 테이블은 "그 시점 AI 가 만든 것" 의 immutable history 로 두고, 사용자 편집은
+     * stories.synopsis 만 진실로 한다 (generate 가 synopsis 를 우선 읽도록 보장).
+     *
+     * 본문 잡(STORY) 이 PENDING/RUNNING 인 동안에는 줄거리 편집 거부 (STORY_ALREADY_IN_PROGRESS).
+     * `updateAt` 을 오늘 날짜로 갱신. 빈 입력 → INVALID_INPUT.
      */
-    fun editStory(userId: Long, storyId: Long, newStory: String): StoryBoardResult {
+    fun editSummary(userId: Long, storyId: Long, newSummaryKo: String): StoryBoardResult {
         ownedStory(userId, storyId)
+
+        // 활성 본문 잡이 있는 동안엔 줄거리 변경 거부 — 진행 중 본문이 stale grounding 으로 가는 것 차단.
+        val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeStoryJob != null) {
+            log.warn("[SUMMARY:EDIT] blocked — active story job exists jobId={}", activeStoryJob.id)
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
-        val trimmed = newStory.trim()
+        val trimmed = newSummaryKo.trim()
         if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
         storyBoard.story = trimmed
@@ -182,6 +248,53 @@ class StoryboardGenerationService(
         }
 
         return StoryBoardResult.from(storyBoard)
+    }
+
+    /**
+     * `GET /storyboard/state` — Step 4 mount 시 본문(STORY) 잡 상태를 한 번에 조회.
+     *
+     * sessionStorage 가 비어있는 엣지케이스 (탭 닫고 재진입) 에서도 FE 가 정확한 화면을
+     * 표시할 수 있도록 활성 잡 / 직전 terminal 상태 / 마지막 SUCCESS 이후 FAILED 카운트 셋
+     * 을 묶어서 반환.
+     *
+     * 카운트 정의 — "마지막 SUCCESS 이후 FAILED" :
+     *  - SUCCESS 잡이 한 번이라도 있으면 그 이후의 FAILED 만 카운트
+     *  - SUCCESS 가 없으면 누적 FAILED 전부 카운트
+     *  → 사용자가 한 번 성공한 뒤 새로 만들기 시도에서 실패한 경우엔 카운터 초기화 효과.
+     */
+    @Transactional(readOnly = true)
+    fun findStoryboardState(userId: Long, storyId: Long): StoryboardStateResult {
+        ownedStory(userId, storyId)
+
+        val activeJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+
+        // 활성 잡이 있으면 latestFinalStatus 는 의미 없음 → null. failedCount 는 그래도 같이 보내준다
+        // (UI 가 활성 잡 polling 중에도 백그라운드로 카운트 표시할 수 있게).
+        val lastSuccessJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS,
+        )
+        val failedCount = jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+            storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, lastSuccessJob?.id ?: 0L,
+        )
+
+        val latestFinalStatus = if (activeJob != null) {
+            null
+        } else {
+            // 활성 잡 없을 때만 의미 있음 — 가장 최근 STORY 잡의 status 가 곧 latestFinalStatus.
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY,
+            )?.status
+        }
+
+        return StoryboardStateResult(
+            activeJob = activeJob?.let {
+                ActiveStoryJob(jobId = it.id, status = it.status, createdAt = it.createdAt)
+            },
+            latestFinalStatus = latestFinalStatus,
+            failedCountSinceLastSuccess = failedCount,
+        )
     }
 
     private fun ownedStory(userId: Long, storyId: Long): Story {
