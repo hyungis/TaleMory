@@ -17,10 +17,10 @@ interface StoryFilterProps {
 export function StoryFilter({ activeFilters, onToggle, totalCount }: StoryFilterProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
-      <div className="text-[#f0e6c0] text-lg font-bold whitespace-nowrap bg-[#2a1b12]/70 px-4 py-2 rounded-xl backdrop-blur-sm shadow-sm border border-[#4a3a24]">
-        총 <span className="text-[#b4dc8c]">{totalCount}</span>권
+      <div className="text-[#3E2A18] text-lg font-bold whitespace-nowrap bg-[#E9DBBE] px-4 py-2 rounded-xl shadow-sm border border-[#9A7548]/40">
+        총 <span className="text-[#3F6B2E]">{totalCount}</span>권
       </div>
-      <div className="flex gap-2 bg-[#2a1b12]/60 backdrop-blur-sm rounded-xl p-1.5 border border-[#4a3a24] shadow-sm">
+      <div className="flex gap-2 bg-[#E9DBBE] rounded-xl p-1.5 border border-[#9A7548]/40 shadow-sm">
         {LEVELS.map(level => {
           const isActive = activeFilters.includes(level)
           return (
@@ -28,7 +28,7 @@ export function StoryFilter({ activeFilters, onToggle, totalCount }: StoryFilter
               key={level}
               type="button"
               onClick={() => onToggle(level)}
-              className={`filter-btn px-4 py-1.5 rounded-lg text-sm font-bold transition-all bg-transparent text-[#b4c4a4] border border-transparent hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] ${isActive ? 'active' : ''}`}
+              className={`filter-btn px-4 py-1.5 rounded-lg text-sm font-bold transition-all bg-transparent text-[#6B4A28] border border-transparent hover:bg-[#3F6B2E]/15 hover:text-[#3F6B2E] ${isActive ? 'active' : ''}`}
             >
               {level}
             </button>

@@ -253,7 +253,8 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(248, 220, 150, 0.9), rgba(240, 200, 120, 0.2) 60%, transparent);
+  /* 크림 배경 위에서도 살짝 보이는 sage green 펄 — 잎가루/꽃가루 톤 */
+  background: radial-gradient(circle, rgba(106, 155, 73, 0.7), rgba(154, 117, 72, 0.18) 55%, transparent);
   animation: floatUpBookshelf var(--duration) var(--delay) ease-in-out infinite;
   opacity: 0;
 }
@@ -300,9 +301,10 @@
   z-index: 5100;
   width: 44px;
   height: 44px;
-  background: #2a1b12;
-  border: 2px solid #3d2b1f;
-  color: #f0e6c0;
+  /* 크림 배경 위에 두드러지게 — 부드러운 탄 브라운 */
+  background: #6B4A28;
+  border: 2px solid #9A7548;
+  color: #FBF6E0;
   font-size: 1.8rem;
   border-radius: 50%;
   cursor: pointer;
@@ -310,37 +312,36 @@
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(154, 117, 72, 0.25);
 }
 
 .modal-close-btn:hover {
-  background: #b4dc8c;
-  color: #0a150a;
+  background: #B9D38F;
+  color: #1F3318;
   transform: rotate(90deg) scale(1.1);
 }
 
-/* ===== Forest Library Theme (우리가족 책장 컨테이너) =====
-   풀스크린 패널 — viewport 전체를 책장 배경으로 채운다.
-   메인(/main) ForestScene 의 따뜻한 동화 일러스트 톤과 매칭하기 위해:
-   - 베이스: 차가운 올리브 → 따뜻한 다크 브라운/탠
-   - 우상단: 황금빛 햇살 spotlight (메인의 빛줄기 모티프)
-   - 좌하단: 청록빛 hint (메인의 폭포 모티프)
-   - 전반: 옅은 이끼 그린 wash 유지 */
+/* ===== Pastel Forest Library Theme (우리가족 책장 컨테이너) =====
+   디자인 시스템 v3 (Pastel Forest) 적용:
+   - 베이스: 따뜻한 크림(#FBF6E0) — 다크 브라운에서 라이트 크림으로 전체 반전
+   - 우상단: 부드러운 햇살 spotlight (옅은 노랑)
+   - 좌하단: 파스텔 틸/그린 hint
+   - 전반: 옅은 세이지 그린 + 따뜻한 크림 wash */
 .bookshelf-modal {
   width: 100%;
   height: 100%;
   max-width: none;
   background:
-    /* 우상단 햇살 — amber spotlight */
-    radial-gradient(ellipse at 88% 0%, rgba(240, 200, 120, 0.16), transparent 55%),
-    /* 좌하단 폭포 hint — cool teal */
-    radial-gradient(ellipse at 0% 100%, rgba(136, 200, 216, 0.07), transparent 50%),
-    /* 전반 이끼 그린 wash */
-    radial-gradient(ellipse at 20% 0%, rgba(180, 220, 140, 0.06), transparent 60%),
-    radial-gradient(ellipse at 80% 100%, rgba(240, 230, 192, 0.04), transparent 60%),
-    /* 따뜻한 다크 브라운 베이스 */
-    linear-gradient(160deg, #2c2218 0%, #3a2a1c 60%, #2a1f14 100%);
-  color: #f0e6c0;
+    /* 우상단 햇살 — soft yellow spotlight */
+    radial-gradient(ellipse at 88% 0%, rgba(255, 250, 224, 0.85), transparent 55%),
+    /* 좌하단 hint — pastel teal */
+    radial-gradient(ellipse at 0% 100%, rgba(215, 236, 239, 0.45), transparent 55%),
+    /* 전반 세이지 wash */
+    radial-gradient(ellipse at 20% 0%, rgba(207, 224, 138, 0.18), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(226, 235, 192, 0.25), transparent 60%),
+    /* 크림 베이스 그라디언트 */
+    linear-gradient(160deg, #FBF6E0 0%, #FBF6E4 60%, #F2EBD2 100%);
+  color: #3E2A18;
   border: none;
   border-radius: 0;
   overflow: hidden;
@@ -348,15 +349,17 @@
   display: flex;
   flex-direction: column;
   font-family: var(--font-body);
-  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.5);
+  /* 부드러운 inset glow — 다크의 깊은 vignette 가 아니라 페이지 가장자리만 살짝 강조 */
+  box-shadow: inset 0 0 80px rgba(154, 117, 72, 0.08);
 }
 
 .bookshelf-modal .bookshelf-title-display {
   font-family: var(--font-display);
   letter-spacing: 0.08em;
+  /* 크림 배경 위 dark green 타이틀 — 부드러운 빛 글로우 + 살짝 떨어진 그림자 */
   text-shadow:
-    0 0 20px rgba(180, 220, 140, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.6);
+    0 0 16px rgba(185, 211, 143, 0.45),
+    0 2px 4px rgba(154, 117, 72, 0.18);
 }
 
 /* Tailwind preflight 아래에서 button/input 이 부모 폰트를 상속하게끔 명시.
@@ -386,14 +389,14 @@
   width: 10px;
 }
 .bookshelf-scroll::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(154, 117, 72, 0.18);
 }
 .bookshelf-scroll::-webkit-scrollbar-thumb {
-  background: #2d5a27;
+  background: #3F6B2E;
   border-radius: 5px;
 }
 .bookshelf-scroll::-webkit-scrollbar-thumb:hover {
-  background: #3d6f34;
+  background: #517E37;
 }
 
 /* ===== Fade-in 연출 (카드/블록 공용) ===== */
@@ -424,104 +427,52 @@
   z-index: 40;
 }
 
-/* ===== 필터 칩 active 상태 ===== */
+/* ===== 필터 칩 active 상태 — pastel forest 톤 ===== */
 .bookshelf-modal .filter-btn.active {
-  background-color: #2d5a27 !important;
-  color: #f0e6c0 !important;
-  border-color: #b4dc8c !important;
-  box-shadow: 0 0 14px rgba(180, 220, 140, 0.35);
+  background-color: #3F6B2E !important;
+  color: #F2EBD2 !important;
+  border-color: #517E37 !important;
+  box-shadow: 0 0 12px rgba(63, 107, 46, 0.35);
 }
 
-/* ===== 나무 텍스처 (선반 상판/앞면) ===== */
-/* ===== 진짜 나무 같은 결 + 옹이 + 톤 변화 =====
-   layered background:
-   1) 옹이(knot) — 진한 radial-gradient ellipse 몇 개
-   2) 외부 PNG 패턴 (있으면 grain 보강)
-   각 layer 는 multiply 로 baseline color 위에 어두운 결을 새김. */
+/* ===== 나무 선반 — Pastel Forest 디자인 시스템 v3 톤 =====
+   사실적 wood grain / 옹이 패턴은 제거하고,
+   매끈한 단색 + 부드러운 그라디언트 + 옅은 inner shadow 로 단순화.
+   디자인 시스템의 라운드/플랫 톤(아이콘, 카드)과 맞춤. */
 .bookshelf-modal .wood-texture {
-  background-image:
-    radial-gradient(ellipse 10px 6px at 18% 55%, rgba(40, 18, 6, 0.55), transparent 70%),
-    radial-gradient(ellipse 7px 5px at 47% 25%, rgba(40, 18, 6, 0.45), transparent 70%),
-    radial-gradient(ellipse 12px 7px at 76% 65%, rgba(40, 18, 6, 0.5), transparent 70%),
-    radial-gradient(ellipse 6px 4px at 92% 30%, rgba(40, 18, 6, 0.4), transparent 70%),
-    url('https://www.transparenttextures.com/patterns/wood-pattern.png');
-  background-blend-mode: multiply;
-  /* position 은 BookshelfRow 가 이미 Tailwind `absolute` 로 잡고 있으므로 여기서 강제 X.
-     (예전에 position: relative 를 박았다가 absolute 가 override 되어 선반 위치가 깨졌음.) */
+  /* 기본은 BookshelfRow 의 Tailwind bg-[#C9A874] / bg-[#9A7548] 가 베이스.
+     여기서는 배경 위에 옅은 highlight gradient 만 얹어 자연스러운 입체감 부여. */
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 250, 224, 0.18) 0%,
+    rgba(255, 250, 224, 0) 40%,
+    rgba(107, 74, 40, 0.08) 100%
+  );
 }
 
-/* 결 강화 — multi-frequency vertical grain.
-   - 굵은 결(저주파, 28px) + 가는 결(고주파, 4px) + 미세 highlight 라인.
-   - mix-blend-mode: multiply 로 어두운 결만 자연스럽게 새겨지고, highlight 는 overlay 로 살짝 빛난 효과.
-   - 외부 PNG 못 받아도 fallback 으로 결이 보이도록. */
-.bookshelf-modal .wood-texture::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    /* 굵은 결 (~28px 간격, 살짝 굵음) */
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 22px,
-      rgba(0, 0, 0, 0.18) 22px,
-      rgba(0, 0, 0, 0.18) 24px,
-      transparent 24px,
-      transparent 50px,
-      rgba(0, 0, 0, 0.12) 50px,
-      rgba(0, 0, 0, 0.12) 51px
-    ),
-    /* 가는 결 (~4px 간격, 미세 grain) */
-    repeating-linear-gradient(
-      88deg,
-      transparent 0,
-      transparent 3px,
-      rgba(0, 0, 0, 0.07) 3px,
-      rgba(0, 0, 0, 0.07) 4px,
-      transparent 4px,
-      transparent 7px,
-      rgba(255, 235, 200, 0.05) 7px,
-      rgba(255, 235, 200, 0.05) 8px
-    );
-  mix-blend-mode: multiply;
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-/* 추가 layer — 좌/우 edge shadow + 위→아래 미세 톤 변화.
-   nesting 한계로 ::before 에 wash 가 이미 잡힌 윗면 외엔 별도 layer 가 필요한데
-   여기선 box-shadow inset 으로 처리. */
+/* 좌우 가장자리 부드러운 inner shadow — 평면 솔리드에 미세 깊이감만 추가. */
 .bookshelf-modal .wood-texture--shelf-top,
 .bookshelf-modal .wood-texture--shelf-front {
   box-shadow:
-    inset 8px 0 12px -8px rgba(0, 0, 0, 0.4),
-    inset -8px 0 12px -8px rgba(0, 0, 0, 0.4);
+    inset 6px 0 10px -8px rgba(107, 74, 40, 0.25),
+    inset -6px 0 10px -8px rgba(107, 74, 40, 0.25);
 }
 
-/* 선반 윗면 — 위 가장자리에 이끼 wash + 작은 이끼 점 cluster.
-   메인 ForestScene 의 집 위 자라난 이끼 모티프와 매칭. */
+/* 선반 윗면 — 위 가장자리에 옅은 sage wash 만 (이끼 점 cluster 제거).
+   파스텔 톤이라 작은 디테일은 노이즈로 보임 → 단순한 그라디언트로 정돈. */
 .bookshelf-modal .wood-texture--shelf-top::before {
   content: '';
   position: absolute;
-  top: -2px;
+  top: 0;
   left: 0;
   right: 0;
-  height: 18px;
-  background:
-    /* 작은 이끼 점들 — 가장자리 따라 산포 */
-    radial-gradient(circle at 8% 40%, rgba(122, 160, 90, 0.85) 1.5px, transparent 2.5px),
-    radial-gradient(circle at 22% 30%, rgba(106, 140, 74, 0.8) 2px, transparent 3px),
-    radial-gradient(circle at 38% 55%, rgba(136, 168, 120, 0.75) 1px, transparent 2px),
-    radial-gradient(circle at 56% 35%, rgba(122, 160, 90, 0.8) 1.5px, transparent 2.5px),
-    radial-gradient(circle at 73% 50%, rgba(106, 140, 74, 0.75) 1px, transparent 2px),
-    radial-gradient(circle at 88% 25%, rgba(136, 168, 120, 0.8) 2px, transparent 3px),
-    /* 위 가장자리 wash */
-    linear-gradient(
-      to bottom,
-      rgba(106, 140, 74, 0.55) 0%,
-      rgba(106, 140, 74, 0.25) 35%,
-      transparent 75%
-    );
+  height: 8px;
+  background: linear-gradient(
+    to bottom,
+    rgba(141, 186, 100, 0.35) 0%,
+    rgba(141, 186, 100, 0.12) 50%,
+    transparent 100%
+  );
   pointer-events: none;
   z-index: 1;
 }
@@ -536,49 +487,49 @@
   transform: perspective(900px) rotateY(-3deg);
   box-shadow:
     /* === 우측 페이지 두께 (베이지 페이지 + 어두운 라인 사이사이) === */
-    2px 0 0 #ebe0b6,
+    2px 0 0 #F4E2BD,
     3px 0 0 rgba(0, 0, 0, 0.18),
-    4px 0 0 #f0e6c0,
+    4px 0 0 #F2EBD2,
     5px 0 0 rgba(0, 0, 0, 0.12),
-    6px 0 0 #ebe0b6,
+    6px 0 0 #F4E2BD,
     7px 0 0 rgba(0, 0, 0, 0.18),
-    8px 0 0 #f0e6c0,
+    8px 0 0 #F2EBD2,
     /* === 하단 페이지 두께 === */
-    0 2px 0 #ebe0b6,
+    0 2px 0 #F4E2BD,
     0 3px 0 rgba(0, 0, 0, 0.15),
-    0 4px 0 #f0e6c0,
+    0 4px 0 #F2EBD2,
     0 5px 0 rgba(0, 0, 0, 0.1),
-    0 6px 0 #ebe0b6,
-    /* === 책장 안쪽 깊이 그림자 === */
-    -12px 14px 22px -6px rgba(0, 0, 0, 0.55),
-    14px 18px 22px -8px rgba(0, 0, 0, 0.4),
+    0 6px 0 #F4E2BD,
+    /* === 책장 안쪽 깊이 그림자 (크림 배경에 맞춰 톤다운) === */
+    -10px 12px 18px -6px rgba(107, 74, 40, 0.35),
+    12px 14px 20px -8px rgba(107, 74, 40, 0.25),
     /* === 좌측 책등 inner shadow === */
-    inset 8px 0 8px -4px rgba(0, 0, 0, 0.35),
-    /* === 우측 amber inner highlight === */
-    inset -2px 0 0 rgba(212, 184, 106, 0.4);
+    inset 8px 0 8px -4px rgba(107, 74, 40, 0.28),
+    /* === 우측 honey inner highlight === */
+    inset -2px 0 0 rgba(217, 190, 130, 0.5);
 }
 
 .bookshelf-modal .book-card:hover {
   transform: perspective(900px) rotateY(-3deg) translateY(-14px) scale(1.04);
   box-shadow:
     /* hover 시에도 페이지 두께 유지 */
-    2px 0 0 #ebe0b6,
+    2px 0 0 #F4E2BD,
     3px 0 0 rgba(0, 0, 0, 0.18),
-    4px 0 0 #f0e6c0,
+    4px 0 0 #F2EBD2,
     5px 0 0 rgba(0, 0, 0, 0.12),
-    6px 0 0 #ebe0b6,
+    6px 0 0 #F4E2BD,
     7px 0 0 rgba(0, 0, 0, 0.18),
-    8px 0 0 #f0e6c0,
-    0 2px 0 #ebe0b6,
+    8px 0 0 #F2EBD2,
+    0 2px 0 #F4E2BD,
     0 3px 0 rgba(0, 0, 0, 0.15),
-    0 4px 0 #f0e6c0,
+    0 4px 0 #F2EBD2,
     0 5px 0 rgba(0, 0, 0, 0.1),
-    0 6px 0 #ebe0b6,
-    /* 그림자만 더 진하게 */
-    -16px 24px 30px -4px rgba(0, 0, 0, 0.6),
-    18px 26px 28px -6px rgba(0, 0, 0, 0.45),
-    inset 8px 0 8px -4px rgba(0, 0, 0, 0.35),
-    inset -2px 0 0 rgba(212, 184, 106, 0.45) !important;
+    0 6px 0 #F4E2BD,
+    /* hover 시 그림자만 더 진하게 (크림 배경 위에서도 떠오르는 느낌) */
+    -14px 22px 26px -4px rgba(107, 74, 40, 0.42),
+    16px 22px 26px -6px rgba(107, 74, 40, 0.32),
+    inset 8px 0 8px -4px rgba(107, 74, 40, 0.28),
+    inset -2px 0 0 rgba(217, 190, 130, 0.55) !important;
 }
 
 /* 표지(.vintage-cover) 좌상단에 따뜻한 빛 spotlight — 책장 햇살이 닿은 느낌. */

@@ -33,11 +33,11 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
 
   return (
     <div
-      className="bookshelf-fade-in book-card bg-[#f0e6c0] rounded-r-xl rounded-l-sm overflow-hidden flex flex-col h-full cursor-pointer relative z-10 border-l-[6px] border-l-[#2a1b12]"
+      className="bookshelf-fade-in book-card bg-[#F2EBD2] rounded-r-xl rounded-l-sm overflow-hidden flex flex-col h-full cursor-pointer relative z-10 border-l-[6px] border-l-[#6B4A28]"
       style={{ animationDelay: `${animationDelayMs}ms` }}
     >
       <div
-        className={`aspect-[3/4] bg-gradient-to-br ${story.bgClass} vintage-cover relative overflow-hidden flex flex-col items-center justify-end text-[#f0e6c0]/80`}
+        className={`aspect-[3/4] bg-gradient-to-br ${story.bgClass} vintage-cover relative overflow-hidden flex flex-col items-center justify-end text-[#F2EBD2]/80`}
       >
         {/* 표지 이미지 — placeholder (추후 story.coverImageUrl 로 교체) */}
         <img
@@ -52,14 +52,14 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
 
         {/* 표지 제목 — vignette 위에 흰색으로 노출 */}
         <div className="relative z-10 mb-4 px-4 text-center">
-          <p className="text-base font-bold leading-tight line-clamp-2 text-[#f0e6c0] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{story.title}</p>
+          <p className="text-base font-bold leading-tight line-clamp-2 text-[#F2EBD2] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{story.title}</p>
         </div>
 
         {/* 뱃지들 — 좌상단: 레벨(초급/중급/고급), 우상단: 페이지 수 */}
         <div className={`absolute top-3 left-3 ${levelColor} text-[11px] px-2 py-1 rounded-md font-sans font-bold shadow-sm z-10`}>
           {story.level}
         </div>
-        <div className="absolute top-3 right-3 bg-black/50 text-[#f0e6c0] text-[10px] px-2 py-1 rounded-md font-sans backdrop-blur-sm flex items-center gap-1 z-10">
+        <div className="absolute top-3 right-3 bg-black/50 text-[#F2EBD2] text-[10px] px-2 py-1 rounded-md font-sans backdrop-blur-sm flex items-center gap-1 z-10">
           {story.pages} Pages
         </div>
 
@@ -68,7 +68,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
           <button
             type="button"
             onClick={() => onRead?.(story)}
-            className="flex-1 bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] rounded-lg py-2 flex items-center justify-center gap-1 hover:bg-[#3d6f34] hover:shadow-[0_0_12px_rgba(180,220,140,0.5)] transition-all font-bold text-sm"
+            className="flex-1 bg-[#3F6B2E] text-[#F2EBD2] border-2 border-[#B9D38F] rounded-lg py-2 flex items-center justify-center gap-1 hover:bg-[#517E37] hover:shadow-[0_0_12px_rgba(180,220,140,0.5)] transition-all font-bold text-sm"
           >
             <BookOpen className="w-4 h-4" /> 읽기
           </button>
@@ -76,7 +76,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
             type="button"
             onClick={() => onShare?.(story)}
             aria-label="공유"
-            className="w-10 h-10 flex items-center justify-center bg-[#8b7a52] text-[#f0e6c0] border-2 border-[#d4b86a] rounded-lg hover:bg-[#a89664] hover:shadow-[0_0_10px_rgba(212,184,106,0.5)] transition-all"
+            className="w-10 h-10 flex items-center justify-center bg-[#9A7548] text-[#F2EBD2] border-2 border-[#D9BE82] rounded-lg hover:bg-[#C9A874] hover:shadow-[0_0_10px_rgba(212,184,106,0.5)] transition-all"
           >
             <Share2 className="w-4 h-4" />
           </button>
@@ -84,7 +84,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
             type="button"
             onClick={() => onDelete?.(story)}
             aria-label="삭제"
-            className="w-10 h-10 flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] rounded-lg hover:bg-[#a84a35] hover:shadow-[0_0_10px_rgba(201,123,74,0.5)] transition-all"
+            className="w-10 h-10 flex items-center justify-center bg-[#B0473F] text-[#F2EBD2] border-2 border-[#E2BFB9] rounded-lg hover:bg-[#B0473F] hover:shadow-[0_0_10px_rgba(201,123,74,0.5)] transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </button>

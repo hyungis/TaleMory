@@ -100,24 +100,24 @@ export function BookshelfModal({
               {/* 타이틀 + 새 동화책 만들기 */}
               <div className="mb-12 flex flex-col md:flex-row justify-between items-center gap-6 bookshelf-fade-in">
                 <div className="text-center md:text-left">
-                  <h1 className="bookshelf-title-display text-4xl md:text-5xl text-[#f0e6c0] mb-3 flex items-center justify-center md:justify-start gap-3 font-bold">
-                    우리가족 책장 <Library className="w-10 h-10 text-[#b4dc8c]" />
+                  <h1 className="bookshelf-title-display text-4xl md:text-5xl text-[#3F6B2E] mb-3 flex items-center justify-center md:justify-start gap-3 font-bold">
+                    우리가족 책장 <Library className="w-10 h-10 text-[#517E37]" />
                   </h1>
-                  <p className="text-[#b4c4a4] text-lg md:text-xl">
+                  <p className="text-[#6B4A28] text-lg md:text-xl">
                     지금까지 만든 소중한 여행과 일상의 이야기들을 모아보세요.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={onCreateStory}
-                  className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.2)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.4)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+                  className="bg-[#3F6B2E] text-[#F2EBD2] px-8 py-4 rounded-full border border-[#B9D38F]/40 shadow-[0_4px_0_#2D4F1F,0_0_20px_rgba(180,220,140,0.2)] hover:translate-y-1 hover:shadow-[0_2px_0_#2D4F1F,0_0_30px_rgba(180,220,140,0.4)] hover:bg-[#517E37] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
                 >
                   <PlusCircle className="w-6 h-6" /> 새 동화책 만들기
                 </button>
               </div>
 
               {/* 필터/정렬 바 */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-[#4a3a24] gap-4 bookshelf-fade-in relative z-20">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-[#9A7548] gap-4 bookshelf-fade-in relative z-20">
                 <StoryFilter
                   activeFilters={activeFilters}
                   onToggle={toggleFilter}
@@ -129,7 +129,7 @@ export function BookshelfModal({
               {/* 책 그리드 (현재 페이지만) */}
               {isLoading ? (
                 <div className="flex items-center justify-center py-20">
-                  <div className="w-10 h-10 border-4 border-[#b4dc8c]/30 border-t-[#b4dc8c] rounded-full animate-spin" />
+                  <div className="w-10 h-10 border-4 border-[#B9D38F]/30 border-t-[#B9D38F] rounded-full animate-spin" />
                 </div>
               ) : (
                 <StoryGrid stories={paged} onRead={onReadStory} onShare={onShareStory} onDelete={onDeleteStory} />
