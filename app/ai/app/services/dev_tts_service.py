@@ -123,7 +123,7 @@ def _voice_metadata(voice_id: str) -> dict[str, Any]:
     return _read_json(metadata_path)
 
 
-def _concat_wavs(paths: list[Path], output_path: Path) -> None:
+def _concat_wavs(paths: list[Path], output_path: Path, pause_ms: int = 900) -> None:
     if not paths:
         raise ValueError("No wav files to concatenate")
 
@@ -138,7 +138,10 @@ def _concat_wavs(paths: list[Path], output_path: Path) -> None:
         out_file.setsampwidth(sampwidth)
         out_file.setframerate(framerate)
 
-        for path in paths:
+        silence_frame_count = int(framerate * max(0, pause_ms) / 1000)
+        silence = b"\x00" * silence_frame_count * nchannels * sampwidth
+
+        for index, path in enumerate(paths):
             with wave.open(str(path), "rb") as in_file:
                 if (
                     in_file.getnchannels() != nchannels
@@ -147,6 +150,8 @@ def _concat_wavs(paths: list[Path], output_path: Path) -> None:
                 ):
                     raise ValueError("All story sentence wav files must share the same audio parameters")
                 out_file.writeframes(in_file.readframes(in_file.getnframes()))
+                if index < len(paths) - 1 and silence:
+                    out_file.writeframes(silence)
 
 
 def create_pending_manifest(job_id: str | int, job_type: str, extra: dict[str, Any]) -> None:
