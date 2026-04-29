@@ -85,7 +85,7 @@ export function CreationPage() {
           onUpdate={flow.updateStep1}
           onChildUpdate={flow.updateChildAt}
           onChildAdd={flow.addChild}
-          onChildAppend={flow.appendChild}
+          onChildAppend={flow.prependChild}
           onChildRemove={flow.removeChildAt}
           onBack={handleBack}
           onStoryCreated={storyId => {
