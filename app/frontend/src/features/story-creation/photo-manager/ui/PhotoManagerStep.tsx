@@ -1,5 +1,20 @@
 import { useCallback } from 'react'
 import { Image as ImageIcon, Loader2, Wand2 } from 'lucide-react'
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { StepHeader } from '../../ui/StepHeader'
 import { PhotoUploadZone } from './PhotoUploadZone'
 import { PhotoItem } from './PhotoItem'
@@ -73,6 +88,35 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
     [serverPhotos, reorderMutation],
   )
 
+  /**
+   * dnd-kit DragEnd 핸들러 — 드롭 위치 기준으로 새 순서 계산 후 서버 PATCH.
+   * activationConstraint(distance:8) 덕분에 짧은 클릭은 drag 로 변환되지 않아 input/button 방해 X.
+   * useReorderPhotos 의 onMutate 가 낙관적 업데이트로 즉시 캐시 재배열 → 깜빡임 없음.
+   */
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      const ids = serverPhotos.map(p => p.photoId)
+      const fromIdx = ids.indexOf(Number(active.id))
+      const toIdx = ids.indexOf(Number(over.id))
+      if (fromIdx === -1 || toIdx === -1) return
+      const next = arrayMove(ids, fromIdx, toIdx)
+      reorderMutation.mutate(next)
+    },
+    [serverPhotos, reorderMutation],
+  )
+
+  /**
+   * dnd-kit sensors:
+   *  - PointerSensor (마우스 + 터치) : distance 8px 이상 이동해야 drag 활성 → 짧은 클릭은 input/button 으로 통과.
+   *  - KeyboardSensor : Tab + Space 로 잡고 화살표 키로 이동 (a11y).
+   */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
   const canProceed = serverPhotos.length > 0 && upload.pending.every(p => p.status === 'error' || false)
 
   return (
@@ -120,24 +164,37 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
 
               {!photosQuery.isPending && totalCount === 0 && <EmptyPhotoState />}
 
-              {/* 서버 커밋된 사진 */}
-              {serverPhotos.map((photo, idx) => (
-                <PhotoItem
-                  key={`server-${photo.photoId}`}
-                  mode="committed"
-                  imageUrl={photo.imageUrl}
-                  description={photo.description}
-                  tagsJson={photo.tagsJson}
-                  onRemove={() => handleRemove(photo.photoId)}
-                  onUpdate={patch => updateMutation.mutate({ photoId: photo.photoId, body: patch })}
-                  onMoveUp={() => handleMove(photo.photoId, -1)}
-                  onMoveDown={() => handleMove(photo.photoId, 1)}
-                  isFirst={idx === 0}
-                  isLast={idx === serverPhotos.length - 1}
-                  isRemoving={deleteMutation.isPending && deleteMutation.variables === photo.photoId}
-                  isReordering={reorderMutation.isPending}
-                />
-              ))}
+              {/* 서버 커밋된 사진 — DndContext + SortableContext 안에서 순서 변경 가능.
+                  uploading/error 카드는 이 context 밖에 있어 드래그 대상 X. */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={serverPhotos.map(p => p.photoId)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {serverPhotos.map((photo, idx) => (
+                    <PhotoItem
+                      key={`server-${photo.photoId}`}
+                      id={photo.photoId}
+                      mode="committed"
+                      imageUrl={photo.imageUrl}
+                      description={photo.description}
+                      tagsJson={photo.tagsJson}
+                      onRemove={() => handleRemove(photo.photoId)}
+                      onUpdate={patch => updateMutation.mutate({ photoId: photo.photoId, body: patch })}
+                      onMoveUp={() => handleMove(photo.photoId, -1)}
+                      onMoveDown={() => handleMove(photo.photoId, 1)}
+                      isFirst={idx === 0}
+                      isLast={idx === serverPhotos.length - 1}
+                      isRemoving={deleteMutation.isPending && deleteMutation.variables === photo.photoId}
+                      isReordering={reorderMutation.isPending}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
 
               {/* 업로드 중/실패 */}
               {upload.pending.map(p =>

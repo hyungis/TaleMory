@@ -38,7 +38,7 @@ export function ChildrenList({
 
   return (
     <div>
-      <label className="block text-black text-lg mb-2 font-bold">아이 정보</label>
+      <label className="block text-black text-2xl mb-2 font-bold">아이 정보</label>
 
       {onLoadPerson && (
         <div className="mb-3">

@@ -130,8 +130,11 @@ export interface UseStoryCreationFlowResult {
   updateVoiceModel: (voiceModel: string | null) => void
   updateChildAt: (index: number, patch: Partial<StoryChild>) => void
   addChild: () => void
-  /** 기존 person 정보를 가져와 새 row 로 append. 드롭다운 "저장된 아이 불러오기" 용. */
-  appendChild: (child: StoryChild) => void
+  /**
+   * 기존 person 정보를 가져와 새 row 로 prepend (배열 앞에 추가).
+   * 드롭다운 "저장된 아이 불러오기" 용 — 사용자가 막 불러온 아이가 가장 위에 보이도록.
+   */
+  prependChild: (child: StoryChild) => void
   removeChildAt: (index: number) => void
   /** 로컬 진행 상태를 날린다. publish / "새로 시작하기" 시점에 호출 예정. */
   resetProgress: () => void
@@ -296,12 +299,16 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     }))
   }, [])
 
-  const appendChild = useCallback((child: StoryChild) => {
+  /**
+   * 불러온 아이를 배열 맨 앞에 추가.
+   * 끝에 빈 placeholder row 가 있어도 그 위에 노출되도록 prepend → 사용자가 즉시 인식 가능.
+   */
+  const prependChild = useCallback((child: StoryChild) => {
     setStoryProject(prev => ({
       ...prev,
       step1: {
         ...prev.step1,
-        children: [...prev.step1.children, child],
+        children: [child, ...prev.step1.children],
       },
     }))
   }, [])
@@ -355,7 +362,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     updateVoiceModel,
     updateChildAt,
     addChild,
-    appendChild,
+    prependChild,
     removeChildAt,
     resetProgress,
   }
