@@ -2,7 +2,9 @@ package com.s210.backend.domain.voice.presentation
 
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.tts.application.VoicePreviewService
 import com.s210.backend.domain.voice.application.VoiceService
+import com.s210.backend.domain.voice.presentation.request.VoicePreviewApiRequest
 import com.s210.backend.domain.voice.presentation.response.VoicePreviewResponse
 import com.s210.backend.domain.voice.presentation.response.VoicePresignResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceProfileResponse
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api")
 class VoiceController(
     private val voiceService: VoiceService,
+    private val voicePreviewService: VoicePreviewService,
 ) {
 
     @GetMapping("/voice-recording-script")
@@ -106,7 +109,16 @@ class VoiceController(
     @PostMapping("/voice-profiles/{voiceProfileId}/preview")
     fun voiceProfilePreview(
         @PathVariable voiceProfileId: Long,
+        @RequestBody request: VoicePreviewApiRequest,
+        @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<VoicePreviewResponse>> {
-        TODO("Not yet implemented")
+        val result = voicePreviewService.preview(
+            userId = user.userId,
+            voiceProfileId = voiceProfileId,
+            text = request.text,
+            emotion = request.emotion,
+            language = request.language,
+        )
+        return ResponseEntity.ok(ApiResponse(data = VoicePreviewResponse.from(result)))
     }
 }

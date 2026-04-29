@@ -1,0 +1,21 @@
+{
+  "jobId": "12345",
+  "jobType": "TTS",
+  "action": "GENERATE",
+  "storyId": 100,
+  "payload": {
+    "storyId": 100,
+    "voiceId": "42",
+    "referenceAudioUrl": "https://s3.example.com/voices/42.wav",
+    "language": "en-US",
+    "format": "wav",
+    "options": {
+      "defaultEmotion": "neutral",
+      "generateFullBookAudio": false
+    },
+    "sentences": [
+      { "sentenceId": 1001, "text": "Once upon a time.", "emotion": null, "stylePrompt": null },
+      { "sentenceId": 1002, "text": "There was a brave child.", "emotion": null, "stylePrompt": null }
+    ]
+  }
+}

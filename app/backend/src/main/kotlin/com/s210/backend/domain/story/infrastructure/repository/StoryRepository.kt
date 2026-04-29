@@ -17,4 +17,6 @@ interface StoryRepository : JpaRepository<Story, Long> {
     fun findByShareTokenAndDeletedAtIsNull(shareToken: String): Story?
 
     fun findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId: Long): List<Story>
+
+    fun findByIdAndUserId(id: Long, userId: Long): Story?
 }

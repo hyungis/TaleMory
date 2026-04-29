@@ -84,3 +84,15 @@ data class OutroVoiceCommitRequest(
 data class ProgressRequest(
     val lastScenePage: Int
 )
+
+data class IllustrationRegenerateRequest(
+    val userPrompt: String,
+)
+
+data class BookmarkRequest(
+    val isBookmarked: Boolean,
+)
+
+data class BgmRequest(
+    val bgmPresetId: Long?,
+)
