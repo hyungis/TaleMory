@@ -192,7 +192,7 @@ class StoryConfirmService(
         val voiceProfile = voiceProfileRepository.findById(voiceProfileId).orElseThrow {
             BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
-        val referenceAudioUrl = voiceProfile.audioUrl
+        val referenceSource = voiceProfile.audioUrl
             ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
 
         val allSentences = createdScenes.flatMap { scene ->
@@ -239,17 +239,18 @@ class StoryConfirmService(
         // 12) MQ publish (cache miss 있을 때만) 또는 즉시 SUCCESS
         val finalStatus = if (cacheMisses > 0) {
             ttsService.publish(
-                StoryTtsJobMessage(
-                    jobId = ttsJob.id.toString(),
-                    storyId = storyId,
-                    payload = StoryTtsPayload(
+                    StoryTtsJobMessage(
+                        jobId = ttsJob.id.toString(),
                         storyId = storyId,
-                        voiceId = voiceProfileId.toString(),
-                        referenceAudioUrl = referenceAudioUrl,
-                        options = TtsOptions(),
-                        sentences = missSentences,
-                    ),
-                )
+                        payload = StoryTtsPayload(
+                            storyId = storyId,
+                            voiceId = voiceProfileId.toString(),
+                            referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
+                            referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
+                            options = TtsOptions(),
+                            sentences = missSentences,
+                        ),
+                    )
             )
             JobStatus.PENDING
         } else {
@@ -280,4 +281,6 @@ class StoryConfirmService(
             cacheMisses = cacheMisses,
         )
     }
+
+    private fun looksLikeS3Key(value: String): Boolean = value.startsWith("stories/")
 }

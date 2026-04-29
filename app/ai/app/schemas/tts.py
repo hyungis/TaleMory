@@ -67,6 +67,8 @@ class PreviewRequest(BaseModel):
     language: str
     format: AudioFormat = "wav"
     options: PreviewOptions
+    referenceAudioUrl: str | None = None
+    referenceAudioS3Key: str | None = None
 
 
 class StorySentenceRequest(BaseModel):
@@ -93,7 +95,8 @@ class StoryTtsOptions(BaseModel):
 class StoryTtsRequest(BaseModel):
     storyId: int
     voiceId: str
-    referenceAudioUrl: str | None = None  # Optional — backward compat; used to cache reference.wav on first run
+    referenceAudioUrl: str | None = None
+    referenceAudioS3Key: str | None = None
     language: str
     format: AudioFormat = "wav"
     options: StoryTtsOptions

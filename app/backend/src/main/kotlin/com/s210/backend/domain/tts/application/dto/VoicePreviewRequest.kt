@@ -5,7 +5,8 @@ data class VoicePreviewRequest(
     val language: String = "en-US",
     val format: String = "wav",
     val options: VoicePreviewOptions = VoicePreviewOptions(),
-    val referenceAudioUrl: String,
+    val referenceAudioUrl: String? = null,
+    val referenceAudioS3Key: String? = null,
 )
 
 data class VoicePreviewOptions(

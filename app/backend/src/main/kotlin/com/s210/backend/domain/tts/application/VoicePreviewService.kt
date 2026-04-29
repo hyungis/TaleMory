@@ -17,7 +17,7 @@ import java.time.Duration
  *
  * 흐름:
  *  1. 소유권 검증 (다른 user 의 voice profile 거부)
- *  2. voice_profiles.audio_url 으로부터 referenceAudioUrl 결정
+ *  2. voice_profiles.audio_url 으로부터 referenceAudioS3Key / referenceAudioUrl 결정
  *  3. AI:8000/api/v1/voices/{voiceId}/preview 동기 호출 (30s timeout)
  *  4. 응답 그대로 forward (audioUrl, s3Key, durationMs)
  *
@@ -47,18 +47,19 @@ class VoicePreviewService(
         if (vp.userId != userId) {
             throw BusinessException(VoiceErrorCode.FORBIDDEN)
         }
-        val refUrl = vp.audioUrl ?: throw BusinessException(VoiceErrorCode.INVALID_REQUEST)
+        val referenceSource = vp.audioUrl ?: throw BusinessException(VoiceErrorCode.INVALID_REQUEST)
 
         val request = VoicePreviewRequest(
             text = text,
             language = language,
-            referenceAudioUrl = refUrl,
+            referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
+            referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
             options = VoicePreviewOptions(emotion = emotion),
         )
 
         return try {
             webClient.post()
-                .uri("/api/v1/voices/{voiceId}/preview", voiceProfileId.toString())
+                .uri("/api/voices/{voiceId}/preview", voiceProfileId.toString())
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono<VoicePreviewResponse>()
@@ -67,4 +68,6 @@ class VoicePreviewService(
             throw BusinessException(VoiceErrorCode.AI_PROVIDER_ERROR, cause = e)
         }
     }
+
+    private fun looksLikeS3Key(value: String): Boolean = value.startsWith("stories/")
 }
