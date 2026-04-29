@@ -9,4 +9,6 @@ interface SceneRepository : JpaRepository<Scene, Long> {
     fun findAllByStoryId(storyId: Long): List<Scene>
 
     fun countByStoryId(storyId: Long): Long
+
+    fun findByIdAndStoryId(id: Long, storyId: Long): Scene?
 }

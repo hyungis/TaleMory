@@ -175,6 +175,16 @@ data class CharacterAnchorView(
  * TTS Job 을 큐에 넣고 즉시 반환 (비동기 시작 = 202 Accepted).
  * 전부 캐시 적중(status=SUCCESS)인 경우도 202 로 통일.
  */
+data class IllustrationRegenerateResponse(
+    val jobId: Long,
+    val status: String,
+)
+
+data class IllustrationRollbackResponse(
+    val illustrationUrl: String,
+    val version: Int,
+)
+
 data class ConfirmStoryboardResponse(
     val jobId: Long,
     val jobType: String,

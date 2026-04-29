@@ -20,4 +20,9 @@ enum class StoryErrorCode(
     SUMMARY_REQUIRED(HttpStatus.BAD_REQUEST, "STORY_010", "줄거리(요약) 생성을 먼저 완료해야 합니다."),
     SUMMARY_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_011", "재생성할 직전 줄거리(요약)가 없습니다."),
     STORY_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "STORY_012", "본문 생성이 이미 진행 중입니다."),
+    ROLLBACK_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "STORY_013", "삽화 롤백을 사용할 수 없습니다."),
+    NOTHING_TO_ROLLBACK(HttpStatus.BAD_REQUEST, "STORY_014", "되돌릴 이전 버전이 없습니다."),
+    REGENERATION_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "STORY_015", "삽화 재생성 횟수를 초과했습니다."),
+    BGM_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_016", "존재하지 않는 BGM 프리셋입니다."),
+    SCENE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_017", "씬을 찾을 수 없습니다."),
 }

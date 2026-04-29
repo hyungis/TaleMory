@@ -4,6 +4,8 @@ import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.model.JobType
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
@@ -39,6 +41,8 @@ class StoryboardResultListenerTest {
     private val storyboardPageRepository: StoryboardPageRepository = mock(StoryboardPageRepository::class.java)
     private val storyRepository: StoryRepository = mock(StoryRepository::class.java)
     private val ttsResultHandler: TtsResultHandler = mock(TtsResultHandler::class.java)
+    private val sceneRepository: SceneRepository = mock(SceneRepository::class.java)
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository = mock(IllustrationVersionRedisRepository::class.java)
     private val objectMapper = jacksonObjectMapper()
 
     private val listener = StoryboardResultListener(
@@ -48,6 +52,8 @@ class StoryboardResultListenerTest {
         storyRepository = storyRepository,
         objectMapper = objectMapper,
         ttsResultHandler = ttsResultHandler,
+        sceneRepository = sceneRepository,
+        illustrationVersionRedisRepository = illustrationVersionRedisRepository,
     )
 
     // -----------------------------------------------------------------------

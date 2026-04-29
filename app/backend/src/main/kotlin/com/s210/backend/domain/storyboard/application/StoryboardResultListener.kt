@@ -1,11 +1,13 @@
 package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.mq.RabbitMQConfig
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.story.entity.StoryBoard
 import com.s210.backend.domain.story.entity.StoryboardPage
+import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
@@ -49,6 +51,8 @@ class StoryboardResultListener(
     private val storyRepository: StoryRepository,
     private val objectMapper: ObjectMapper,
     private val ttsResultHandler: TtsResultHandler,
+    private val sceneRepository: SceneRepository,
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -286,16 +290,30 @@ class StoryboardResultListener(
         }
 
         if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) {
-            // 잡이 이미 끝난 경우라도 도착한 COMPLETED 페이지는 storyboard_pages 에 반영해두면
-            // 유저 입장에선 "그 페이지는 이미지가 있다" 라는 데이터 자체는 살아남음.
-            // 단 잡 status 는 더 변경하지 않는다.
-            if (envelope.status.equals("COMPLETED", ignoreCase = true)) {
+            if (job.sceneId == null && envelope.status.equals("COMPLETED", ignoreCase = true)) {
                 applyImageUrlIfPresent(envelope)
             }
             log.info(
                 "Image job {} already finalized ({}), skip job-level update",
                 job.id, job.status,
             )
+            return
+        }
+
+        // scene illustration regeneration (post-confirm)
+        if (job.sceneId != null) {
+            when (envelope.status.uppercase()) {
+                "COMPLETED" -> handleSceneImageSuccess(job, envelope)
+                "FAILED" -> {
+                    val code = envelope.error?.code ?: "UNKNOWN"
+                    val message = envelope.error?.message ?: "에러 정보 없음"
+                    markFailed(job, code, message)
+                }
+                else -> log.warn(
+                    "Unknown scene image envelope status '{}' for jobId {}",
+                    envelope.status, envelope.jobId,
+                )
+            }
             return
         }
 
@@ -452,6 +470,45 @@ class StoryboardResultListener(
         log.info(
             "Job {} SUCCESS — storyId={}, storyLen={}, pages={}, costUsd={}",
             job.id, job.storyId, koreanBody.length, payload.pages.size, payload.usage.costUsd,
+        )
+    }
+
+    private fun handleSceneImageSuccess(job: StoryGenerationJob, envelope: StoryboardImageResultEnvelope) {
+        val resultData = envelope.payload?.result
+        if (resultData == null) {
+            markFailed(job, "PAYLOAD_MISSING", "이미지 결과 payload 가 없습니다.")
+            return
+        }
+
+        val scene = sceneRepository.findById(job.sceneId!!).orElse(null)
+        if (scene == null) {
+            markFailed(job, "SCENE_NOT_FOUND", "씬을 찾을 수 없습니다.")
+            return
+        }
+
+        scene.illustrationUrl = resultData.imageUrl
+
+        job.status = JobStatus.SUCCESS
+        job.finishedAt = LocalDateTime.now()
+
+        // Redis illust versions push (best-effort)
+        try {
+            val currentVersion = illustrationVersionRedisRepository.getCurrent(scene.id) ?: 1
+            val newVersion = currentVersion + 1
+            illustrationVersionRedisRepository.pushVersion(
+                sceneId = scene.id,
+                version = newVersion,
+                url = resultData.imageUrl,
+                prompt = null,
+                jobId = job.id,
+            )
+        } catch (e: Exception) {
+            log.warn("Redis illust version push failed for sceneId={}: {}", scene.id, e.message)
+        }
+
+        log.info(
+            "Scene image job {} SUCCESS — storyId={}, sceneId={}",
+            job.id, job.storyId, job.sceneId,
         )
     }
 

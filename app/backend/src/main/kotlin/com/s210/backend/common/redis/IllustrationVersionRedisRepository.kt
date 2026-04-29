@@ -57,6 +57,18 @@ class IllustrationVersionRedisRepository(
     fun getCurrent(sceneId: Long): Int? =
         redis.opsForValue().get(currentKey(sceneId))?.toIntOrNull()
 
-    private fun versionsKey(sceneId: Long) = "$VERSIONS_PREFIX:$sceneId"
+    fun listVersions(sceneId: Long): List<String> =
+        redis.opsForList().range(versionsKey(sceneId), 0, -1) ?: emptyList()
+
+    fun setCurrent(sceneId: Long, version: Int) {
+        redis.opsForValue().set(currentKey(sceneId), version.toString(), TTL)
+    }
+
+    fun deleteAll(sceneId: Long) {
+        redis.delete(versionsKey(sceneId))
+        redis.delete(currentKey(sceneId))
+    }
+
+    internal fun versionsKey(sceneId: Long) = "$VERSIONS_PREFIX:$sceneId"
     private fun currentKey(sceneId: Long) = "$CURRENT_PREFIX:$sceneId"
 }

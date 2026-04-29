@@ -99,10 +99,14 @@ class StoryController(
         return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 
-    // 즐겨찾기 토글 (추후 구현)
     @PatchMapping("/{storyId}/bookmark")
-    fun storyBookmarkModify(@PathVariable storyId: Long): ResponseEntity<ApiResponse<Unit>> {
-        TODO("Not yet implemented")
+    fun storyBookmarkModify(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+        @RequestBody request: com.s210.backend.domain.story.presentation.request.BookmarkRequest,
+    ): ResponseEntity<Unit> {
+        storyService.modifyBookmark(user.userId, storyId, request.isBookmarked)
+        return ResponseEntity.noContent().build()
     }
 
     // 최종본 공개

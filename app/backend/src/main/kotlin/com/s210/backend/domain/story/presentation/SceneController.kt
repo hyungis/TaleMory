@@ -3,15 +3,20 @@ package com.s210.backend.domain.story.presentation
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.HighlightOutroService
+import com.s210.backend.domain.story.application.SceneIllustrationService
 import com.s210.backend.domain.story.application.StoryProgressService
 import com.s210.backend.domain.story.application.StoryService
+import com.s210.backend.domain.story.presentation.request.BgmRequest
 import com.s210.backend.domain.story.presentation.request.HighlightVoiceCommitRequest
+import com.s210.backend.domain.story.presentation.request.IllustrationRegenerateRequest
 import com.s210.backend.domain.story.presentation.request.OutroRequest
 import com.s210.backend.domain.story.presentation.request.OutroVoiceCommitRequest
 import com.s210.backend.domain.story.presentation.request.PresignedUrlRequest
 import com.s210.backend.domain.story.presentation.request.ProgressRequest
 import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
+import com.s210.backend.domain.story.presentation.response.IllustrationRegenerateResponse
+import com.s210.backend.domain.story.presentation.response.IllustrationRollbackResponse
 import com.s210.backend.domain.story.presentation.response.OutroResponse
 import com.s210.backend.domain.story.presentation.response.PresignedUrlResponse
 import com.s210.backend.domain.story.presentation.response.ProgressResponse
@@ -27,6 +32,7 @@ class SceneController(
     private val storyProgressService: StoryProgressService,
     private val storyService: StoryService,
     private val highlightOutroService: HighlightOutroService,
+    private val sceneIllustrationService: SceneIllustrationService,
 ) {
 
     // 동화 씬(페이지) 목록 조회
@@ -36,34 +42,44 @@ class SceneController(
         return ResponseEntity.ok(ApiResponse(data = result))
     }
 
-    // 삽화 재생성 (AI)
     @PostMapping("/scenes/{sceneId}/illustration/regenerate")
     fun sceneIllustrationRegenerate(
         @PathVariable storyId: Long,
-        @PathVariable sceneId: Long
-    ): ResponseEntity<ApiResponse<Map<String, Any>>> {
-        // TODO: SceneService.regenerateIllustration(sceneId) → 비동기 jobId 반환
-        TODO("Not yet implemented")
+        @PathVariable sceneId: Long,
+        @RequestBody request: IllustrationRegenerateRequest,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<IllustrationRegenerateResponse>> {
+        val result = sceneIllustrationService.regenerateIllustration(
+            userId = user.userId,
+            storyId = storyId,
+            sceneId = sceneId,
+            userPrompt = request.userPrompt,
+        )
+        return ResponseEntity.accepted().body(
+            ApiResponse(data = IllustrationRegenerateResponse(
+                jobId = result.jobId,
+                status = result.status,
+            ))
+        )
     }
 
-    // 삽화 롤백
     @PostMapping("/scenes/{sceneId}/illustration/rollback")
     fun sceneIllustrationRollback(
         @PathVariable storyId: Long,
-        @PathVariable sceneId: Long
-    ): ResponseEntity<ApiResponse<SceneResponse>> {
-        // TODO: SceneService.rollbackIllustration(sceneId)
-        TODO("Not yet implemented")
-    }
-
-    // 삽화 버전 목록 조회
-    @GetMapping("/scenes/{sceneId}/illustration/versions")
-    fun sceneIllustrationVersionList(
-        @PathVariable storyId: Long,
-        @PathVariable sceneId: Long
-    ): ResponseEntity<ApiResponse<List<Map<String, Any>>>> {
-        // TODO: SceneService.findIllustrationVersions(sceneId)
-        TODO("Not yet implemented")
+        @PathVariable sceneId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<IllustrationRollbackResponse>> {
+        val result = sceneIllustrationService.rollbackIllustration(
+            userId = user.userId,
+            storyId = storyId,
+            sceneId = sceneId,
+        )
+        return ResponseEntity.ok(
+            ApiResponse(data = IllustrationRollbackResponse(
+                illustrationUrl = result.illustrationUrl,
+                version = result.version,
+            ))
+        )
     }
 
     // ── 강조 문장 녹음 (3-phase presigned URL) ──
@@ -145,14 +161,14 @@ class SceneController(
         TODO("Not yet implemented")
     }
 
-    // BGM 설정
     @PatchMapping("/bgm")
     fun storyBgmModify(
         @PathVariable storyId: Long,
-        @RequestBody request: Map<String, Long>
-    ): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: StoryService.modifyBgm(storyId, bgmPresetId)
-        TODO("Not yet implemented")
+        @RequestBody request: BgmRequest,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<Unit> {
+        storyService.modifyBgm(user.userId, storyId, request.bgmPresetId)
+        return ResponseEntity.noContent().build()
     }
 
     // ── 아웃트로 ──
