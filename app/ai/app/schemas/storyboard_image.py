@@ -22,6 +22,8 @@ class StoryboardImageGenerateItemRequest(BaseModel):
     page: StoryboardImagePageInput
     children: list[ChildInfo] = Field(..., min_length=1)
     companions: list[str] = Field(default_factory=list)
+    characterReferenceImageUrls: list[str] = Field(default_factory=list, max_length=1)
+    characterReferenceImageS3Keys: list[str] = Field(default_factory=list, max_length=1)
     referenceImageUrls: list[str] = Field(default_factory=list, max_length=3)
     referenceImageS3Keys: list[str] = Field(default_factory=list, max_length=3)
     stylePreset: str | None = Field(default=None, max_length=50)
@@ -32,6 +34,18 @@ class StoryboardImageGenerateRequest(BaseModel):
     storyId: int = Field(..., ge=1)
     seed: int = Field(..., ge=0)
     items: list[StoryboardImageGenerateItemRequest] = Field(..., min_length=1, max_length=20)
+
+
+class StoryboardCharacterReferenceGenerateRequest(BaseModel):
+    storyId: int = Field(..., ge=1)
+    seed: int = Field(..., ge=0)
+    storyboard: StoryboardImageContext
+    children: list[ChildInfo] = Field(..., min_length=1)
+    companions: list[str] = Field(default_factory=list)
+    referenceImageUrls: list[str] = Field(default_factory=list, max_length=3)
+    referenceImageS3Keys: list[str] = Field(default_factory=list, max_length=3)
+    stylePreset: str | None = Field(default=None, max_length=50)
+    additionalInstruction: str | None = Field(default=None, max_length=2000)
 
 
 class StoryboardImageRegenerateRequest(BaseModel):
@@ -80,6 +94,13 @@ class StoryboardImageGenerateResponse(BaseModel):
     seed: int
     results: list[StoryboardImageGenerateResult]
     usage: StoryboardImageBatchUsage
+
+
+class StoryboardCharacterReferenceGenerateResponse(BaseModel):
+    storyId: int
+    seed: int
+    imageUrl: str
+    usage: StoryboardImageUsage
 
 
 class StoryboardImageRegenerateResponse(BaseModel):

@@ -1,15 +1,33 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.storyboard_image import (
+    StoryboardCharacterReferenceGenerateRequest,
+    StoryboardCharacterReferenceGenerateResponse,
     StoryboardImageGenerateRequest,
     StoryboardImageGenerateResponse,
     StoryboardImageRegenerateRequest,
     StoryboardImageRegenerateResponse,
 )
-from app.services.storyboard_image_service import generate_storyboard_images, regenerate_storyboard_image
+from app.services.storyboard_image_service import (
+    generate_storyboard_character_reference,
+    generate_storyboard_images,
+    regenerate_storyboard_image,
+)
 
 
 router = APIRouter(prefix="/internal/storyboard-images", tags=["storyboard-images"])
+
+
+@router.post("/character-reference", response_model=StoryboardCharacterReferenceGenerateResponse)
+def generate_storyboard_character_reference_endpoint(
+    request: StoryboardCharacterReferenceGenerateRequest,
+) -> StoryboardCharacterReferenceGenerateResponse:
+    try:
+        return generate_storyboard_character_reference(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/generate", response_model=StoryboardImageGenerateResponse)

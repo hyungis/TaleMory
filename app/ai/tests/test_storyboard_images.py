@@ -91,7 +91,7 @@ def test_call_gemini_image_api_sends_requested_seed() -> None:
     original_urlopen = storyboard_image_service.request.urlopen
     storyboard_image_service.request.urlopen = fake_urlopen
     try:
-        storyboard_image_service._call_gemini_image_api("seeded prompt", [], 987654321)
+        storyboard_image_service._call_gemini_image_api("seeded prompt", [], [], [], [], 987654321)
     finally:
         storyboard_image_service.request.urlopen = original_urlopen
 
@@ -260,9 +260,19 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
     settings.GEMINI_API_KEY = "test-key"
     captured_prompt: dict[str, str] = {}
 
-    def fake_call_gemini_image_api(final_prompt: str, reference_image_urls: list[str], seed: int) -> dict:
+    def fake_call_gemini_image_api(
+        final_prompt: str,
+        character_reference_image_urls: list[str],
+        character_reference_image_s3_keys: list[str],
+        reference_image_urls: list[str],
+        reference_image_s3_keys: list[str],
+        seed: int,
+    ) -> dict:
         captured_prompt["value"] = final_prompt
+        assert character_reference_image_urls == []
+        assert character_reference_image_s3_keys == []
         assert reference_image_urls == ["https://example.com/reference.png"]
+        assert reference_image_s3_keys == []
         assert seed == 4321
         return {
             "candidates": [
