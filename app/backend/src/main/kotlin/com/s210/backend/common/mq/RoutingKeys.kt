@@ -33,4 +33,7 @@ object RoutingKeys {
     // 워커가 자체적으로 큐(`ai.gpu.request.queue` 또는 `ai.gpu.tts.generate.request.queue`)를
     // declare/bind 하므로 BE 는 publish 만 신경쓰면 된다.
     const val TTS_GENERATE = "ai.gpu.tts.generate"
+
+    // ---------- TTS 미리듣기 ----------
+    const val TTS_PREVIEW = "ai.gpu.tts.preview"
 }

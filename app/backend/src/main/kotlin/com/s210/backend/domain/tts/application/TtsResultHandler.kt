@@ -60,7 +60,13 @@ class TtsResultHandler(
         }
 
         when (envelope.status.uppercase()) {
-            "COMPLETED" -> handleCompleted(job, envelope)
+            "COMPLETED" -> {
+                if (job.jobType == com.s210.backend.domain.job.model.JobType.TTS_PREVIEW) {
+                    handlePreviewCompleted(job, envelope)
+                } else {
+                    handleCompleted(job, envelope)
+                }
+            }
             "FAILED" -> {
                 val code = envelope.error?.code ?: "UNKNOWN"
                 val msg = envelope.error?.message ?: "(unknown)"
@@ -124,6 +130,21 @@ class TtsResultHandler(
 
         // 4) Redis job status
         tryUpdateRedisStatus(storyId, "done", 100, null)
+    }
+
+    private fun handlePreviewCompleted(job: StoryGenerationJob, envelope: StoryTtsResultEnvelope) {
+        val payload = envelope.payload
+        if (payload == null) {
+            log.warn("TTS_PREVIEW COMPLETED with null payload, jobId={}", envelope.jobId)
+            job.status = JobStatus.FAILED
+            job.errorMessage = "PAYLOAD_MISSING: AI 응답에 payload가 없습니다."
+            job.finishedAt = LocalDateTime.now()
+            return
+        }
+        job.status = JobStatus.SUCCESS
+        job.resultPayload = objectMapper.writeValueAsString(payload)
+        job.finishedAt = LocalDateTime.now()
+        log.info("TTS_PREVIEW job {} SUCCESS", job.id)
     }
 
     private fun tryStoreCache(vpId: Long, text: String, audioUrl: String) {
