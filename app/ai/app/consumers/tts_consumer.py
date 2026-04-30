@@ -7,7 +7,7 @@ from app.mq.publisher import TtsResultPublisher
 from app.schemas.mq_tts import StoryTtsGenerateJobMessage, StoryTtsResultPayload, TtsError
 from app.services.cosyvoice_client import CosyVoiceInvocationError, CosyVoiceNotConfiguredError
 from app.services.dev_tts_service import create_pending_manifest, generate_story_tts_result, update_manifest
-from app.services.storage_service import StorageConfigurationError, StorageUploadError
+from app.services.storage_service import StorageConfigurationError, StorageDownloadError, StorageUploadError
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
             {"status": "FAILED", "finishedAt": _now(), "error": {"message": str(exc)}},
         )
         return
-    except (StorageConfigurationError, StorageUploadError) as exc:
+    except (StorageConfigurationError, StorageDownloadError, StorageUploadError) as exc:
         _handle_failure(
             publisher,
             message.jobId,

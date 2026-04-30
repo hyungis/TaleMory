@@ -55,4 +55,16 @@ interface StoryGenerationJobRepository : JpaRepository<StoryGenerationJob, Long>
         status: JobStatus,
         id: Long,
     ): Long
+
+    fun countBySceneIdAndJobTypeAndStatusIn(
+        sceneId: Long,
+        jobType: JobType,
+        statuses: List<JobStatus>,
+    ): Long
+
+    fun countByStoryIdAndJobTypeAndStatusIn(
+        storyId: Long,
+        jobType: JobType,
+        statuses: List<JobStatus>,
+    ): Long
 }

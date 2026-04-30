@@ -10,16 +10,24 @@ from app.services.dev_tts_service import (
     process_story_tts_job,
     read_manifest,
 )
-from app.services.storage_service import StorageConfigurationError, StorageUploadError
+from app.services.storage_service import StorageConfigurationError, StorageDownloadError, StorageUploadError
 
 
-router = APIRouter(prefix="/api/v1", tags=["tts"])
+router = APIRouter(prefix="/api", tags=["tts"])
 
 
 @router.post("/voices/{voiceId}/preview", response_model=ApiSuccessResponse)
 def preview_voice(voiceId: str, request: PreviewRequest) -> ApiSuccessResponse:
     try:
-        data = generate_preview(voiceId, request.text, request.language, request.format, request.options)
+        data = generate_preview(
+            voiceId,
+            request.text,
+            request.language,
+            request.format,
+            request.options,
+            request.referenceAudioUrl,
+            request.referenceAudioS3Key,
+        )
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"Voice not found: {voiceId}") from error
     except ValueError as error:
@@ -28,7 +36,7 @@ def preview_voice(voiceId: str, request: PreviewRequest) -> ApiSuccessResponse:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except CosyVoiceInvocationError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
-    except (StorageConfigurationError, StorageUploadError) as error:
+    except (StorageConfigurationError, StorageDownloadError, StorageUploadError) as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     return ApiSuccessResponse(data=data)
 

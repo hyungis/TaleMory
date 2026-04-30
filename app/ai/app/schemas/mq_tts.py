@@ -14,6 +14,7 @@ TtsFailureType = Literal["GENERATE_TTS_FAILED"]
 class StoryTtsGenerateJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: TtsJobType = "TTS"
+    action: str | None = None  # Optional — BE may include GENERATE/REGENERATE
     storyId: int | None = Field(default=None, ge=1)
     payload: StoryTtsRequest
 

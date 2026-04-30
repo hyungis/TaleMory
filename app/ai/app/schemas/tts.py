@@ -1,21 +1,29 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 
 AudioFormat = Literal["wav", "mp3"]
-EmotionType = Literal[
-    "NEUTRAL",
-    "WARM",
-    "HAPPY",
-    "EXCITED",
-    "CALM",
-    "SAD",
-    "SOFT",
-    "SERIOUS",
-    "ANGRY",
-    "NARRATION",
+
+# Accept emotion strings case-insensitively (BE may send lowercase enum names).
+_emotion_upper = BeforeValidator(lambda v: v.upper() if isinstance(v, str) else v)
+
+EmotionType = Annotated[
+    Literal[
+        "NEUTRAL",
+        "WARM",
+        "HAPPY",
+        "EXCITED",
+        "CALM",
+        "SAD",
+        "SOFT",
+        "SERIOUS",
+        "ANGRY",
+        "NARRATION",
+    ],
+    _emotion_upper,
 ]
+
 JobType = Literal["VOICE_CLONE", "TTS"]
 JobStatus = Literal["PENDING", "RUNNING", "SUCCESS", "FAILED"]
 
@@ -59,6 +67,8 @@ class PreviewRequest(BaseModel):
     language: str
     format: AudioFormat = "wav"
     options: PreviewOptions
+    referenceAudioUrl: str | None = None
+    referenceAudioS3Key: str | None = None
 
 
 class StorySentenceRequest(BaseModel):
@@ -85,6 +95,8 @@ class StoryTtsOptions(BaseModel):
 class StoryTtsRequest(BaseModel):
     storyId: int
     voiceId: str
+    referenceAudioUrl: str | None = None
+    referenceAudioS3Key: str | None = None
     language: str
     format: AudioFormat = "wav"
     options: StoryTtsOptions

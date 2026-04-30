@@ -2,17 +2,20 @@ package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.domain.story.application.dto.CreateStoryCommand
 import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.application.dto.StoryResult
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
+import com.s210.backend.domain.preset.infrastructure.repository.BgmPresetRepository
 import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.story.presentation.response.ShareLinkResponse
 import com.s210.backend.domain.story.presentation.response.StoryResponse
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -32,7 +35,10 @@ class StoryService(
     private val storyRepository: StoryRepository,
     private val sceneRepository: SceneRepository,
     private val stylePresetRepository: StylePresetRepository,
+    private val bgmPresetRepository: BgmPresetRepository,
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     /**
      * 로그인 유저의 "진행 중인 동화" 1건(최신 DRAFT) 을 반환한다.
      * 없으면 null — controller 에서 `ApiResponse(data = null)` 로 내려준다.
@@ -140,6 +146,15 @@ class StoryService(
         if (story.shareToken == null) {
             story.shareToken = UUID.randomUUID().toString().replace("-", "")
         }
+
+        // Redis illust versions 정리 (best-effort)
+        try {
+            val scenes = sceneRepository.findAllByStoryId(storyId)
+            scenes.forEach { illustrationVersionRedisRepository.deleteAll(it.id) }
+        } catch (e: Exception) {
+            log.warn("Redis illust cleanup failed on publish storyId={}: {}", storyId, e.message)
+        }
+
         return ShareLinkResponse(
             shareToken = story.shareToken!!,
             shareUrl = "/shared/${story.shareToken}",
@@ -167,6 +182,19 @@ class StoryService(
     /**
      * 삽화 스타일 프리셋 선택. Story.stylePresetId 를 갱신한다.
      */
+    fun modifyBookmark(userId: Long, storyId: Long, isBookmarked: Boolean) {
+        val story = ownedStory(userId, storyId)
+        story.isBookmarked = isBookmarked
+    }
+
+    fun modifyBgm(userId: Long, storyId: Long, bgmPresetId: Long?) {
+        val story = ownedStory(userId, storyId)
+        if (bgmPresetId != null && !bgmPresetRepository.existsById(bgmPresetId)) {
+            throw BusinessException(StoryErrorCode.BGM_PRESET_NOT_FOUND)
+        }
+        story.bgmPresetId = bgmPresetId
+    }
+
     fun modifyStyle(userId: Long, storyId: Long, stylePresetId: Long) {
         val story = ownedStory(userId, storyId)
         if (!stylePresetRepository.existsById(stylePresetId)) {
