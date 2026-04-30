@@ -7,7 +7,7 @@ import {
 import { createVoiceProfile } from '../api/createVoiceProfile'
 import { getVoiceProfiles } from '../api/getVoiceProfiles'
 import { postVoicePreview } from '../api/postVoicePreview'
-import { getGenerationJob } from '../../../story-creation/storyboard-prompt/api/getGenerationJob'
+import { getVoicePreview } from '../api/getVoicePreview'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -227,7 +227,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
       }
 
       // BE에 TTS 미리듣기 비동기 작업 요청
-      const { jobId } = await postVoicePreview(profileId, text)
+      const { previewId } = await postVoicePreview(profileId, text)
 
       // 3초 간격 polling — 최대 5분
       const POLL_INTERVAL = 3_000
@@ -241,15 +241,13 @@ export function useVoiceClone(): UseVoiceCloneResult {
             return
           }
           try {
-            const job = await getGenerationJob(jobId)
+            const job = await getVoicePreview(previewId)
             if (job.status === 'SUCCESS') {
-              const payload = job.resultPayload as Record<string, unknown> | null
-              const audioUrl = (payload?.audioUrl ?? payload?.url ?? '') as string
-              if (!audioUrl) {
+              if (!job.audioUrl) {
                 reject(new Error('TTS 결과에 오디오 URL이 없습니다.'))
                 return
               }
-              resolve(audioUrl)
+              resolve(job.audioUrl)
               return
             }
             if (job.status === 'FAILED') {

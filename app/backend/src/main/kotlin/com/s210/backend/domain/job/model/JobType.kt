@@ -19,7 +19,4 @@ enum class JobType {
 
     /** 스토리보드 줄거리(요약) 생성 작업 — V9 ENUM 추가. */
     STORYBOARD_STORY_SUMMARY,
-
-    /** 보이스 클론 미리듣기 (단일 문장 TTS) — 비동기 RabbitMQ 기반. */
-    TTS_PREVIEW,
 }

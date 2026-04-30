@@ -138,7 +138,6 @@ export type JobTypeApi =
   | 'STORYBOARD_STORY'
   | 'ILLUSTRATION'
   | 'TTS'
-  | 'TTS_PREVIEW'
   | 'BGM'
   | 'VOICE_CLONE'
   | 'STORY'
