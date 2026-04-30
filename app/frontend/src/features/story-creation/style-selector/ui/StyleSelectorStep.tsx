@@ -1,7 +1,8 @@
-import { Palette, Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 import type { StoryProject, StylePresetCode } from '../../model/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { useStylePresetsQuery } from '../model/useStylePresetsQuery'
 import { useStoryStylePatch } from '../model/useStoryStylePatch'
 
@@ -36,22 +37,20 @@ export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext
       <CreationHeader currentStep={5} />
       <div className="bookshelf-scroll">
         <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8 text-[#f0e6c0]">
-              <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <Palette className="w-8 h-8 text-[#f0e6c0]" />
-              </div>
-              <h2 className="text-3xl font-bold">동화책의 스타일을 골라주세요</h2>
-              <p className="text-[#b4c4a4] mt-2">선택한 스타일로 전체 페이지가 일관되게 그려져요.</p>
-            </div>
+          <div className="max-w-7xl mx-auto pb-12">
+            <StepTitleBlock
+              stepNumber={5}
+              title="삽화 스타일을 골라주세요"
+              subtitle="선택한 스타일로 전체 페이지가 일관되게 그려져요"
+            />
 
             {presetsQuery.isLoading && (
               <div className="text-center py-12">
-                <Loader2 className="w-10 h-10 text-[#b4dc8c] animate-spin mx-auto" />
+                <Loader2 className="w-10 h-10 text-[#3F6B2E] animate-spin mx-auto" />
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {(presetsQuery.data ?? []).map(preset => {
                 const isSelected = data.style === preset.code
                 return (
@@ -59,25 +58,20 @@ export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext
                     key={preset.id}
                     type="button"
                     onClick={() => onStyleChange(preset.code as StylePresetCode)}
-                    className={`relative rounded-2xl p-6 text-left transition-all border-2 flex flex-col items-start gap-3 bg-gradient-to-br from-[#e8ddb4] to-[#b4dc8c]/60 ${
+                    className={`relative rounded-2xl p-4 text-left transition-all border-2 flex flex-col items-start gap-2 bg-gradient-to-br from-[#F4E4BC] to-[#B9D38F]/50 ${
                       isSelected
-                        ? 'border-[#b4dc8c] shadow-[0_0_25px_rgba(180,220,140,0.55)] scale-[1.02]'
-                        : 'border-transparent hover:border-[#8b7a52]/60'
+                        ? 'border-[#3F6B2E] shadow-[0_0_20px_rgba(63,107,46,0.3)] scale-[1.02]'
+                        : 'border-[#9A7548]/30 hover:border-[#3F6B2E]/60'
                     }`}
                   >
-                    {preset.code === 'watercolor' && (
-                      <span className="absolute top-3 right-3 bg-[#2d5a27] text-[#f0e6c0] text-[11px] px-2 py-0.5 rounded-full font-bold z-10">
-                        추천
-                      </span>
-                    )}
                     {isSelected && (
-                      <span className="absolute top-3 left-3 w-7 h-7 rounded-full bg-[#2d5a27] text-[#f0e6c0] flex items-center justify-center shadow-md z-10">
-                        <Check className="w-4 h-4" />
+                      <span className="absolute top-2 left-2 w-6 h-6 rounded-full bg-[#3F6B2E] text-[#FFFEF8] flex items-center justify-center shadow-md z-10 border border-[#B9D38F]/50">
+                        <Check className="w-3.5 h-3.5" />
                       </span>
                     )}
 
-                    {/* 미리보기 이미지 */}
-                    <div className="relative w-full aspect-[3/4] rounded-xl mb-2 overflow-hidden">
+                    {/* 미리보기 이미지 — 정사각형으로 축소 */}
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden">
                       {preset.previewUrl && (
                         <img
                           src={preset.previewUrl}
@@ -87,9 +81,7 @@ export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext
                       )}
                     </div>
 
-                    <div>
-                      <h3 className="text-lg text-[#2d5a27] font-bold mb-1">{preset.name}</h3>
-                    </div>
+                    <h3 className="text-sm md:text-base text-[#3E2A18] font-bold">{preset.name}</h3>
                   </button>
                 )
               })}

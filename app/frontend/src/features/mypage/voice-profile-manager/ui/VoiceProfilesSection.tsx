@@ -11,6 +11,9 @@ interface Props {
   isBusy?: boolean
 }
 
+/**
+ * 목소리 보관함 섹션 — Pastel Forest 톤.
+ */
 export function VoiceProfilesSection({
   voiceProfiles,
   onAddClick,
@@ -21,26 +24,26 @@ export function VoiceProfilesSection({
   isBusy = false,
 }: Props) {
   return (
-    <section className="rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-6 md:p-8 space-y-4">
+    <section className="rounded-3xl bg-[#E9DBBE] border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] p-6 md:p-8 space-y-4">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-[#e4d4b4]">목소리 보관함</h2>
-          <p className="text-sm text-[#b4c4a4] mt-1">저장한 녹음과 TTS 샘플을 다시 들어볼 수 있어요.</p>
+          <h2 className="text-xl font-bold text-[#3E2A18]">목소리 보관함</h2>
+          <p className="text-sm text-[#6B4A28] mt-1">저장한 녹음과 TTS 샘플을 다시 들어볼 수 있어요.</p>
         </div>
         <button
           type="button"
           onClick={onAddClick}
           disabled={isBusy}
-          className="px-4 py-2 rounded-lg bg-[#3ca55c] text-[#1a0f08] text-sm font-medium hover:bg-[#4cb56c] transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-5 py-2.5 rounded-full bg-[#8DBA64] text-[#1F3318] text-sm font-bold border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_3px_0_#3F6B2E]"
         >
           + 목소리 추가
         </button>
       </header>
 
       {isLoading ? (
-        <p className="text-sm text-[#b4c4a4] px-1 py-4">목소리 목록을 불러오는 중이에요.</p>
+        <p className="text-sm text-[#6B4A28] px-1 py-4">목소리 목록을 불러오는 중이에요.</p>
       ) : voiceProfiles.length === 0 ? (
-        <p className="text-sm text-[#6a5a44] italic px-1 py-4">아직 저장된 목소리가 없어요.</p>
+        <p className="text-sm text-[#9A7548] italic px-1 py-4">아직 저장된 목소리가 없어요.</p>
       ) : (
         <ul className="space-y-3">
           {voiceProfiles.map(profile => (
@@ -77,14 +80,14 @@ function VoiceProfileCard({
   const [failed, setFailed] = useState(false)
 
   return (
-    <li className="rounded-xl bg-[#1a0f08] border border-[#4a3a24] p-4 space-y-3">
+    <li className="rounded-2xl bg-[#F4E4BC] border border-[#9A7548]/30 p-4 space-y-3 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#3ca55c]/20 border border-[#3ca55c] text-[#3ca55c] text-lg flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-full bg-[#B9D38F]/45 border border-[#3F6B2E]/40 text-[#3F6B2E] text-lg font-bold flex items-center justify-center shrink-0">
           음
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[#e4d4b4] font-medium truncate">{profile.title}</p>
-          <p className="text-xs text-[#b4c4a4] truncate">
+          <p className="text-[#3E2A18] font-bold truncate">{profile.title}</p>
+          <p className="text-xs text-[#6B4A28] truncate">
             {profile.ttsVoiceUrl ? 'TTS 미리듣기 가능' : '원본 녹음본'}
           </p>
         </div>
@@ -94,7 +97,7 @@ function VoiceProfileCard({
               type="button"
               onClick={() => onDetails(profile)}
               disabled={isBusy}
-              className="px-2 py-1 rounded-md text-xs text-[#b4c4a4] hover:bg-[#4a3a24] hover:text-[#e4d4b4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2.5 py-1 rounded-md text-xs font-bold text-[#3F6B2E] hover:bg-[#B9D38F]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               상세
             </button>
@@ -104,7 +107,7 @@ function VoiceProfileCard({
               type="button"
               onClick={() => onEdit(profile)}
               disabled={isBusy}
-              className="px-2 py-1 rounded-md text-xs text-[#b4c4a4] hover:bg-[#4a3a24] hover:text-[#e4d4b4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2.5 py-1 rounded-md text-xs font-bold text-[#3F6B2E] hover:bg-[#B9D38F]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               수정
             </button>
@@ -114,7 +117,7 @@ function VoiceProfileCard({
               type="button"
               onClick={() => onDelete(profile)}
               disabled={isBusy}
-              className="px-2 py-1 rounded-md text-xs text-[#e85c5c] hover:bg-[#e85c5c] hover:text-[#1a0f08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2.5 py-1 rounded-md text-xs font-bold text-[#a3413f] hover:bg-[#D8857C]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               삭제
             </button>
@@ -130,16 +133,15 @@ function VoiceProfileCard({
             preload="none"
             onError={() => setFailed(true)}
             className="w-full"
-            style={{ colorScheme: 'dark' }}
           />
           {failed && (
-            <p className="text-xs text-[#6a5a44] italic">
+            <p className="text-xs text-[#9A7548] italic">
               오디오를 재생할 수 없어요. 저장된 파일 주소를 다시 확인해 주세요.
             </p>
           )}
         </>
       ) : (
-        <p className="text-xs text-[#6a5a44] italic">
+        <p className="text-xs text-[#9A7548] italic">
           아직 재생 가능한 오디오가 연결되지 않았어요.
         </p>
       )}

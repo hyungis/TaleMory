@@ -6,21 +6,21 @@ export type PersonRoleApi = 'CHILD' | 'COMPANION'
 export interface PersonResponse {
   id: number
   name: string
-  birthDate: string
+  age: number
   gender: PersonGenderApi
   role: PersonRoleApi
 }
 
 export interface CreatePersonRequest {
   name: string
-  birthDate: string
+  age: number
   gender: PersonGenderApi
   role: PersonRoleApi
 }
 
 export interface UpdatePersonRequest {
   name?: string
-  birthDate?: string
+  age?: number
   gender?: PersonGenderApi
 }
 
@@ -29,7 +29,7 @@ export function mapPerson(payload: PersonResponse, userId: number): Person {
     id: payload.id,
     userId,
     name: payload.name,
-    birthDate: payload.birthDate,
+    age: payload.age,
     gender: mapGender(payload.gender),
     role: mapRole(payload.role),
   }

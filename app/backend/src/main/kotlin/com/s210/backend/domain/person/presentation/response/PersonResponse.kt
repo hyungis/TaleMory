@@ -1,12 +1,11 @@
 package com.s210.backend.domain.person.presentation.response
 
 import com.s210.backend.domain.person.application.dto.PersonResult
-import java.time.LocalDate
 
 data class PersonResponse(
     val id: Long,
     val name: String,
-    val birthDate: LocalDate,
+    val age: Int,
     val gender: String,
     val role: String,
 ) {
@@ -15,7 +14,7 @@ data class PersonResponse(
         fun from(result: PersonResult): PersonResponse = PersonResponse(
             id = result.id,
             name = result.name,
-            birthDate = result.birthDate,
+            age = result.age,
             gender = result.gender.name,
             role = result.role.name,
         )

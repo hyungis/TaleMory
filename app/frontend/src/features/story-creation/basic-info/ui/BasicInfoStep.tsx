@@ -15,9 +15,7 @@ import { usePersonPost } from '../model/usePersonPost'
 import { useStoryPost } from '../model/useStoryPost'
 import { useStoryUpdate } from '../model/useStoryUpdate'
 import {
-  ageToBirthDate,
   apiGenderToStoryChild,
-  birthDateToAge,
   levelToDifficulty,
   storyChildGenderToApi,
 } from '../lib/mappers'
@@ -100,7 +98,7 @@ export function BasicInfoStep({
       onChildAppend({
         name: person.name,
         gender: apiGenderToStoryChild(person.gender),
-        age: birthDateToAge(person.birthDate),
+        age: String(person.age),
         personId: person.id,
       })
     },
@@ -138,7 +136,7 @@ export function BasicInfoStep({
 
             const created = await personPost.mutateAsync({
               name: child.name.trim(),
-              birthDate: ageToBirthDate(child.age),
+              age: Number.parseInt(child.age, 10) || 0,
               gender: storyChildGenderToApi(child.gender),
               role: 'CHILD',
             })
