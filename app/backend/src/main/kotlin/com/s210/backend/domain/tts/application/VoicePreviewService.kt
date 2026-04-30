@@ -1,36 +1,33 @@
 package com.s210.backend.domain.tts.application
 
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.domain.job.entity.StoryGenerationJob
+import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobType
+import com.s210.backend.domain.tts.application.dto.TtsPreviewJobMessage
 import com.s210.backend.domain.tts.application.dto.VoicePreviewOptions
 import com.s210.backend.domain.tts.application.dto.VoicePreviewRequest
-import com.s210.backend.domain.tts.application.dto.VoicePreviewResponse
 import com.s210.backend.domain.voice.exception.VoiceErrorCode
 import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
-import java.time.Duration
+import tools.jackson.databind.ObjectMapper
 
 /**
- * 보이스 클론 미리듣기 — BE → AI 동기 HTTP 호출.
+ * 보이스 클론 미리듣기 — BE → AI 비동기 RabbitMQ 호출.
  *
  * 흐름:
  *  1. 소유권 검증 (다른 user 의 voice profile 거부)
  *  2. voice_profiles.audio_url 으로부터 referenceAudioS3Key / referenceAudioUrl 결정
- *  3. AI:8000/api/v1/voices/{voiceId}/preview 동기 호출 (30s timeout)
- *  4. 응답 그대로 forward (audioUrl, s3Key, durationMs)
- *
- * 에러:
- *  - 다른 user → FORBIDDEN
- *  - voice_profile 없거나 deleted → NOT_FOUND
- *  - 텍스트 빈/>500자 → INVALID_REQUEST
- *  - AI 5xx / timeout → AI_PROVIDER_ERROR
+ *  3. StoryGenerationJob (TTS_PREVIEW) 생성
+ *  4. RabbitMQ 로 미리듣기 요청 publish
+ *  5. jobId 반환 → FE 는 GET /api/generation-jobs/{jobId} 로 polling
  */
 @Service
 class VoicePreviewService(
     private val voiceProfileRepository: VoiceProfileRepository,
-    @Qualifier("aiServiceWebClient") private val webClient: WebClient,
+    private val jobRepository: StoryGenerationJobRepository,
+    private val ttsService: TtsService,
+    private val objectMapper: ObjectMapper,
 ) {
     fun preview(
         userId: Long,
@@ -38,7 +35,7 @@ class VoicePreviewService(
         text: String,
         emotion: String? = null,
         language: String = "en-US",
-    ): VoicePreviewResponse {
+    ): Long {
         if (text.isBlank() || text.length > 500) {
             throw BusinessException(VoiceErrorCode.INVALID_REQUEST)
         }
@@ -49,25 +46,32 @@ class VoicePreviewService(
         }
         val referenceSource = vp.audioUrl ?: throw BusinessException(VoiceErrorCode.INVALID_REQUEST)
 
-        val request = VoicePreviewRequest(
-            text = text,
-            language = language,
-            referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
-            referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
-            options = VoicePreviewOptions(emotion = emotion),
+        val job = jobRepository.save(
+            StoryGenerationJob(
+                storyId = 0,
+                jobType = JobType.TTS_PREVIEW,
+                requestPayload = objectMapper.writeValueAsString(
+                    mapOf("voiceProfileId" to voiceProfileId),
+                ),
+            ),
         )
 
-        return try {
-            webClient.post()
-                .uri("/api/voices/{voiceId}/preview", voiceProfileId.toString())
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono<VoicePreviewResponse>()
-                .block(Duration.ofSeconds(30))!!
-        } catch (e: Exception) {
-            throw BusinessException(VoiceErrorCode.AI_PROVIDER_ERROR, cause = e)
-        }
+        ttsService.publishPreview(
+            TtsPreviewJobMessage(
+                jobId = job.id.toString(),
+                voiceId = voiceProfileId.toString(),
+                payload = VoicePreviewRequest(
+                    text = text,
+                    language = language,
+                    options = VoicePreviewOptions(emotion = emotion ?: "NEUTRAL"),
+                    referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
+                    referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
+                ),
+            ),
+        )
+
+        return job.id
     }
 
-    private fun looksLikeS3Key(value: String): Boolean = value.startsWith("stories/")
+    private fun looksLikeS3Key(value: String): Boolean = value.startsWith("stories/") || value.startsWith("voices/")
 }

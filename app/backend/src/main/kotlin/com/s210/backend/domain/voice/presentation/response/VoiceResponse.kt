@@ -1,6 +1,5 @@
 package com.s210.backend.domain.voice.presentation.response
 
-import com.s210.backend.domain.tts.application.dto.VoicePreviewResponse as TtsVoicePreviewResponse
 import com.s210.backend.domain.voice.application.dto.VoiceProfileResult
 import java.time.Instant
 import java.time.LocalDateTime
@@ -33,19 +32,11 @@ data class VoiceProfileResponse(
     }
 }
 
-data class VoicePreviewResponse(
-    val audioUrl: String,
-    val s3Key: String,
-    val durationMs: Long,
-) {
-    companion object {
-        fun from(ttsResponse: TtsVoicePreviewResponse): VoicePreviewResponse = VoicePreviewResponse(
-            audioUrl = ttsResponse.audioUrl,
-            s3Key = ttsResponse.s3Key,
-            durationMs = ttsResponse.durationMs,
-        )
-    }
-}
+data class VoicePreviewJobResponse(
+    val jobId: Long,
+    val jobType: String = "TTS_PREVIEW",
+    val status: String = "PENDING",
+)
 
 data class VoiceRecordingScriptResponse(
     val script: String,

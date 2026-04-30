@@ -14,4 +14,6 @@ data class VoicePreviewOptions(
     val stylePrompt: String? = null,
     val speakingRate: Double? = null,
     val pitch: Double? = null,
+    val volumeGain: Double? = null,
+    val useSsml: Boolean = false,
 )

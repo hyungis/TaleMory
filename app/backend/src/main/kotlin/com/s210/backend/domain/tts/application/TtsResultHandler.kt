@@ -7,6 +7,7 @@ import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobR
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepository
+import com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope
 import com.s210.backend.domain.tts.application.dto.StoryTtsResultEnvelope
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -60,7 +61,9 @@ class TtsResultHandler(
         }
 
         when (envelope.status.uppercase()) {
-            "COMPLETED" -> handleCompleted(job, envelope)
+            "COMPLETED" -> {
+                handleCompleted(job, envelope)
+            }
             "FAILED" -> {
                 val code = envelope.error?.code ?: "UNKNOWN"
                 val msg = envelope.error?.message ?: "(unknown)"
@@ -70,6 +73,35 @@ class TtsResultHandler(
                 tryUpdateRedisStatus(job.storyId, "failed", null, "$code: $msg")
             }
             else -> log.warn("Unknown TTS envelope status: {}", envelope.status)
+        }
+    }
+
+    fun handle(envelope: PreviewTtsResultEnvelope) {
+        val jobIdLong = envelope.jobId.toLongOrNull()
+        if (jobIdLong == null) {
+            log.warn("Invalid TTS_PREVIEW jobId: {}", envelope.jobId)
+            return
+        }
+        val job = jobRepository.findById(jobIdLong).orElse(null)
+        if (job == null) {
+            log.warn("Unknown TTS_PREVIEW jobId: {}", envelope.jobId)
+            return
+        }
+        if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) {
+            log.info("TTS_PREVIEW job {} already finalized ({}), skip", job.id, job.status)
+            return
+        }
+
+        when (envelope.status.uppercase()) {
+            "COMPLETED" -> handlePreviewCompleted(job, envelope)
+            "FAILED" -> {
+                val code = envelope.error?.code ?: "UNKNOWN"
+                val msg = envelope.error?.message ?: "(unknown)"
+                job.status = JobStatus.FAILED
+                job.errorMessage = "$code: $msg".take(65_535)
+                job.finishedAt = LocalDateTime.now()
+            }
+            else -> log.warn("Unknown TTS_PREVIEW envelope status: {}", envelope.status)
         }
     }
 
@@ -124,6 +156,21 @@ class TtsResultHandler(
 
         // 4) Redis job status
         tryUpdateRedisStatus(storyId, "done", 100, null)
+    }
+
+    private fun handlePreviewCompleted(job: StoryGenerationJob, envelope: PreviewTtsResultEnvelope) {
+        val payload = envelope.payload
+        if (payload == null) {
+            log.warn("TTS_PREVIEW COMPLETED with null payload, jobId={}", envelope.jobId)
+            job.status = JobStatus.FAILED
+            job.errorMessage = "PAYLOAD_MISSING: AI 응답에 payload가 없습니다."
+            job.finishedAt = LocalDateTime.now()
+            return
+        }
+        job.status = JobStatus.SUCCESS
+        job.resultPayload = objectMapper.writeValueAsString(payload)
+        job.finishedAt = LocalDateTime.now()
+        log.info("TTS_PREVIEW job {} SUCCESS", job.id)
     }
 
     private fun tryStoreCache(vpId: Long, text: String, audioUrl: String) {

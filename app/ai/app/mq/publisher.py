@@ -26,6 +26,12 @@ from app.schemas.mq_storyboard_image import (
 from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
 from app.schemas.mq_storyboard_summary import StorySummaryFailureEnvelope, StorySummarySuccessEnvelope
 from app.schemas.mq_tts import StoryTtsResultPayload, TtsError, TtsFailureEnvelope, TtsSuccessEnvelope
+from app.schemas.mq_tts_preview import (
+    PreviewTtsError,
+    PreviewTtsFailureEnvelope,
+    PreviewTtsResultPayload,
+    PreviewTtsSuccessEnvelope,
+)
 from app.schemas.storyboard import StoryboardGenerateResponse
 from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
@@ -211,6 +217,34 @@ class TtsResultPublisher:
         )
         self._publish(
             routing_key=settings.RABBITMQ_TTS_GENERATE_FAILED_ROUTING_KEY,
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_preview_result(
+        self,
+        job_id: str,
+        payload: PreviewTtsResultPayload,
+    ) -> None:
+        envelope = PreviewTtsSuccessEnvelope(
+            jobId=job_id,
+            payload=payload,
+        )
+        self._publish(
+            routing_key="ai.result.tts.preview.completed",
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_preview_failure(
+        self,
+        job_id: str,
+        error: PreviewTtsError,
+    ) -> None:
+        envelope = PreviewTtsFailureEnvelope(
+            jobId=job_id,
+            error=error,
+        )
+        self._publish(
+            routing_key="ai.result.tts.preview.failed",
             message=envelope.model_dump(mode="json"),
         )
 

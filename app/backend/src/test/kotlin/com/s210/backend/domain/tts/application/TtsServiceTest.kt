@@ -4,8 +4,11 @@ import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.mq.RoutingKeys
 import com.s210.backend.domain.tts.application.dto.StoryTtsJobMessage
 import com.s210.backend.domain.tts.application.dto.StoryTtsPayload
+import com.s210.backend.domain.tts.application.dto.TtsPreviewJobMessage
 import com.s210.backend.domain.tts.application.dto.TtsOptions
 import com.s210.backend.domain.tts.application.dto.TtsSentenceItem
+import com.s210.backend.domain.tts.application.dto.VoicePreviewOptions
+import com.s210.backend.domain.tts.application.dto.VoicePreviewRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -39,6 +42,30 @@ class TtsServiceTest {
         verify(template).convertAndSend(exchangeCap.capture(), keyCap.capture(), bodyCap.capture())
         assertThat(exchangeCap.value).isEqualTo(RabbitMQConfig.REQUEST_EXCHANGE)
         assertThat(keyCap.value).isEqualTo(RoutingKeys.TTS_GENERATE)
+        assertThat(bodyCap.value).isEqualTo(message)
+    }
+
+    @Test
+    fun `publishes preview message to ai gpu tts preview routing key`() {
+        val message = TtsPreviewJobMessage(
+            jobId = "888",
+            voiceId = "42",
+            payload = VoicePreviewRequest(
+                text = "Hello preview",
+                language = "ko-KR",
+                options = VoicePreviewOptions(emotion = "NEUTRAL"),
+                referenceAudioUrl = "https://s3/ref.wav",
+            ),
+        )
+
+        service.publishPreview(message)
+
+        val exchangeCap = ArgumentCaptor.forClass(String::class.java)
+        val keyCap = ArgumentCaptor.forClass(String::class.java)
+        val bodyCap = ArgumentCaptor.forClass(Any::class.java)
+        verify(template).convertAndSend(exchangeCap.capture(), keyCap.capture(), bodyCap.capture())
+        assertThat(exchangeCap.value).isEqualTo(RabbitMQConfig.REQUEST_EXCHANGE)
+        assertThat(keyCap.value).isEqualTo(RoutingKeys.TTS_PREVIEW)
         assertThat(bodyCap.value).isEqualTo(message)
     }
 }

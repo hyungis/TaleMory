@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_TTS_TEXT,
-  TTS_API_BASE,
-  TTS_API_URL,
   TTS_STORAGE_KEY,
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
 } from '../lib/defaults'
-import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript } from '../api/voiceProfileApi'
+import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript, postVoicePreview } from '../api/voiceProfileApi'
+import { getGenerationJob } from '../../storyboard-prompt/api/getGenerationJob'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -249,35 +248,74 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     }
 
     setIsTtsLoading(true)
-    setTtsStatusText('보이스 클론 TTS를 만드는 중입니다. CPU 환경에서는 시간이 걸릴 수 있어요.')
+    setTtsStatusText('보이스 클론 TTS를 만드는 중입니다…')
 
     try {
-      const voiceBlob = dataUrlToBlob(recordedAudioUrl)
-      const formData = new FormData()
-      formData.append('text', text)
-      formData.append('ref_text', VOICE_SAMPLE_SCRIPT.replaceAll('"', '').trim())
-      formData.append('language', 'Auto')
-      formData.append('voice', voiceBlob, 'voice.webm')
+      // 음성 프로필이 아직 서버에 저장되지 않았으면 먼저 업로드
+      let profileId = savedProfileId
+      if (!profileId) {
+        const audioBlob = dataUrlToBlob(recordedAudioUrl)
+        const autoTitle = `녹음_${new Date().toISOString().slice(0, 19).replace('T', '_')}`
+        const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
+        await uploadAudioToS3(presigned.uploadUrl, audioBlob)
+        const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
+        profileId = profile.voiceProfileId
+        setSavedProfileId(profileId)
+      }
 
-      const response = await fetch(TTS_API_URL, { method: 'POST', body: formData })
-      if (!response.ok) throw new Error((await response.text()) || 'TTS 생성 실패')
+      // BE에 TTS 미리듣기 비동기 작업 요청
+      const { jobId } = await postVoicePreview(profileId, text)
 
-      const result = (await response.json()) as { download_url: string }
-      const audioResponse = await fetch(`${TTS_API_BASE}${result.download_url}`)
+      // 3초 간격 polling — 최대 5분
+      const POLL_INTERVAL = 3_000
+      const MAX_DURATION = 5 * 60 * 1000
+      const start = Date.now()
+
+      const pollResult = await new Promise<string>((resolve, reject) => {
+        const poll = async () => {
+          if (Date.now() - start > MAX_DURATION) {
+            reject(new Error('TTS 생성 시간이 초과되었습니다.'))
+            return
+          }
+          try {
+            const job = await getGenerationJob(jobId)
+            if (job.status === 'SUCCESS') {
+              const payload = job.resultPayload as Record<string, unknown> | null
+              const audioUrl = (payload?.audioUrl ?? payload?.url ?? '') as string
+              if (!audioUrl) {
+                reject(new Error('TTS 결과에 오디오 URL이 없습니다.'))
+                return
+              }
+              resolve(audioUrl)
+              return
+            }
+            if (job.status === 'FAILED') {
+              reject(new Error(job.errorMessage ?? 'TTS 생성에 실패했습니다.'))
+              return
+            }
+            setTimeout(poll, POLL_INTERVAL)
+          } catch (err) {
+            reject(err)
+          }
+        }
+        setTimeout(poll, POLL_INTERVAL)
+      })
+
+      // 결과 오디오를 dataURL로 변환하여 재생 준비
+      const audioResponse = await fetch(pollResult)
       const audioBlob = await audioResponse.blob()
       const dataUrl = await blobToDataUrl(audioBlob)
 
       setTtsAudioUrl(dataUrl)
       setTtsStatusText('TTS가 준비됐어요. 재생 후 제목을 입력하고 저장하세요.')
-    } catch {
+    } catch (err) {
       setTtsAudioUrl(null)
-      setTtsStatusText(
-        `TTS 생성에 실패했습니다. ${TTS_API_BASE} 서버가 켜져 있는지 확인해 주세요.`,
-      )
+      const message = err instanceof Error ? err.message : 'TTS 생성에 실패했습니다.'
+      setTtsStatusText(message)
     } finally {
       setIsTtsLoading(false)
     }
-  }, [recordedAudioUrl, ttsText])
+  }, [recordedAudioUrl, ttsText, savedProfileId])
 
   /**
    * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).

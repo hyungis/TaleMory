@@ -100,6 +100,7 @@ class Settings(BaseModel):
     RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.story.regenerate.request.queue")
     RABBITMQ_TTS_GENERATE_QUEUE: str = getenv("RABBITMQ_TTS_GENERATE_QUEUE", "ai.gpu.request.queue")
     RABBITMQ_TTS_RESULT_QUEUE: str = getenv("RABBITMQ_TTS_RESULT_QUEUE", "ai.result.tts.queue")
+    RABBITMQ_TTS_PREVIEW_QUEUE: str = getenv("RABBITMQ_TTS_PREVIEW_QUEUE", "ai.gpu.preview.request.queue")
     RABBITMQ_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_GENERATE_ROUTING_KEY", "ai.cpu.story.generate")
     RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY",
@@ -111,6 +112,7 @@ class Settings(BaseModel):
     )
     RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
     RABBITMQ_TTS_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_TTS_GENERATE_ROUTING_KEY", "ai.gpu.tts.generate")
+    RABBITMQ_TTS_PREVIEW_ROUTING_KEY: str = getenv("RABBITMQ_TTS_PREVIEW_ROUTING_KEY", "ai.gpu.tts.preview")
     RABBITMQ_TTS_RESULT_BINDING_KEY: str = getenv("RABBITMQ_TTS_RESULT_BINDING_KEY", "ai.result.tts.#")
     RABBITMQ_IMAGE_GENERATE_QUEUE: str = getenv(
         "RABBITMQ_IMAGE_GENERATE_QUEUE",

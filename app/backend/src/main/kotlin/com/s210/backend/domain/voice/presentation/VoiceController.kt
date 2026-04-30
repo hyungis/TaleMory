@@ -5,7 +5,7 @@ import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.tts.application.VoicePreviewService
 import com.s210.backend.domain.voice.application.VoiceService
 import com.s210.backend.domain.voice.presentation.request.VoicePreviewApiRequest
-import com.s210.backend.domain.voice.presentation.response.VoicePreviewResponse
+import com.s210.backend.domain.voice.presentation.response.VoicePreviewJobResponse
 import com.s210.backend.domain.voice.presentation.response.VoicePresignResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceProfileResponse
 import com.s210.backend.domain.voice.presentation.response.VoiceRecordingScriptResponse
@@ -111,14 +111,16 @@ class VoiceController(
         @PathVariable voiceProfileId: Long,
         @RequestBody request: VoicePreviewApiRequest,
         @AuthenticationPrincipal user: CustomUser,
-    ): ResponseEntity<ApiResponse<VoicePreviewResponse>> {
-        val result = voicePreviewService.preview(
+    ): ResponseEntity<ApiResponse<VoicePreviewJobResponse>> {
+        val jobId = voicePreviewService.preview(
             userId = user.userId,
             voiceProfileId = voiceProfileId,
             text = request.text,
             emotion = request.emotion,
             language = request.language,
         )
-        return ResponseEntity.ok(ApiResponse(data = VoicePreviewResponse.from(result)))
+        return ResponseEntity
+            .accepted()
+            .body(ApiResponse(data = VoicePreviewJobResponse(jobId = jobId)))
     }
 }
