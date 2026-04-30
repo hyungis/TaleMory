@@ -6,11 +6,9 @@ import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
-import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.job.presentation.response.JobResponse
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
-import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
@@ -27,7 +25,6 @@ import tools.jackson.databind.ObjectMapper
 class JobService(
     private val jobRepository: StoryGenerationJobRepository,
     private val storyRepository: StoryRepository,
-    private val voiceProfileRepository: VoiceProfileRepository,
     private val objectMapper: ObjectMapper,
     private val jobStatusRedisRepository: JobStatusRedisRepository,
 ) {
@@ -56,26 +53,10 @@ class JobService(
     }
 
     private fun assertOwned(userId: Long, job: StoryGenerationJob) {
-        if (job.jobType == JobType.TTS_PREVIEW) {
-            assertPreviewOwned(userId, job)
-            return
-        }
         val story = storyRepository.findById(job.storyId).orElseThrow {
             BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         }
         if (story.userId != userId) {
-            throw BusinessException(CommonErrorCode.FORBIDDEN)
-        }
-    }
-
-    private fun assertPreviewOwned(userId: Long, job: StoryGenerationJob) {
-        val payload = job.requestPayload?.toJsonNodeOrNull()
-            ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        val voiceProfileId = payload["voiceProfileId"]?.asLong()
-            ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        val voiceProfile = voiceProfileRepository.findByIdAndDeletedAtIsNull(voiceProfileId)
-            ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        if (voiceProfile.userId != userId) {
             throw BusinessException(CommonErrorCode.FORBIDDEN)
         }
     }
