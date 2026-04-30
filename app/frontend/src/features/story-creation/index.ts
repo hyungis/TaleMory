@@ -17,6 +17,7 @@ export { MAX_STEP } from './model/types'
 export {
   BasicInfoStep,
   DraftResumeModal,
+  DraftResumeBanner,
   getDraftStory,
   deleteStory,
   rehydrateStep1,
@@ -39,3 +40,6 @@ export { FinalPreviewStep } from './final-preview'
 export { PublishStoryStep } from './publish-story'
 export { StepHeader } from './ui/StepHeader'
 export { NextButton } from './ui/NextButton'
+export { CreationHeader } from './ui/CreationHeader'
+export { CreationFooter } from './ui/CreationFooter'
+export { StepTitleBlock } from './ui/StepTitleBlock'

@@ -19,14 +19,14 @@ export function StorySort({ value, onChange }: StorySortProps) {
         <select
           value={value}
           onChange={e => onChange(e.target.value as SortKey)}
-          className="appearance-none bg-[#2a1b12]/70 backdrop-blur-sm border border-[#4a3a24] text-[#d6c78e] text-base rounded-xl py-2.5 pl-3 pr-9 outline-none cursor-pointer shadow-sm hover:border-[#6a5a44] transition-colors"
+          className="appearance-none bg-[#E9DBBE] border border-[#9A7548]/40 text-[#3E2A18] text-base font-bold rounded-xl py-2.5 pl-3 pr-9 outline-none cursor-pointer shadow-sm hover:border-[#3F6B2E] transition-colors"
         >
           <option value="newest">최신순</option>
           <option value="oldest">오래된순</option>
           <option value="name">가나다순</option>
         </select>
         <ChevronDown
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#d6c78e] pointer-events-none"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B4A28] pointer-events-none"
           aria-hidden="true"
         />
       </div>

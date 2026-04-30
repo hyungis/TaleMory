@@ -21,8 +21,8 @@ export function BookshelfPagination({ currentPage, totalPages, onPageChange }: B
         onClick={() => canPrev && onPageChange(currentPage - 1)}
         disabled={!canPrev}
         aria-label="이전 페이지"
-        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 transition-colors shadow-sm ${
-          canPrev ? 'hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] cursor-pointer' : 'opacity-40 cursor-not-allowed'
+        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#9A7548]/40 text-[#3E2A18] bg-[#E9DBBE] transition-colors shadow-sm ${
+          canPrev ? 'hover:bg-[#B9D38F] hover:border-[#8DBA64] cursor-pointer' : 'opacity-40 cursor-not-allowed'
         }`}
       >
         <ChevronLeft className="w-5 h-5" />
@@ -37,8 +37,8 @@ export function BookshelfPagination({ currentPage, totalPages, onPageChange }: B
             onClick={() => onPageChange(page)}
             className={
               isCurrent
-                ? 'w-10 h-10 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] font-bold shadow-[0_0_14px_rgba(180,220,140,0.4)] border border-[#b4dc8c]/50'
-                : 'w-10 h-10 rounded-full flex items-center justify-center border border-[#4a3a24] bg-[#2a1b12]/70 text-[#d6c78e] hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors cursor-pointer shadow-sm'
+                ? 'w-10 h-10 rounded-full flex items-center justify-center bg-[#8DBA64] text-[#1F3318] font-bold shadow-[0_0_10px_rgba(141,186,100,0.35)] border border-[#B9D38F]'
+                : 'w-10 h-10 rounded-full flex items-center justify-center border border-[#9A7548]/40 bg-[#E9DBBE] text-[#3E2A18] hover:bg-[#B9D38F] hover:border-[#8DBA64] transition-colors cursor-pointer shadow-sm'
             }
           >
             {page}
@@ -51,8 +51,8 @@ export function BookshelfPagination({ currentPage, totalPages, onPageChange }: B
         onClick={() => canNext && onPageChange(currentPage + 1)}
         disabled={!canNext}
         aria-label="다음 페이지"
-        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 transition-colors shadow-sm ${
-          canNext ? 'hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] cursor-pointer' : 'opacity-40 cursor-not-allowed'
+        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#9A7548]/40 text-[#3E2A18] bg-[#E9DBBE] transition-colors shadow-sm ${
+          canNext ? 'hover:bg-[#B9D38F] hover:border-[#8DBA64] cursor-pointer' : 'opacity-40 cursor-not-allowed'
         }`}
       >
         <ChevronRight className="w-5 h-5" />

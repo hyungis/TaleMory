@@ -36,6 +36,12 @@ interface BookshelfModalProps {
    * slot 으로 받는다. 호출자가 `<TopRightMenu />` 등을 그대로 넣어주면 된다.
    */
   topRightMenu?: ReactNode
+  /**
+   * 타이틀 블록과 필터 바 사이에 노출되는 상단 배너 슬롯.
+   * 진행 중인 동화(`<DraftResumeBanner />`) 같이 책장 바깥 도메인의 위젯을 주입하기 위함.
+   * features/bookshelf 가 features/story-creation 을 직접 의존하지 않도록 slot 패턴 사용.
+   */
+  topBanner?: ReactNode
 }
 
 /**
@@ -57,6 +63,7 @@ export function BookshelfModal({
   stories = DUMMY_STORIES,
   isLoading = false,
   topRightMenu,
+  topBanner,
 }: BookshelfModalProps) {
   const { paged, filtered, activeFilters, toggleFilter, sort, updateSort, page, setPage, totalPages } =
     useBookshelf(stories)
@@ -102,27 +109,27 @@ export function BookshelfModal({
         </button>
 
         <div className="bookshelf-scroll">
-          <main className="py-12 px-6 md:px-12 relative">
-            <div className="max-w-6xl mx-auto pb-16">
+          <main className="py-12 px-6 md:px-16 lg:px-32 xl:px-48 2xl:px-64 relative">
+            <div className="mx-auto pb-16">
               {/* 타이틀 + 새 동화책 만들기 */}
               <div className="mb-12 flex flex-col md:flex-row justify-between items-center gap-6 bookshelf-fade-in">
                 <div className="text-center md:text-left">
-                  <h1 className="bookshelf-title-display text-4xl md:text-5xl text-[#f0e6c0] mb-3 flex items-center justify-center md:justify-start gap-3 font-bold">
-                    우리가족 책장 <Library className="w-10 h-10 text-[#b4dc8c]" />
+                  <h1 className="bookshelf-title-display text-4xl md:text-5xl text-[#3F6B2E] mb-3 flex items-center justify-center md:justify-start gap-3 font-bold">
+                    우리가족 책장 <Library className="w-10 h-10 text-[#517E37]" />
                   </h1>
-                  <p className="text-[#b4c4a4] text-lg md:text-xl">
+                  <p className="text-[#6B4A28] text-lg md:text-xl">
                     지금까지 만든 소중한 여행과 일상의 이야기들을 모아보세요.
                   </p>
                 </div>
                 {/* 우측 in-world 액션 묶음. 마이페이지(보조) → 새 동화책 만들기(주요) 순서로 배치해
-                    primary CTA 가 시선의 끝에 자연스럽게 닿도록 한다. */}
+                    primary CTA 가 시선의 끝에 자연스럽게 닿도록 한다. Pastel Forest 톤. */}
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                   {onOpenMypage && (
                     <button
                       type="button"
                       onClick={onOpenMypage}
                       aria-label="마이페이지로 이동"
-                      className="bg-[#f0e6c0] text-[#2d5a27] px-6 py-3 rounded-full border-2 border-[#b4dc8c] shadow-[0_3px_0_#7a8a64,0_0_15px_rgba(180,220,140,0.15)] hover:translate-y-0.5 hover:bg-[#e8ddb4] hover:shadow-[0_2px_0_#7a8a64,0_0_22px_rgba(180,220,140,0.35)] transition-all font-bold flex items-center gap-2 text-lg whitespace-nowrap"
+                      className="bg-[#E9DBBE] text-[#3E2A18] px-6 py-3 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-all font-bold flex items-center gap-2 text-lg whitespace-nowrap"
                     >
                       <User className="w-5 h-5" /> 마이페이지
                     </button>
@@ -130,15 +137,18 @@ export function BookshelfModal({
                   <button
                     type="button"
                     onClick={onCreateStory}
-                    className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.2)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.4)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+                    className="bg-[#8DBA64] text-[#1F3318] px-8 py-4 rounded-full border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-1 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
                   >
                     <PlusCircle className="w-6 h-6" /> 새 동화책 만들기
                   </button>
                 </div>
               </div>
 
+              {/* 진행 중인 동화 배너 — 외부에서 주입 (story-creation/DraftResumeBanner). null/undefined 면 미렌더. */}
+              {topBanner}
+
               {/* 필터/정렬 바 */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-[#4a3a24] gap-4 bookshelf-fade-in relative z-20">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-[#9A7548] gap-4 bookshelf-fade-in relative z-20">
                 <StoryFilter
                   activeFilters={activeFilters}
                   onToggle={toggleFilter}
@@ -150,7 +160,7 @@ export function BookshelfModal({
               {/* 책 그리드 (현재 페이지만) */}
               {isLoading ? (
                 <div className="flex items-center justify-center py-20">
-                  <div className="w-10 h-10 border-4 border-[#b4dc8c]/30 border-t-[#b4dc8c] rounded-full animate-spin" />
+                  <div className="w-10 h-10 border-4 border-[#B9D38F]/30 border-t-[#B9D38F] rounded-full animate-spin" />
                 </div>
               ) : (
                 <StoryGrid stories={paged} onRead={onReadStory} onShare={onShareStory} onDelete={onDeleteStory} />

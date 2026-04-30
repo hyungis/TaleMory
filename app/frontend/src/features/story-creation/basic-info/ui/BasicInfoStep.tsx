@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react'
-import { AlertCircle, User } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { ApiError } from '../../../../shared/api'
 import type { StoryChild, StoryProject } from '../../model/types'
-import { StepHeader } from '../../ui/StepHeader'
-import { NextButton } from '../../ui/NextButton'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { clearCreationProgressSnapshot } from '../../lib/progressStorage'
 import { LevelPicker } from './LevelPicker'
 import { ChildrenList } from './ChildrenList'
@@ -207,20 +208,18 @@ export function BasicInfoStep({
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={1} stepTitle="동화책 주인공 정보" onBack={onBack} />
+      <CreationHeader currentStep={1} />
 
       <div className="bookshelf-scroll">
-        <main className="py-12 px-6 bookshelf-fade-in">
-          <div className="max-w-3xl mx-auto bg-[#f0e6c0] p-8 md:p-12 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-2 border-[#2a1b12]">
-            <div className="text-center mb-10">
-              <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <User className="w-8 h-8 text-[#f0e6c0]" />
-              </div>
-              <h2 className="text-4xl text-black font-bold">여행 장소와 일정을 입력해주세요</h2>
-              <p className="text-black mt-2">동화책의 주인공이 될 아이의 정보를 알려주세요.</p>
-            </div>
-
-            <div className="space-y-6">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
+          <div className="max-w-7xl mx-auto">
+            <StepTitleBlock
+              stepNumber={1}
+              title="가족을 소개해주세요"
+              subtitle="이 동화책의 주인공과 등장인물을 알려주세요"
+            />
+            <div className="bg-[#f0e6c0] p-8 md:p-10 rounded-2xl shadow-sm border border-[#9A7548]/40">
+              <div className="space-y-6">
               <ChildrenList
                 children={data.children}
                 onChildUpdate={onChildUpdate}
@@ -264,19 +263,24 @@ export function BasicInfoStep({
               </div>
             </div>
 
-            {submitError && (
-              <div className="mt-6 bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#8b3a2a] text-sm px-4 py-3 rounded-xl flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{submitError}</span>
-              </div>
-            )}
-
-            <NextButton onClick={handleNext} disabled={isSubmitting}>
-              {isSubmitting ? '저장 중…' : '사진 선택하러 가기'}
-            </NextButton>
+              {submitError && (
+                <div className="mt-6 bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#8b3a2a] text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+            </div>
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={1}
+        onBack={onBack}
+        onNext={handleNext}
+        nextLabel={isSubmitting ? '저장 중…' : '사진 선택하러 가기'}
+        nextDisabled={isSubmitting}
+      />
     </div>
   )
 }

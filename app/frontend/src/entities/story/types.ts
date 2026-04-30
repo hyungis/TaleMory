@@ -13,11 +13,14 @@ export interface Story {
   /** 표시용 ISO date string (YYYY-MM-DD). 정렬 정밀도는 createdAt 사용. */
   date: string
   /**
-   * 정렬 기준. BE 의 `createdAt` 원본 datetime ISO (예: "2026-04-27T10:23:11Z").
-   * 같은 날 만든 책 사이 시간 차이까지 정확히 정렬하기 위해 별도로 보관.
-   * dummy 데이터에선 미설정 가능 → date 로 fallback.
+   * 작성 시작 시각 (BE `createdAt`). publishedAt 이 없을 때(즉 dummy 데이터/임시) 의 정렬 fallback.
    */
   createdAt?: string
+  /**
+   * 출판 완료 시각 (BE `publishedAt`). 책장 정렬의 1순위 키 — 책장은 published 만 보여주므로
+   * 사용자가 "최신순" 으로 인지하는 기준은 "최근 출판한 동화" 다.
+   */
+  publishedAt?: string | null
   /** 삽화 스타일 라벨 (원본 더미 데이터 기준) */
   style: string
   /** 페이지 수 */
