@@ -14,8 +14,8 @@ export type DifficultyApi = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 export interface PersonResponse {
   id: number
   name: string
-  /** ISO-8601 (YYYY-MM-DD). */
-  birthDate: string
+  /** 만 나이 (V10 마이그레이션으로 birth_date 가 age 로 교체됨). */
+  age: number
   gender: PersonGender
   role: PersonRoleApi
 }
@@ -23,7 +23,7 @@ export interface PersonResponse {
 /** POST /api/persons request body. */
 export interface CreatePersonRequest {
   name: string
-  birthDate: string
+  age: number
   gender: PersonGender
   role: PersonRoleApi
 }
@@ -31,7 +31,7 @@ export interface CreatePersonRequest {
 /** PATCH /api/persons/{id} request body (모든 필드 optional). */
 export interface ModifyPersonRequest {
   name?: string
-  birthDate?: string
+  age?: number
   gender?: PersonGender
 }
 

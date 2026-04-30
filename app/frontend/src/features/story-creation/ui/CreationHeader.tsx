@@ -24,18 +24,13 @@ export function CreationHeader({ currentStep }: CreationHeaderProps) {
 
   return (
     <div className="flex items-center justify-between py-3 px-6 border-b-2 border-[#9A7548]/30 bg-[#F4E4BC] shrink-0 gap-4">
-      {/* 로고 */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="w-8 h-8 bg-[#B9D38F] border-2 border-[#3F6B2E] rounded-lg flex items-center justify-center text-[#1F3318] font-bold text-base shadow-[0_2px_0_#3F6B2E]">
-          T
-        </div>
-        <span
-          className="text-[#3E2A18] font-bold text-lg tracking-wide hidden sm:inline"
-          style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}
-        >
-          Talemory
-        </span>
-      </div>
+      {/* 로고 — Talemory 손글씨 워드마크 (아이콘 박스 제거). */}
+      <span
+        className="text-[#3F6B2E] font-bold text-2xl md:text-3xl tracking-wide shrink-0"
+        style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}
+      >
+        Talemory
+      </span>
 
       {/* 진행 단계 dots — connector 가 flex-grow 로 늘어나 가로 가득 채움. */}
       <div className="flex items-center flex-1 min-w-0 px-2">
