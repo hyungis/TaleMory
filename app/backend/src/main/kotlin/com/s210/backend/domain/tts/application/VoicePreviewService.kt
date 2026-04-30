@@ -66,7 +66,7 @@ class VoicePreviewService(
 
     fun getStatus(userId: Long, previewId: String): TtsPreviewStatusResponse {
         val snapshot = previewRedis.get(previewId)
-            ?: throw BusinessException(VoiceErrorCode.NOT_FOUND)
+            ?: throw BusinessException(VoiceErrorCode.PREVIEW_NOT_FOUND)
         if (snapshot.userId != userId) {
             throw BusinessException(VoiceErrorCode.FORBIDDEN)
         }

@@ -73,7 +73,7 @@ class VoiceControllerPreviewStatusTest {
 
         assertThatThrownBy { service.getStatus(userId = 7L, previewId = previewId) }
             .isInstanceOfSatisfying(BusinessException::class.java) { ex ->
-                assertThat(ex.errorCode).isEqualTo(VoiceErrorCode.NOT_FOUND)
+                assertThat(ex.errorCode).isEqualTo(VoiceErrorCode.PREVIEW_NOT_FOUND)
             }
     }
 

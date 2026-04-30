@@ -140,13 +140,13 @@ class VoicePreviewServiceTest {
     }
 
     @Test
-    fun `getStatus throws NOT_FOUND when previewId missing or expired`() {
+    fun `getStatus throws PREVIEW_NOT_FOUND when previewId missing or expired`() {
         val previewId = UUID.randomUUID().toString()
         `when`(previewRedis.get(previewId)).thenReturn(null)
 
         assertThatThrownBy { service.getStatus(userId = 7L, previewId = previewId) }
             .isInstanceOfSatisfying(BusinessException::class.java) { ex ->
-                assertThat(ex.errorCode).isEqualTo(VoiceErrorCode.NOT_FOUND)
+                assertThat(ex.errorCode).isEqualTo(VoiceErrorCode.PREVIEW_NOT_FOUND)
             }
     }
 

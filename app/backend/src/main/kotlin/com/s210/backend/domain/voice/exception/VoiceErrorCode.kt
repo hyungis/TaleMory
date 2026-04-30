@@ -18,4 +18,5 @@ enum class VoiceErrorCode(
     FORBIDDEN(HttpStatus.FORBIDDEN, "VOICE_011", "해당 보이스 프로필에 대한 권한이 없습니다."),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "VOICE_012", "잘못된 요청입니다."),
     AI_PROVIDER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "VOICE_013", "AI 서비스 호출에 실패했습니다."),
+    PREVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "VOICE_014", "미리듣기가 만료되었어요. 다시 시도해주세요."),
 }
