@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
   CheckCircle,
   ImageIcon,
   Loader2,
+  Pencil,
+  Quote,
   RefreshCw,
   RotateCcw,
   Sparkles,
   Wand2,
 } from 'lucide-react'
+import { MAX_PER_PAGE_REFINE } from '../lib/defaults'
 import {
   useGenerateStoryboardImagesPost,
   useRegenerateStoryboardImagePost,
@@ -27,11 +28,45 @@ import {
 import { useGenerateStoryboardStoryPost } from '../../storyboard-prompt/model/useGenerateStoryboardStoryPost'
 import { deleteStory } from '../../basic-info'
 import { ROUTES } from '../../../../shared/constants'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 
 /** "마지막 SUCCESS 이후 FAILED" 한도. 이 값 이상이면 사용자에게 사과 + 메인 페이지 이동. */
 const FAILED_LIMIT = 3
 /** 한도 초과 시 자동 메인 이동까지의 카운트다운(ms). 사용자가 메시지를 읽을 시간 + "지금 이동" 으로 단축 가능. */
 const LIMIT_EXCEEDED_REDIRECT_MS = 5_000
+
+/**
+ * 페이지별 cache-buster (재생성 SUCCESS 시 ++) 와 재생성 남은 횟수를 storyId 별로 sessionStorage 에 보관.
+ * 페이지 이탈 후 재진입 시 state 가 리셋되어도 캐시버스터/카운터가 살아남도록 한다.
+ *
+ * BE 가 페이지 row 에 image_updated_at 또는 refine_remaining 을 노출하기 전 까지의 임시 패치.
+ */
+const imageVersionStorageKey = (storyId: number | null) =>
+  `talemory:storyboard-editor:image-version:${storyId ?? 'unknown'}`
+const refineRemainingStorageKey = (storyId: number | null) =>
+  `talemory:storyboard-editor:refine-remaining:${storyId ?? 'unknown'}`
+
+function loadStoredJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
+function saveStoredJson(key: string, value: unknown): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // QuotaExceeded / serialization error — 캐시버스터는 best-effort 라 무시.
+  }
+}
 
 interface StoryboardEditorStepProps {
   storyId: number | null
@@ -239,6 +274,22 @@ export function StoryboardEditorStep({
   const [currentImageJobId, setCurrentImageJobId] = useState<number | null>(null)
   const imageJobQuery = useGenerationJobQuery(currentImageJobId)
 
+  // 어떤 페이지가 현재 재생성 요청 중인지 추적 — 페이지별 spinner / 에러 표시에 사용.
+  // (regenerateImageMut 자체는 페이지 무관 단일 instance 라 별도 ref 필요.)
+  // 폴링이 끝날 때까지 유지되어 mutate inflight 뿐 아니라 server 폴링 동안에도 스피너 노출.
+  const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null)
+  const [regenerateErrors, setRegenerateErrors] = useState<Record<number, string>>({})
+  // 페이지별 이미지 캐시 버스터 — AI 워커가 같은 S3 key 에 덮어쓰는 케이스에서
+  // URL 이 동일해 브라우저가 옛 이미지를 cached 로 보여주는 문제 방지.
+  // 재생성 SUCCESS 시 해당 페이지 카운터를 ++ 하고 <img src> 에 ?v={n} 으로 붙인다.
+  // sessionStorage 에 storyId 별로 persist — 페이지 이탈 후 재진입 시에도 캐시버스터 유지.
+  const [imageVersion, setImageVersion] = useState<Record<number, number>>(() =>
+    loadStoredJson<Record<number, number>>(imageVersionStorageKey(storyId), {}),
+  )
+  useEffect(() => {
+    saveStoredJson(imageVersionStorageKey(storyId), imageVersion)
+  }, [imageVersion, storyId])
+
   // 진행 중 폴링이 갱신될 때마다 페이지 캐시도 invalidate → 페이지마다 image_url 즉시 표시.
   useEffect(() => {
     if (currentImageJobId !== null && storyId !== null) {
@@ -254,11 +305,42 @@ export function StoryboardEditorStep({
       (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut)
     ) {
       setCurrentImageJobId(null)
+      // 단일 페이지 재생성 폴링 종료 — 페이지별 스피너 해제 + 실패 시 메시지 / 성공 시 캐시버스터.
+      if (regeneratingPageNumber !== null) {
+        if (status === 'SUCCESS') {
+          // 성공: 해당 페이지 imageVersion 증가 → <img src> 가 ?v=N 으로 강제 reload.
+          const successPage = regeneratingPageNumber
+          setImageVersion(prev => ({
+            ...prev,
+            [successPage]: (prev[successPage] ?? 0) + 1,
+          }))
+        } else if (status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut) {
+          const failedPage = regeneratingPageNumber
+          setRegenerateErrors(prev => ({
+            ...prev,
+            [failedPage]:
+              status === 'FAILED'
+                ? '그림 재생성에 실패했어요. 잠시 후 다시 시도해 주세요.'
+                : status === 'CANCELLED'
+                  ? '그림 재생성이 취소됐어요.'
+                  : '그림 재생성이 너무 오래 걸려 중단됐어요.',
+          }))
+        }
+        setRegeneratingPageNumber(null)
+      }
       if (storyId !== null) {
-        void queryClient.invalidateQueries({ queryKey: ['storyboard-pages', storyId] })
+        // 단순 invalidate 가 아닌 refetch — staleTime/observer 상태와 무관하게 반드시 새로 받도록.
+        void queryClient.refetchQueries({ queryKey: ['storyboard-pages', storyId] })
       }
     }
-  }, [imageJobQuery.data?.status, imageJobQuery.isTimedOut, currentImageJobId, queryClient, storyId])
+  }, [
+    imageJobQuery.data?.status,
+    imageJobQuery.isTimedOut,
+    currentImageJobId,
+    regeneratingPageNumber,
+    queryClient,
+    storyId,
+  ])
 
   const pages: StoryboardPageItem[] = useMemo(
     () =>
@@ -283,6 +365,49 @@ export function StoryboardEditorStep({
 
   // 페이지별 재생성 input 값.
   const [regeneratePrompts, setRegeneratePrompts] = useState<Record<number, string>>({})
+
+  // 페이지당 재생성 남은 횟수. 페이지가 처음 로드될 때 MAX_PER_PAGE_REFINE 로 초기화.
+  // sessionStorage 에 storyId 별로 persist — 페이지 이탈 후 재진입 시에도 카운터 유지.
+  const [refineRemaining, setRefineRemaining] = useState<Record<number, number>>(() =>
+    loadStoredJson<Record<number, number>>(refineRemainingStorageKey(storyId), {}),
+  )
+  useEffect(() => {
+    setRefineRemaining(prev => {
+      const next = { ...prev }
+      for (const p of pages) {
+        if (next[p.pageNumber] === undefined) {
+          next[p.pageNumber] = MAX_PER_PAGE_REFINE
+        }
+      }
+      return next
+    })
+  }, [pages])
+  useEffect(() => {
+    saveStoredJson(refineRemainingStorageKey(storyId), refineRemaining)
+  }, [refineRemaining, storyId])
+
+  // 보기 모드 — 'grid' (한 줄 3장 갤러리) / 'individual' (페이지마다 글+이미지+재생성).
+  // 그리드에서 사진 클릭 시 individual 모드로 전환 + 해당 페이지로 스크롤.
+  const [viewMode, setViewMode] = useState<'grid' | 'individual'>('individual')
+  const [pendingScrollPage, setPendingScrollPage] = useState<number | null>(null)
+
+  const handleSelectPageFromGrid = useCallback((pageNumber: number) => {
+    setViewMode('individual')
+    setPendingScrollPage(pageNumber)
+  }, [])
+
+  // viewMode 가 individual 로 바뀐 직후 카드가 mount 되면 해당 페이지로 부드럽게 스크롤.
+  useEffect(() => {
+    if (viewMode !== 'individual' || pendingScrollPage === null) return
+    const rafId = window.requestAnimationFrame(() => {
+      const el = document.getElementById(`storyboard-page-${pendingScrollPage}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      setPendingScrollPage(null)
+    })
+    return () => window.cancelAnimationFrame(rafId)
+  }, [viewMode, pendingScrollPage])
 
   const handleDraftChange = useCallback((pageNumber: number, value: string) => {
     setDrafts(prev => ({ ...prev, [pageNumber]: value }))
@@ -309,17 +434,39 @@ export function StoryboardEditorStep({
     (pageNumber: number) => {
       const userPrompt = (regeneratePrompts[pageNumber] ?? '').trim()
       if (userPrompt.length === 0) return
+      const remaining = refineRemaining[pageNumber] ?? MAX_PER_PAGE_REFINE
+      if (remaining <= 0) return // 페이지당 한도 소진 — 호출 자체 차단.
+      setRegeneratingPageNumber(pageNumber)
+      // 이 페이지 이전 에러는 새 시도 시 리셋.
+      setRegenerateErrors(prev => {
+        if (!(pageNumber in prev)) return prev
+        const next = { ...prev }
+        delete next[pageNumber]
+        return next
+      })
       regenerateImageMut.mutate(
         { pageNumber, userPrompt },
         {
           onSuccess: res => {
             setCurrentImageJobId(res.jobId)
             setRegeneratePrompts(prev => ({ ...prev, [pageNumber]: '' }))
+            setRefineRemaining(prev => ({
+              ...prev,
+              [pageNumber]: Math.max(0, (prev[pageNumber] ?? MAX_PER_PAGE_REFINE) - 1),
+            }))
+            // regeneratingPageNumber 는 폴링이 끝날 때(아래 useEffect) 까지 유지 — 스피너 계속 노출.
+          },
+          onError: err => {
+            setRegenerateErrors(prev => ({
+              ...prev,
+              [pageNumber]: err.message || '그림 재생성 요청에 실패했어요.',
+            }))
+            setRegeneratingPageNumber(null)
           },
         },
       )
     },
-    [regenerateImageMut, regeneratePrompts],
+    [regenerateImageMut, regeneratePrompts, refineRemaining],
   )
 
   // 진행 중 여부 — 어떤 이미지 잡이든 PENDING/RUNNING 이면 모든 image 액션 disable.
@@ -335,39 +482,50 @@ export function StoryboardEditorStep({
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <div className="flex items-center justify-between py-4 px-8 border-b border-[#4a3a24] bg-[#2a1b12]/60 shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="이전 단계"
-            className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">STEP 04 / 08</span>
-          <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">
-            스토리보드 다듬기
-          </span>
-        </div>
-      </div>
+      <CreationHeader currentStep={4} />
 
       <div className="bookshelf-scroll">
-        <main className="py-10 px-6 bookshelf-fade-in">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
           <div className="max-w-7xl mx-auto pb-12">
-            {/* 타이틀 */}
-            <div className="mb-8 text-center">
-              <div className="inline-flex items-center gap-2 bg-[#2d5a27]/60 px-5 py-2 rounded-full border border-[#b4dc8c]/50 shadow-sm mb-4">
-                <Sparkles className="w-5 h-5 text-[#b4dc8c]" />
-                <span className="text-[#b4dc8c] font-bold">페이지별로 글과 그림을 다듬어보세요</span>
+            <StepTitleBlock
+              stepNumber={4}
+              title="스토리보드를 다듬어주세요"
+              subtitle="한 페이지씩 글과 그림을 손봐 우리 가족만의 동화책으로 완성해보세요"
+            />
+
+            {/* 보기 모드 토글 — 페이지가 있을 때만 노출.
+                grid: 한 줄 3장 사진 갤러리. 사진 클릭 → individual 모드 + 해당 페이지로 스크롤.
+                individual: 페이지마다 글/이미지/재생성 카드 (기본). */}
+            {pages.length > 0 && (
+              <div className="mb-6 flex justify-center">
+                <div className="inline-flex bg-[#E9DBBE] border-2 border-[#9A7548]/40 rounded-full p-1 gap-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    aria-pressed={viewMode === 'grid'}
+                    className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-[#3F6B2E] text-[#FFFFE5] shadow'
+                        : 'text-[#6B4A28] hover:bg-[#9A7548]/10'
+                    }`}
+                  >
+                    그림으로 한번에 보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('individual')}
+                    aria-pressed={viewMode === 'individual'}
+                    className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${
+                      viewMode === 'individual'
+                        ? 'bg-[#3F6B2E] text-[#FFFFE5] shadow'
+                        : 'text-[#6B4A28] hover:bg-[#9A7548]/10'
+                    }`}
+                  >
+                    개별 페이지 보기
+                  </button>
+                </div>
               </div>
-              <h1 className="text-3xl md:text-4xl text-[#f0e6c0] mb-3 font-bold">
-                우리 가족의 이야기 페이지
-              </h1>
-              <p className="text-[#b4c4a4] text-lg">
-                페이지마다 글을 직접 다듬고, 마음에 드는 그림이 나올 때까지 다시 그릴 수 있어요.
-              </p>
-            </div>
+            )}
 
             {/* 전체 이미지 생성 버튼 */}
             {pages.length > 0 && !someImagesReady && (
@@ -379,7 +537,7 @@ export function StoryboardEditorStep({
                       모든 페이지 그림 만들기
                     </h3>
                     <p className="text-[#8b7a52]">
-                      AI 가 페이지마다 한 장씩 그림을 그려요. 보통 페이지당 10~30초.
+                      AI 가 페이지마다 한 장씩 그림을 그려요.
                     </p>
                   </div>
                   <button
@@ -495,56 +653,79 @@ export function StoryboardEditorStep({
                 </div>
               )}
 
-            {/* 페이지 카드 — 한 줄에 1 개씩. 양옆을 max-w-7xl 로 넓혀 이미지가 충분히 크게. */}
-            <div className="space-y-6">
-              {pages.map(page => (
-                <PageCard
-                  key={page.pageNumber}
-                  page={page}
-                  draft={drafts[page.pageNumber] ?? ''}
-                  onDraftChange={value => handleDraftChange(page.pageNumber, value)}
-                  onDraftBlur={() => handleDraftBlur(page.pageNumber, page.koreanText)}
-                  regeneratePrompt={regeneratePrompts[page.pageNumber] ?? ''}
-                  onRegeneratePromptChange={value =>
-                    setRegeneratePrompts(prev => ({ ...prev, [page.pageNumber]: value }))
-                  }
-                  onRegenerateImage={() => handleRegenerateImage(page.pageNumber)}
-                  regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending}
-                  patchPending={patchMut.isPending}
-                />
-              ))}
-            </div>
+            {/* viewMode 분기:
+                - grid: 한 줄 3장 사진 갤러리. 사진 클릭 → individual + 스크롤.
+                - individual: 페이지마다 카드 (글 + 이미지 + 재생성). */}
+            {pages.length > 0 && viewMode === 'grid' && (
+              <PageGrid
+                pages={pages}
+                onSelect={handleSelectPageFromGrid}
+                imageVersionMap={imageVersion}
+              />
+            )}
 
-            {/* 하단 액션 */}
-            <div className="flex justify-between items-center pt-8 mt-8 border-t border-[#4a3a24]">
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-xl font-bold transition-colors"
-              >
-                이전
-              </button>
-              <div className="text-[#b4dc8c] font-bold hidden sm:flex items-center gap-2 bg-[#2d5a27]/60 px-6 py-2.5 rounded-full border border-[#b4dc8c]/40 text-lg shadow-sm">
-                <CheckCircle className="w-6 h-6" />
+            {pages.length > 0 && viewMode === 'individual' && (
+              <div className="space-y-4">
+                {pages.map(page => (
+                  <div
+                    key={page.pageNumber}
+                    id={`storyboard-page-${page.pageNumber}`}
+                    style={{ scrollMarginTop: '24px' }}
+                  >
+                    <PageCard
+                      page={page}
+                      draft={drafts[page.pageNumber] ?? ''}
+                      onDraftChange={value => handleDraftChange(page.pageNumber, value)}
+                      onDraftBlur={() => handleDraftBlur(page.pageNumber, page.koreanText)}
+                      regeneratePrompt={regeneratePrompts[page.pageNumber] ?? ''}
+                      onRegeneratePromptChange={value =>
+                        setRegeneratePrompts(prev => ({ ...prev, [page.pageNumber]: value }))
+                      }
+                      onRegenerateImage={() => handleRegenerateImage(page.pageNumber)}
+                      regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending}
+                      patchPending={patchMut.isPending}
+                      refineRemaining={refineRemaining[page.pageNumber] ?? MAX_PER_PAGE_REFINE}
+                      isRegeneratingThis={regeneratingPageNumber === page.pageNumber}
+                      regenerateError={regenerateErrors[page.pageNumber] ?? null}
+                      imageVersion={imageVersion[page.pageNumber] ?? 0}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 진행 상태 배지 — 하단 푸터 위 (footer 가 좁아 중앙 status 는 footer 밖으로 분리). */}
+            <div className="mt-8 flex justify-center">
+              <div className={`font-bold flex items-center gap-2 px-5 py-2 rounded-full border-2 text-sm shadow-sm ${
+                allImagesReady
+                  ? 'bg-[#B9D38F]/40 border-[#3F6B2E] text-[#1F3318]'
+                  : 'bg-[#E9DBBE] border-[#9A7548]/40 text-[#6B4A28]'
+              }`}>
+                <CheckCircle className="w-4 h-4" />
                 <span>{allImagesReady ? '모든 그림이 준비됐어요' : '편집 진행 중'}</span>
               </div>
-              <button
-                type="button"
-                onClick={onNext}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-3 text-xl whitespace-nowrap"
-              >
-                다음: 그림 스타일 선택 <ArrowRight className="w-6 h-6" />
-              </button>
             </div>
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={4}
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="다음: 그림 스타일 선택"
+      />
     </div>
   )
 }
 
 /**
- * 페이지 1장 카드 — 글 textarea + 이미지(또는 placeholder) + 재생성 input.
+ * 페이지 1장 카드 — 새 디자인 (스크린샷 기준 pastel forest 톤).
+ *
+ * 좌측: 이미지(또는 placeholder) + "그림 다시 그리기" 입력/버튼/카운터를 같은 컬럼에 묶음.
+ * 우측: 큰 따옴표 + 영어 본문(메인) + 한글 해석(textarea, blur 자동 저장).
+ *
+ * 페이지당 재생성은 MAX_PER_PAGE_REFINE 회까지 허용. refineRemaining = 0 이면 input/button 모두 disable.
  */
 function PageCard(props: {
   page: StoryboardPageItem
@@ -556,6 +737,13 @@ function PageCard(props: {
   onRegenerateImage: () => void
   regenerateDisabled: boolean
   patchPending: boolean
+  refineRemaining: number
+  /** 이 페이지가 현재 재생성 요청 중 (mutate inflight 또는 폴링 중)인지. spinner 노출용. */
+  isRegeneratingThis: boolean
+  /** 이 페이지의 마지막 재생성 시도 에러 메시지. null 이면 표시 없음. */
+  regenerateError: string | null
+  /** 재생성 SUCCESS 마다 ++ 되는 카운터. <img src> 에 ?v=N 으로 붙어 브라우저 캐시 우회. */
+  imageVersion: number
 }) {
   const {
     page,
@@ -567,95 +755,237 @@ function PageCard(props: {
     onRegenerateImage,
     regenerateDisabled,
     patchPending,
+    refineRemaining,
+    isRegeneratingThis,
+    regenerateError,
+    imageVersion,
   } = props
 
+  // S3 같은 deterministic key 덮어쓰기 케이스 대비 — 버전 > 0 일 때만 cache-buster 부착.
+  const imageSrc = page.imageUrl
+    ? imageVersion > 0
+      ? `${page.imageUrl}${page.imageUrl.includes('?') ? '&' : '?'}v=${imageVersion}`
+      : page.imageUrl
+    : null
+
+  const refineExhausted = refineRemaining <= 0
+  const inputDisabled = regenerateDisabled || refineExhausted || isRegeneratingThis
+  const buttonDisabled =
+    regenerateDisabled ||
+    refineExhausted ||
+    isRegeneratingThis ||
+    regeneratePrompt.trim().length === 0
+
+  // 한글 해석 — 기본은 read-only 표시. "직접 편집" 클릭 시 textarea 로 전환.
+  // blur 시 onDraftBlur (PATCH) + 표시 모드 복귀.
+  const [editingKorean, setEditingKorean] = useState(false)
+  const koreanText = draft.trim()
+
   return (
-    <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] shadow-md overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 bg-[#e8ddb4] border-b-2 border-[#8b7a52]/40">
-        <span className="text-[#2d5a27] font-bold">페이지 {page.pageNumber}</span>
+    <div className="bg-[#E9DBBE] rounded-2xl border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] overflow-hidden">
+      {/* Header — Page 배지 + 저장 중 인디케이터 */}
+      <div className="flex items-center justify-between px-5 pt-3 pb-2">
+        <span
+          className="inline-flex items-center bg-[#B9D38F]/45 text-[#3F6B2E] font-bold px-3 py-1 rounded-full text-sm border border-[#3F6B2E]/40"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          Page {page.pageNumber}
+        </span>
         {patchPending && (
-          <span className="text-[#8b7a52] text-sm inline-flex items-center gap-1">
-            <Loader2 className="w-4 h-4 animate-spin" /> 저장 중
+          <span className="text-[#9A7548] text-xs inline-flex items-center gap-1.5">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> 저장 중
           </span>
         )}
       </div>
 
-      {/* 이미지(왼쪽) + 텍스트(오른쪽) — 카드 내부 좌우 2분할.
-          items-start: 이미지 column 이 자체 aspect-square 높이만 유지하고
-          텍스트가 길어도 옆에 빈 공간을 만들지 않게 한다. */}
-      <div className="grid grid-cols-2 gap-0 items-start">
-        {/* 이미지 영역 — 카드 폭의 절반 = aspect-square */}
-        <div className="bg-[#e8ddb4] aspect-square flex items-center justify-center border-r-2 border-[#8b7a52]/40 overflow-hidden self-start">
-          {page.imageUrl ? (
-            <img
-              src={page.imageUrl}
-              alt={`페이지 ${page.pageNumber} 그림`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="text-center text-[#8b7a52] p-6">
-              <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-60" />
-              <p>아직 그림이 없어요.</p>
-              <p className="text-sm">상단 "그림 만들기 시작" 을 눌러주세요.</p>
-            </div>
-          )}
-        </div>
-
-        {/* 텍스트 영역 — 영어 메인 + 한글 보조 + 재생성 */}
-        <div className="p-5 flex flex-col">
-          {/* 영어 본문 — 메인 */}
-          <div className="mb-4">
-            <label className="text-[#2d5a27] font-bold mb-2 block text-sm uppercase tracking-wide">
-              English
-            </label>
-            <div className="p-4 rounded-lg bg-[#fbf3d4] border-2 border-[#8b7a52]/60 text-[#2d5a27] text-base leading-relaxed font-sans whitespace-pre-wrap min-h-[6rem]">
-              {page.englishText?.trim() || '(영어 본문이 아직 없어요)'}
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 md:px-5 pb-4 md:pb-5">
+        {/* ── 좌측: 이미지 + 재생성 ─────────────────────────── */}
+        <div className="flex flex-col gap-2.5">
+          {/* 이미지 영역 — 가로폭 대비 짧게 (4:3) 잡아 카드 높이 축소. */}
+          <div className="aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden">
+            {imageSrc ? (
+              <img
+                src={imageSrc}
+                alt={`페이지 ${page.pageNumber} 그림`}
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
+            ) : (
+              <div className="text-center text-[#3F6B2E] p-4 max-w-[85%]">
+                <ImageIcon className="w-9 h-9 mx-auto mb-2 opacity-60" />
+                <p className="font-bold text-xs">아직 그림이 없어요</p>
+                {page.sceneSummary && (
+                  <p className="text-[11px] text-[#6B4A28] mt-1.5 italic line-clamp-2">
+                    {page.sceneSummary}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* 한글 해석 — 보조 */}
-          <div>
-            <label className="text-[#8b7a52] font-bold mb-2 flex items-center justify-between text-sm uppercase tracking-wide">
-              <span>한글 해석</span>
-              <span className="text-[#8b7a52]/70 normal-case tracking-normal text-xs">
-                포커스 빼면 자동 저장
+          {/* 재생성 UI — 사진 바로 밑. 입력 + 버튼 + 남은 횟수 카운터. */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[#3F6B2E] font-bold text-xs flex items-center gap-1.5">
+                <Wand2 className="w-3.5 h-3.5" /> 그림 다시 그리기
+              </label>
+              <span
+                className={`text-[11px] font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                  refineExhausted
+                    ? 'text-[#9A7548]/70 border-[#9A7548]/30 bg-[#E9DBBE]/50'
+                    : 'text-[#3F6B2E] border-[#3F6B2E]/30 bg-[#B9D38F]/25'
+                }`}
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                {refineRemaining} / {MAX_PER_PAGE_REFINE} 남음
               </span>
-            </label>
-            <textarea
-              value={draft}
-              onChange={e => onDraftChange(e.target.value)}
-              onBlur={onDraftBlur}
-              className="w-full h-24 p-3 rounded-lg bg-[#f5ebc0] border border-[#8b7a52]/40 text-[#5a4a27] text-sm leading-relaxed focus:border-[#2d5a27] focus:ring-2 focus:ring-[#b4dc8c]/30 focus:outline-none resize-none font-sans"
-              maxLength={4000}
-              placeholder="한글 해석을 다듬어 주세요"
-            />
-          </div>
-
-          {/* 이미지 재생성 */}
-          <div className="mt-4 pt-4 border-t-2 border-[#8b7a52]/30">
-            <label className="text-[#2d5a27] font-bold mb-2 flex items-center gap-2 text-sm">
-              <Wand2 className="w-4 h-4" /> 그림 다시 그리기
-            </label>
-            <div className="flex gap-2">
+            </div>
+            <div className="flex gap-1.5">
               <input
                 type="text"
                 value={regeneratePrompt}
                 onChange={e => onRegeneratePromptChange(e.target.value)}
-                placeholder="예: '따뜻한 색감으로'"
-                className="flex-1 p-2.5 rounded-md border-2 border-[#b4dc8c] bg-[#fbf3d4] focus:border-[#2d5a27] focus:outline-none text-sm font-sans text-[#2d5a27] placeholder-[#8b7a52]/60"
+                placeholder={
+                  refineExhausted ? '재생성 횟수를 모두 사용했어요' : '예: 따뜻한 색감으로'
+                }
+                disabled={inputDisabled}
+                className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none text-xs text-[#3E2A18] placeholder-[#9A7548]/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               />
               <button
                 type="button"
                 onClick={onRegenerateImage}
-                disabled={regenerateDisabled || regeneratePrompt.trim().length === 0}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-4 py-2 rounded-md font-bold hover:bg-[#3d6f34] border border-[#b4dc8c]/40 transition-colors flex items-center gap-1 text-sm shadow-[0_2px_0_#1a3a14] disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={buttonDisabled}
+                title={refineExhausted ? '재생성 횟수를 모두 사용했어요' : '그림 다시 그리기'}
+                aria-label="그림 다시 그리기"
+                className="bg-[#3F6B2E] text-[#FFFEF8] px-3 py-1.5 rounded-lg font-bold hover:bg-[#4F7B3E] transition-colors flex items-center gap-1 text-xs shadow-[0_2px_0_#1F3318] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
               >
-                <RefreshCw className="w-4 h-4" />
+                {isRegeneratingThis ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
+            {/* 진행 중 안내 / 에러 메시지 — 페이지별 즉시 피드백. */}
+            {isRegeneratingThis && (
+              <p className="text-[11px] text-[#3F6B2E] inline-flex items-center gap-1.5 mt-0.5">
+                <Loader2 className="w-3 h-3 animate-spin" /> 그림을 다시 그리는 중이에요…
+              </p>
+            )}
+            {regenerateError && !isRegeneratingThis && (
+              <p className="text-[11px] text-[#a3413f] inline-flex items-start gap-1.5 mt-0.5">
+                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                <span>{regenerateError}</span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── 우측: 큰 따옴표 + 영어 본문 + 한글 해석 (읽기/편집 토글) ── */}
+        <div className="bg-[#F4E4BC]/85 rounded-xl p-4 md:p-5 flex flex-col border border-[#9A7548]/15">
+          <Quote className="w-6 h-6 text-[#3F6B2E] opacity-70 mb-1.5" aria-hidden="true" />
+          {/* 영어 본문 — 메인. 카드를 줄여도 본문은 잘 보이게 큰 사이즈 유지. */}
+          <p className="text-[#3E2A18] text-lg md:text-xl leading-relaxed font-medium mb-4 whitespace-pre-wrap">
+            {page.englishText?.trim() || '(영어 본문이 아직 없어요)'}
+          </p>
+
+          {/* 한글 해석 — 기본 read-only, "직접 편집" 클릭 시 textarea 전환 */}
+          <div className="border-t border-[#9A7548]/25 pt-3 mt-auto">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[#9A7548] text-xs font-bold uppercase tracking-wide">
+                한글 해석
+              </span>
+              {!editingKorean && (
+                <button
+                  type="button"
+                  onClick={() => setEditingKorean(true)}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors"
+                >
+                  <Pencil className="w-3 h-3" /> 직접 편집
+                </button>
+              )}
+            </div>
+            {editingKorean ? (
+              <textarea
+                value={draft}
+                onChange={e => onDraftChange(e.target.value)}
+                onBlur={() => {
+                  onDraftBlur()
+                  setEditingKorean(false)
+                }}
+                autoFocus
+                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5"
+                maxLength={4000}
+                placeholder="한글 해석을 다듬어 주세요"
+              />
+            ) : (
+              <p className="text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold whitespace-pre-wrap min-h-[2.5rem]">
+                {koreanText || (
+                  <span className="text-[#9A7548]/60 font-normal italic">
+                    한글 해석이 비어 있어요. "직접 편집" 을 눌러 입력해주세요.
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 한 줄에 3장씩 그림만 보여주는 갤러리. 사진 클릭 → onSelect(pageNumber) 로 individual 모드 전환.
+ *
+ * - 이미지 없는 페이지는 placeholder 표시 (썸네일 자리는 유지해서 페이지 번호 일관성 보존).
+ * - 페이지 번호 배지를 좌상단에 띄워 "몇 페이지 사진인지" 즉시 파악 가능.
+ */
+function PageGrid({
+  pages,
+  onSelect,
+  imageVersionMap,
+}: {
+  pages: StoryboardPageItem[]
+  onSelect: (pageNumber: number) => void
+  imageVersionMap: Record<number, number>
+}) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+      {pages.map(page => {
+        const v = imageVersionMap[page.pageNumber] ?? 0
+        const src = page.imageUrl
+          ? v > 0
+            ? `${page.imageUrl}${page.imageUrl.includes('?') ? '&' : '?'}v=${v}`
+            : page.imageUrl
+          : null
+        return (
+        <button
+          key={page.pageNumber}
+          type="button"
+          onClick={() => onSelect(page.pageNumber)}
+          title={`페이지 ${page.pageNumber} 편집`}
+          aria-label={`페이지 ${page.pageNumber} 편집`}
+          className="group relative aspect-square overflow-hidden rounded-2xl border-2 border-[#2a1b12] bg-[#e8ddb4] shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all"
+        >
+          {src ? (
+            <img
+              src={src}
+              alt={`페이지 ${page.pageNumber} 그림`}
+              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+              draggable={false}
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8b7a52]">
+              <ImageIcon className="w-10 h-10 opacity-50 mb-2" />
+              <p className="text-sm font-bold">아직 그림 없음</p>
+            </div>
+          )}
+          <span className="absolute top-2 left-2 inline-flex items-center justify-center bg-[#2d5a27]/90 text-[#f0e6c0] text-xs font-bold px-2.5 py-1 rounded-full border border-[#b4dc8c]/50 shadow-sm">
+            페이지 {page.pageNumber}
+          </span>
+        </button>
+        )
+      })}
     </div>
   )
 }

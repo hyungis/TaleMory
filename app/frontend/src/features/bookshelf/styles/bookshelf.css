@@ -301,10 +301,10 @@
   z-index: 5100;
   width: 44px;
   height: 44px;
-  /* 크림 배경 위에 두드러지게 — 부드러운 탄 브라운 */
-  background: #6B4A28;
-  border: 2px solid #9A7548;
-  color: #FBF6E0;
+  /* 더 부드러운 honey 톤 + 어둡지 않은 텍스트 */
+  background: #C9A874;
+  border: 2px solid #D9BE82;
+  color: #3E2A18;
   font-size: 1.8rem;
   border-radius: 50%;
   cursor: pointer;
@@ -312,7 +312,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(154, 117, 72, 0.25);
+  box-shadow: 0 4px 12px rgba(154, 117, 72, 0.2);
 }
 
 .modal-close-btn:hover {
@@ -427,12 +427,23 @@
   z-index: 40;
 }
 
-/* ===== 필터 칩 active 상태 — pastel forest 톤 ===== */
+/* Step 모달 안의 type="number" 인풋의 OS 기본 spinner 숨김 — 커스텀 ↑↓ 버튼으로 교체. */
+.bookshelf-modal.step-forest-modal input[type='number']::-webkit-outer-spin-button,
+.bookshelf-modal.step-forest-modal input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.bookshelf-modal.step-forest-modal input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ===== 필터 칩 active 상태 — softer pastel sage ===== */
 .bookshelf-modal .filter-btn.active {
-  background-color: #3F6B2E !important;
-  color: #F2EBD2 !important;
-  border-color: #517E37 !important;
-  box-shadow: 0 0 12px rgba(63, 107, 46, 0.35);
+  background-color: #8DBA64 !important;
+  color: #1F3318 !important;
+  border-color: #B9D38F !important;
+  box-shadow: 0 0 10px rgba(141, 186, 100, 0.3);
 }
 
 /* ===== 나무 선반 — Pastel Forest 디자인 시스템 v3 톤 =====

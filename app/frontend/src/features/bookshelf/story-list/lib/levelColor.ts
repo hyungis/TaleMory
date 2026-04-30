@@ -14,10 +14,10 @@ import type { StoryLevel } from '../../../../entities/story'
 export function getLevelColor(level: StoryLevel): string {
   switch (level) {
     case '초급':
-      return 'bg-[#8DBA64] text-[#1F3318]'
+      return 'bg-[#B9D38F] text-[#1F3318]'
     case '중급':
-      return 'bg-[#D9BE82] text-[#3E2A18]'
+      return 'bg-[#E9DBBE] text-[#3E2A18]'
     case '고급':
-      return 'bg-[#B0473F] text-[#F2EBD2]'
+      return 'bg-[#D8857C] text-[#3E2A18]'
   }
 }

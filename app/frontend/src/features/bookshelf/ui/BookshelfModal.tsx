@@ -30,6 +30,12 @@ interface BookshelfModalProps {
    * slot 으로 받는다. 호출자가 `<TopRightMenu />` 등을 그대로 넣어주면 된다.
    */
   topRightMenu?: ReactNode
+  /**
+   * 타이틀 블록과 필터 바 사이에 노출되는 상단 배너 슬롯.
+   * 진행 중인 동화(`<DraftResumeBanner />`) 같이 책장 바깥 도메인의 위젯을 주입하기 위함.
+   * features/bookshelf 가 features/story-creation 을 직접 의존하지 않도록 slot 패턴 사용.
+   */
+  topBanner?: ReactNode
 }
 
 /**
@@ -50,6 +56,7 @@ export function BookshelfModal({
   stories = DUMMY_STORIES,
   isLoading = false,
   topRightMenu,
+  topBanner,
 }: BookshelfModalProps) {
   const { paged, filtered, activeFilters, toggleFilter, sort, updateSort, page, setPage, totalPages } =
     useBookshelf(stories)
@@ -95,8 +102,8 @@ export function BookshelfModal({
         </button>
 
         <div className="bookshelf-scroll">
-          <main className="py-12 px-6 md:px-12 relative">
-            <div className="max-w-6xl mx-auto pb-16">
+          <main className="py-12 px-6 md:px-16 lg:px-32 xl:px-48 2xl:px-64 relative">
+            <div className="mx-auto pb-16">
               {/* 타이틀 + 새 동화책 만들기 */}
               <div className="mb-12 flex flex-col md:flex-row justify-between items-center gap-6 bookshelf-fade-in">
                 <div className="text-center md:text-left">
@@ -110,11 +117,14 @@ export function BookshelfModal({
                 <button
                   type="button"
                   onClick={onCreateStory}
-                  className="bg-[#3F6B2E] text-[#F2EBD2] px-8 py-4 rounded-full border border-[#B9D38F]/40 shadow-[0_4px_0_#2D4F1F,0_0_20px_rgba(180,220,140,0.2)] hover:translate-y-1 hover:shadow-[0_2px_0_#2D4F1F,0_0_30px_rgba(180,220,140,0.4)] hover:bg-[#517E37] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+                  className="bg-[#8DBA64] text-[#1F3318] px-8 py-4 rounded-full border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-1 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
                 >
                   <PlusCircle className="w-6 h-6" /> 새 동화책 만들기
                 </button>
               </div>
+
+              {/* 진행 중인 동화 배너 — 외부에서 주입 (story-creation/DraftResumeBanner). null/undefined 면 미렌더. */}
+              {topBanner}
 
               {/* 필터/정렬 바 */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-[#9A7548] gap-4 bookshelf-fade-in relative z-20">

@@ -11,6 +11,9 @@ import {
 } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import type { StoryProject } from '../../model/types'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { useStoryboardPagesQuery } from '../../storyboard-pages'
 import { useGenerateStoryboardStoryPost } from '../model/useGenerateStoryboardStoryPost'
 import { useGenerateSummary } from '../model/useGenerateSummary'
@@ -276,41 +279,20 @@ export function PromptStep({
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <div className="flex items-center justify-between py-4 px-8 border-b border-[#4a3a24] bg-[#2a1b12]/60 shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="이전 단계"
-            className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">STEP 03 / 08</span>
-          <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">스토리 만들기</span>
-        </div>
-      </div>
+      <CreationHeader currentStep={3} />
 
       <div className="bookshelf-scroll">
-        <main className="py-10 px-6 bookshelf-fade-in">
-          <div className="max-w-3xl mx-auto pb-12">
-            {/* 타이틀 */}
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center gap-2 bg-[#2d5a27]/60 px-4 py-1.5 rounded-full border border-[#b4dc8c]/50 mb-4 shadow-sm">
-                <Sparkles className="w-4 h-4 text-[#b4dc8c]" />
-                <span className="text-[#b4dc8c] text-sm font-bold">
-                  {hasResult ? '이런 이야기로 만들면 어때요?' : 'AI 에게 부탁해 볼까요?'}
-                </span>
-              </div>
-              <h1 className="text-3xl md:text-4xl text-[#f0e6c0] mb-3 font-bold">
-                {hasResult ? '우리 가족의 줄거리 미리보기' : '어떤 이야기로 만들까요?'}
-              </h1>
-              <p className="text-[#b4c4a4] text-lg">
-                {hasResult
-                  ? '마음에 드시면 확정해서 본격적인 동화책 본문으로 넘어갈 수 있어요. 아니면 AI 에게 다시 부탁할 수 있어요.'
-                  : '원하는 분위기나 주제를 자유롭게 적어주세요. 비워도 업로드하신 사진·여행 정보만으로 만들 수 있어요.'}
-              </p>
-            </div>
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
+          <div className="max-w-7xl mx-auto pb-12">
+            <StepTitleBlock
+              stepNumber={3}
+              title={hasResult ? '우리 가족의 줄거리' : '어떤 이야기로 만들까요?'}
+              subtitle={
+                hasResult
+                  ? '마음에 드시면 확정해서 본문으로 넘어갈 수 있어요. 아니면 AI 에게 다시 부탁할 수 있어요'
+                  : '원하는 분위기나 주제를 자유롭게 적어주세요. 비워도 업로드한 사진·여행 정보만으로 만들 수 있어요'
+              }
+            />
 
             {showInput && (
               <PromptInputCard
@@ -359,39 +341,36 @@ export function PromptStep({
               <p className="mt-4 text-[#fca5a5] text-sm text-center">{publishError}</p>
             )}
 
-            {/* 하단 액션 */}
-            <div className="flex justify-between items-center pt-6 mt-8 border-t border-[#4a3a24]">
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors"
-              >
-                이전
-              </button>
-              <button
-                type="button"
-                onClick={handleMainButtonClick}
-                disabled={!hasResult || isPublishing}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-              >
-                {isPublishing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> 본문 준비 중
-                  </>
-                ) : isLocked ? (
-                  <>
-                    본문으로 돌아가기 <ArrowRight className="w-5 h-5" />
-                  </>
-                ) : (
-                  <>
-                    스토리 확정하고 다음 <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </div>
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={3}
+        onBack={onBack}
+        rightSlot={
+          <button
+            type="button"
+            onClick={handleMainButtonClick}
+            disabled={!hasResult || isPublishing}
+            className="flex items-center gap-1.5 bg-[#8DBA64] text-[#1F3318] px-5 py-2 rounded-full border-2 border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_3px_0_#3F6B2E] transition-all font-bold text-sm whitespace-nowrap"
+          >
+            {isPublishing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> 본문 준비 중
+              </>
+            ) : isLocked ? (
+              <>
+                본문으로 돌아가기 <ArrowRight className="w-4 h-4" />
+              </>
+            ) : (
+              <>
+                스토리 확정하고 다음 <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        }
+      />
     </div>
   )
 }
@@ -469,7 +448,7 @@ function LoadingCard({
     <div className="bg-[#f0e6c0] rounded-[2.5rem] border-2 border-[#2a1b12] shadow-[0_20px_60px_rgba(0,0,0,0.5)] p-10 text-center">
       <Loader2 className="w-14 h-14 text-[#2d5a27] animate-spin mx-auto mb-6" />
       <h2 className="text-2xl text-[#2d5a27] font-bold mb-2">{hint}</h2>
-      <p className="text-[#8b7a52]">보통 10~30초 정도 걸려요. 잠시만 기다려주세요.</p>
+      <p className="text-[#8b7a52]">잠시만 기다려주세요.</p>
     </div>
   )
 }

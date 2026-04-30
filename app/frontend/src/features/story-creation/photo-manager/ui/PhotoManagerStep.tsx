@@ -15,7 +15,9 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { StepHeader } from '../../ui/StepHeader'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { PhotoUploadZone } from './PhotoUploadZone'
 import { PhotoItem } from './PhotoItem'
 import { EmptyPhotoState } from './EmptyPhotoState'
@@ -121,25 +123,20 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={2} stepTitle="추억 사진 선택 & 태깅" onBack={onBack} />
+      <CreationHeader currentStep={2} />
 
       <div className="bookshelf-scroll">
-        <main className="py-12 px-6 bookshelf-fade-in">
-          <div className="max-w-4xl mx-auto pb-12">
-            {/* 타이틀 영역 */}
-            <div className="text-center mb-10">
-              <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <ImageIcon className="w-8 h-8 text-[#f0e6c0]" />
-              </div>
-              <h2 className="text-3xl text-[#f0e6c0] font-bold">추억이 담긴 사진을 올려주세요</h2>
-              <p className="text-[#b4c4a4] mt-2">
-                업로드된 사진들이 모여 멋진 동화책의 뼈대가 됩니다.
-              </p>
-            </div>
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
+          <div className="max-w-7xl mx-auto pb-12">
+            <StepTitleBlock
+              stepNumber={2}
+              title="추억의 사진을 모아주세요"
+              subtitle="10장 이상 올려주시면 훨씬 풍성한 동화가 돼요"
+            />
 
             {/* storyId 없으면 경고 */}
             {storyId === null && (
-              <div className="bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#f0e6c0] text-sm px-4 py-3 rounded-xl mb-4">
+              <div className="bg-[#D8857C]/20 border border-[#B0473F]/40 text-[#3E2A18] text-sm px-4 py-3 rounded-xl mb-4">
                 ⚠ step 1 저장이 완료되지 않았습니다. 이전 단계로 돌아가 다시 시도해주세요.
               </div>
             )}
@@ -149,15 +146,15 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
 
             {/* 업로드된 사진 리스트 */}
             <div className="space-y-4 mb-8">
-              <h3 className="text-xl text-[#f0e6c0] border-b border-[#4a3a24] pb-2 font-bold flex justify-between items-center">
+              <h3 className="text-xl text-[#3E2A18] border-b border-[#9A7548]/40 pb-2 font-bold flex justify-between items-center">
                 <span>업로드된 사진</span>
-                <span className="bg-[#2a1b12]/70 text-[#b4dc8c] px-3 py-1 rounded-full text-sm border border-[#b4dc8c]/50 font-sans shadow-sm">
+                <span className="bg-[#E9DBBE] text-[#3F6B2E] px-3 py-1 rounded-full text-sm border border-[#9A7548]/40 font-sans shadow-sm">
                   {totalCount} / {MAX_PHOTOS} 장
                 </span>
               </h3>
 
               {photosQuery.isPending && storyId !== null && (
-                <div className="flex items-center justify-center gap-2 text-[#b4c4a4] py-8">
+                <div className="flex items-center justify-center gap-2 text-[#76695A] py-8">
                   <Loader2 className="w-5 h-5 animate-spin" /> 사진 목록 불러오는 중…
                 </div>
               )}
@@ -218,27 +215,27 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
               )}
             </div>
 
-            {/* 하단 액션 바 */}
-            <div className="flex justify-between items-center pt-6 border-t border-[#4a3a24]">
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors"
-              >
-                이전 단계
-              </button>
-              <button
-                type="button"
-                onClick={onNext}
-                disabled={!canProceed}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-              >
-                다음: 스토리 만들기 <Wand2 className="w-5 h-5" />
-              </button>
-            </div>
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={2}
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="다음: 스토리 만들기"
+        nextDisabled={!canProceed}
+        rightSlot={
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!canProceed}
+            className="flex items-center gap-1.5 bg-[#8DBA64] text-[#1F3318] px-5 py-2 rounded-full border-2 border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_3px_0_#3F6B2E] transition-all font-bold text-sm whitespace-nowrap"
+          >
+            다음: 스토리 만들기 <Wand2 className="w-4 h-4" />
+          </button>
+        }
+      />
     </div>
   )
 }

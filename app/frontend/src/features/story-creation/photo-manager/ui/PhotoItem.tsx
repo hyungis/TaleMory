@@ -251,7 +251,7 @@ function CommittedFields({
         <label className="block text-black text-sm mb-1 font-bold">사진 설명 (선택)</label>
         <input
           type="text"
-          placeholder="예: 해솔이가 처음으로 바다에 발을 담근 날"
+          placeholder="예: OO이가 처음으로 바다에 발을 담근 날"
           value={descLocal}
           onChange={e => setDescLocal(e.target.value)}
           onBlur={handleDescBlur}
@@ -262,7 +262,7 @@ function CommittedFields({
         <label className="block text-black text-sm mb-1 font-bold">태그 (선택)</label>
         <input
           type="text"
-          placeholder="예: #제주도 #여름휴가 #해솔이첫바다"
+          placeholder="예: #제주도 #여름휴가 #OO이첫바다"
           value={tagsLocal}
           onChange={e => setTagsLocal(e.target.value)}
           onBlur={handleTagsBlur}

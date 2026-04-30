@@ -68,7 +68,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
           <button
             type="button"
             onClick={() => onRead?.(story)}
-            className="flex-1 bg-[#3F6B2E] text-[#F2EBD2] border-2 border-[#B9D38F] rounded-lg py-2 flex items-center justify-center gap-1 hover:bg-[#517E37] hover:shadow-[0_0_12px_rgba(180,220,140,0.5)] transition-all font-bold text-sm"
+            className="flex-1 bg-[#8DBA64] text-[#1F3318] border-2 border-[#B9D38F] rounded-lg py-2 flex items-center justify-center gap-1 hover:bg-[#A6CB45] hover:shadow-[0_0_12px_rgba(141,186,100,0.5)] transition-all font-bold text-sm"
           >
             <BookOpen className="w-4 h-4" /> 읽기
           </button>
@@ -76,7 +76,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
             type="button"
             onClick={() => onShare?.(story)}
             aria-label="공유"
-            className="w-10 h-10 flex items-center justify-center bg-[#9A7548] text-[#F2EBD2] border-2 border-[#D9BE82] rounded-lg hover:bg-[#C9A874] hover:shadow-[0_0_10px_rgba(212,184,106,0.5)] transition-all"
+            className="w-10 h-10 flex items-center justify-center bg-[#C9A874] text-[#3E2A18] border-2 border-[#E9DBBE] rounded-lg hover:bg-[#D9BE82] hover:shadow-[0_0_10px_rgba(217,190,130,0.5)] transition-all"
           >
             <Share2 className="w-4 h-4" />
           </button>
@@ -84,7 +84,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
             type="button"
             onClick={() => onDelete?.(story)}
             aria-label="삭제"
-            className="w-10 h-10 flex items-center justify-center bg-[#B0473F] text-[#F2EBD2] border-2 border-[#E2BFB9] rounded-lg hover:bg-[#B0473F] hover:shadow-[0_0_10px_rgba(201,123,74,0.5)] transition-all"
+            className="w-10 h-10 flex items-center justify-center bg-[#D8857C] text-[#3E2A18] border-2 border-[#E2BFB9] rounded-lg hover:bg-[#E2BFB9] hover:shadow-[0_0_10px_rgba(216,133,124,0.5)] transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </button>

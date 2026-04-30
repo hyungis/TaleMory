@@ -430,12 +430,13 @@ class StoryboardResultListener(
             },
         )
 
-        // 5) Story 엔티티: 제목은 본문 결과로 갱신, synopsis 는 줄거리 그대로 보존 (옵션 ②).
+        // 5) Story.title 은 더 이상 AI 가 만든 영문 title 로 덮어쓰지 않는다.
+        //    - AI 의 영문 title 은 이미지 생성 grounding (StoryboardImageGenerationService) 용 컨텍스트로만
+        //      쓰이며, job.result_payload(JSON) 안에 그대로 남아있어 다운스트림은 영향 없음.
+        //    - Story.title 은 사용자가 명시적으로 입력한 값(없으면 null)으로 두어, 책장/배너에서
+        //      한글 fallback ("OO이의 새 동화" 등) 이 자연스럽게 동작하도록 한다.
         //    synopsis 는 Step 3 에서 사용자가 편집 가능한 한글 줄거리이며 본문 grounding 의 한글 source.
         //    본문 합본 텍스트가 필요하면 storyboard_pages.korean_text 를 join 해서 산출.
-        storyRepository.findById(job.storyId).ifPresent { story ->
-            story.title = payload.title
-        }
 
         log.info(
             "Job {} SUCCESS — storyId={}, storyLen={}, pages={}, costUsd={}",

@@ -9,6 +9,7 @@ import {
   getDraftStory,
   deleteStory,
   DraftResumeModal,
+  DraftResumeBanner,
   clearCreationProgressSnapshot,
 } from '../../../features/story-creation'
 import type { StoryDraftResponse } from '../../../features/story-creation'
@@ -47,7 +48,11 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
   // (useState(false) 로 시작하면 useEffect 가 fire 하기 전 1 frame 동안 모달 없이 ForestScene 만 보이는
   //  flash 가 발생함 — `/main/bookshelf` 새로고침 시 user-facing flash 의 원인이었음.)
   const [isLibraryOpen, setIsLibraryOpen] = useState(isActive)
+  // 진행 중인 동화 — 책장 진입 시 fetch 해서 배너로 항상 노출.
   const [draft, setDraft] = useState<StoryDraftResponse | null>(null)
+  // "새 동화책 만들기" 클릭 + draft 가 있는 경우 노출되는 confirm 모달 표시 여부.
+  // (배너의 "이어서 만들기" 는 모달을 거치지 않고 바로 navigate.)
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false)
   const [isResolvingDraft, setIsResolvingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
   const [stories, setStories] = useState<Story[]>([])
@@ -60,11 +65,13 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
   }, [])
 
   /**
-   * isActive 가 true 로 바뀔 때마다 모달을 다시 열고 stories 를 fresh 하게 fetch.
+   * isActive 가 true 로 바뀔 때마다 모달을 다시 열고 stories + draft 를 fresh 하게 fetch.
    *
    * 컴포넌트 자체는 scene-container 에 의해 unmount 되지 않으므로, prop 변화를 감지해
    * "재진입 = 책장 다시 열기" 의미로 동작시킨다. 이전 close 후 검은 화면 버그 회피용.
-   * cancelled 플래그로 진행 중 fetch 가 unmount/비활성 후에도 setState 하지 않도록 보호.
+   *
+   * 두 fetch 는 독립이라 Promise.all 로 병렬 호출. cancelled 플래그로 진행 중 fetch 가
+   * unmount/비활성 후에도 setState 하지 않도록 보호.
    */
   useEffect(() => {
     if (!isActive) return
@@ -73,10 +80,13 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
     setStoriesLoading(true)
 
     let cancelled = false
+
     void getMyStories()
       .then(result => {
         if (cancelled) return
-        setStories(result.map(mapApiToStory))
+        // 책장에는 published 된 동화만 표시 — 진행 중(DRAFT) 은 상단 배너가 담당.
+        const published = result.filter(s => s.publishedAt !== null)
+        setStories(published.map(mapApiToStory))
       })
       .catch(() => {
         if (cancelled) return
@@ -85,6 +95,17 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
       .finally(() => {
         if (cancelled) return
         setStoriesLoading(false)
+      })
+
+    // 진행 중인 동화 — 배너 표시용. 실패는 silent(배너만 안 뜸).
+    void getDraftStory()
+      .then(result => {
+        if (cancelled) return
+        setDraft(result)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setDraft(null)
       })
 
     return () => {
@@ -102,45 +123,36 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
 
   /**
    * "새 동화책 만들기" 버튼 진입점.
-   *  1) 서버에 진행 중 DRAFT 가 있는지 조회 (GET /api/stories/draft)
-   *  2) 있으면 DraftResumeModal 오픈 → onResume / onStartNew 에서 실제 네비게이션
-   *  3) 없으면 빈 상태로 바로 /creation 진입
    *
-   * 네트워크 실패 시엔 에러 뱃지 + 빈 상태로 폴백 (최악의 UX 회피).
+   * draft 는 이미 책장 진입 시 fetch 되어 state 에 있으므로, 재조회 없이 그대로 분기.
+   *  - draft 있음 → confirm 모달 오픈 (이어서 OR 새로 시작)
+   *  - draft 없음 → 바로 /creation 진입
+   *
+   * NOTE: 배너의 "이어서 만들기" 는 모달을 거치지 않고 직접 handleResumeDraft 호출 →
+   *       빠른 resume 경로. 이 함수는 "새로 시작" 이 가능한 모달 흐름 전용.
    */
-  const handleCreateStory = useCallback(async () => {
-    if (isResolvingDraft) return
+  const handleCreateStory = useCallback(() => {
     setDraftError(null)
-    setIsResolvingDraft(true)
-
-    try {
-      const draftResult = await getDraftStory()
-      if (draftResult) {
-        setDraft(draftResult)
-        setIsLibraryOpen(false)
-        return
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : '초안 조회에 실패했습니다.'
-      setDraftError(message)
-    } finally {
-      setIsResolvingDraft(false)
+    if (draft) {
+      // 책장 그대로 둔 채 confirm dialog 만 위에 띄움.
+      setIsDraftModalOpen(true)
+      return
     }
-
-    // draft 없음 또는 조회 실패 → navigate. (sessionStorage stale storyId 정리 포함)
+    // draft 없음 → navigate. (sessionStorage stale storyId 정리 포함)
     clearCreationProgressSnapshot()
     navigate(ROUTES.creation)
-  }, [isResolvingDraft, navigate])
-
-  /** 이어서 작성 — location state 로 draft 넘겨 CreationPage 가 rehydrate. */
-  const handleResumeDraft = useCallback(() => {
-    if (!draft) return
-    setDraft(null)
-    navigate(ROUTES.creation, { state: { draft } })
   }, [draft, navigate])
 
-  /** 새로 시작 — 기존 DRAFT soft delete 후 즉시 navigate (요정 연출 없음). */
+  /** 이어서 작성 — 배너/모달 둘 다에서 사용. location state 로 draft 넘겨 CreationPage 가 rehydrate. */
+  const handleResumeDraft = useCallback(() => {
+    if (!draft) return
+    const target = draft
+    setDraft(null)
+    setIsDraftModalOpen(false)
+    navigate(ROUTES.creation, { state: { draft: target } })
+  }, [draft, navigate])
+
+  /** 새로 시작 — 기존 DRAFT soft delete 후 즉시 navigate. */
   const handleStartNew = useCallback(async () => {
     if (!draft || isResolvingDraft) return
     setIsResolvingDraft(true)
@@ -148,6 +160,7 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
     try {
       await deleteStory(draft.storyId)
       setDraft(null)
+      setIsDraftModalOpen(false)
       // 서버 DRAFT 를 지웠으니 sessionStorage 의 옛 storyId snapshot 도 명시 reset.
       clearCreationProgressSnapshot()
       navigate(ROUTES.creation)
@@ -159,8 +172,9 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
     }
   }, [draft, isResolvingDraft, navigate])
 
+  /** 모달만 닫음 — draft state 는 유지해 배너가 그대로 보이도록. */
   const handleCloseDraftModal = useCallback(() => {
-    setDraft(null)
+    setIsDraftModalOpen(false)
   }, [])
 
   const handleReadStory = useCallback(
@@ -211,12 +225,16 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
         stories={stories}
         isLoading={storiesLoading}
         topRightMenu={<TopRightMenu />}
+        topBanner={
+          draft ? (
+            <DraftResumeBanner draft={draft} onResume={handleResumeDraft} />
+          ) : null
+        }
       />
 
-      {draft && (
+      {draft && isDraftModalOpen && (
         <DraftResumeModal
           draft={draft}
-          onResume={handleResumeDraft}
           onStartNew={handleStartNew}
           onClose={handleCloseDraftModal}
           isSubmitting={isResolvingDraft}
