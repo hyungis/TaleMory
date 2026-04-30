@@ -43,6 +43,7 @@ class TtsPreviewRedisRepository(
         redis.expire(key, TTL)
     }
 
+    /** PENDING → SUCCESS 단방향 전이. 동일 previewId 로 두 번 호출하면 이전 상태를 덮어쓰니, 호출자가 단일 terminal write 를 보장해야 한다. */
     fun markSuccess(previewId: String, audioUrl: String) {
         val key = key(previewId)
         val fields = mapOf(
@@ -54,6 +55,7 @@ class TtsPreviewRedisRepository(
         redis.expire(key, TTL)
     }
 
+    /** PENDING → FAILED 단방향 전이. 동일 previewId 로 두 번 호출하면 이전 상태를 덮어쓰니, 호출자가 단일 terminal write 를 보장해야 한다. */
     fun markFailed(previewId: String, errorCode: String, errorMessage: String) {
         val key = key(previewId)
         val fields = mapOf(
