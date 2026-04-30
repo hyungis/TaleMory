@@ -55,7 +55,7 @@ export async function deleteVoiceProfile(voiceProfileId: number): Promise<void> 
 }
 
 export interface VoicePreviewJobDto {
-  jobId: number
+  previewId: string
   jobType: string
   status: string
 }
@@ -70,6 +70,21 @@ export async function postVoicePreview(
     text,
     language,
   })
+}
+
+export interface VoicePreviewStatusDto {
+  previewId: string
+  status: 'PENDING' | 'SUCCESS' | 'FAILED'
+  audioUrl: string | null
+  errorCode: string | null
+  errorMessage: string | null
+  createdAt: string
+  finishedAt: string | null
+}
+
+/** GET /api/voice-profiles/previews/{previewId} — 미리듣기 잡 상태 폴링 */
+export async function getVoicePreview(previewId: string): Promise<VoicePreviewStatusDto> {
+  return get<VoicePreviewStatusDto>(`${VOICE_PROFILE_ENDPOINT}/previews/${previewId}`)
 }
 
 interface RecordingScriptResponse {
