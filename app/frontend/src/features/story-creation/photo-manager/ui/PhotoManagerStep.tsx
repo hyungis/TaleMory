@@ -3,7 +3,6 @@ import { Image as ImageIcon, Loader2, Wand2 } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
-  KeyboardSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -12,7 +11,6 @@ import {
 import {
   SortableContext,
   arrayMove,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { StepHeader } from '../../ui/StepHeader'
@@ -110,11 +108,13 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
   /**
    * dnd-kit sensors:
    *  - PointerSensor (마우스 + 터치) : distance 8px 이상 이동해야 drag 활성 → 짧은 클릭은 input/button 으로 통과.
-   *  - KeyboardSensor : Tab + Space 로 잡고 화살표 키로 이동 (a11y).
+   *
+   * KeyboardSensor 는 의도적으로 제거: input 에서 친 Space 가 root 카드의 keydown 핸들러로
+   * 버블링되면 카드가 active drag 상태로 진입해 검은 오버레이가 깔리는 사고가 있었다.
+   * 키보드 a11y 는 카드 우상단의 위/아래 화살표 버튼(onMoveUp/Down) 으로 대체.
    */
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
   const canProceed = serverPhotos.length > 0 && upload.pending.every(p => p.status === 'error' || false)
