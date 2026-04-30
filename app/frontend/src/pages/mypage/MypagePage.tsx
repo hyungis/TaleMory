@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Person } from '../../entities/person'
 import type { UserProfile } from '../../entities/user'
-import { buildOauthLogoutUrl, clearAuthSession, setAuthSession, useAuthSession } from '../../features/auth'
+import { buildOauthLogoutUrl, clearAuthSession, setAuthSession, useAuthSession, useLogout } from '../../features/auth'
 import {
   DangerZone,
   PersonEditModal,
@@ -38,7 +38,14 @@ export function MypagePage() {
   const authSession = useAuthSession()
   const meQuery = useMeQuery(authSession.isAuthenticated)
   const meUpdate = useMeUpdate()
+  const { isPending: isLoggingOut, logout } = useLogout()
   const hasMissingUserError = isMissingUserError(meQuery.error)
+
+  const handleLogoutClick = () => {
+    void logout().catch(() => {
+      window.alert('로그아웃에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    })
+  }
 
   useEffect(() => {
     if (!hasMissingUserError) return
@@ -74,18 +81,26 @@ export function MypagePage() {
     withdraw.error,
   )
 
+  // 로그아웃 진행 중에는 "로그인 필요" 분기로 들어가지 않고 빈 캔버스를 유지.
+  // useLogout 이 clearAuthSession 직후 isAuthenticated 를 false 로 만들기 때문에
+  // 가드 없이 두면 alert + window.location.assign 사이에 "로그인이 필요한 페이지" 가
+  // 한 프레임 깜빡이며 노출되는 문제 방지.
+  if (isLoggingOut) {
+    return <div className="h-full bg-[#F4E4BC]" aria-hidden="true" />
+  }
+
   if (!authSession.isAuthenticated || hasMissingUserError) {
     return (
-      <div className="h-full overflow-y-auto bg-[#1a0f08]">
-        <main className="max-w-3xl mx-auto px-4 md:px-6 py-16">
-          <section className="rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-8 text-center space-y-3">
-            <h1 className="text-2xl font-bold text-[#e4d4b4]">로그인이 필요한 페이지예요</h1>
-            <p className="text-sm text-[#b4c4a4]">
+      <div className="h-full overflow-y-auto bg-[#F4E4BC]">
+        <main className="max-w-3xl mx-auto px-6 md:px-8 py-16">
+          <section className="rounded-3xl bg-[#E9DBBE] border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] p-8 text-center space-y-4">
+            <h1 className="text-2xl font-bold text-[#3E2A18]">로그인이 필요한 페이지예요</h1>
+            <p className="text-sm text-[#6B4A28]">
               마이페이지는 로그인한 사용자만 확인할 수 있어요.
             </p>
             <Link
               to={ROUTES.home}
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#3ca55c] text-[#1a0f08] text-sm font-medium hover:bg-[#4cb56c] transition-colors"
+              className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-[#8DBA64] text-[#1F3318] text-sm font-bold border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all"
             >
               홈으로 이동
             </Link>
@@ -131,14 +146,14 @@ export function MypagePage() {
         personId: modal.person.id,
         body: {
           name: draft.name,
-          birthDate: draft.birthDate,
+          age: draft.age,
           gender: mapGenderToApi(draft.gender),
         },
       })
     } else {
       await personPost.mutateAsync({
         name: draft.name,
-        birthDate: draft.birthDate ?? '',
+        age: draft.age,
         gender: mapGenderToApi(draft.gender),
         role: 'CHILD',
       })
@@ -182,12 +197,12 @@ export function MypagePage() {
 
   return (
     <>
-      <div className="h-full overflow-y-auto bg-[#1a0f08] [animation:mypageEntry_0.45s_ease-out_forwards]">
-        <header className="h-14 px-6 bg-[#2a1b12] border-b border-[#4a3a24] flex items-center justify-between sticky top-0 z-50">
+      <div className="h-full overflow-y-auto bg-[#F4E4BC] [animation:mypageEntry_0.45s_ease-out_forwards]">
+        <header className="h-14 px-6 bg-[#E9DBBE] border-b-2 border-[#9A7548]/30 flex items-center justify-between sticky top-0 z-50 shadow-sm">
           <button
             type="button"
             onClick={goToBookshelf}
-            className="flex items-center gap-2 text-[#b4c4a4] hover:text-[#e4d4b4] transition-colors text-sm font-medium"
+            className="flex items-center gap-1.5 bg-[#F4E4BC] text-[#3E2A18] px-4 py-1.5 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-colors font-bold text-sm"
             aria-label="책장으로 돌아가기"
           >
             <span aria-hidden="true">{'←'}</span>
@@ -195,18 +210,23 @@ export function MypagePage() {
           </button>
           <Link
             to={ROUTES.home}
-            className="text-[#3ca55c] text-xl font-bold tracking-wider"
-            style={{ textShadow: '0 0 12px rgba(60, 165, 92, 0.4), 0 2px 8px rgba(0, 0, 0, 0.6)' }}
+            className="text-[#3F6B2E] text-2xl font-bold tracking-wider"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             TaleMory
           </Link>
         </header>
 
-        <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-10 space-y-6 pb-16">
-          <h1 className="text-2xl md:text-3xl font-bold text-[#e4d4b4]">마이페이지</h1>
+        <main className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 py-10 space-y-6 pb-16">
+          <h1
+            className="text-3xl md:text-4xl font-bold text-[#3E2A18]"
+            style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}
+          >
+            마이페이지
+          </h1>
 
           {pageError && (
-            <div className="bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#f0e6c0] text-sm px-4 py-3 rounded-xl">
+            <div className="bg-[#F4E4BC] border-2 border-[#a3413f]/40 text-[#a3413f] text-sm px-4 py-3 rounded-xl font-bold">
               {pageError}
             </div>
           )}
@@ -217,8 +237,8 @@ export function MypagePage() {
               onEditClick={() => setModal({ kind: 'profile-edit' })}
             />
           ) : (
-            <section className="rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-6 md:p-8">
-              <p className="text-sm text-[#b4c4a4]">내 정보를 불러오는 중이에요.</p>
+            <section className="rounded-3xl bg-[#E9DBBE] border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] p-6 md:p-8">
+              <p className="text-sm text-[#6B4A28]">내 정보를 불러오는 중이에요.</p>
             </section>
           )}
 
@@ -240,7 +260,11 @@ export function MypagePage() {
             isBusy={voiceProfileDelete.isPending}
           />
 
-          <DangerZone onWithdrawClick={() => setModal({ kind: 'withdraw' })} />
+          <DangerZone
+            onWithdrawClick={() => setModal({ kind: 'withdraw' })}
+            onLogoutClick={handleLogoutClick}
+            isLoggingOut={isLoggingOut}
+          />
         </main>
       </div>
 

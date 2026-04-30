@@ -40,7 +40,7 @@ class PersonService(
             Person(
                 userId = userId,
                 name = command.name,
-                birthDate = command.birthDate,
+                age = command.age,
                 gender = command.gender,
                 role = command.role,
             ),
@@ -49,7 +49,7 @@ class PersonService(
     fun modifyPerson(userId: Long, personId: Long, command: ModifyPersonCommand): PersonResult {
         val person = ownedPerson(userId, personId)
         command.name?.let { person.name = it }
-        command.birthDate?.let { person.birthDate = it }
+        command.age?.let { person.age = it }
         command.gender?.let { person.gender = it }
         // role 변경은 마이페이지 별도 플로우에서 다루므로 이번 API 에선 의도적으로 제외.
         return PersonResult.from(person)

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { Person } from '../../../../entities/person'
 
 type PersonDraft = Omit<Person, 'id' | 'userId'>
@@ -10,53 +11,18 @@ interface Props {
   onSave: (draft: PersonDraft) => void
 }
 
-// ── 날짜 헬퍼 ─────────────────────────────────────────────
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate()
-}
-
-const CURRENT_YEAR = new Date().getFullYear()
-const YEARS = Array.from({ length: CURRENT_YEAR - 1919 }, (_, i) => CURRENT_YEAR - i)
-const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
-const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
-
-function parseBirthDate(date?: string) {
-  if (!date) return { year: '', month: '', day: '' }
-  const [y, m, d] = date.split('-')
-  return {
-    year: y ?? '',
-    month: m ? String(parseInt(m, 10)) : '',
-    day: d ? String(parseInt(d, 10)) : '',
-  }
-}
+const MIN_AGE = 0
+const MAX_AGE = 99
 
 /**
- * 주인공 추가/편집 모달.
- * 생년월일은 브라우저 네이티브 date input 대신 년·월·일 커스텀 셀렉트 사용.
- * 이유: native input[type=date] 는 다크 배경에서 스타일 제어 불가, 월별 일 수 자동 보정도 직접 처리.
+ * 주인공 추가/편집 모달 — Pastel Forest 톤.
+ * 생년월일 대신 만 나이 (0..99) 만 입력 — V10 마이그레이션으로 BE 도 age 컬럼만 보유.
  */
 export function PersonEditModal({ initial, onClose, onSave }: Props) {
   const isEdit = !!initial
   const [name, setName] = useState(initial?.name ?? '')
   const [gender, setGender] = useState<Gender | ''>(initial?.gender ?? '')
-
-  const init = parseBirthDate(initial?.birthDate)
-  const [birthYear, setBirthYear] = useState(init.year)
-  const [birthMonth, setBirthMonth] = useState(init.month)
-  const [birthDay, setBirthDay] = useState(init.day)
-
-  // 월/년도가 바뀌어 선택한 일이 범위를 벗어나면 마지막 날로 보정
-  const daysInMonth =
-    birthYear && birthMonth
-      ? getDaysInMonth(parseInt(birthYear, 10), parseInt(birthMonth, 10))
-      : 31
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-
-  useEffect(() => {
-    if (birthDay && parseInt(birthDay, 10) > daysInMonth) {
-      setBirthDay(String(daysInMonth))
-    }
-  }, [daysInMonth, birthDay])
+  const [age, setAge] = useState<string>(initial?.age != null ? String(initial.age) : '')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -66,12 +32,12 @@ export function PersonEditModal({ initial, onClose, onSave }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!gender || !birthYear || !birthMonth || !birthDay) return
-    const mm = String(birthMonth).padStart(2, '0')
-    const dd = String(birthDay).padStart(2, '0')
+    if (!gender) return
+    const parsedAge = Number.parseInt(age, 10)
+    if (!Number.isFinite(parsedAge) || parsedAge < MIN_AGE || parsedAge > MAX_AGE) return
     onSave({
       name: name.trim(),
-      birthDate: `${birthYear}-${mm}-${dd}`,
+      age: parsedAge,
       gender,
       role: 'child',
     })
@@ -82,135 +48,52 @@ export function PersonEditModal({ initial, onClose, onSave }: Props) {
     { value: 'female', label: '여' },
   ]
 
-  // 셀렉트 공통 클래스
-  const selectBase =
-    'w-full px-2 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] ' +
-    'text-[#e4d4b4] text-sm text-center ' +
-    'focus:border-[#3ca55c] focus:outline-none ' +
-    'hover:border-[#6a5a44] transition-colors ' +
-    '[color-scheme:dark] cursor-pointer appearance-none'
-
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-[#3E2A18]/60 flex items-center justify-center p-4"
       onClick={onClose}
       role="presentation"
     >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl bg-[#2a1b12] border border-[#4a3a24] p-6 space-y-4"
+        className="w-full max-w-md rounded-3xl bg-[#FFFEF8] border-2 border-[#B9D38F]/55 shadow-[0_12px_32px_rgba(154,117,72,0.25)] p-6 space-y-4"
       >
-        <h2 className="text-xl font-bold text-[#e4d4b4]">
+        <h2 className="text-xl font-bold text-[#3E2A18]">
           {isEdit ? '주인공 편집' : '주인공 추가'}
         </h2>
 
         {/* 이름 */}
         <label className="block space-y-1">
-          <span className="text-sm text-[#b4c4a4]">이름</span>
+          <span className="text-sm text-[#6B4A28] font-bold">이름</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
             placeholder="예: 김별"
-            className="w-full px-3 py-2 rounded-lg bg-[#1a0f08] border border-[#4a3a24] text-[#e4d4b4] focus:border-[#3ca55c] focus:outline-none"
+            className="w-full px-3 py-2 rounded-xl bg-[#F4E4BC]/60 border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold placeholder-[#9A7548]/50 focus:border-[#3F6B2E] focus:outline-none"
           />
         </label>
 
-        {/* 생년월일 — 년·월·일 커스텀 셀렉트 */}
-        <div className="space-y-2">
-          <span className="text-sm text-[#b4c4a4] flex items-center gap-1.5">
-            <span aria-hidden="true">🎂</span>
-            생년월일
-          </span>
-
-          <div className="flex gap-2">
-            {/* 년도 */}
-            <div className="relative flex-[5]">
-              <select
-                value={birthYear}
-                onChange={(e) => setBirthYear(e.target.value)}
-                required
-                aria-label="출생 년도"
-                className={selectBase + ' pr-6'}
-              >
-                <option value="" disabled>년도</option>
-                {YEARS.map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}년
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6a5a44] text-[10px]" aria-hidden="true">
-                ▼
-              </span>
-            </div>
-
-            {/* 월 */}
-            <div className="relative flex-[3]">
-              <select
-                value={birthMonth}
-                onChange={(e) => setBirthMonth(e.target.value)}
-                required
-                aria-label="출생 월"
-                className={selectBase + ' pr-6'}
-              >
-                <option value="" disabled>월</option>
-                {MONTHS.map((m) => (
-                  <option key={m} value={String(m)}>
-                    {MONTH_LABELS[m - 1]}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6a5a44] text-[10px]" aria-hidden="true">
-                ▼
-              </span>
-            </div>
-
-            {/* 일 — 년+월 선택 전까지 비활성 */}
-            <div className="relative flex-[3]">
-              <select
-                value={birthDay}
-                onChange={(e) => setBirthDay(e.target.value)}
-                required
-                disabled={!birthYear || !birthMonth}
-                aria-label="출생 일"
-                className={selectBase + ' pr-6 disabled:opacity-40 disabled:cursor-not-allowed'}
-              >
-                <option value="" disabled>일</option>
-                {days.map((d) => (
-                  <option key={d} value={String(d)}>
-                    {d}일
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6a5a44] text-[10px]" aria-hidden="true">
-                ▼
-              </span>
-            </div>
-          </div>
-
-          {/* 선택된 날짜 미리보기 */}
-          {birthYear && birthMonth && birthDay && (
-            <p className="text-xs text-[#3ca55c] pl-1">
-              {birthYear}년 {MONTH_LABELS[parseInt(birthMonth, 10) - 1]} {birthDay}일
-            </p>
-          )}
-        </div>
+        {/* 나이 — 직접 타이핑 + ↑↓ 버튼 */}
+        <label className="block space-y-1">
+          <span className="text-sm text-[#6B4A28] font-bold">나이 (만)</span>
+          <AgeInput value={age} onChange={setAge} />
+        </label>
 
         {/* 성별 */}
         <fieldset className="space-y-1">
-          <legend className="text-sm text-[#b4c4a4]">성별</legend>
+          <legend className="text-sm text-[#6B4A28] font-bold">성별</legend>
           <div className="grid grid-cols-2 gap-2">
             {genderOptions.map((opt) => {
               const selected = gender === opt.value
               return (
                 <label
                   key={opt.value}
-                  className={`px-3 py-2 rounded-lg border text-sm text-center cursor-pointer transition-colors ${
+                  className={`px-3 py-2 rounded-xl border-2 text-sm text-center cursor-pointer transition-colors font-bold ${
                     selected
-                      ? 'border-[#3ca55c] bg-[#3ca55c]/15 text-[#3ca55c]'
-                      : 'border-[#4a3a24] text-[#b4c4a4] hover:border-[#6a5a44]'
+                      ? 'border-[#3F6B2E] bg-[#B9D38F]/40 text-[#3F6B2E]'
+                      : 'border-[#9A7548]/40 bg-[#F4E4BC]/60 text-[#6B4A28] hover:border-[#3F6B2E]/60'
                   }`}
                 >
                   <input
@@ -233,18 +116,78 @@ export function PersonEditModal({ initial, onClose, onSave }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-[#4a3a24] text-[#b4c4a4] hover:bg-[#4a3a24] transition-colors"
+            className="flex-1 px-4 py-2.5 rounded-full border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold bg-[#E9DBBE] hover:bg-[#D9BE82] transition-colors"
           >
             취소
           </button>
           <button
             type="submit"
-            className="flex-1 px-4 py-2 rounded-lg bg-[#3ca55c] text-[#1a0f08] font-medium hover:bg-[#4cb56c] transition-colors"
+            className="flex-1 px-4 py-2.5 rounded-full bg-[#8DBA64] text-[#1F3318] font-bold border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all"
           >
             {isEdit ? '저장' : '추가'}
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+/* ============================================================================
+ * AgeInput — 직접 타이핑 + 우측 ↑↓ 버튼.
+ * 빈 문자열은 타이핑 transient 로 허용 (제출 시점에 검증).
+ * ChildrenList 의 동명 컴포넌트와 디자인 일관성 유지.
+ * ========================================================================= */
+function AgeInput({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (next: string) => void
+}) {
+  const adjust = (delta: 1 | -1) => {
+    const parsed = Number.parseInt(value, 10)
+    const base = Number.isFinite(parsed) ? parsed : 0
+    const next = Math.min(MAX_AGE, Math.max(MIN_AGE, base + delta))
+    onChange(String(next))
+  }
+
+  const inputStyle: CSSProperties = {
+    // OS 기본 spinner 숨김 — Chrome/Safari (-webkit-) + Firefox (MozAppearance)
+    MozAppearance: 'textfield',
+  }
+
+  return (
+    <div className="relative min-w-0">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={MIN_AGE}
+        max={MAX_AGE}
+        placeholder="예: 5"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={inputStyle}
+        className="w-full px-3 py-2 pr-10 rounded-xl bg-[#F4E4BC]/60 border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold placeholder-[#9A7548]/50 focus:border-[#3F6B2E] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <div className="absolute right-[3px] top-[3px] bottom-[3px] w-7 flex flex-col border-l border-[#9A7548]/30 rounded-r-[10px] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => adjust(1)}
+          aria-label="나이 한 살 늘리기"
+          className="flex-1 flex items-center justify-center text-[#9A7548] hover:bg-[#D9BE82]/50 hover:text-[#6B4A28] active:bg-[#C9A874]/60 transition-colors"
+        >
+          <ChevronUp className="w-3.5 h-3.5" strokeWidth={2.5} />
+        </button>
+        <div className="h-px bg-[#9A7548]/25" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={() => adjust(-1)}
+          aria-label="나이 한 살 줄이기"
+          className="flex-1 flex items-center justify-center text-[#9A7548] hover:bg-[#D9BE82]/50 hover:text-[#6B4A28] active:bg-[#C9A874]/60 transition-colors"
+        >
+          <ChevronDown className="w-3.5 h-3.5" strokeWidth={2.5} />
+        </button>
+      </div>
     </div>
   )
 }
