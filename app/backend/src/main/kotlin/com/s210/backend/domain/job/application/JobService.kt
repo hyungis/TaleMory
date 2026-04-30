@@ -2,8 +2,10 @@ package com.s210.backend.domain.job.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.presentation.response.JobResponse
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
@@ -24,18 +26,30 @@ class JobService(
     private val jobRepository: StoryGenerationJobRepository,
     private val storyRepository: StoryRepository,
     private val objectMapper: ObjectMapper,
+    private val jobStatusRedisRepository: JobStatusRedisRepository,
 ) {
 
     /**
      * 단건 조회 + 소유권 검증 (해당 Job 이 속한 Story 의 userId 로 확인).
      * 존재하지 않으면 404, 다른 사용자 것이면 403.
+     *
+     * PENDING/RUNNING 상태일 때는 Redis hash 에서 progress/current_step/stage 를 보강.
+     * terminal status (SUCCESS/FAILED/CANCELLED) 에서는 Redis 조회 skip.
+     * Redis 장애 시 try/catch 로 swallow → progress=null (폴링 status 는 정상 동작).
      */
     fun findJob(userId: Long, jobId: Long): JobResponse {
         val job = jobRepository.findById(jobId).orElseThrow {
             BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         }
         assertOwned(userId, job)
-        return job.toResponse()
+
+        val live: Map<String, String> = if (job.status == JobStatus.PENDING || job.status == JobStatus.RUNNING) {
+            try { jobStatusRedisRepository.getStatus(job.storyId) } catch (_: Exception) { emptyMap() }
+        } else {
+            emptyMap()
+        }
+
+        return job.toResponse(live)
     }
 
     private fun assertOwned(userId: Long, job: StoryGenerationJob) {
@@ -47,7 +61,7 @@ class JobService(
         }
     }
 
-    private fun StoryGenerationJob.toResponse(): JobResponse = JobResponse(
+    private fun StoryGenerationJob.toResponse(live: Map<String, String> = emptyMap()): JobResponse = JobResponse(
         jobId = id,
         storyId = storyId,
         sentenceId = sentenceId,
@@ -61,6 +75,9 @@ class JobService(
         startedAt = startedAt,
         finishedAt = finishedAt,
         createdAt = createdAt,
+        progress = live["progress"]?.toIntOrNull(),
+        currentStep = live["current_step"],
+        stage = live["stage"],
     )
 
     private fun String.toJsonNodeOrNull(): JsonNode? =

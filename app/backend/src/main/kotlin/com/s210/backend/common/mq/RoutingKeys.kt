@@ -29,6 +29,8 @@ object RoutingKeys {
     const val STORY_SUMMARY_GENERATE = "ai.cpu.story.summary.generate"
     const val STORY_SUMMARY_REGENERATE = "ai.cpu.story.summary.regenerate"
 
-    // ---------- 후속 이슈에서 추가 예정 ----------
-    // const val TTS_GENERATE = "ai.gpu.tts.generate"
+    // ---------- TTS 생성 ----------
+    // 워커가 자체적으로 큐(`ai.gpu.request.queue` 또는 `ai.gpu.tts.generate.request.queue`)를
+    // declare/bind 하므로 BE 는 publish 만 신경쓰면 된다.
+    const val TTS_GENERATE = "ai.gpu.tts.generate"
 }

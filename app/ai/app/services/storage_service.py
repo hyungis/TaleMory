@@ -18,6 +18,10 @@ class StorageUploadError(RuntimeError):
     """Raised when an object upload fails."""
 
 
+class StorageDownloadError(RuntimeError):
+    """Raised when an object download fails."""
+
+
 @dataclass(frozen=True)
 class StoredAsset:
     url: str
@@ -95,6 +99,14 @@ def _upload_file(path: Path, content_type: str) -> StoredAsset:
         raise StorageUploadError(f"Failed to upload {path.name} to S3: {error}") from error
 
     return StoredAsset(url=_build_s3_public_url(key), key=key)
+
+
+def download_s3_bytes(key: str) -> bytes:
+    try:
+        response = _s3_client().get_object(Bucket=settings.AWS_S3_BUCKET, Key=key)
+        return response["Body"].read()
+    except (BotoCoreError, ClientError, OSError, KeyError) as error:
+        raise StorageDownloadError(f"Failed to download {key} from S3: {error}") from error
 
 
 def _build_s3_public_url(key: str) -> str:

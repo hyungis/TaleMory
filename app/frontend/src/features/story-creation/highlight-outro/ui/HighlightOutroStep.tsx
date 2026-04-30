@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ArrowRight,
   Loader2,
   Mic,
   Pause,
@@ -24,12 +23,14 @@ import {
   commitOutroVoice,
   type SceneDto,
 } from '../api/highlightOutroApi'
+import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 
 interface HighlightOutroStepProps {
   storyId?: number | null
   projectData: StoryProject
   onBack: () => void
   onNext: () => void
+  setStoryGenerationJobId: (jobId: number | null) => void
 }
 
 interface HighlightSentence {
@@ -71,7 +72,10 @@ export function HighlightOutroStep({
   projectData,
   onBack,
   onNext,
+  setStoryGenerationJobId,
 }: HighlightOutroStepProps) {
+  const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
+  const [confirmError, setConfirmError] = useState<string | null>(null)
   // --- 씬 데이터 (백엔드 연동 시 사용) ---
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(false)
@@ -300,6 +304,30 @@ export function HighlightOutroStep({
       setOutroSaving(false)
     }
   }, [storyId, outroText, outroSignature])
+
+  const handleNext = useCallback(async () => {
+    if (!storyId) return
+    setConfirmError(null)
+    try {
+      // 1) 아웃트로 저장 (텍스트가 있는 경우)
+      if (outroText.trim()) {
+        await saveOutro(storyId, outroText.trim(), outroSignature.trim() || null)
+      }
+      // 2) storyboard confirm → TTS 잡 시작
+      const job = await confirmStoryboard(storyId)
+      // 3) jobId 부모로 전달
+      setStoryGenerationJobId(job.jobId)
+      // 4) Step 8 진입
+      onNext()
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string }
+      if (apiErr?.status === 409) {
+        setConfirmError('선행 단계가 완료되지 않았습니다. 이전 단계를 확인해 주세요.')
+      } else {
+        setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했습니다.')
+      }
+    }
+  }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, onNext])
 
   const playAudio = useCallback((url: string) => {
     if (audioRef.current) {
@@ -641,6 +669,12 @@ export function HighlightOutroStep({
               </section>
             </div>
 
+            {/* 다음 단계 confirm 진행 중 에러 메시지 — 푸터 위에 자리. 네비 버튼은 CreationFooter 가 담당. */}
+            {confirmError && (
+              <p className="mt-6 text-center text-sm font-bold text-[#8b3a2a] bg-[#F4E4BC] rounded-2xl px-4 py-3 border-2 border-[#8b3a2a]/40">
+                {confirmError}
+              </p>
+            )}
           </div>
         </main>
       </div>
@@ -648,8 +682,9 @@ export function HighlightOutroStep({
       <CreationFooter
         currentStep={7}
         onBack={onBack}
-        onNext={onNext}
-        nextLabel="완성 미리보기"
+        onNext={() => void handleNext()}
+        nextLabel={isConfirming ? '동화책 만드는 중...' : '완성 미리보기'}
+        nextDisabled={isConfirming}
       />
     </div>
   )

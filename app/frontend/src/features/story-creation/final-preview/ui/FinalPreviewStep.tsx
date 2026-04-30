@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -18,9 +17,12 @@ import {
 } from '../../highlight-outro/api/highlightOutroApi'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
+import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
 
 interface FinalPreviewStepProps {
   storyId: number | null
+  /** TTS 잡 jobId (HighlightOutroStep confirm 응답). null 이면 폴링 없이 즉시 scenes fetch. */
+  storyGenerationJobId: number | null
   onBack: () => void
   /** "내 책장 보관하기" — 제작 플로우 종료 후 메인(서점) 으로 복귀. */
   onSaveToBookshelf: () => void
@@ -34,28 +36,37 @@ interface FinalPreviewStepProps {
  * STEP 08 — "완성된 동화책"
  *
  * 서버에서 scenes + outro 를 조회하여 실제 삽화/본문/TTS 를 표시한다.
+ * storyGenerationJobId 가 있으면 TTS 잡이 SUCCESS 될 때까지 폴링하고,
+ * SUCCESS(또는 jobId=null) 시점에 scenes/outro 를 fetch 한다.
  */
 export function FinalPreviewStep({
   storyId,
+  storyGenerationJobId,
   onBack,
   onSaveToBookshelf,
   onOpenViewer,
   onShare,
 }: FinalPreviewStepProps) {
+  const jobQuery = useGenerationJobQuery(storyGenerationJobId)
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [outro, setOutro] = useState<OutroDto | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadingScenes, setLoadingScenes] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
   useEffect(() => {
     if (!storyId) {
-      setLoading(false)
+      setLoadingScenes(false)
       setError('스토리 ID가 없습니다.')
       return
     }
+
+    // jobId 가 없거나 SUCCESS 도달 시점에만 scenes/outro fetch
+    const shouldFetch = !storyGenerationJobId || jobQuery.data?.status === 'SUCCESS'
+    if (!shouldFetch) return
+
     let cancelled = false
-    setLoading(true)
+    setLoadingScenes(true)
     Promise.all([getScenes(storyId), getOutro(storyId)])
       .then(([scenesData, outroData]) => {
         if (cancelled) return
@@ -68,12 +79,12 @@ export function FinalPreviewStep({
         setError('동화 데이터를 불러오지 못했습니다.')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoadingScenes(false)
       })
     return () => {
       cancelled = true
     }
-  }, [storyId])
+  }, [storyId, jobQuery.data?.status, storyGenerationJobId])
 
   const totalPages = scenes.length
   const currentScene = scenes[resultPageIndex] ?? null
@@ -104,10 +115,36 @@ export function FinalPreviewStep({
     }
   }, [onShare])
 
-  if (loading) {
+  // TTS 잡이 PENDING/RUNNING 인 경우 또는 scenes fetch 중인 경우 blocking
+  const isJobInProgress =
+    !!storyGenerationJobId &&
+    (jobQuery.data?.status === 'PENDING' || jobQuery.data?.status === 'RUNNING')
+  const blocking = isJobInProgress || loadingScenes
+
+  if (blocking) {
+    const message = jobQuery.data?.currentStep ?? '동화책 만드는 중...'
     return (
       <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-[#b4dc8c] animate-spin" />
+        <p className="ml-4 text-[#f0e6c0] text-lg">{message}</p>
+      </div>
+    )
+  }
+
+  if (jobQuery.data?.status === 'FAILED') {
+    return (
+      <div className="bookshelf-modal step-forest-modal flex items-center justify-center flex-col gap-4">
+        <p className="text-red-400 text-lg">동화 음성 생성에 실패했습니다.</p>
+        {jobQuery.data.errorMessage && (
+          <p className="text-[#f0e6c0] text-sm">{jobQuery.data.errorMessage}</p>
+        )}
+        <button
+          type="button"
+          onClick={onBack}
+          className="bg-[#f0e6c0] text-[#2d5a27] px-6 py-2 rounded-full border-2 border-[#b4dc8c] hover:bg-[#b4dc8c] transition-all font-bold"
+        >
+          이전 단계로
+        </button>
       </div>
     )
   }

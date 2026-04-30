@@ -322,10 +322,30 @@ class StoryboardSummaryServiceTest {
     }
 
     @Test
-    fun `findSummary returns summaryKo from job resultPayload and SUCCESS status when latest job is SUCCESS`() {
-        stubOwnedStory()
+    fun `findSummary returns synopsis (user-edited SOT) when latest job is SUCCESS and synopsis is set`() {
+        // editSummary 또는 listener 가 stories.synopsis 에 채워둔 값을 SOT 로 본다.
+        stubOwnedStoryWithSynopsis("사용자가 직접 다듬은 줄거리")
 
-        // SUMMARY 의 진실원은 잡 자신의 result_payload (StorySummaryPayload JSON).
+        // 잡 페이로드엔 옛 AI 원본이 들어있어도 무시되어야 — synopsis 우선.
+        val payloadJson = objectMapper.writeValueAsString(
+            buildSummaryPayload().copy(summaryKo = "AI 가 만든 옛 줄거리"),
+        )
+        val successJob = buildJob(12L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS, payloadJson)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY_SUMMARY)
+        ).thenReturn(successJob)
+
+        val result = service.findSummary(userId, storyId)
+
+        assertEquals("사용자가 직접 다듬은 줄거리", result.summaryKo)
+        assertEquals("SUCCESS", result.jobStatus)
+        assertEquals("12", result.jobId)
+    }
+
+    @Test
+    fun `findSummary falls back to job resultPayload when synopsis is empty (legacy data path)`() {
+        stubOwnedStory()  // synopsis = null
+
         val payloadJson = objectMapper.writeValueAsString(
             buildSummaryPayload().copy(summaryKo = "한글 요약 내용"),
         )
@@ -336,6 +356,7 @@ class StoryboardSummaryServiceTest {
 
         val result = service.findSummary(userId, storyId)
 
+        // synopsis 가 비어있을 때만 잡 페이로드로 fallback — legacy 데이터 / SUCCESS 직후 listener race 윈도우 방어.
         assertEquals("한글 요약 내용", result.summaryKo)
         assertEquals("SUCCESS", result.jobStatus)
         assertEquals("12", result.jobId)
@@ -364,15 +385,37 @@ class StoryboardSummaryServiceTest {
     }
 
     @Test
-    fun `findSummary returns prior SUCCESS summaryKo from its resultPayload and FAILED status when latest is FAILED`() {
-        stubOwnedStory()
+    fun `findSummary returns synopsis when latest is FAILED but user has edited synopsis previously`() {
+        // 시나리오: 사용자가 SUCCESS 후 줄거리를 편집해 synopsis 에 보관 → 재생성 시도 → FAILED.
+        // synopsis 는 그대로 살아있어야 하고, FE 가 사용자 편집본을 다시 볼 수 있어야 한다.
+        stubOwnedStoryWithSynopsis("사용자 편집본")
 
         val failedJob = buildJob(14L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.FAILED, null)
         `when`(
             jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY_SUMMARY)
         ).thenReturn(failedJob)
 
-        // 직전 SUCCESS 잡의 result_payload 에서 summaryKo 추출.
+        val result = service.findSummary(userId, storyId)
+
+        assertEquals("사용자 편집본", result.summaryKo)
+        assertEquals("FAILED", result.jobStatus)
+        assertEquals("14", result.jobId)
+        // synopsis 가 채워져 있으면 직전 SUCCESS 잡 페이로드 조회는 건너뛰어야 함 (불필요 쿼리 방지).
+        verify(jobRepository, never()).findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS
+        )
+    }
+
+    @Test
+    fun `findSummary falls back to prior SUCCESS resultPayload when latest is FAILED and synopsis is empty (legacy)`() {
+        stubOwnedStory()  // synopsis = null
+
+        val failedJob = buildJob(14L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.FAILED, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY_SUMMARY)
+        ).thenReturn(failedJob)
+
+        // 직전 SUCCESS 잡의 result_payload 에서 summaryKo 추출 — legacy 데이터 호환 경로.
         val priorPayloadJson = objectMapper.writeValueAsString(
             buildSummaryPayload().copy(summaryKo = "이전 성공 요약"),
         )
@@ -402,6 +445,20 @@ class StoryboardSummaryServiceTest {
             difficulty = Difficulty.BEGINNER,
             mainCharacterJson = """[{"name":"아이","age":5,"gender":"MALE"}]""",
             companionsJson = "[]",
+        )
+        `when`(storyRepository.findById(storyId)).thenReturn(Optional.of(story))
+    }
+
+    /** synopsis 가 미리 채워져 있는 상태 — findSummary 의 SOT 우선 경로 검증용. */
+    private fun stubOwnedStoryWithSynopsis(synopsis: String) {
+        val story = Story(
+            id = storyId,
+            userId = userId,
+            travelPlace = "제주도",
+            difficulty = Difficulty.BEGINNER,
+            mainCharacterJson = """[{"name":"아이","age":5,"gender":"MALE"}]""",
+            companionsJson = "[]",
+            synopsis = synopsis,
         )
         `when`(storyRepository.findById(storyId)).thenReturn(Optional.of(story))
     }

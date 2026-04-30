@@ -7,6 +7,9 @@ import java.time.LocalDateTime
 /**
  * `GET /api/generation-jobs/{jobId}` 의 응답 (API 명세 #56).
  * FE 의 polling 대상 — `resultPayload` 가 채워지면 SUCCESS, `errorMessage` 가 채워지면 FAILED.
+ *
+ * `progress` / `currentStep` / `stage` 는 Redis 실시간 값으로 보강 (PENDING/RUNNING 시).
+ * terminal status (SUCCESS/FAILED/CANCELLED) 에서는 null.
  */
 data class JobResponse(
     val jobId: Long,
@@ -24,6 +27,12 @@ data class JobResponse(
     val startedAt: LocalDateTime?,
     val finishedAt: LocalDateTime?,
     val createdAt: LocalDateTime,
+    /** Redis 실시간 진행률 (0-100). PENDING/RUNNING 이 아닐 때는 null. */
+    val progress: Int? = null,
+    /** Redis 현재 처리 단계 설명. PENDING/RUNNING 이 아닐 때는 null. */
+    val currentStep: String? = null,
+    /** Redis 현재 파이프라인 스테이지 이름. PENDING/RUNNING 이 아닐 때는 null. */
+    val stage: String? = null,
 )
 
 /**

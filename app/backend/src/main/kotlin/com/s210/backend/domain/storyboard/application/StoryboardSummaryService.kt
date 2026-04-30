@@ -213,19 +213,23 @@ class StoryboardSummaryService(
     /**
      * `GET /summary` 응답 데이터 조회 (AC7).
      *
-     * 가장 최근 STORYBOARD_STORY_SUMMARY 잡(status 무관) 1건을 보고 5케이스로 분기:
+     * 가장 최근 STORYBOARD_STORY_SUMMARY 잡(status 무관) 1건을 보고 분기:
      *  1) 잡이 아예 없음 → `(null, null, null)`
-     *  2) PENDING/RUNNING/CANCELLED → `(null, status, jobId)`
-     *  3) SUCCESS → SUMMARY 잡의 `result_payload` JSON 에서 `summaryKo` 추출
-     *  4) FAILED → 직전 SUCCESS 잡의 result_payload 에서 `summaryKo` 추출 (fallback)
+     *  2) PENDING/RUNNING/CANCELLED → `(null, status, jobId)` — 새 잡 진행 중엔 옛 줄거리 가리고 LOADING UI
+     *  3) SUCCESS / FAILED → `(stories.synopsis, status, jobId)` — synopsis 가 현재 줄거리 SOT
      *
-     * ⚠️ `story_boards.story` 컬럼은 STORY 본문 SUCCESS 시 페이지별 한글 본문이 합쳐져
-     *    덮어쓰이므로, 거기서 읽으면 줄거리가 아니라 "본문 합친 것" 이 반환된다.
-     *    → SUMMARY 의 진실원은 SUMMARY 잡 자신의 result_payload (StorySummaryPayload JSON).
+     * SOT 결정 — `stories.synopsis`:
+     *  - SUMMARY 잡 SUCCESS 시 listener 가 `payload.summaryKo` 로 채움
+     *  - `editSummary` (사용자 편집) 가 사용자 입력으로 덮어씀
+     *  - STORY 본문 listener 는 더 이상 synopsis 를 건드리지 않음 (옛날엔 덮어썼음)
+     *  → 사용자 편집 후에도 정확히 반영되며, 잡 페이로드의 immutable history 를 우회.
+     *
+     * Legacy fallback — synopsis 가 비어있으면 잡 페이로드에서 추출 (이전 데이터 호환).
+     * SUCCESS 잡이 들어왔는데 listener race 로 synopsis 가 아직 비어있는 짧은 윈도우에도 동작.
      */
     @Transactional(readOnly = true)
     fun findSummary(userId: Long, storyId: Long): SummaryResponseData {
-        ownedStory(userId, storyId)
+        val story = ownedStory(userId, storyId)
 
         val latestJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
             storyId = storyId,
@@ -240,22 +244,27 @@ class StoryboardSummaryService(
                     jobStatus = latestJob.status.name,
                     jobId = jobIdStr,
                 )
-            JobStatus.SUCCESS ->
+            JobStatus.SUCCESS, JobStatus.FAILED -> {
+                // synopsis 우선 — 사용자 편집 결과까지 반영.
+                val synopsis = story.synopsis?.takeIf { it.isNotBlank() }
+                // legacy / race fallback — synopsis 가 비어있을 때만 잡 페이로드에서 추출.
+                // SUCCESS: 자기 잡 / FAILED: 직전 SUCCESS 잡.
+                val fallback: String? = if (synopsis == null) {
+                    val sourceJob = if (latestJob.status == JobStatus.SUCCESS) {
+                        latestJob
+                    } else {
+                        jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                            storyId = storyId,
+                            jobType = JobType.STORYBOARD_STORY_SUMMARY,
+                            status = JobStatus.SUCCESS,
+                        )
+                    }
+                    extractSummaryKo(sourceJob?.resultPayload)
+                } else null
+
                 SummaryResponseData(
-                    summaryKo = extractSummaryKo(latestJob.resultPayload),
-                    jobStatus = JobStatus.SUCCESS.name,
-                    jobId = jobIdStr,
-                )
-            JobStatus.FAILED -> {
-                // 직전 SUCCESS 잡이 있다면 그 잡의 result_payload 에서 한글 요약을 추출해 함께 반환.
-                val previousSuccess = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
-                    storyId = storyId,
-                    jobType = JobType.STORYBOARD_STORY_SUMMARY,
-                    status = JobStatus.SUCCESS,
-                )
-                SummaryResponseData(
-                    summaryKo = extractSummaryKo(previousSuccess?.resultPayload),
-                    jobStatus = JobStatus.FAILED.name,
+                    summaryKo = synopsis ?: fallback,
+                    jobStatus = latestJob.status.name,
                     jobId = jobIdStr,
                 )
             }

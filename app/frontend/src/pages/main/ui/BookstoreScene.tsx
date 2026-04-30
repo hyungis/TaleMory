@@ -185,6 +185,16 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
     [navigate],
   )
 
+  /**
+   * 마이페이지 in-world 진입점.
+   * 책장 모달은 닫지 않고(자연스러운 복귀 경로 보존) `/mypage` 로 이동.
+   * 복귀는 MypagePage 의 "← 돌아가기" 가 `/main/bookshelf` 로 navigate(replace)
+   * 하므로 새 MainPage 인스턴스가 마운트되면서 BookshelfModal 이 다시 열린다.
+   */
+  const handleOpenMypage = useCallback(() => {
+    navigate(ROUTES.mypage)
+  }, [navigate])
+
   const handleDeleteStory = useCallback(async (story: Story) => {
     if (!window.confirm(`"${story.title}" 을(를) 정말 삭제하시겠어요?`)) return
     try {
@@ -219,6 +229,7 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
         isOpen={isLibraryOpen}
         onClose={handleCloseLibrary}
         onCreateStory={handleCreateStory}
+        onOpenMypage={handleOpenMypage}
         onReadStory={handleReadStory}
         onShareStory={handleShareStory}
         onDeleteStory={handleDeleteStory}

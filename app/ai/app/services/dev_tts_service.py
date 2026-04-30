@@ -6,6 +6,7 @@ import wave
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
+from urllib import error, request
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
@@ -13,7 +14,12 @@ from uuid import uuid4
 from app.core.config import settings
 from app.schemas.tts import PreviewOptions, VoiceRegisterRequest
 from app.services.cosyvoice_client import synthesize_cross_lingual_tts
-from app.services.storage_service import build_public_url, store_bytes, store_file
+from app.services.storage_service import (
+    build_public_url,
+    download_s3_bytes,
+    store_bytes,
+    store_file,
+)
 
 
 SAMPLE_RATE = 22050
@@ -87,6 +93,52 @@ def _copy_or_generate_reference(source: str, target: Path) -> None:
     shutil.copyfile(candidate, target)
 
 
+def _is_http_url(value: str) -> bool:
+    lowered = value.lower()
+    return lowered.startswith("http://") or lowered.startswith("https://")
+
+
+def _looks_like_s3_key(value: str) -> bool:
+    return value.startswith("stories/")
+
+
+def _download_url_bytes(url: str) -> bytes:
+    try:
+        with request.urlopen(url, timeout=60) as response:
+            return response.read()
+    except error.URLError as exc:
+        raise RuntimeError(f"Failed to download reference audio from URL: {exc.reason}") from exc
+
+
+def resolve_reference_voice(
+    voice_id: str,
+    reference_audio_url: str | None = None,
+    reference_audio_s3_key: str | None = None,
+) -> Path:
+    reference_path = _voice_reference_path(voice_id)
+    if reference_path.exists():
+        return reference_path
+
+    remote_s3_key = reference_audio_s3_key
+    remote_url = reference_audio_url
+    if remote_s3_key is None and remote_url and _looks_like_s3_key(remote_url):
+        remote_s3_key = remote_url
+        remote_url = None
+
+    if remote_s3_key:
+        audio_bytes = download_s3_bytes(remote_s3_key)
+    elif remote_url and _is_http_url(remote_url):
+        audio_bytes = _download_url_bytes(remote_url)
+    else:
+        raise FileNotFoundError(
+            f"Reference voice not found locally and no downloadable remote source provided: {voice_id}"
+        )
+
+    _ensure_parent(reference_path)
+    reference_path.write_bytes(audio_bytes)
+    return reference_path
+
+
 def _duration_ms_from_audio(audio_bytes: bytes, audio_format: str, fallback_text: str) -> int:
     if audio_format == "wav":
         try:
@@ -123,7 +175,7 @@ def _voice_metadata(voice_id: str) -> dict[str, Any]:
     return _read_json(metadata_path)
 
 
-def _concat_wavs(paths: list[Path], output_path: Path) -> None:
+def _concat_wavs(paths: list[Path], output_path: Path, pause_ms: int = 900) -> None:
     if not paths:
         raise ValueError("No wav files to concatenate")
 
@@ -138,7 +190,10 @@ def _concat_wavs(paths: list[Path], output_path: Path) -> None:
         out_file.setsampwidth(sampwidth)
         out_file.setframerate(framerate)
 
-        for path in paths:
+        silence_frame_count = int(framerate * max(0, pause_ms) / 1000)
+        silence = b"\x00" * silence_frame_count * nchannels * sampwidth
+
+        for index, path in enumerate(paths):
             with wave.open(str(path), "rb") as in_file:
                 if (
                     in_file.getnchannels() != nchannels
@@ -147,6 +202,8 @@ def _concat_wavs(paths: list[Path], output_path: Path) -> None:
                 ):
                     raise ValueError("All story sentence wav files must share the same audio parameters")
                 out_file.writeframes(in_file.readframes(in_file.getnframes()))
+                if index < len(paths) - 1 and silence:
+                    out_file.writeframes(silence)
 
 
 def create_pending_manifest(job_id: str | int, job_type: str, extra: dict[str, Any]) -> None:
@@ -266,10 +323,10 @@ def generate_preview(
     language: str,
     output_format: str,
     options: PreviewOptions,
+    reference_audio_url: str | None = None,
+    reference_audio_s3_key: str | None = None,
 ) -> dict[str, Any]:
-    reference_path = _voice_reference_path(voice_id)
-    if not reference_path.exists():
-        raise FileNotFoundError(voice_id)
+    reference_path = resolve_reference_voice(voice_id, reference_audio_url, reference_audio_s3_key)
 
     preview_id = f"preview_{uuid4().hex[:12]}"
     audio_bytes, resolved_format = synthesize_cross_lingual_tts(
@@ -321,9 +378,11 @@ def generate_story_tts_result(
     progress_callback: Callable[[int], None] | None = None,
 ) -> dict[str, Any]:
     voice_id = request["voiceId"]
-    reference_path = _voice_reference_path(voice_id)
-    if not reference_path.exists():
-        raise FileNotFoundError(voice_id)
+    reference_path = resolve_reference_voice(
+        voice_id,
+        request.get("referenceAudioUrl"),
+        request.get("referenceAudioS3Key"),
+    )
 
     story_id = request["storyId"]
     sentence_paths: list[Path] = []

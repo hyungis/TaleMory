@@ -95,11 +95,14 @@ export function MypagePage() {
     )
   }
 
-  const goToForest = () => {
-    // `/main` 이 라우트로 분리되어 있어 그대로 ForestScene(house.png) 으로 진입.
+  const goToBookshelf = () => {
+    // 마이페이지는 BookstoreScene(=BookshelfModal) 안의 in-world 버튼에서 진입한다.
+    // 따라서 복귀도 ForestScene 재생 없이 곧장 책장 씬으로 들어가야 한다.
+    // `/main/bookshelf` 라우트로 직행하면 MainPage 의 `isBookshelfOpen` 이 true 로 마운트되어
+    // 책장 모달이 첫 프레임부터 열린 상태가 된다 (CreationPage.goToBookshelf 패턴과 동일).
     // replace: true 로 `/mypage` 를 히스토리에서 치워 브라우저 뒤로가기가 마이페이지로
     // 다시 빨려 들어가지 않도록 한다.
-    navigate(ROUTES.main, { replace: true })
+    navigate(ROUTES.mainBookshelf, { replace: true })
   }
 
   const handleProfileSave = async (
@@ -183,11 +186,12 @@ export function MypagePage() {
         <header className="h-14 px-6 bg-[#2a1b12] border-b border-[#4a3a24] flex items-center justify-between sticky top-0 z-50">
           <button
             type="button"
-            onClick={goToForest}
+            onClick={goToBookshelf}
             className="flex items-center gap-2 text-[#b4c4a4] hover:text-[#e4d4b4] transition-colors text-sm font-medium"
+            aria-label="책장으로 돌아가기"
           >
-            <span>{'<'}</span>
-            <span>홈으로</span>
+            <span aria-hidden="true">{'←'}</span>
+            <span>돌아가기</span>
           </button>
           <Link
             to={ROUTES.home}

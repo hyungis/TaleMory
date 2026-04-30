@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpenCheck,
   Loader2,
