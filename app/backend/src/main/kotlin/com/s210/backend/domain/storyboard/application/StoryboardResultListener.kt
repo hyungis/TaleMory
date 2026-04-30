@@ -74,6 +74,7 @@ class StoryboardResultListener(
             )
             val STORY = setOf("GENERATE_STORY_COMPLETED", "GENERATE_STORY_FAILED")
             val TTS = setOf("GENERATE_TTS_COMPLETED", "GENERATE_TTS_FAILED")
+            val TTS_PREVIEW = setOf("GENERATE_TTS_PREVIEW_COMPLETED", "GENERATE_TTS_PREVIEW_FAILED")
         }
     }
 
@@ -121,7 +122,7 @@ class StoryboardResultListener(
                 )
                 handleStoryResult(envelope)
             }
-            in EnvelopeTypes.TTS -> {
+            in EnvelopeTypes.TTS, in EnvelopeTypes.TTS_PREVIEW -> {
                 val envelope = objectMapper.treeToValue(tree, StoryTtsResultEnvelope::class.java)
                 log.info(
                     "[TTS:RES] received — type={}, jobId={}, storyId={}, status={}",

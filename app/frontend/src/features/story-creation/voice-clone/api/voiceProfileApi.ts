@@ -54,6 +54,24 @@ export async function deleteVoiceProfile(voiceProfileId: number): Promise<void> 
   return deleteRequest<void>(`${VOICE_PROFILE_ENDPOINT}/${voiceProfileId}`)
 }
 
+export interface VoicePreviewJobDto {
+  jobId: number
+  jobType: string
+  status: string
+}
+
+/** POST /api/voice-profiles/{id}/preview — TTS 미리듣기 비동기 작업 시작 (202 Accepted) */
+export async function postVoicePreview(
+  voiceProfileId: number,
+  text: string,
+  language: string = 'ko-KR',
+): Promise<VoicePreviewJobDto> {
+  return post<VoicePreviewJobDto>(`${VOICE_PROFILE_ENDPOINT}/${voiceProfileId}/preview`, {
+    text,
+    language,
+  })
+}
+
 interface RecordingScriptResponse {
   script: string
 }

@@ -3,12 +3,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { isApiError } from '../../../../shared/api'
 import {
   DEFAULT_TTS_TEXT,
-  TTS_API_BASE,
-  TTS_API_URL,
-  VOICE_SAMPLE_SCRIPT,
 } from './voiceDefaults'
 import { createVoiceProfile } from '../api/createVoiceProfile'
 import { getVoiceProfiles } from '../api/getVoiceProfiles'
+import { postVoicePreview } from '../api/postVoicePreview'
+import { getGenerationJob } from '../../../story-creation/storyboard-prompt/api/getGenerationJob'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -94,6 +93,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
   const [isSaving, setIsSaving] = useState(false)
   const [voiceTitle, setVoiceTitle] = useState('')
   const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 목소리가 없습니다.')
+  const [savedProfileId, setSavedProfileId] = useState<number | null>(null)
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
@@ -190,6 +190,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
 
       setRecordedAudioUrl(latest.audioUrl || null)
       setVoiceTitle(latest.title)
+      setSavedProfileId(latest.id)
       setStatus('ready')
       setStatusLabel('기존 목소리 불러옴')
       setTtsStatusText('기존 목소리로 TTS를 만들어볼 수 있어요.')
@@ -212,33 +213,72 @@ export function useVoiceClone(): UseVoiceCloneResult {
     }
 
     setIsTtsLoading(true)
-    setTtsStatusText('보이스 클론 TTS를 만드는 중입니다.')
+    setTtsStatusText('보이스 클론 TTS를 만드는 중입니다…')
 
     try {
-      const voiceBlob = await audioUrlToBlob(recordedAudioUrl)
-      const formData = new FormData()
-      formData.append('text', text)
-      formData.append('ref_text', VOICE_SAMPLE_SCRIPT.replaceAll('"', '').trim())
-      formData.append('language', 'Auto')
-      formData.append('voice', voiceBlob, 'voice.webm')
+      // 음성 프로필이 아직 서버에 저장되지 않았으면 먼저 업로드
+      let profileId = savedProfileId
+      if (!profileId) {
+        const audioBlob = await audioUrlToBlob(recordedAudioUrl)
+        const autoTitle = `녹음_${new Date().toISOString().slice(0, 19).replace('T', '_')}`
+        const profile = await createVoiceProfile({ title: autoTitle, audioBlob })
+        profileId = profile.id
+        setSavedProfileId(profileId)
+      }
 
-      const response = await fetch(TTS_API_URL, { method: 'POST', body: formData })
-      if (!response.ok) throw new Error((await response.text()) || 'TTS 생성 실패')
+      // BE에 TTS 미리듣기 비동기 작업 요청
+      const { jobId } = await postVoicePreview(profileId, text)
 
-      const result = (await response.json()) as { download_url: string }
-      const audioResponse = await fetch(`${TTS_API_BASE}${result.download_url}`)
+      // 3초 간격 polling — 최대 5분
+      const POLL_INTERVAL = 3_000
+      const MAX_DURATION = 5 * 60 * 1000
+      const start = Date.now()
+
+      const pollResult = await new Promise<string>((resolve, reject) => {
+        const poll = async () => {
+          if (Date.now() - start > MAX_DURATION) {
+            reject(new Error('TTS 생성 시간이 초과되었습니다.'))
+            return
+          }
+          try {
+            const job = await getGenerationJob(jobId)
+            if (job.status === 'SUCCESS') {
+              const payload = job.resultPayload as Record<string, unknown> | null
+              const audioUrl = (payload?.audioUrl ?? payload?.url ?? '') as string
+              if (!audioUrl) {
+                reject(new Error('TTS 결과에 오디오 URL이 없습니다.'))
+                return
+              }
+              resolve(audioUrl)
+              return
+            }
+            if (job.status === 'FAILED') {
+              reject(new Error(job.errorMessage ?? 'TTS 생성에 실패했습니다.'))
+              return
+            }
+            setTimeout(poll, POLL_INTERVAL)
+          } catch (err) {
+            reject(err)
+          }
+        }
+        setTimeout(poll, POLL_INTERVAL)
+      })
+
+      // 결과 오디오를 dataURL로 변환하여 재생 준비
+      const audioResponse = await fetch(pollResult)
       const audioBlob = await audioResponse.blob()
       const dataUrl = await blobToDataUrl(audioBlob)
 
       setTtsAudioUrl(dataUrl)
       setTtsStatusText('TTS가 준비됐어요. 재생 후 제목과 함께 저장하세요.')
-    } catch {
+    } catch (err) {
       setTtsAudioUrl(null)
-      setTtsStatusText(`TTS 생성에 실패했습니다. ${TTS_API_BASE} 서버가 켜져 있는지 확인해 주세요.`)
+      const message = err instanceof Error ? err.message : 'TTS 생성에 실패했습니다.'
+      setTtsStatusText(message)
     } finally {
       setIsTtsLoading(false)
     }
-  }, [recordedAudioUrl, ttsText])
+  }, [recordedAudioUrl, ttsText, savedProfileId])
 
   const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
     const title = voiceTitle.trim()
@@ -260,6 +300,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
       const audioBlob = await audioUrlToBlob(recordedAudioUrl)
       const profile = await createVoiceProfile({ title, audioBlob })
 
+      setSavedProfileId(profile.id)
       setStatus('ready')
       setStatusLabel('서버 저장 완료')
       setSavedVoiceSummary(`저장된 보이스: ${profile.title}`)
