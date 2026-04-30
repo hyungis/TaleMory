@@ -20,6 +20,8 @@ export function useItemsPerRow(): number {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  if (width >= 2400) return 6
+  if (width >= 1920) return 5
   if (width >= 1280) return 4
   if (width >= 1024) return 3
   if (width >= 640) return 2

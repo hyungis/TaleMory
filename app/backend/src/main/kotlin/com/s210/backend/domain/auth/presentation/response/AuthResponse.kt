@@ -1,6 +1,8 @@
 package com.s210.backend.domain.auth.presentation.response
 
 import com.s210.backend.domain.auth.application.dto.AuthResult
+import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
+import com.s210.backend.domain.auth.application.dto.OauthSignupProfile
 import java.time.LocalDateTime
 
 data class AuthResponse(
@@ -10,6 +12,21 @@ data class AuthResponse(
 
 data class RefreshTokenResponse(
     val accessToken: String
+)
+
+data class KakaoCallbackResponse(
+    val status: String,
+    val accessToken: String? = null,
+    val user: AuthUserResponse? = null,
+    val signupToken: String? = null,
+    val profile: OauthSignupProfileResponse? = null,
+)
+
+data class OauthSignupProfileResponse(
+    val email: String,
+    val name: String,
+    val nickname: String,
+    val phone: String?,
 )
 
 data class AuthUserResponse(
@@ -43,3 +60,34 @@ fun AuthResult.toAuthResponse(): AuthResponse =
             updatedAt = user.updatedAt,
         ),
     )
+
+fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
+    when (this) {
+        is OauthCallbackResult.Login -> authResult.toKakaoCallbackResponse()
+        is OauthCallbackResult.SignupRequired -> KakaoCallbackResponse(
+            status = CALLBACK_STATUS_SIGNUP_REQUIRED,
+            signupToken = signupToken,
+            profile = profile.toResponse(),
+        )
+    }
+
+private fun AuthResult.toKakaoCallbackResponse(): KakaoCallbackResponse {
+    val authResponse = toAuthResponse()
+
+    return KakaoCallbackResponse(
+        status = CALLBACK_STATUS_LOGIN,
+        accessToken = authResponse.accessToken,
+        user = authResponse.user,
+    )
+}
+
+private fun OauthSignupProfile.toResponse(): OauthSignupProfileResponse =
+    OauthSignupProfileResponse(
+        email = email,
+        name = name,
+        nickname = nickname,
+        phone = phone,
+    )
+
+private const val CALLBACK_STATUS_LOGIN = "LOGIN"
+private const val CALLBACK_STATUS_SIGNUP_REQUIRED = "SIGNUP_REQUIRED"

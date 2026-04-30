@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -16,6 +15,8 @@ import {
   type SceneDto,
   type OutroDto,
 } from '../../highlight-outro/api/highlightOutroApi'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
 import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
 
 interface FinalPreviewStepProps {
@@ -160,26 +161,10 @@ export function FinalPreviewStep({
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      {/* Step 헤더 */}
-      <div className="flex items-center justify-between py-4 px-8 border-b border-[#4a3a24] bg-[#2a1b12]/60 shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="이전 단계"
-            className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">STEP 08 / 09</span>
-          <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">
-            완성된 동화책
-          </span>
-        </div>
-      </div>
+      <CreationHeader currentStep={8} />
 
       <div className="bookshelf-scroll">
-        <main className="py-10 px-4 md:px-10 bookshelf-fade-in">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
           <div className="max-w-6xl mx-auto pb-12">
             {/* 성공 배지 */}
             <div className="text-center mb-8">
@@ -259,6 +244,8 @@ export function FinalPreviewStep({
           </div>
         </main>
       </div>
+
+      <CreationFooter currentStep={8} onBack={onBack} />
     </div>
   )
 }

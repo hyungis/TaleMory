@@ -15,4 +15,5 @@ enum class AuthErrorCode(
     ALREADY_REGISTERED(HttpStatus.CONFLICT, "AUTH_005", "이미 가입된 사용자입니다."),
     UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH_006", "지원하지 않는 OAuth 제공자입니다."),
     WITHDRAWN_ACCOUNT(HttpStatus.FORBIDDEN, "AUTH_007", "탈퇴한 계정은 로그인할 수 없습니다."),
+    OAUTH_SIGNUP_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "AUTH_008", "카카오 가입 정보가 만료되었습니다. 다시 시도해주세요."),
 }

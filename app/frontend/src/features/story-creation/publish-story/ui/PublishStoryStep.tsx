@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Copy, Share2, CheckCircle2, PartyPopper, Loader2 } from 'lucide-react'
-import { StepHeader } from '../../ui/StepHeader'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
 import { publishStory, getShareLink } from '../../../bookshelf'
 
 interface PublishStoryStepProps {
@@ -62,9 +63,9 @@ export function PublishStoryStep({ storyId, onBack, onExit }: PublishStoryStepPr
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={9} stepTitle="동화책 발행" onBack={onBack} />
+      <CreationHeader currentStep={9} />
       <div className="bookshelf-scroll">
-        <main className="py-12 px-6 bookshelf-fade-in">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
           <div className="max-w-2xl mx-auto bg-[#f0e6c0] p-8 md:p-12 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-2 border-[#2a1b12] text-center">
             <div className="w-20 h-20 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-5 border-2 border-[#b4dc8c] shadow-[0_0_25px_rgba(180,220,140,0.5)]">
               <PartyPopper className="w-10 h-10 text-[#f0e6c0]" />
@@ -141,6 +142,8 @@ export function PublishStoryStep({ storyId, onBack, onExit }: PublishStoryStepPr
           </div>
         </main>
       </div>
+
+      <CreationFooter currentStep={9} onBack={onBack} />
     </div>
   )
 }
