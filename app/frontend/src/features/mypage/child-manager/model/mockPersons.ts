@@ -7,8 +7,8 @@
 import type { Person } from '../../../../entities/person'
 
 export const mockPersons: Person[] = [
-  { id: 101, userId: 1, name: '김별', birthDate: '2019-05-10', gender: 'female', role: 'child' },
-  { id: 102, userId: 1, name: '김달', birthDate: '2022-03-22', gender: 'male', role: 'child' },
-  { id: 201, userId: 1, name: '엄마', birthDate: '1988-11-03', gender: 'female', role: 'companion' },
-  { id: 202, userId: 1, name: '아빠', birthDate: '1986-07-18', gender: 'male', role: 'companion' },
+  { id: 101, userId: 1, name: '김별', age: 6, gender: 'female', role: 'child' },
+  { id: 102, userId: 1, name: '김달', age: 3, gender: 'male', role: 'child' },
+  { id: 201, userId: 1, name: '엄마', age: 37, gender: 'female', role: 'companion' },
+  { id: 202, userId: 1, name: '아빠', age: 39, gender: 'male', role: 'companion' },
 ]
