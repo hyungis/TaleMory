@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties, type ReactNode } from 'react'
-import { Library, PlusCircle } from 'lucide-react'
+import { Library, PlusCircle, User } from 'lucide-react'
 import { DUMMY_STORIES, type Story } from '../../../entities/story'
 import { StoryGrid } from '../story-list'
 import { StoryFilter } from '../story-filter'
@@ -14,6 +14,12 @@ interface BookshelfModalProps {
   onClose: () => void
   /** 상단 "새 동화책 만들기" 버튼. Task 4(story-creation) 에서 연결. */
   onCreateStory?: () => void
+  /**
+   * 상단 "마이페이지" in-world 진입점.
+   * BookstoreScene 안에 노출되며, 클릭 시 호출자가 `/mypage` 로 navigate.
+   * 미제공 시 버튼 자체가 렌더되지 않아 호환성 유지.
+   */
+  onOpenMypage?: () => void
   /** 개별 카드 "읽기" 버튼. Task 9(viewer) 에서 연결. */
   onReadStory?: (story: Story) => void
   /** 개별 카드 "공유" 버튼. */
@@ -44,6 +50,7 @@ export function BookshelfModal({
   isOpen,
   onClose,
   onCreateStory,
+  onOpenMypage,
   onReadStory,
   onShareStory,
   onDeleteStory,
@@ -107,13 +114,27 @@ export function BookshelfModal({
                     지금까지 만든 소중한 여행과 일상의 이야기들을 모아보세요.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={onCreateStory}
-                  className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.2)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.4)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
-                >
-                  <PlusCircle className="w-6 h-6" /> 새 동화책 만들기
-                </button>
+                {/* 우측 in-world 액션 묶음. 마이페이지(보조) → 새 동화책 만들기(주요) 순서로 배치해
+                    primary CTA 가 시선의 끝에 자연스럽게 닿도록 한다. */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  {onOpenMypage && (
+                    <button
+                      type="button"
+                      onClick={onOpenMypage}
+                      aria-label="마이페이지로 이동"
+                      className="bg-[#f0e6c0] text-[#2d5a27] px-6 py-3 rounded-full border-2 border-[#b4dc8c] shadow-[0_3px_0_#7a8a64,0_0_15px_rgba(180,220,140,0.15)] hover:translate-y-0.5 hover:bg-[#e8ddb4] hover:shadow-[0_2px_0_#7a8a64,0_0_22px_rgba(180,220,140,0.35)] transition-all font-bold flex items-center gap-2 text-lg whitespace-nowrap"
+                    >
+                      <User className="w-5 h-5" /> 마이페이지
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onCreateStory}
+                    className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.2)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.4)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+                  >
+                    <PlusCircle className="w-6 h-6" /> 새 동화책 만들기
+                  </button>
+                </div>
               </div>
 
               {/* 필터/정렬 바 */}
