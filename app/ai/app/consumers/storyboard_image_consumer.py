@@ -11,7 +11,11 @@ from app.schemas.mq_storyboard_image import (
     StoryboardImageGenerateJobMessage,
     StoryboardImageRegenerateJobMessage,
 )
-from app.services.storyboard_image_service import generate_storyboard_image_item, regenerate_storyboard_image
+from app.services.storyboard_image_service import (
+    ensure_storyboard_character_reference,
+    generate_storyboard_image_item,
+    regenerate_storyboard_image,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +99,9 @@ def _dispatch_regenerate_message(
 
 def handle_generate_batch_message(body: bytes, publisher: StoryboardImageJobPublisher) -> None:
     message = StoryboardImageGenerateJobMessage.model_validate_json(body)
+    items = ensure_storyboard_character_reference(message.payload.storyId, message.payload.seed, message.payload.items)
 
-    for item in message.payload.items:
+    for item in items:
         publisher.publish_generate_item_job(
             StoryboardImageGenerateItemJobMessage(
                 jobId=message.jobId,

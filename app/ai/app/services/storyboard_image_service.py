@@ -9,6 +9,8 @@ import boto3
 
 from app.core.config import settings
 from app.schemas.storyboard_image import (
+    StoryboardCharacterReferenceGenerateRequest,
+    StoryboardCharacterReferenceGenerateResponse,
     StoryboardImageBatchUsage,
     StoryboardImageGenerateItemRequest,
     StoryboardImageGenerateRequest,
@@ -23,50 +25,28 @@ _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
 )
 _FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
-    "Keep it as a rough pre-coloring storyboard sketch with loose linework and no polished final rendering."
+    "Keep it as a black-and-white rough pre-coloring storyboard sketch only. "
+    "Use loose pencil or ink linework on mostly white paper. Do not add colored fills, accent colors, "
+    "watercolor washes, painted shading, polished lighting, or final illustration rendering."
 )
 
-_STYLE_VISUAL_DIRECTIONS: dict[str, str] = {
-    "watercolor": (
-        "Visual direction: soft watercolor painting style, warm and gentle color palette, "
-        "delicate brush strokes with visible paper texture, light washes and blending, "
-        "dreamy and whimsical atmosphere, child-safe tone."
-    ),
-    "digital": (
-        "Visual direction: polished digital painting style similar to Pixar/Disney animation, "
-        "vibrant saturated colors, smooth shading and lighting, 3D-like depth, "
-        "expressive character faces, lively and dynamic composition, child-safe tone."
-    ),
-    "crayon": (
-        "Visual direction: colored pencil and crayon drawing style, as if drawn by a child, "
-        "rough and playful strokes, warm earthy tones, visible pencil texture, "
-        "simple and charming composition, child-safe tone."
-    ),
-    "line": (
-        "Visual direction: clean line drawing style, minimal black ink outlines, "
-        "simple and elegant composition, mostly monochrome with sparse accent colors, "
-        "refined and sophisticated sketch feel, child-safe tone."
-    ),
-    "collage": (
-        "Visual direction: paper collage and cut-out art style, layered torn paper textures, "
-        "mixed media feel with overlapping shapes, bold colors and patterns, "
-        "handcrafted and tactile appearance, child-safe tone."
-    ),
-}
-
-_DEFAULT_VISUAL_DIRECTION = (
-    "Visual direction: loose pencil-and-ink storyboard sketch, rough hand-drawn linework, "
-    "minimal flat shading, no polished final rendering, expressive faces, clean composition, "
-    "child-safe tone."
-)
 _GEMINI_RETRY_DELAY_SECONDS = 0.5
+_CHARACTER_REFERENCE_OBJECT_PATH = "stories/{story_id}/storyboard-character/reference.png"
+_MAX_GEMINI_REFERENCE_IMAGES = 3
 
 
 def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
     results: list[StoryboardImageGenerateResult] = []
     storyboard_seed = request_model.seed
+    items = ensure_storyboard_character_reference(
+        request_model.storyId,
+        storyboard_seed,
+        request_model.items,
+        request_model.characterSourceImageUrls,
+        request_model.characterSourceImageS3Keys,
+    )
 
-    for item in request_model.items:
+    for item in items:
         results.append(generate_storyboard_image_item(request_model.storyId, item, storyboard_seed))
 
     return StoryboardImageGenerateResponse(
@@ -77,15 +57,86 @@ def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) ->
     )
 
 
+def ensure_storyboard_character_reference(
+    story_id: int,
+    seed: int,
+    items: list[StoryboardImageGenerateItemRequest],
+    character_source_image_urls: list[str] | None = None,
+    character_source_image_s3_keys: list[str] | None = None,
+) -> list[StoryboardImageGenerateItemRequest]:
+    if not items:
+        return items
+    if any(item.characterReferenceImageUrls or item.characterReferenceImageS3Keys for item in items):
+        return items
+
+    first_item = items[0]
+    reference_image_urls = _unique_refs(
+        character_source_image_urls or [ref for item in items for ref in item.referenceImageUrls],
+        limit=3,
+    )
+    reference_image_s3_keys = _unique_refs(
+        character_source_image_s3_keys or [ref for item in items for ref in item.referenceImageS3Keys],
+        limit=3,
+    )
+    character_response = generate_storyboard_character_reference(
+        StoryboardCharacterReferenceGenerateRequest(
+            storyId=story_id,
+            seed=seed,
+            storyboard=first_item.storyboard,
+            children=first_item.children,
+            companions=first_item.companions,
+            referenceImageS3Keys=reference_image_s3_keys,
+            referenceImageUrls=reference_image_urls,
+        )
+    )
+    character_s3_key = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
+    return [
+        item.model_copy(
+            update={
+                "characterReferenceImageS3Keys": [character_s3_key],
+                "characterReferenceImageUrls": [character_response.imageUrl],
+            }
+        )
+        for item in items
+    ]
+
+
+def generate_storyboard_character_reference(
+    request_model: StoryboardCharacterReferenceGenerateRequest,
+) -> StoryboardCharacterReferenceGenerateResponse:
+    if settings.GEMINI_API_KEY:
+        return _generate_character_reference_with_gemini(request_model)
+    return _generate_character_reference_locally(request_model)
+
+
+def _unique_refs(values: list[str], limit: int) -> list[str]:
+    refs: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        refs.append(value)
+        seen.add(value)
+        if len(refs) >= limit:
+            break
+    return refs
+
+
 def regenerate_storyboard_image(
     request_model: StoryboardImageRegenerateRequest,
 ) -> StoryboardImageRegenerateResponse:
     regenerate_item = _build_regenerate_item(request_model.item, request_model.userPrompt)
-    result = generate_storyboard_image_item(request_model.storyId, regenerate_item, request_model.seed)
+    result = generate_storyboard_image_item(
+        request_model.storyId,
+        regenerate_item,
+        request_model.seed,
+        output_version=request_model.outputVersion,
+    )
 
     return StoryboardImageRegenerateResponse(
         storyId=request_model.storyId,
         seed=request_model.seed,
+        outputVersion=request_model.outputVersion,
         result=result,
     )
 
@@ -94,20 +145,24 @@ def generate_storyboard_image_item(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     seed: int,
+    output_version: int | None = None,
 ) -> StoryboardImageGenerateResult:
     if settings.GEMINI_API_KEY:
-        return _generate_item_with_gemini(story_id, item, seed)
-    return _generate_item_locally(story_id, item)
+        return _generate_item_with_gemini(story_id, item, seed, output_version)
+    return _generate_item_locally(story_id, item, output_version)
 
 
 def _generate_item_with_gemini(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     seed: int,
+    output_version: int | None = None,
 ) -> StoryboardImageGenerateResult:
     final_prompt = _build_final_prompt(item)
     response_json = _call_gemini_image_api(
         final_prompt,
+        item.characterReferenceImageUrls,
+        item.characterReferenceImageS3Keys,
         item.referenceImageUrls,
         item.referenceImageS3Keys,
         seed,
@@ -124,13 +179,15 @@ def _generate_item_with_gemini(
         )
         retry_response_json = _call_gemini_image_api(
             retry_prompt,
+            item.characterReferenceImageUrls,
+            item.characterReferenceImageS3Keys,
             item.referenceImageUrls,
             item.referenceImageS3Keys,
             seed,
         )
         image_bytes = _extract_image_bytes(retry_response_json)
         response_json = retry_response_json
-    image_url = _upload_and_resolve_url(story_id, item, image_bytes)
+    image_url = _upload_and_resolve_url(story_id, item, image_bytes, output_version)
     usage = _extract_gemini_usage(response_json)
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
@@ -142,10 +199,69 @@ def _generate_item_with_gemini(
 def _generate_item_locally(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
+    output_version: int | None = None,
 ) -> StoryboardImageGenerateResult:
-    image_url = _upload_and_resolve_url(story_id, item, _ONE_PIXEL_PNG)
+    image_url = _upload_and_resolve_url(story_id, item, _ONE_PIXEL_PNG, output_version)
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
+        imageUrl=image_url,
+        usage=StoryboardImageUsage(
+            provider="local",
+            model=settings.STORYBOARD_IMAGE_MODEL,
+            promptTokens=0,
+            candidateTokens=0,
+            totalTokens=0,
+            imageCount=1,
+            costUsd=0.0,
+        ),
+    )
+
+
+def _generate_character_reference_with_gemini(
+    request_model: StoryboardCharacterReferenceGenerateRequest,
+) -> StoryboardCharacterReferenceGenerateResponse:
+    final_prompt = _build_character_reference_prompt(request_model)
+    response_json = _call_gemini_image_api(
+        final_prompt=final_prompt,
+        character_reference_image_urls=[],
+        character_reference_image_s3_keys=[],
+        reference_image_urls=request_model.referenceImageUrls,
+        reference_image_s3_keys=request_model.referenceImageS3Keys,
+        seed=request_model.seed,
+    )
+    try:
+        image_bytes = _extract_image_bytes(response_json)
+    except ValueError as exc:
+        if "no image data" not in str(exc):
+            raise
+        time.sleep(_GEMINI_RETRY_DELAY_SECONDS)
+        retry_response_json = _call_gemini_image_api(
+            final_prompt=f"{final_prompt}\nReturn only the generated image. Do not return explanatory text.",
+            character_reference_image_urls=[],
+            character_reference_image_s3_keys=[],
+            reference_image_urls=request_model.referenceImageUrls,
+            reference_image_s3_keys=request_model.referenceImageS3Keys,
+            seed=request_model.seed,
+        )
+        image_bytes = _extract_image_bytes(retry_response_json)
+        response_json = retry_response_json
+
+    image_url = _upload_and_resolve_character_reference_url(request_model.storyId, image_bytes)
+    return StoryboardCharacterReferenceGenerateResponse(
+        storyId=request_model.storyId,
+        seed=request_model.seed,
+        imageUrl=image_url,
+        usage=_extract_gemini_usage(response_json),
+    )
+
+
+def _generate_character_reference_locally(
+    request_model: StoryboardCharacterReferenceGenerateRequest,
+) -> StoryboardCharacterReferenceGenerateResponse:
+    image_url = _upload_and_resolve_character_reference_url(request_model.storyId, _ONE_PIXEL_PNG)
+    return StoryboardCharacterReferenceGenerateResponse(
+        storyId=request_model.storyId,
+        seed=request_model.seed,
         imageUrl=image_url,
         usage=StoryboardImageUsage(
             provider="local",
@@ -179,31 +295,155 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         f"{child.name} ({child.age}, {child.gender.lower()})" for child in item.children
     )
     companions = ", ".join(item.companions) if item.companions else "family"
-    visual_direction = _STYLE_VISUAL_DIRECTIONS.get(item.stylePreset or "", _DEFAULT_VISUAL_DIRECTION)
+    has_character_reference = bool(item.characterReferenceImageUrls or item.characterReferenceImageS3Keys)
+    has_scene_reference = bool(item.referenceImageUrls or item.referenceImageS3Keys)
     parts = [
-        "Create a children's storybook illustration.",
-        f"Story title: {item.storyboard.title}",
-        f"Story synopsis: {item.storyboard.synopsis}",
-        f"Page {item.pageNumber} scene summary: {item.page.sceneSummary}",
-        f"Page English text: {item.page.englishText}",
-        f"Page Korean text: {item.page.koreanText}",
-        f"Base image prompt: {item.page.imagePrompt}",
-        f"Main children: {child_descriptions}",
-        f"Companions in scene: {companions}",
-        visual_direction,
+        f"# Storyboard Image Prompt - Page {item.pageNumber}",
+        "",
+        "## Non-Negotiable Visual Mode",
+        "- Black-and-white rough pre-coloring storyboard sketch only.",
+        "- The image must look like an unfinished production storyboard, not a finished children's book illustration.",
+        "- Use mostly white paper, loose graphite pencil or black ink lines, construction lines, sparse hatching, and minimal light-gray sketch marks.",
         (
-            "Absolutely no visible text anywhere in the image. "
-            "Do not render any words, letters, captions, subtitles, speech bubbles, sound effects, "
-            "typographic elements, signage, labels, logos, packaging text, poster text, UI text, or watermarks. "
-            "If an object would normally contain text, render it as blank abstract shapes or texture with no readable characters."
+            "- Do not add any color: no colored fills, no accent colors, no warm palette, no pastel tint, "
+            "no watercolor wash, no crayon color, no colored pencil, no collage color, no saturated color."
         ),
+        (
+            "- Do not create a polished image: no digital painting, no smooth 3D shading, no final-render lighting, "
+            "no detailed texture rendering, no completed background painting."
+        ),
+        "",
+        "## Objective",
+        "- Create a rough pre-coloring children's storybook storyboard sketch for layout and scene planning.",
+        "",
+        "## Story Context",
+        f"- Title: {item.storyboard.title}",
+        f"- Synopsis: {item.storyboard.synopsis}",
+        f"- Page: {item.pageNumber}",
+        f"- Scene summary: {item.page.sceneSummary}",
+        f"- English text: {item.page.englishText}",
+        f"- Korean text: {item.page.koreanText}",
+        f"- Base image prompt: {item.page.imagePrompt}",
+        "",
+        "## Characters",
+        f"- Main children: {child_descriptions}",
+        f"- Companions in scene: {companions}",
+        (
+            "- Character consistency lock: preserve the same child identity across every page. "
+            "Keep face shape, apparent age, hairstyle, hair color, body proportion, and recurring accessories stable. "
+            "Do not invent a different child, sibling, haircut, outfit color scheme, or facial structure unless explicitly requested."
+        ),
+        "",
+        "## Visual Direction",
+        "- Rough storyboard sketch, monochrome pencil/ink lines, no polished final rendering, child-safe composition.",
+        "- If the base image prompt asks for an illustration, storybook look, warmth, or any color style, reinterpret it as black-and-white sketch composition only.",
+        "",
+        "## Hard Constraints",
+        (
+            "- Absolutely no visible text anywhere in the image. Do not render any words, letters, captions, subtitles, "
+            "speech bubbles, sound effects, typographic elements, signage, labels, logos, packaging text, poster text, "
+            "UI text, or watermarks. If an object would normally contain text, render it as blank abstract shapes or "
+            "texture with no readable characters."
+        ),
+        "- Color ban: the final image must contain no intentional color. Use black, white, and light gray only.",
     ]
-    if item.referenceImageUrls or item.referenceImageS3Keys:
-        parts.append(
-            "Reference images are provided to preserve the travel mood and character consistency where possible."
+    if has_character_reference:
+        parts.extend(
+            [
+                "",
+                "## Character Reference",
+                (
+                    "- When a character identity reference is available, it is the first reference image. "
+                    "Use it only for identity: each character's face, hairstyle, apparent age, and body proportion. "
+                    "Do not copy the character reference image's color, color rendering, painted finish, lighting style, or completed illustration look. "
+                    "Do not copy the character reference sheet layout, side-by-side lineup, neutral pose, white background, or character-sheet composition. "
+                    "Use scene photos only for outfit, pose, background, props, lighting, and travel memory context. "
+                    "If character and scene references conflict, preserve the character reference identity and borrow the scene/outfit from the scene reference."
+                ),
+                "- The output must be the requested storyboard page scene, not a character reference sheet.",
+                "- Place the characters naturally inside the page scene described above. Do not render isolated front-facing character lineup poses unless the page scene explicitly asks for that.",
+                "- Convert all reference-image color information into monochrome line structure. Treat color as forbidden noise.",
+            ]
         )
-    parts.append(f"Additional instruction: {_compose_additional_instruction(item.additionalInstruction)}")
+    if has_scene_reference:
+        parts.extend(
+            [
+                "",
+                "## Scene References",
+                (
+                    "- Later reference images provide page-specific travel mood, clothing, pose, props, and background. "
+                    "Do not copy a different face from the scene reference when a character identity reference is provided."
+                ),
+                "- Use scene references for layout and object placement only. Do not copy their color palette, lighting, or rendered finish.",
+            ]
+        )
+    additional_instruction = _compose_additional_instruction(item.additionalInstruction)
+    parts.extend(["", "## Additional Instruction"])
+    parts.extend(f"- {line}" for line in additional_instruction.splitlines() if line.strip())
     return "\n".join(parts)
+
+
+def _build_character_reference_prompt(request_model: StoryboardCharacterReferenceGenerateRequest) -> str:
+    child_descriptions = ", ".join(
+        f"{child.name} ({child.age}, {child.gender.lower()})" for child in request_model.children
+    )
+    companions = ", ".join(request_model.companions) if request_model.companions else "no named companions"
+    character_sheet_subjects = _format_character_sheet_subjects(request_model)
+    parts = [
+        "# Storyboard Character Reference Prompt",
+        "",
+        "## Objective",
+        "- Create one reusable family character reference sheet for a children's storybook storyboard.",
+        "- The image must function as the fixed identity reference for all later storyboard pages.",
+        "",
+        "## Visual Style",
+        "- Render as a rough black-and-white storyboard character reference sketch.",
+        "- Use loose pencil or ink linework on mostly white paper.",
+        "- Keep it unfinished and pre-coloring, suitable as a production reference sheet.",
+        "- Do not use colored fills, watercolor, crayon, digital painting, polished lighting, or finished illustration rendering.",
+        "",
+        "## Story Characters",
+        f"- Title: {request_model.storyboard.title}",
+        f"- Synopsis: {request_model.storyboard.synopsis}",
+        f"- Main children: {child_descriptions}",
+        f"- Companions: {companions}",
+        f"- Character sheet subjects: {character_sheet_subjects}",
+        "",
+        "## Source Photo Handling",
+        (
+            "- Use the provided family photo or reference photos only to infer each person's identity, age range, "
+            "face shape, hairstyle, and body proportion."
+        ),
+        "- If multiple photos are provided, combine identity clues carefully without merging people into one identity.",
+        "- Do not copy photo lighting, background, camera angle, or rendered finish.",
+        "",
+        "## Character Sheet Requirements",
+        f"- Show {character_sheet_subjects} clearly side by side in a clean character sheet layout.",
+        "- Preserve distinct faces for each person. Do not merge their identities.",
+        (
+            "- Do not change their apparent age, hairstyle, face shape, facial structure, or body proportion "
+            "unless the story character information explicitly requires it."
+        ),
+        "- Use simple neutral outfits unless the photo has a strongly recognizable outfit.",
+        "- Avoid detailed background.",
+        "",
+        "## Hard Constraints",
+        "- No visible text, labels, captions, or watermarks.",
+        "- Do not create extra family members or omit requested story characters.",
+    ]
+    return "\n".join(parts)
+
+
+def _format_character_sheet_subjects(request_model: StoryboardCharacterReferenceGenerateRequest) -> str:
+    child_names = [child.name for child in request_model.children]
+    subjects = child_names + request_model.companions
+    if not subjects:
+        return "the requested story family characters"
+    if len(subjects) == 1:
+        return subjects[0]
+    if len(subjects) == 2:
+        return f"{subjects[0]} and {subjects[1]}"
+    return f"{', '.join(subjects[:-1])}, and {subjects[-1]}"
 
 
 def _compose_additional_instruction(additional_instruction: str | None) -> str:
@@ -215,6 +455,8 @@ def _compose_additional_instruction(additional_instruction: str | None) -> str:
 
 def _call_gemini_image_api(
     final_prompt: str,
+    character_reference_image_urls: list[str],
+    character_reference_image_s3_keys: list[str],
     reference_image_urls: list[str],
     reference_image_s3_keys: list[str],
     seed: int,
@@ -226,7 +468,13 @@ def _call_gemini_image_api(
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{settings.STORYBOARD_IMAGE_MODEL}:generateContent?key={parse.quote(settings.GEMINI_API_KEY)}"
     )
-    parts = _build_gemini_parts(final_prompt, reference_image_urls, reference_image_s3_keys)
+    parts = _build_gemini_parts(
+        final_prompt,
+        character_reference_image_urls,
+        character_reference_image_s3_keys,
+        reference_image_urls,
+        reference_image_s3_keys,
+    )
     payload = {
         "contents": [{"parts": parts}],
         "generationConfig": _build_gemini_generation_config(seed),
@@ -249,37 +497,44 @@ def _call_gemini_image_api(
 
 def _build_gemini_parts(
     final_prompt: str,
+    character_reference_image_urls: list[str],
+    character_reference_image_s3_keys: list[str],
     reference_image_urls: list[str],
     reference_image_s3_keys: list[str],
 ) -> list[dict]:
     parts: list[dict] = []
-    for s3_key in reference_image_s3_keys[:3]:
-        downloaded = _download_reference_image_from_s3(s3_key)
-        if downloaded is None:
-            continue
-        mime_type, raw_bytes = downloaded
-        parts.append(
-            {
-                "inlineData": {
-                    "mimeType": mime_type,
-                    "data": base64.b64encode(raw_bytes).decode("ascii"),
-                }
-            }
-        )
-    for image_url in reference_image_urls[:3]:
-        downloaded = _download_reference_image(image_url)
-        if downloaded is None:
-            continue
-        mime_type, raw_bytes = downloaded
-        parts.append(
-            {
-                "inlineData": {
-                    "mimeType": mime_type,
-                    "data": base64.b64encode(raw_bytes).decode("ascii"),
-                }
-            }
-        )
+    parts.extend(_download_image_parts(character_reference_image_s3_keys[:1], from_s3=True, remaining=1))
+    if not parts:
+        parts.extend(_download_image_parts(character_reference_image_urls[:1], from_s3=False, remaining=1))
+
+    remaining = _MAX_GEMINI_REFERENCE_IMAGES - len(parts)
+    if remaining > 0:
+        scene_s3_parts = _download_image_parts(reference_image_s3_keys, from_s3=True, remaining=remaining)
+        parts.extend(scene_s3_parts)
+    remaining = _MAX_GEMINI_REFERENCE_IMAGES - len(parts)
+    if remaining > 0:
+        parts.extend(_download_image_parts(reference_image_urls, from_s3=False, remaining=remaining))
     parts.append({"text": final_prompt})
+    return parts
+
+
+def _download_image_parts(image_refs: list[str], from_s3: bool, remaining: int) -> list[dict]:
+    parts: list[dict] = []
+    for image_ref in image_refs:
+        if len(parts) >= remaining:
+            break
+        downloaded = _download_reference_image_from_s3(image_ref) if from_s3 else _download_reference_image(image_ref)
+        if downloaded is None:
+            continue
+        mime_type, raw_bytes = downloaded
+        parts.append(
+            {
+                "inlineData": {
+                    "mimeType": mime_type,
+                    "data": base64.b64encode(raw_bytes).decode("ascii"),
+                }
+            }
+        )
     return parts
 
 
@@ -376,8 +631,26 @@ def _upload_and_resolve_url(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     image_bytes: bytes,
+    output_version: int | None = None,
 ) -> str:
-    object_path = f"stories/{story_id}/storyboard-image/{item.pageNumber}.png"
+    object_path = _storyboard_image_object_path(story_id, item.pageNumber, output_version)
+    if _has_s3_upload_config():
+        _upload_to_s3(object_path, image_bytes)
+        return _resolve_public_url(object_path)
+
+    public_url = _join_base_url(settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL, object_path)
+    if public_url:
+        return public_url
+    return f"local://storyboard-images/{object_path}"
+
+
+def _storyboard_image_object_path(story_id: int, page_number: int, output_version: int | None = None) -> str:
+    version = output_version or 1
+    return f"stories/{story_id}/storyboard-image/{page_number}/v{version}.png"
+
+
+def _upload_and_resolve_character_reference_url(story_id: int, image_bytes: bytes) -> str:
+    object_path = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
     if _has_s3_upload_config():
         _upload_to_s3(object_path, image_bytes)
         return _resolve_public_url(object_path)
