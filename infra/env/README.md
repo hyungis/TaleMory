@@ -159,7 +159,6 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_VITE_API_BASE_URL` | — | `/api` (Vite build-time 주입) |
 | `ENV_DEV_APP_OPENAI_API_KEY` | ✅ | OpenAI API 키 |
 | `ENV_DEV_APP_GEMINI_API_KEY` | ✅ | Gemini API 키 (storyboard 이미지 생성). 미설정 시 이미지 생성 호출 실패 |
-| `ENV_DEV_APP_AI_SERVICE_BASE_URL` | — | BE → AI HTTP 동기 호출 base URL (Voice Preview 등) |
 | `ENV_DEV_APP_VITE_TTS_API_BASE` | — | 마이페이지 voice-profile TTS API base URL (Vite build-time 주입) |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | — | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | — | `ai.gpu.tts.preview` |
