@@ -204,12 +204,22 @@ class MemberService(
     }
 
     private fun validateOauthSignupCommand(command: OauthSignupCommand) {
+        val phone = command.phone?.trim()
+
         if (
             command.signupToken.isBlank() ||
             command.email.isBlank() ||
             command.name.isBlank() ||
             command.nickname.isBlank()
         ) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!EMAIL_PATTERN.matches(command.email.trim())) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
     }
@@ -276,5 +286,7 @@ class MemberService(
 
     companion object {
         private const val SUPPORTED_PROVIDER = "kakao"
+        private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+        private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
     }
 }
