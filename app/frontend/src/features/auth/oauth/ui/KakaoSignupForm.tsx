@@ -1,0 +1,222 @@
+import { useCallback, useState, type FormEvent } from 'react'
+import { AlertCircle, UserPlus } from 'lucide-react'
+import { isApiError } from '../../../../shared/api'
+import { TermsCheckboxes } from '../../terms'
+import { useKakaoSignupPost } from '../model/useKakaoSignupPost'
+import type { KakaoSignupProfile } from '../types'
+import type { LoginResponse } from '../../login'
+
+interface KakaoSignupFormValues {
+  email: string
+  name: string
+  nickname: string
+  phone: string
+  smsAgree: boolean
+  marketingAgree: boolean
+}
+
+interface KakaoSignupFormProps {
+  signupToken: string
+  profile: KakaoSignupProfile
+  onSuccess: (result: LoginResponse) => void
+  onCancel: () => void
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
+
+function createInitialValues(profile: KakaoSignupProfile): KakaoSignupFormValues {
+  return {
+    email: profile.email ?? '',
+    name: profile.name ?? '',
+    nickname: profile.nickname ?? '',
+    phone: profile.phone ?? '',
+    smsAgree: false,
+    marketingAgree: false,
+  }
+}
+
+function validate(values: KakaoSignupFormValues): string | null {
+  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email)) return '올바른 이메일 형식을 입력해주세요.'
+  if (!values.name.trim()) return '이름을 입력해주세요.'
+  if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
+  if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
+  return null
+}
+
+function getKakaoSignupErrorMessage(error: unknown): string {
+  if (!isApiError(error)) {
+    return '카카오 회원가입 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (error.code === 'AUTH_002') {
+    return '이미 사용 중인 이메일입니다.'
+  }
+
+  if (error.code === 'AUTH_008') {
+    return '카카오 인증 시간이 만료됐어요. 다시 카카오로 시작해주세요.'
+  }
+
+  if (error.code === 'NETWORK_ERROR') {
+    return '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (error.code === 'REQUEST_TIMEOUT') {
+    return '응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  return error.message
+}
+
+export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: KakaoSignupFormProps) {
+  const [values, setValues] = useState<KakaoSignupFormValues>(() => createInitialValues(profile))
+  const [error, setError] = useState('')
+  const { isPending, signup } = useKakaoSignupPost()
+
+  const handleChange = useCallback(
+    <K extends keyof KakaoSignupFormValues>(key: K, value: KakaoSignupFormValues[K]) => {
+      setError('')
+      setValues(prev => ({ ...prev, [key]: value }))
+    },
+    [],
+  )
+
+  const handleSubmit = useCallback(
+    async (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault()
+      if (isPending) return
+
+      const validationError = validate(values)
+      if (validationError) {
+        setError(validationError)
+        return
+      }
+
+      try {
+        const result = await signup({
+          signupToken,
+          email: values.email.trim(),
+          name: values.name.trim(),
+          nickname: values.nickname.trim(),
+          phone: values.phone.trim() || undefined,
+          agreeSms: values.smsAgree,
+          agreeMarketing: values.marketingAgree,
+        })
+
+        setError('')
+        onSuccess(result)
+      } catch (submitError) {
+        setError(getKakaoSignupErrorMessage(submitError))
+      }
+    },
+    [isPending, onSuccess, signup, signupToken, values],
+  )
+
+  return (
+    <div className="min-h-screen bg-[#f6f0da] flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] shadow-[0_20px_60px_rgba(0,0,0,0.28)] overflow-hidden">
+        <div className="bg-[#2a1b12] px-6 py-5 flex items-center gap-3 border-b border-[#4a3a24]">
+          <div className="w-10 h-10 bg-[#2d5a27] rounded-xl flex items-center justify-center border border-[#b4dc8c]/40">
+            <UserPlus className="w-5 h-5 text-[#b4dc8c]" />
+          </div>
+          <div>
+            <p className="text-sm text-[#b4dc8c] font-bold">카카오 인증 완료</p>
+            <h1 className="text-xl text-[#f0e6c0] font-bold">회원 정보 입력</h1>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" aria-busy={isPending}>
+          <div>
+            <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+              이메일 <span className="text-[#8b3a2a]">*</span>
+            </label>
+            <input
+              type="email"
+              value={values.email}
+              disabled={isPending}
+              onChange={e => handleChange('email', e.target.value)}
+              autoComplete="email"
+              placeholder="example@email.com"
+              className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+                이름 <span className="text-[#8b3a2a]">*</span>
+              </label>
+              <input
+                type="text"
+                value={values.name}
+                disabled={isPending}
+                onChange={e => handleChange('name', e.target.value)}
+                autoComplete="name"
+                placeholder="홍길동"
+                className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+                닉네임 <span className="text-[#8b3a2a]">*</span>
+              </label>
+              <input
+                type="text"
+                value={values.nickname}
+                disabled={isPending}
+                onChange={e => handleChange('nickname', e.target.value)}
+                placeholder="해솔맘"
+                className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+              휴대폰 <span className="text-xs text-[#8b7a52]/70">(선택)</span>
+            </label>
+            <input
+              type="tel"
+              value={values.phone}
+              disabled={isPending}
+              onChange={e => handleChange('phone', e.target.value)}
+              autoComplete="tel"
+              placeholder="010-1234-5678"
+              className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <TermsCheckboxes
+            smsAgree={values.smsAgree}
+            marketingAgree={values.marketingAgree}
+            onChange={(key, value) => handleChange(key, value)}
+          />
+
+          {error && (
+            <div className="bg-[#8b3a2a]/10 border border-[#8b3a2a]/40 text-[#8b3a2a] text-sm px-3 py-2 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="w-full bg-[#2d5a27] text-[#f0e6c0] py-3.5 rounded-xl border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.45)] hover:bg-[#3d6f34] transition-all font-bold text-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)]"
+          >
+            {isPending ? '가입 처리 중...' : '가입하고 시작하기'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="w-full text-[#8b7a52] text-sm font-bold hover:text-[#2d5a27] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            다음에 할게요
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
