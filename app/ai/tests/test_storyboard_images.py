@@ -179,6 +179,74 @@ def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() ->
     assert captured_seeds == [555777999, 555777999]
 
 
+def test_generate_storyboard_images_uses_top_level_character_source_images() -> None:
+    captured_reference_sources: dict[str, list[str]] = {}
+
+    def fake_generate_storyboard_character_reference(request_model):
+        captured_reference_sources["urls"] = request_model.referenceImageUrls
+        captured_reference_sources["s3_keys"] = request_model.referenceImageS3Keys
+        return storyboard_image_service.StoryboardCharacterReferenceGenerateResponse(
+            storyId=request_model.storyId,
+            seed=request_model.seed,
+            imageUrl="https://cdn.example.com/storyboards/stories/1/storyboard-character/reference.png",
+            usage=storyboard_image_service.StoryboardImageUsage(
+                provider="local",
+                model=settings.STORYBOARD_IMAGE_MODEL,
+                promptTokens=0,
+                candidateTokens=0,
+                totalTokens=0,
+                imageCount=1,
+                costUsd=0.0,
+            ),
+        )
+
+    original_generate_character_reference = storyboard_image_service.generate_storyboard_character_reference
+    storyboard_image_service.generate_storyboard_character_reference = fake_generate_storyboard_character_reference
+    try:
+        items = storyboard_image_service.ensure_storyboard_character_reference(
+            story_id=1,
+            seed=1234,
+            character_source_image_urls=["https://example.com/child.jpg"],
+            character_source_image_s3_keys=[
+                "stories/1/character-source/child-closeup.jpg",
+                "stories/1/character-source/family-photo.jpg",
+            ],
+            items=[
+                storyboard_image_service.StoryboardImageGenerateItemRequest.model_validate(
+                    {
+                        "pageNumber": 1,
+                        "storyboard": {
+                            "title": "리나의 와이키키 모험",
+                            "synopsis": "가족과 함께한 따뜻한 여행 이야기",
+                        },
+                        "page": {
+                            "pageNumber": 1,
+                            "sceneSummary": "리나가 와이키키에 도착한 장면",
+                            "englishText": "Lina arrived at Waikiki with her family.",
+                            "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
+                            "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
+                        },
+                        "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
+                        "companions": ["엄마", "아빠"],
+                        "referenceImageS3Keys": ["stories/1/page-scene/ignored-for-character.jpg"],
+                    }
+                )
+            ],
+        )
+    finally:
+        storyboard_image_service.generate_storyboard_character_reference = original_generate_character_reference
+
+    assert captured_reference_sources["urls"] == ["https://example.com/child.jpg"]
+    assert captured_reference_sources["s3_keys"] == [
+        "stories/1/character-source/child-closeup.jpg",
+        "stories/1/character-source/family-photo.jpg",
+    ]
+    assert items[0].characterReferenceImageS3Keys == ["stories/1/storyboard-character/reference.png"]
+    assert items[0].characterReferenceImageUrls == [
+        "https://cdn.example.com/storyboards/stories/1/storyboard-character/reference.png"
+    ]
+
+
 def test_generate_storyboard_images_requires_seed() -> None:
     response = client.post(
         "/internal/storyboard-images/generate",
@@ -328,7 +396,8 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
 
     assert response.seed == 4321
     assert response.result.pageNumber == 1
-    assert "Additional instruction: 따뜻한 동화책 느낌" in captured_prompt["value"]
+    assert "## Additional Instruction" in captured_prompt["value"]
+    assert "- 따뜻한 동화책 느낌" in captured_prompt["value"]
     assert "User regeneration request: 리나 표정을 더 신나게 바꿔줘" in captured_prompt["value"]
 
 

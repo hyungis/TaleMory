@@ -25,42 +25,11 @@ _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
 )
 _FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
-    "Keep it as a rough pre-coloring storyboard sketch with loose linework and no polished final rendering."
+    "Keep it as a black-and-white rough pre-coloring storyboard sketch only. "
+    "Use loose pencil or ink linework on mostly white paper. Do not add colored fills, accent colors, "
+    "watercolor washes, painted shading, polished lighting, or final illustration rendering."
 )
 
-_STYLE_VISUAL_DIRECTIONS: dict[str, str] = {
-    "watercolor": (
-        "Visual direction: soft watercolor painting style, warm and gentle color palette, "
-        "delicate brush strokes with visible paper texture, light washes and blending, "
-        "dreamy and whimsical atmosphere, child-safe tone."
-    ),
-    "digital": (
-        "Visual direction: polished digital painting style similar to Pixar/Disney animation, "
-        "vibrant saturated colors, smooth shading and lighting, 3D-like depth, "
-        "expressive character faces, lively and dynamic composition, child-safe tone."
-    ),
-    "crayon": (
-        "Visual direction: colored pencil and crayon drawing style, as if drawn by a child, "
-        "rough and playful strokes, warm earthy tones, visible pencil texture, "
-        "simple and charming composition, child-safe tone."
-    ),
-    "line": (
-        "Visual direction: clean line drawing style, minimal black ink outlines, "
-        "simple and elegant composition, mostly monochrome with sparse accent colors, "
-        "refined and sophisticated sketch feel, child-safe tone."
-    ),
-    "collage": (
-        "Visual direction: paper collage and cut-out art style, layered torn paper textures, "
-        "mixed media feel with overlapping shapes, bold colors and patterns, "
-        "handcrafted and tactile appearance, child-safe tone."
-    ),
-}
-
-_DEFAULT_VISUAL_DIRECTION = (
-    "Visual direction: loose pencil-and-ink storyboard sketch, rough hand-drawn linework, "
-    "minimal flat shading, no polished final rendering, expressive faces, clean composition, "
-    "child-safe tone."
-)
 _GEMINI_RETRY_DELAY_SECONDS = 0.5
 _CHARACTER_REFERENCE_OBJECT_PATH = "stories/{story_id}/storyboard-character/reference.png"
 _MAX_GEMINI_REFERENCE_IMAGES = 3
@@ -69,7 +38,13 @@ _MAX_GEMINI_REFERENCE_IMAGES = 3
 def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
     results: list[StoryboardImageGenerateResult] = []
     storyboard_seed = request_model.seed
-    items = ensure_storyboard_character_reference(request_model.storyId, storyboard_seed, request_model.items)
+    items = ensure_storyboard_character_reference(
+        request_model.storyId,
+        storyboard_seed,
+        request_model.items,
+        request_model.characterSourceImageUrls,
+        request_model.characterSourceImageS3Keys,
+    )
 
     for item in items:
         results.append(generate_storyboard_image_item(request_model.storyId, item, storyboard_seed))
@@ -86,6 +61,8 @@ def ensure_storyboard_character_reference(
     story_id: int,
     seed: int,
     items: list[StoryboardImageGenerateItemRequest],
+    character_source_image_urls: list[str] | None = None,
+    character_source_image_s3_keys: list[str] | None = None,
 ) -> list[StoryboardImageGenerateItemRequest]:
     if not items:
         return items
@@ -93,6 +70,14 @@ def ensure_storyboard_character_reference(
         return items
 
     first_item = items[0]
+    reference_image_urls = _unique_refs(
+        character_source_image_urls or [ref for item in items for ref in item.referenceImageUrls],
+        limit=3,
+    )
+    reference_image_s3_keys = _unique_refs(
+        character_source_image_s3_keys or [ref for item in items for ref in item.referenceImageS3Keys],
+        limit=3,
+    )
     character_response = generate_storyboard_character_reference(
         StoryboardCharacterReferenceGenerateRequest(
             storyId=story_id,
@@ -100,13 +85,8 @@ def ensure_storyboard_character_reference(
             storyboard=first_item.storyboard,
             children=first_item.children,
             companions=first_item.companions,
-            referenceImageS3Keys=_unique_refs([ref for item in items for ref in item.referenceImageS3Keys], limit=3),
-            referenceImageUrls=[],
-            stylePreset=first_item.stylePreset,
-            additionalInstruction=(
-                "Create the fixed identity reference for every storyboard page. "
-                "Prioritize stable face, apparent age, hairstyle, body proportion, and recurring accessory."
-            ),
+            referenceImageS3Keys=reference_image_s3_keys,
+            referenceImageUrls=reference_image_urls,
         )
     )
     character_s3_key = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
@@ -309,51 +289,88 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
     has_character_reference = bool(item.characterReferenceImageUrls or item.characterReferenceImageS3Keys)
     has_scene_reference = bool(item.referenceImageUrls or item.referenceImageS3Keys)
     parts = [
-        "Create a rough pre-coloring children's storybook storyboard sketch.",
+        f"# Storyboard Image Prompt - Page {item.pageNumber}",
+        "",
+        "## Non-Negotiable Visual Mode",
+        "- Black-and-white rough pre-coloring storyboard sketch only.",
+        "- The image must look like an unfinished production storyboard, not a finished children's book illustration.",
+        "- Use mostly white paper, loose graphite pencil or black ink lines, construction lines, sparse hatching, and minimal light-gray sketch marks.",
         (
-            "Output must look unfinished and ready for later coloring: loose pencil-and-ink linework, "
-            "construction-sketch feel, sparse hatching, minimal grayscale or very pale flat shading only."
+            "- Do not add any color: no colored fills, no accent colors, no warm palette, no pastel tint, "
+            "no watercolor wash, no crayon color, no colored pencil, no collage color, no saturated color."
         ),
         (
-            "Do not create a finished full-color illustration. "
-            "Do not use watercolor washes, polished digital painting, crayon coloring, collage textures, "
-            "smooth 3D shading, saturated colors, or final-render lighting."
+            "- Do not create a polished image: no digital painting, no smooth 3D shading, no final-render lighting, "
+            "no detailed texture rendering, no completed background painting."
         ),
-        f"Story title: {item.storyboard.title}",
-        f"Story synopsis: {item.storyboard.synopsis}",
-        f"Page {item.pageNumber} scene summary: {item.page.sceneSummary}",
-        f"Page English text: {item.page.englishText}",
-        f"Page Korean text: {item.page.koreanText}",
-        f"Base image prompt: {item.page.imagePrompt}",
-        f"Main children: {child_descriptions}",
-        f"Companions in scene: {companions}",
+        "",
+        "## Objective",
+        "- Create a rough pre-coloring children's storybook storyboard sketch for layout and scene planning.",
+        "",
+        "## Story Context",
+        f"- Title: {item.storyboard.title}",
+        f"- Synopsis: {item.storyboard.synopsis}",
+        f"- Page: {item.pageNumber}",
+        f"- Scene summary: {item.page.sceneSummary}",
+        f"- English text: {item.page.englishText}",
+        f"- Korean text: {item.page.koreanText}",
+        f"- Base image prompt: {item.page.imagePrompt}",
+        "",
+        "## Characters",
+        f"- Main children: {child_descriptions}",
+        f"- Companions in scene: {companions}",
         (
-            "Character consistency lock: preserve the same child identity across every page. "
+            "- Character consistency lock: preserve the same child identity across every page. "
             "Keep face shape, apparent age, hairstyle, hair color, body proportion, and recurring accessories stable. "
             "Do not invent a different child, sibling, haircut, outfit color scheme, or facial structure unless explicitly requested."
         ),
-        "Visual direction: rough storyboard sketch, monochrome pencil/ink lines, no polished final rendering, child-safe composition.",
+        "",
+        "## Visual Direction",
+        "- Rough storyboard sketch, monochrome pencil/ink lines, no polished final rendering, child-safe composition.",
+        "- If the base image prompt asks for an illustration, storybook look, warmth, or any color style, reinterpret it as black-and-white sketch composition only.",
+        "",
+        "## Hard Constraints",
         (
-            "Absolutely no visible text anywhere in the image. "
-            "Do not render any words, letters, captions, subtitles, speech bubbles, sound effects, "
-            "typographic elements, signage, labels, logos, packaging text, poster text, UI text, or watermarks. "
-            "If an object would normally contain text, render it as blank abstract shapes or texture with no readable characters."
+            "- Absolutely no visible text anywhere in the image. Do not render any words, letters, captions, subtitles, "
+            "speech bubbles, sound effects, typographic elements, signage, labels, logos, packaging text, poster text, "
+            "UI text, or watermarks. If an object would normally contain text, render it as blank abstract shapes or "
+            "texture with no readable characters."
         ),
+        "- Color ban: the final image must contain no intentional color. Use black, white, and light gray only.",
     ]
     if has_character_reference:
-        parts.append(
-            "Reference image role: when a character identity reference is available, it is the first reference image. "
-            "Use it for the child's face, hairstyle, age, and body proportion. "
-            "Do not copy the character reference image's color rendering, painted finish, lighting style, or completed illustration look. "
-            "Use scene photos only for outfit, pose, background, props, lighting, and travel memory context. "
-            "If character and scene references conflict, preserve the character reference identity and borrow the scene/outfit from the scene reference."
+        parts.extend(
+            [
+                "",
+                "## Character Reference",
+                (
+                    "- When a character identity reference is available, it is the first reference image. "
+                    "Use it only for identity: each character's face, hairstyle, apparent age, and body proportion. "
+                    "Do not copy the character reference image's color, color rendering, painted finish, lighting style, or completed illustration look. "
+                    "Do not copy the character reference sheet layout, side-by-side lineup, neutral pose, white background, or character-sheet composition. "
+                    "Use scene photos only for outfit, pose, background, props, lighting, and travel memory context. "
+                    "If character and scene references conflict, preserve the character reference identity and borrow the scene/outfit from the scene reference."
+                ),
+                "- The output must be the requested storyboard page scene, not a character reference sheet.",
+                "- Place the characters naturally inside the page scene described above. Do not render isolated front-facing character lineup poses unless the page scene explicitly asks for that.",
+                "- Convert all reference-image color information into monochrome line structure. Treat color as forbidden noise.",
+            ]
         )
     if has_scene_reference:
-        parts.append(
-            "Scene reference role: later reference images provide page-specific travel mood, clothing, pose, props, and background. "
-            "Do not copy a different face from the scene reference when a character identity reference is provided."
+        parts.extend(
+            [
+                "",
+                "## Scene References",
+                (
+                    "- Later reference images provide page-specific travel mood, clothing, pose, props, and background. "
+                    "Do not copy a different face from the scene reference when a character identity reference is provided."
+                ),
+                "- Use scene references for layout and object placement only. Do not copy their color palette, lighting, or rendered finish.",
+            ]
         )
-    parts.append(f"Additional instruction: {_compose_additional_instruction(item.additionalInstruction)}")
+    additional_instruction = _compose_additional_instruction(item.additionalInstruction)
+    parts.extend(["", "## Additional Instruction"])
+    parts.extend(f"- {line}" for line in additional_instruction.splitlines() if line.strip())
     return "\n".join(parts)
 
 
@@ -361,34 +378,63 @@ def _build_character_reference_prompt(request_model: StoryboardCharacterReferenc
     child_descriptions = ", ".join(
         f"{child.name} ({child.age}, {child.gender.lower()})" for child in request_model.children
     )
-    companions = ", ".join(request_model.companions) if request_model.companions else "family"
-    visual_direction = _STYLE_VISUAL_DIRECTIONS.get(request_model.stylePreset or "", _DEFAULT_VISUAL_DIRECTION)
-    additional_instruction = request_model.additionalInstruction.strip() if request_model.additionalInstruction else "None"
-    return "\n".join(
-        [
-            "Create one reusable character identity reference image for a children's storybook storyboard.",
-            "The image must function as the fixed identity reference for all later page illustrations.",
-            f"Story title: {request_model.storyboard.title}",
-            f"Story synopsis: {request_model.storyboard.synopsis}",
-            f"Main children: {child_descriptions}",
-            f"Companions for context only: {companions}",
-            visual_direction,
-            (
-                "Show the main child clearly with a stable face shape, apparent age, hairstyle, hair color, "
-                "body proportion, and one simple recurring accessory or outfit color cue."
-            ),
-            (
-                "Prefer a clean character sheet layout: front-facing head-and-shoulders plus simple full-body view. "
-                "Avoid detailed backgrounds so the image can be reused as an identity reference."
-            ),
-            (
-                "If source photos are provided, use them only to infer the child's identity, age, hairstyle, "
-                "and natural clothing cues. Do not include photo-realistic rendering."
-            ),
-            "Absolutely no visible text, labels, captions, logos, or watermarks anywhere in the image.",
-            f"Additional instruction: {additional_instruction}",
-        ]
-    )
+    companions = ", ".join(request_model.companions) if request_model.companions else "no named companions"
+    character_sheet_subjects = _format_character_sheet_subjects(request_model)
+    parts = [
+        "# Storyboard Character Reference Prompt",
+        "",
+        "## Objective",
+        "- Create one reusable family character reference sheet for a children's storybook storyboard.",
+        "- The image must function as the fixed identity reference for all later storyboard pages.",
+        "",
+        "## Visual Style",
+        "- Render as a rough black-and-white storyboard character reference sketch.",
+        "- Use loose pencil or ink linework on mostly white paper.",
+        "- Keep it unfinished and pre-coloring, suitable as a production reference sheet.",
+        "- Do not use colored fills, watercolor, crayon, digital painting, polished lighting, or finished illustration rendering.",
+        "",
+        "## Story Characters",
+        f"- Title: {request_model.storyboard.title}",
+        f"- Synopsis: {request_model.storyboard.synopsis}",
+        f"- Main children: {child_descriptions}",
+        f"- Companions: {companions}",
+        f"- Character sheet subjects: {character_sheet_subjects}",
+        "",
+        "## Source Photo Handling",
+        (
+            "- Use the provided family photo or reference photos only to infer each person's identity, age range, "
+            "face shape, hairstyle, and body proportion."
+        ),
+        "- If multiple photos are provided, combine identity clues carefully without merging people into one identity.",
+        "- Do not copy photo lighting, background, camera angle, or rendered finish.",
+        "",
+        "## Character Sheet Requirements",
+        f"- Show {character_sheet_subjects} clearly side by side in a clean character sheet layout.",
+        "- Preserve distinct faces for each person. Do not merge their identities.",
+        (
+            "- Do not change their apparent age, hairstyle, face shape, facial structure, or body proportion "
+            "unless the story character information explicitly requires it."
+        ),
+        "- Use simple neutral outfits unless the photo has a strongly recognizable outfit.",
+        "- Avoid detailed background.",
+        "",
+        "## Hard Constraints",
+        "- No visible text, labels, captions, or watermarks.",
+        "- Do not create extra family members or omit requested story characters.",
+    ]
+    return "\n".join(parts)
+
+
+def _format_character_sheet_subjects(request_model: StoryboardCharacterReferenceGenerateRequest) -> str:
+    child_names = [child.name for child in request_model.children]
+    subjects = child_names + request_model.companions
+    if not subjects:
+        return "the requested story family characters"
+    if len(subjects) == 1:
+        return subjects[0]
+    if len(subjects) == 2:
+        return f"{subjects[0]} and {subjects[1]}"
+    return f"{', '.join(subjects[:-1])}, and {subjects[-1]}"
 
 
 def _compose_additional_instruction(additional_instruction: str | None) -> str:
