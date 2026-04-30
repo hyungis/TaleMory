@@ -51,6 +51,7 @@ class StoryboardCharacterReferenceGenerateRequest(BaseModel):
 class StoryboardImageRegenerateRequest(BaseModel):
     storyId: int = Field(..., ge=1)
     seed: int = Field(..., ge=0)
+    outputVersion: int = Field(..., ge=1)
     userPrompt: str = Field(..., min_length=1, max_length=2000)
     item: StoryboardImageGenerateItemRequest
 
@@ -106,4 +107,5 @@ class StoryboardCharacterReferenceGenerateResponse(BaseModel):
 class StoryboardImageRegenerateResponse(BaseModel):
     storyId: int
     seed: int
+    outputVersion: int
     result: StoryboardImageGenerateResult

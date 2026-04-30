@@ -126,11 +126,17 @@ def regenerate_storyboard_image(
     request_model: StoryboardImageRegenerateRequest,
 ) -> StoryboardImageRegenerateResponse:
     regenerate_item = _build_regenerate_item(request_model.item, request_model.userPrompt)
-    result = generate_storyboard_image_item(request_model.storyId, regenerate_item, request_model.seed)
+    result = generate_storyboard_image_item(
+        request_model.storyId,
+        regenerate_item,
+        request_model.seed,
+        output_version=request_model.outputVersion,
+    )
 
     return StoryboardImageRegenerateResponse(
         storyId=request_model.storyId,
         seed=request_model.seed,
+        outputVersion=request_model.outputVersion,
         result=result,
     )
 
@@ -139,16 +145,18 @@ def generate_storyboard_image_item(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     seed: int,
+    output_version: int | None = None,
 ) -> StoryboardImageGenerateResult:
     if settings.GEMINI_API_KEY:
-        return _generate_item_with_gemini(story_id, item, seed)
-    return _generate_item_locally(story_id, item)
+        return _generate_item_with_gemini(story_id, item, seed, output_version)
+    return _generate_item_locally(story_id, item, output_version)
 
 
 def _generate_item_with_gemini(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     seed: int,
+    output_version: int | None = None,
 ) -> StoryboardImageGenerateResult:
     final_prompt = _build_final_prompt(item)
     response_json = _call_gemini_image_api(
@@ -179,7 +187,7 @@ def _generate_item_with_gemini(
         )
         image_bytes = _extract_image_bytes(retry_response_json)
         response_json = retry_response_json
-    image_url = _upload_and_resolve_url(story_id, item, image_bytes)
+    image_url = _upload_and_resolve_url(story_id, item, image_bytes, output_version)
     usage = _extract_gemini_usage(response_json)
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
@@ -191,8 +199,9 @@ def _generate_item_with_gemini(
 def _generate_item_locally(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
+    output_version: int | None = None,
 ) -> StoryboardImageGenerateResult:
-    image_url = _upload_and_resolve_url(story_id, item, _ONE_PIXEL_PNG)
+    image_url = _upload_and_resolve_url(story_id, item, _ONE_PIXEL_PNG, output_version)
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
@@ -622,8 +631,9 @@ def _upload_and_resolve_url(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     image_bytes: bytes,
+    output_version: int | None = None,
 ) -> str:
-    object_path = f"stories/{story_id}/storyboard-image/{item.pageNumber}.png"
+    object_path = _storyboard_image_object_path(story_id, item.pageNumber, output_version)
     if _has_s3_upload_config():
         _upload_to_s3(object_path, image_bytes)
         return _resolve_public_url(object_path)
@@ -632,6 +642,11 @@ def _upload_and_resolve_url(
     if public_url:
         return public_url
     return f"local://storyboard-images/{object_path}"
+
+
+def _storyboard_image_object_path(story_id: int, page_number: int, output_version: int | None = None) -> str:
+    version = output_version or 1
+    return f"stories/{story_id}/storyboard-image/{page_number}/v{version}.png"
 
 
 def _upload_and_resolve_character_reference_url(story_id: int, image_bytes: bytes) -> str:

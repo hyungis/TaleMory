@@ -63,7 +63,7 @@ def test_generate_storyboard_images_uses_local_fallback_when_gemini_key_missing(
     assert body["seed"] == 1234
     assert len(body["results"]) == 1
     assert body["results"][0]["pageNumber"] == 1
-    assert body["results"][0]["imageUrl"] == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1.png"
+    assert body["results"][0]["imageUrl"] == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1/v1.png"
     assert "finalPrompt" not in body["results"][0]
     assert body["results"][0]["usage"]["model"] == settings.STORYBOARD_IMAGE_MODEL
     assert body["usage"]["totalImages"] == 1
@@ -104,8 +104,9 @@ def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() ->
     settings.GEMINI_API_KEY = "test-key"
     captured_seeds: list[int] = []
 
-    def fake_generate_item_with_gemini(story_id, item, seed):
+    def fake_generate_item_with_gemini(story_id, item, seed, output_version=None):
         del story_id
+        assert output_version is None
         captured_seeds.append(seed)
         return storyboard_image_service.StoryboardImageGenerateResult(
             pageNumber=item.pageNumber,
@@ -121,8 +122,26 @@ def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() ->
             ),
         )
 
+    def fake_generate_storyboard_character_reference(request_model):
+        return storyboard_image_service.StoryboardCharacterReferenceGenerateResponse(
+            storyId=request_model.storyId,
+            seed=request_model.seed,
+            imageUrl="https://cdn.example.com/storyboards/stories/1/storyboard-character/reference.png",
+            usage=storyboard_image_service.StoryboardImageUsage(
+                provider="google",
+                model=settings.STORYBOARD_IMAGE_MODEL,
+                promptTokens=1,
+                candidateTokens=1,
+                totalTokens=2,
+                imageCount=1,
+                costUsd=None,
+            ),
+        )
+
     original_generate_item_with_gemini = storyboard_image_service._generate_item_with_gemini
+    original_generate_storyboard_character_reference = storyboard_image_service.generate_storyboard_character_reference
     storyboard_image_service._generate_item_with_gemini = fake_generate_item_with_gemini
+    storyboard_image_service.generate_storyboard_character_reference = fake_generate_storyboard_character_reference
     try:
         response = storyboard_image_service.generate_storyboard_images(
             storyboard_image_service.StoryboardImageGenerateRequest.model_validate(
@@ -174,6 +193,7 @@ def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() ->
         )
     finally:
         storyboard_image_service._generate_item_with_gemini = original_generate_item_with_gemini
+        storyboard_image_service.generate_storyboard_character_reference = original_generate_storyboard_character_reference
 
     assert response.seed == 555777999
     assert captured_seeds == [555777999, 555777999]
@@ -291,6 +311,7 @@ def test_regenerate_storyboard_image_uses_local_fallback_when_gemini_key_missing
         json={
             "storyId": 1,
             "seed": 1234,
+            "outputVersion": 2,
             "userPrompt": "리나가 더 환하게 웃도록 바꿔줘",
             "item": {
                 "pageNumber": 1,
@@ -319,8 +340,9 @@ def test_regenerate_storyboard_image_uses_local_fallback_when_gemini_key_missing
     body = response.json()
     assert body["storyId"] == 1
     assert body["seed"] == 1234
+    assert body["outputVersion"] == 2
     assert body["result"]["pageNumber"] == 1
-    assert body["result"]["imageUrl"] == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1.png"
+    assert body["result"]["imageUrl"] == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1/v2.png"
     assert body["result"]["usage"]["model"] == settings.STORYBOARD_IMAGE_MODEL
 
 
@@ -367,6 +389,7 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
                 {
                     "storyId": 1,
                     "seed": 4321,
+                    "outputVersion": 3,
                     "userPrompt": "리나 표정을 더 신나게 바꿔줘",
                     "item": {
                         "pageNumber": 1,
@@ -395,7 +418,9 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
         storyboard_image_service._call_gemini_image_api = original_call
 
     assert response.seed == 4321
+    assert response.outputVersion == 3
     assert response.result.pageNumber == 1
+    assert response.result.imageUrl == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1/v3.png"
     assert "## Additional Instruction" in captured_prompt["value"]
     assert "- 따뜻한 동화책 느낌" in captured_prompt["value"]
     assert "User regeneration request: 리나 표정을 더 신나게 바꿔줘" in captured_prompt["value"]
@@ -407,6 +432,7 @@ def test_regenerate_storyboard_image_requires_user_prompt() -> None:
         json={
             "storyId": 1,
             "seed": 1234,
+            "outputVersion": 2,
             "item": {
                 "pageNumber": 1,
                 "storyboard": {
