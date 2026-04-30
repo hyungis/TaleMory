@@ -33,7 +33,7 @@ data class VoiceProfileResponse(
 }
 
 data class VoicePreviewJobResponse(
-    val jobId: Long,
+    val previewId: String,
     val jobType: String = "TTS_PREVIEW",
     val status: String = "PENDING",
 )

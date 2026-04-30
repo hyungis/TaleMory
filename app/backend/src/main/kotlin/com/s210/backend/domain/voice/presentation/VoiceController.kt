@@ -112,7 +112,7 @@ class VoiceController(
         @RequestBody request: VoicePreviewApiRequest,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<VoicePreviewJobResponse>> {
-        val jobId = voicePreviewService.preview(
+        val previewId = voicePreviewService.preview(
             userId = user.userId,
             voiceProfileId = voiceProfileId,
             text = request.text,
@@ -121,6 +121,6 @@ class VoiceController(
         )
         return ResponseEntity
             .accepted()
-            .body(ApiResponse(data = VoicePreviewJobResponse(jobId = jobId)))
+            .body(ApiResponse(data = VoicePreviewJobResponse(previewId = previewId)))
     }
 }
