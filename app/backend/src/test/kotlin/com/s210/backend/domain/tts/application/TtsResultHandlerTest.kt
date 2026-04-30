@@ -42,6 +42,8 @@ class TtsResultHandlerTest {
     private val sceneSentenceRepository: SceneSentenceRepository = mock(SceneSentenceRepository::class.java)
     private val ttsCacheService: TtsCacheService = mock(TtsCacheService::class.java)
     private val jobStatusRepo: JobStatusRedisRepository = mock(JobStatusRedisRepository::class.java)
+    private val previewRedis: com.s210.backend.common.redis.TtsPreviewRedisRepository =
+        mock(com.s210.backend.common.redis.TtsPreviewRedisRepository::class.java)
     private val objectMapper = jacksonObjectMapper()
 
     private val handler = TtsResultHandler(
@@ -50,6 +52,7 @@ class TtsResultHandlerTest {
         sceneSentenceRepository = sceneSentenceRepository,
         ttsCacheService = ttsCacheService,
         jobStatusRepo = jobStatusRepo,
+        previewRedis = previewRedis,
         objectMapper = objectMapper,
     )
 
@@ -266,4 +269,120 @@ class TtsResultHandlerTest {
             promptTemplateVersion = "1.0",
         ),
     )
+
+    // -----------------------------------------------------------------------
+    // Preview: COMPLETED → markSuccess
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `preview COMPLETED calls markSuccess with audioUrl from payload`() {
+        val previewId = "p-success"
+        `when`(previewRedis.get(previewId)).thenReturn(
+            com.s210.backend.common.redis.TtsPreviewSnapshot(
+                previewId = previewId,
+                userId = 7L,
+                voiceProfileId = 42L,
+                status = JobStatus.PENDING,
+                audioUrl = null,
+                errorCode = null,
+                errorMessage = null,
+                createdAt = java.time.Instant.now(),
+                finishedAt = null,
+            )
+        )
+        val envelope = com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope(
+            jobId = previewId,
+            type = "tts.preview.result",
+            status = "COMPLETED",
+            payload = com.s210.backend.domain.tts.application.dto.PreviewTtsResultPayload(
+                voiceId = "42",
+                audioUrl = "https://s3/preview.wav",
+                durationMs = 1200,
+                format = "wav",
+            ),
+        )
+
+        handler.handle(envelope)
+
+        verify(previewRedis).markSuccess(previewId, "https://s3/preview.wav")
+        verify(jobRepository, never()).findById(anyLong())
+    }
+
+    @Test
+    fun `preview FAILED calls markFailed with code and message from envelope error`() {
+        val previewId = "p-failed"
+        `when`(previewRedis.get(previewId)).thenReturn(
+            com.s210.backend.common.redis.TtsPreviewSnapshot(
+                previewId = previewId,
+                userId = 7L,
+                voiceProfileId = 42L,
+                status = JobStatus.PENDING,
+                audioUrl = null,
+                errorCode = null,
+                errorMessage = null,
+                createdAt = java.time.Instant.now(),
+                finishedAt = null,
+            )
+        )
+        val envelope = com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope(
+            jobId = previewId,
+            type = "tts.preview.result",
+            status = "FAILED",
+            error = com.s210.backend.domain.storyboard.application.dto.AiError(code = "TTS_INFER_FAILED", message = "GPU OOM"),
+        )
+
+        handler.handle(envelope)
+
+        verify(previewRedis).markFailed(previewId, "TTS_INFER_FAILED", "GPU OOM")
+    }
+
+    @Test
+    fun `preview COMPLETED with null payload calls markFailed with PAYLOAD_MISSING`() {
+        val previewId = "p-null-payload"
+        `when`(previewRedis.get(previewId)).thenReturn(
+            com.s210.backend.common.redis.TtsPreviewSnapshot(
+                previewId = previewId,
+                userId = 7L,
+                voiceProfileId = 42L,
+                status = JobStatus.PENDING,
+                audioUrl = null,
+                errorCode = null,
+                errorMessage = null,
+                createdAt = java.time.Instant.now(),
+                finishedAt = null,
+            )
+        )
+        val envelope = com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope(
+            jobId = previewId,
+            type = "tts.preview.result",
+            status = "COMPLETED",
+            payload = null,
+        )
+
+        handler.handle(envelope)
+
+        verify(previewRedis).markFailed(previewId, "PAYLOAD_MISSING", "AI 응답에 payload가 없습니다.")
+    }
+
+    @Test
+    fun `preview unknown previewId logs warn and skips redis writes`() {
+        val previewId = "p-missing"
+        `when`(previewRedis.get(previewId)).thenReturn(null)
+        val envelope = com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope(
+            jobId = previewId,
+            type = "tts.preview.result",
+            status = "COMPLETED",
+            payload = com.s210.backend.domain.tts.application.dto.PreviewTtsResultPayload(
+                voiceId = "42",
+                audioUrl = "https://s3/preview.wav",
+                durationMs = 1200,
+                format = "wav",
+            ),
+        )
+
+        handler.handle(envelope)
+
+        verify(previewRedis, never()).markSuccess(anyString(), anyString())
+        verify(previewRedis, never()).markFailed(anyString(), anyString(), anyString())
+    }
 }
