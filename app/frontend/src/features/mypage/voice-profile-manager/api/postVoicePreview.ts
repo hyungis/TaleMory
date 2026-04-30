@@ -3,7 +3,7 @@ import { post } from '../../../../shared/api'
 const VOICE_PROFILES_ENDPOINT = '/voice-profiles'
 
 export interface VoicePreviewJobDto {
-  jobId: number
+  previewId: string
   jobType: string
   status: string
 }
