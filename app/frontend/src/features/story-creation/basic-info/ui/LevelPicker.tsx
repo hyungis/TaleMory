@@ -11,7 +11,7 @@ interface LevelPickerProps {
 export function LevelPicker({ value, onChange }: LevelPickerProps) {
   return (
     <div>
-      <label className="block text-black text-lg mb-3 font-bold">난이도</label>
+      <label className="block text-black text-2xl mb-3 font-bold">난이도</label>
       <div className="grid grid-cols-3 gap-3">
         {LEVELS.map(lv => (
           <button
