@@ -12,6 +12,6 @@ export function postIllustrationRegenerate(
 ): Promise<IllustrationRegenerateResponse> {
   return post<IllustrationRegenerateResponse>(
     `/stories/${storyId}/scenes/${sceneId}/illustration/regenerate`,
-    JSON.stringify({ userPrompt }),
+    { userPrompt },
   )
 }
