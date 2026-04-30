@@ -3,6 +3,7 @@ package com.s210.backend.domain.voice.presentation
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.tts.application.VoicePreviewService
+import com.s210.backend.domain.tts.presentation.response.TtsPreviewStatusResponse
 import com.s210.backend.domain.voice.application.VoiceService
 import com.s210.backend.domain.voice.presentation.request.VoicePreviewApiRequest
 import com.s210.backend.domain.voice.presentation.response.VoicePreviewJobResponse
@@ -122,5 +123,14 @@ class VoiceController(
         return ResponseEntity
             .accepted()
             .body(ApiResponse(data = VoicePreviewJobResponse(previewId = previewId)))
+    }
+
+    @GetMapping("/voice-profiles/previews/{previewId}")
+    fun voicePreviewStatus(
+        @PathVariable previewId: String,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<TtsPreviewStatusResponse>> {
+        val response = voicePreviewService.getStatus(user.userId, previewId)
+        return ResponseEntity.ok(ApiResponse(data = response))
     }
 }
