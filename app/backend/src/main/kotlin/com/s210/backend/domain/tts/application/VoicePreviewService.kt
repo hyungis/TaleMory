@@ -6,9 +6,11 @@ import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobR
 import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.tts.application.dto.TtsPreviewJobMessage
 import com.s210.backend.domain.tts.application.dto.VoicePreviewOptions
+import com.s210.backend.domain.tts.application.dto.VoicePreviewRequest
 import com.s210.backend.domain.voice.exception.VoiceErrorCode
 import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.springframework.stereotype.Service
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 보이스 클론 미리듣기 — BE → AI 비동기 RabbitMQ 호출.
@@ -25,6 +27,7 @@ class VoicePreviewService(
     private val voiceProfileRepository: VoiceProfileRepository,
     private val jobRepository: StoryGenerationJobRepository,
     private val ttsService: TtsService,
+    private val objectMapper: ObjectMapper,
 ) {
     fun preview(
         userId: Long,
@@ -47,17 +50,23 @@ class VoicePreviewService(
             StoryGenerationJob(
                 storyId = 0,
                 jobType = JobType.TTS_PREVIEW,
+                requestPayload = objectMapper.writeValueAsString(
+                    mapOf("voiceProfileId" to voiceProfileId),
+                ),
             ),
         )
 
         ttsService.publishPreview(
             TtsPreviewJobMessage(
                 jobId = job.id.toString(),
-                text = text,
-                language = language,
-                referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
-                referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
-                options = VoicePreviewOptions(emotion = emotion),
+                voiceId = voiceProfileId.toString(),
+                payload = VoicePreviewRequest(
+                    text = text,
+                    language = language,
+                    options = VoicePreviewOptions(emotion = emotion ?: "NEUTRAL"),
+                    referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
+                    referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
+                ),
             ),
         )
 

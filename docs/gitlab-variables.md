@@ -134,6 +134,9 @@ RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY=ai.result.final-illus
 RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY=ai.result.final-illustration.generate.failed
 RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY=ai.result.final-illustration.revise.completed
 RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY=ai.result.final-illustration.revise.failed
+
+RABBITMQ_TTS_PREVIEW_QUEUE=ai.gpu.preview.request.queue
+RABBITMQ_TTS_PREVIEW_ROUTING_KEY=ai.gpu.tts.preview
 ```
 
 - [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
@@ -280,6 +283,9 @@ RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY=ai.result.final-illus
 RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY=ai.result.final-illustration.generate.failed
 RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY=ai.result.final-illustration.revise.completed
 RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY=ai.result.final-illustration.revise.failed
+
+RABBITMQ_TTS_PREVIEW_QUEUE=ai.gpu.preview.request.queue
+RABBITMQ_TTS_PREVIEW_ROUTING_KEY=ai.gpu.tts.preview
 ```
 
 - [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료

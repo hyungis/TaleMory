@@ -17,6 +17,7 @@ import com.s210.backend.domain.storyboard.application.dto.StorySummaryResultEnve
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import com.s210.backend.domain.tts.application.TtsResultHandler
+import com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope
 import com.s210.backend.domain.tts.application.dto.StoryTtsResultEnvelope
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
@@ -122,11 +123,19 @@ class StoryboardResultListener(
                 )
                 handleStoryResult(envelope)
             }
-            in EnvelopeTypes.TTS, in EnvelopeTypes.TTS_PREVIEW -> {
+            in EnvelopeTypes.TTS -> {
                 val envelope = objectMapper.treeToValue(tree, StoryTtsResultEnvelope::class.java)
                 log.info(
                     "[TTS:RES] received — type={}, jobId={}, storyId={}, status={}",
                     type, envelope.jobId, envelope.storyId, envelope.status,
+                )
+                ttsResultHandler.handle(envelope)
+            }
+            in EnvelopeTypes.TTS_PREVIEW -> {
+                val envelope = objectMapper.treeToValue(tree, PreviewTtsResultEnvelope::class.java)
+                log.info(
+                    "[TTS_PREVIEW:RES] received ??type={}, jobId={}, status={}",
+                    type, envelope.jobId, envelope.status,
                 )
                 ttsResultHandler.handle(envelope)
             }

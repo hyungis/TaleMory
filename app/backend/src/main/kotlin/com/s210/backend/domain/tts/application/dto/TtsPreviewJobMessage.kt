@@ -7,9 +7,6 @@ package com.s210.backend.domain.tts.application.dto
 data class TtsPreviewJobMessage(
     val jobId: String,
     val jobType: String = "TTS_PREVIEW",
-    val text: String,
-    val language: String = "en-US",
-    val referenceAudioUrl: String? = null,
-    val referenceAudioS3Key: String? = null,
-    val options: VoicePreviewOptions = VoicePreviewOptions(),
+    val voiceId: String,
+    val payload: VoicePreviewRequest,
 )

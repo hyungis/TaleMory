@@ -161,6 +161,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_GEMINI_API_KEY` | ✅ | Gemini API 키 (storyboard 이미지 생성). 미설정 시 이미지 생성 호출 실패 |
 | `ENV_DEV_APP_AI_SERVICE_BASE_URL` | — | BE → AI HTTP 동기 호출 base URL (Voice Preview 등) |
 | `ENV_DEV_APP_VITE_TTS_API_BASE` | — | 마이페이지 voice-profile TTS API base URL (Vite build-time 주입) |
+| `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | — | `ai.gpu.preview.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | — | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | — | `gemini-2.5-flash-image` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | — | `ai.image.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | — | `ai.image.generate.item.request.queue` |
@@ -351,6 +353,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.completed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.failed` |
 | `ENV_DEV_APP_VITE_TTS_API_BASE` | no | TTS API base URL (마이페이지 voice-profile) |
+| `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
 
 ### MASTER APP (AI 출처)
@@ -398,4 +402,6 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.completed` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.failed` |
 | `ENV_MASTER_APP_VITE_TTS_API_BASE` | no | TTS API base URL (마이페이지 voice-profile) |
+| `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |

@@ -11,6 +11,8 @@ import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.model.Difficulty
 import com.s210.backend.domain.story.model.StoryStatus
+import com.s210.backend.domain.voice.entity.VoiceProfile
+import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -34,12 +36,14 @@ class JobControllerPollingTest {
 
     private val jobRepository: StoryGenerationJobRepository = mock(StoryGenerationJobRepository::class.java)
     private val storyRepository: StoryRepository = mock(StoryRepository::class.java)
+    private val voiceProfileRepository: VoiceProfileRepository = mock(VoiceProfileRepository::class.java)
     private val jobStatusRedisRepo: JobStatusRedisRepository = mock(JobStatusRedisRepository::class.java)
     private val objectMapper: ObjectMapper = ObjectMapper()
 
     private val service = JobService(
         jobRepository = jobRepository,
         storyRepository = storyRepository,
+        voiceProfileRepository = voiceProfileRepository,
         objectMapper = objectMapper,
         jobStatusRedisRepository = jobStatusRedisRepo,
     )
@@ -110,6 +114,30 @@ class JobControllerPollingTest {
         service.findJob(userId, job.id)
 
         verify(jobStatusRedisRepo, never()).getStatus(storyId)
+    }
+
+    @Test
+    fun `preview job checks ownership using voice profile`() {
+        val voiceProfile = VoiceProfile(
+            id = 55L,
+            userId = userId,
+            title = "sample",
+            audioUrl = "stories/voice/1/ref.wav",
+        )
+        val job = StoryGenerationJob(
+            id = 2L,
+            storyId = 0L,
+            jobType = JobType.TTS_PREVIEW,
+            status = JobStatus.SUCCESS,
+            requestPayload = """{"voiceProfileId":55}""",
+        )
+        `when`(jobRepository.findById(job.id)).thenReturn(Optional.of(job))
+        `when`(voiceProfileRepository.findByIdAndDeletedAtIsNull(55L)).thenReturn(voiceProfile)
+
+        val response = service.findJob(userId, job.id)
+
+        assertThat(response.jobType).isEqualTo("TTS_PREVIEW")
+        assertThat(response.jobId).isEqualTo(job.id)
     }
 
     // ------------------------------------------------------------------

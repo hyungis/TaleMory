@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.schemas.tts import PreviewRequest
@@ -10,10 +12,21 @@ class PreviewTtsJobMessage(BaseModel):
     payload: PreviewRequest
 
 
+class PreviewTtsAppliedStyle(BaseModel):
+    emotion: str | None = None
+    stylePrompt: str | None = None
+    speakingRate: float | None = None
+    pitch: float | None = None
+    volumeGain: float | None = None
+
+
 class PreviewTtsResultPayload(BaseModel):
+    voiceId: str
     audioUrl: str
-    s3Key: str
+    s3Key: str | None = None
     durationMs: int
+    format: str
+    appliedStyle: PreviewTtsAppliedStyle | None = None
 
 
 class PreviewTtsError(BaseModel):
@@ -21,7 +34,15 @@ class PreviewTtsError(BaseModel):
     message: str
 
 
-class PreviewTtsRpcResponse(BaseModel):
-    success: bool
-    data: PreviewTtsResultPayload | None = None
-    error: PreviewTtsError | None = None
+class PreviewTtsSuccessEnvelope(BaseModel):
+    jobId: str
+    type: Literal["GENERATE_TTS_PREVIEW_COMPLETED"] = "GENERATE_TTS_PREVIEW_COMPLETED"
+    status: Literal["COMPLETED"] = "COMPLETED"
+    payload: PreviewTtsResultPayload
+
+
+class PreviewTtsFailureEnvelope(BaseModel):
+    jobId: str
+    type: Literal["GENERATE_TTS_PREVIEW_FAILED"] = "GENERATE_TTS_PREVIEW_FAILED"
+    status: Literal["FAILED"] = "FAILED"
+    error: PreviewTtsError
