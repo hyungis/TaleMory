@@ -4,13 +4,17 @@ import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.MemberService
+import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.auth.presentation.request.KakaoCallbackRequest
+import com.s210.backend.domain.auth.presentation.request.KakaoSignupRequest
 import com.s210.backend.domain.auth.presentation.request.LoginRequest
 import com.s210.backend.domain.auth.presentation.request.SignupRequest
 import com.s210.backend.domain.auth.presentation.response.AuthResponse
+import com.s210.backend.domain.auth.presentation.response.KakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.response.RefreshTokenResponse
 import com.s210.backend.domain.auth.presentation.response.toAuthResponse
+import com.s210.backend.domain.auth.presentation.response.toKakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.support.RefreshTokenCookieManager
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -53,11 +57,29 @@ class AuthController(
     fun authKakaoCallback(
         @RequestBody request: KakaoCallbackRequest,
         response: HttpServletResponse,
-    ): ResponseEntity<ApiResponse<AuthResponse>> {
+    ): ResponseEntity<ApiResponse<KakaoCallbackResponse>> {
         val result = memberService.loginWithKakaoCallback(
             code = request.code,
             redirectUri = request.redirectUri,
         )
+        if (result is OauthCallbackResult.Login) {
+            refreshTokenCookieManager.addRefreshToken(response, result.authResult.refreshToken)
+        }
+
+        return ResponseEntity.ok(
+            ApiResponse(
+                success = true,
+                data = result.toKakaoCallbackResponse(),
+            )
+        )
+    }
+
+    @PostMapping("/kakao/signup")
+    fun authKakaoSignup(
+        @RequestBody request: KakaoSignupRequest,
+        response: HttpServletResponse,
+    ): ResponseEntity<ApiResponse<AuthResponse>> {
+        val result = memberService.signUpWithKakao(request.toCommand())
         refreshTokenCookieManager.addRefreshToken(response, result.refreshToken)
 
         return ResponseEntity.ok(
