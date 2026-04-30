@@ -1,6 +1,21 @@
 import { useCallback } from 'react'
-import { Image as ImageIcon, Loader2, Wand2 } from 'lucide-react'
-import { StepHeader } from '../../ui/StepHeader'
+import { Loader2, Wand2 } from 'lucide-react'
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { PhotoUploadZone } from './PhotoUploadZone'
 import { PhotoItem } from './PhotoItem'
 import { EmptyPhotoState } from './EmptyPhotoState'
@@ -73,29 +88,55 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
     [serverPhotos, reorderMutation],
   )
 
+  /**
+   * dnd-kit DragEnd 핸들러 — 드롭 위치 기준으로 새 순서 계산 후 서버 PATCH.
+   * activationConstraint(distance:8) 덕분에 짧은 클릭은 drag 로 변환되지 않아 input/button 방해 X.
+   * useReorderPhotos 의 onMutate 가 낙관적 업데이트로 즉시 캐시 재배열 → 깜빡임 없음.
+   */
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      const ids = serverPhotos.map(p => p.photoId)
+      const fromIdx = ids.indexOf(Number(active.id))
+      const toIdx = ids.indexOf(Number(over.id))
+      if (fromIdx === -1 || toIdx === -1) return
+      const next = arrayMove(ids, fromIdx, toIdx)
+      reorderMutation.mutate(next)
+    },
+    [serverPhotos, reorderMutation],
+  )
+
+  /**
+   * dnd-kit sensors:
+   *  - PointerSensor (마우스 + 터치) : distance 8px 이상 이동해야 drag 활성 → 짧은 클릭은 input/button 으로 통과.
+   *
+   * KeyboardSensor 는 의도적으로 제거: input 에서 친 Space 가 root 카드의 keydown 핸들러로
+   * 버블링되면 카드가 active drag 상태로 진입해 검은 오버레이가 깔리는 사고가 있었다.
+   * 키보드 a11y 는 카드 우상단의 위/아래 화살표 버튼(onMoveUp/Down) 으로 대체.
+   */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  )
+
   const canProceed = serverPhotos.length > 0 && upload.pending.every(p => p.status === 'error' || false)
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={2} stepTitle="추억 사진 선택 & 태깅" onBack={onBack} />
+      <CreationHeader currentStep={2} />
 
       <div className="bookshelf-scroll">
-        <main className="py-12 px-6 bookshelf-fade-in">
-          <div className="max-w-4xl mx-auto pb-12">
-            {/* 타이틀 영역 */}
-            <div className="text-center mb-10">
-              <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <ImageIcon className="w-8 h-8 text-[#f0e6c0]" />
-              </div>
-              <h2 className="text-3xl text-[#f0e6c0] font-bold">추억이 담긴 사진을 올려주세요</h2>
-              <p className="text-[#b4c4a4] mt-2">
-                업로드된 사진들이 모여 멋진 동화책의 뼈대가 됩니다.
-              </p>
-            </div>
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
+          <div className="max-w-7xl mx-auto pb-12">
+            <StepTitleBlock
+              stepNumber={2}
+              title="추억의 사진을 모아주세요"
+              subtitle="10장 이상 올려주시면 훨씬 풍성한 동화가 돼요"
+            />
 
             {/* storyId 없으면 경고 */}
             {storyId === null && (
-              <div className="bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#f0e6c0] text-sm px-4 py-3 rounded-xl mb-4">
+              <div className="bg-[#D8857C]/20 border border-[#B0473F]/40 text-[#3E2A18] text-sm px-4 py-3 rounded-xl mb-4">
                 ⚠ step 1 저장이 완료되지 않았습니다. 이전 단계로 돌아가 다시 시도해주세요.
               </div>
             )}
@@ -105,39 +146,52 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
 
             {/* 업로드된 사진 리스트 */}
             <div className="space-y-4 mb-8">
-              <h3 className="text-xl text-[#f0e6c0] border-b border-[#4a3a24] pb-2 font-bold flex justify-between items-center">
+              <h3 className="text-xl text-[#3E2A18] border-b border-[#9A7548]/40 pb-2 font-bold flex justify-between items-center">
                 <span>업로드된 사진</span>
-                <span className="bg-[#2a1b12]/70 text-[#b4dc8c] px-3 py-1 rounded-full text-sm border border-[#b4dc8c]/50 font-sans shadow-sm">
+                <span className="bg-[#E9DBBE] text-[#3F6B2E] px-3 py-1 rounded-full text-sm border border-[#9A7548]/40 font-sans shadow-sm">
                   {totalCount} / {MAX_PHOTOS} 장
                 </span>
               </h3>
 
               {photosQuery.isPending && storyId !== null && (
-                <div className="flex items-center justify-center gap-2 text-[#b4c4a4] py-8">
+                <div className="flex items-center justify-center gap-2 text-[#76695A] py-8">
                   <Loader2 className="w-5 h-5 animate-spin" /> 사진 목록 불러오는 중…
                 </div>
               )}
 
               {!photosQuery.isPending && totalCount === 0 && <EmptyPhotoState />}
 
-              {/* 서버 커밋된 사진 */}
-              {serverPhotos.map((photo, idx) => (
-                <PhotoItem
-                  key={`server-${photo.photoId}`}
-                  mode="committed"
-                  imageUrl={photo.imageUrl}
-                  description={photo.description}
-                  tagsJson={photo.tagsJson}
-                  onRemove={() => handleRemove(photo.photoId)}
-                  onUpdate={patch => updateMutation.mutate({ photoId: photo.photoId, body: patch })}
-                  onMoveUp={() => handleMove(photo.photoId, -1)}
-                  onMoveDown={() => handleMove(photo.photoId, 1)}
-                  isFirst={idx === 0}
-                  isLast={idx === serverPhotos.length - 1}
-                  isRemoving={deleteMutation.isPending && deleteMutation.variables === photo.photoId}
-                  isReordering={reorderMutation.isPending}
-                />
-              ))}
+              {/* 서버 커밋된 사진 — DndContext + SortableContext 안에서 순서 변경 가능.
+                  uploading/error 카드는 이 context 밖에 있어 드래그 대상 X. */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={serverPhotos.map(p => p.photoId)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {serverPhotos.map((photo, idx) => (
+                    <PhotoItem
+                      key={`server-${photo.photoId}`}
+                      id={photo.photoId}
+                      mode="committed"
+                      imageUrl={photo.imageUrl}
+                      description={photo.description}
+                      tagsJson={photo.tagsJson}
+                      onRemove={() => handleRemove(photo.photoId)}
+                      onUpdate={patch => updateMutation.mutate({ photoId: photo.photoId, body: patch })}
+                      onMoveUp={() => handleMove(photo.photoId, -1)}
+                      onMoveDown={() => handleMove(photo.photoId, 1)}
+                      isFirst={idx === 0}
+                      isLast={idx === serverPhotos.length - 1}
+                      isRemoving={deleteMutation.isPending && deleteMutation.variables === photo.photoId}
+                      isReordering={reorderMutation.isPending}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
 
               {/* 업로드 중/실패 */}
               {upload.pending.map(p =>
@@ -161,27 +215,27 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
               )}
             </div>
 
-            {/* 하단 액션 바 */}
-            <div className="flex justify-between items-center pt-6 border-t border-[#4a3a24]">
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors"
-              >
-                이전 단계
-              </button>
-              <button
-                type="button"
-                onClick={onNext}
-                disabled={!canProceed}
-                className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-              >
-                다음: 스토리 만들기 <Wand2 className="w-5 h-5" />
-              </button>
-            </div>
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={2}
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="다음: 스토리 만들기"
+        nextDisabled={!canProceed}
+        rightSlot={
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!canProceed}
+            className="flex items-center gap-1.5 bg-[#8DBA64] text-[#1F3318] px-5 py-2 rounded-full border-2 border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_3px_0_#3F6B2E] transition-all font-bold text-sm whitespace-nowrap"
+          >
+            다음: 스토리 만들기 <Wand2 className="w-4 h-4" />
+          </button>
+        }
+      />
     </div>
   )
 }

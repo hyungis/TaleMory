@@ -85,7 +85,7 @@ export function CreationPage() {
           onUpdate={flow.updateStep1}
           onChildUpdate={flow.updateChildAt}
           onChildAdd={flow.addChild}
-          onChildAppend={flow.appendChild}
+          onChildAppend={flow.prependChild}
           onChildRemove={flow.removeChildAt}
           onBack={handleBack}
           onStoryCreated={storyId => {
@@ -157,12 +157,14 @@ export function CreationPage() {
           projectData={flow.projectData}
           onBack={handleBack}
           onNext={flow.handleNext}
+          setStoryGenerationJobId={flow.setStoryGenerationJobId}
         />
       )}
 
       {flow.currentStep === 8 && (
         <FinalPreviewStep
           storyId={flow.storyId}
+          storyGenerationJobId={flow.storyGenerationJobId}
           onBack={handleBack}
           onSaveToBookshelf={goToBookshelf}
           onOpenViewer={() => {

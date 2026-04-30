@@ -30,6 +30,7 @@ export function mapApiToStory(api: StoryApiResponse): Story {
     badgeType: 'mic',
     badgeText: 'AI 음성',
     bgClass: BG_CLASSES[api.id % BG_CLASSES.length],
+    publishedAt: api.publishedAt,
     status: api.status,
     shareToken: api.shareToken,
     coverImageUrl: api.coverImageUrl,

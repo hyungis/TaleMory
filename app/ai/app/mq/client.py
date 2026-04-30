@@ -12,6 +12,8 @@ def create_connection() -> Any:
         port=settings.RABBITMQ_PORT,
         virtual_host=settings.RABBITMQ_VHOST,
         credentials=credentials,
+        heartbeat=1200,
+        blocked_connection_timeout=300,
     )
     return pika.BlockingConnection(parameters)
 

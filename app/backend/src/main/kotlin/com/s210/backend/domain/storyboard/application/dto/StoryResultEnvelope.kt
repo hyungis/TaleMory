@@ -107,3 +107,9 @@ data class StoryError(
     val code: String,
     val message: String,
 )
+
+/**
+ * 범용 AI 결과 에러 정보 (TTS, Image 등 다양한 AI 작업에서 재사용).
+ * code 예: "GENERATE_TTS_ERROR", "GENERATE_TTS_RUNTIME_ERROR"
+ */
+typealias AiError = StoryError

@@ -4,11 +4,14 @@ import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.model.JobType
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.story.entity.StoryBoard
 import com.s210.backend.domain.storyboard.application.StoryboardResultListener.Companion.EnvelopeTypes
+import com.s210.backend.domain.tts.application.TtsResultHandler
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -37,6 +40,9 @@ class StoryboardResultListenerTest {
     private val storyBoardRepository: StoryBoardRepository = mock(StoryBoardRepository::class.java)
     private val storyboardPageRepository: StoryboardPageRepository = mock(StoryboardPageRepository::class.java)
     private val storyRepository: StoryRepository = mock(StoryRepository::class.java)
+    private val ttsResultHandler: TtsResultHandler = mock(TtsResultHandler::class.java)
+    private val sceneRepository: SceneRepository = mock(SceneRepository::class.java)
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository = mock(IllustrationVersionRedisRepository::class.java)
     private val objectMapper = jacksonObjectMapper()
 
     private val listener = StoryboardResultListener(
@@ -45,6 +51,9 @@ class StoryboardResultListenerTest {
         storyboardPageRepository = storyboardPageRepository,
         storyRepository = storyRepository,
         objectMapper = objectMapper,
+        ttsResultHandler = ttsResultHandler,
+        sceneRepository = sceneRepository,
+        illustrationVersionRedisRepository = illustrationVersionRedisRepository,
     )
 
     // -----------------------------------------------------------------------

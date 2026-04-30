@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ArrowRight,
   Loader2,
   Mic,
   Pause,
@@ -11,7 +10,8 @@ import {
   MessageSquareHeart,
 } from 'lucide-react'
 import type { StoryProject } from '../../model/types'
-import { StepHeader } from '../../ui/StepHeader'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
 import {
   getScenes,
   presignHighlightVoice,
@@ -23,12 +23,14 @@ import {
   commitOutroVoice,
   type SceneDto,
 } from '../api/highlightOutroApi'
+import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 
 interface HighlightOutroStepProps {
   storyId?: number | null
   projectData: StoryProject
   onBack: () => void
   onNext: () => void
+  setStoryGenerationJobId: (jobId: number | null) => void
 }
 
 interface HighlightSentence {
@@ -70,7 +72,10 @@ export function HighlightOutroStep({
   projectData,
   onBack,
   onNext,
+  setStoryGenerationJobId,
 }: HighlightOutroStepProps) {
+  const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
+  const [confirmError, setConfirmError] = useState<string | null>(null)
   // --- 씬 데이터 (백엔드 연동 시 사용) ---
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(false)
@@ -300,6 +305,30 @@ export function HighlightOutroStep({
     }
   }, [storyId, outroText, outroSignature])
 
+  const handleNext = useCallback(async () => {
+    if (!storyId) return
+    setConfirmError(null)
+    try {
+      // 1) 아웃트로 저장 (텍스트가 있는 경우)
+      if (outroText.trim()) {
+        await saveOutro(storyId, outroText.trim(), outroSignature.trim() || null)
+      }
+      // 2) storyboard confirm → TTS 잡 시작
+      const job = await confirmStoryboard(storyId)
+      // 3) jobId 부모로 전달
+      setStoryGenerationJobId(job.jobId)
+      // 4) Step 8 진입
+      onNext()
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string }
+      if (apiErr?.status === 409) {
+        setConfirmError('선행 단계가 완료되지 않았습니다. 이전 단계를 확인해 주세요.')
+      } else {
+        setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했습니다.')
+      }
+    }
+  }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, onNext])
+
   const playAudio = useCallback((url: string) => {
     if (audioRef.current) {
       audioRef.current.pause()
@@ -322,10 +351,10 @@ export function HighlightOutroStep({
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={7} stepTitle="강조 녹음 & 아웃트로" onBack={onBack} />
+      <CreationHeader currentStep={7} />
 
       <div className="bookshelf-scroll">
-        <main className="py-10 px-6 bookshelf-fade-in">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
           <div className="max-w-4xl mx-auto pb-12">
             {/* 타이틀 */}
             <div className="text-center mb-8">
@@ -640,26 +669,23 @@ export function HighlightOutroStep({
               </section>
             </div>
 
-            {/* 하단 네비 */}
-            <div className="mt-10 flex justify-between items-center w-full bg-[#2a1b12]/70 p-4 rounded-full shadow-sm border-2 border-[#4a3a24]">
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-4 py-2 text-lg font-bold transition-colors"
-              >
-                이전 단계
-              </button>
-              <button
-                type="button"
-                onClick={onNext}
-                className="bg-[#2d5a27] text-[#f0e6c0] text-xl px-10 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all flex items-center gap-2 font-bold"
-              >
-                완성 미리보기 <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
+            {/* 다음 단계 confirm 진행 중 에러 메시지 — 푸터 위에 자리. 네비 버튼은 CreationFooter 가 담당. */}
+            {confirmError && (
+              <p className="mt-6 text-center text-sm font-bold text-[#8b3a2a] bg-[#F4E4BC] rounded-2xl px-4 py-3 border-2 border-[#8b3a2a]/40">
+                {confirmError}
+              </p>
+            )}
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={7}
+        onBack={onBack}
+        onNext={() => void handleNext()}
+        nextLabel={isConfirming ? '동화책 만드는 중...' : '완성 미리보기'}
+        nextDisabled={isConfirming}
+      />
     </div>
   )
 }

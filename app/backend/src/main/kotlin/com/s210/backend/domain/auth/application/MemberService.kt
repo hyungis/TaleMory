@@ -8,12 +8,16 @@ import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.dto.AuthResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
+import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
+import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
+import com.s210.backend.domain.auth.application.dto.OauthSignupProfile
 import com.s210.backend.domain.auth.application.dto.OauthUserProfile
 import com.s210.backend.domain.auth.application.dto.SignupCommand
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.auth.exception.AuthErrorCode
 import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
+import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.user.entity.User
 import com.s210.backend.domain.user.entity.OauthAccount
@@ -36,6 +40,7 @@ class MemberService(
     private val authenticationManager: AuthenticationManager,
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val oauthRedirectUriResolver: OauthRedirectUriResolver,
+    private val oauthSignupTokenProvider: OauthSignupTokenProvider,
 ) {
     fun signUp(command: SignupCommand): ApiResponse<Unit> {
         if (memberRepository.existsByLoginIdAndDeletedAtIsNull(command.loginId)) {
@@ -78,11 +83,11 @@ class MemberService(
         return AuthResult(tokenInfo.grantType, tokenInfo.accessToken, tokenInfo.refreshToken, user)
     }
 
-    fun loginWithKakaoCallback(code: String, redirectUri: String): AuthResult {
+    fun loginWithKakaoCallback(code: String, redirectUri: String): OauthCallbackResult {
         val allowedRedirectUri = oauthRedirectUriResolver.requireAllowedRedirectUri(redirectUri)
         val oauthUserProfile = kakaoOAuthClient.fetchUserProfile(code, allowedRedirectUri)
 
-        return createOauthLoginResult(oauthUserProfile)
+        return createOauthCallbackResult(oauthUserProfile)
     }
 
     fun getOauthAuthorizeUrl(provider: String, origin: String): String {
@@ -104,12 +109,86 @@ class MemberService(
 
         val redirectUri = oauthRedirectUriResolver.buildBackendCallbackUri(origin, provider)
         val oauthUserProfile = kakaoOAuthClient.fetchUserProfile(code, redirectUri)
-        return createOauthLoginResult(oauthUserProfile)
+        return when (val result = createOauthCallbackResult(oauthUserProfile)) {
+            is OauthCallbackResult.Login -> result.authResult
+            is OauthCallbackResult.SignupRequired -> throw BusinessException(AuthErrorCode.OAUTH_FAILED)
+        }
     }
 
-    private fun createOauthLoginResult(oauthUserProfile: OauthUserProfile): AuthResult {
-        val user = findOrCreateOauthUser(oauthUserProfile)
-        val principal = createOauthPrincipal(user, oauthUserProfile.provider)
+    fun signUpWithKakao(command: OauthSignupCommand): AuthResult {
+        validateOauthSignupCommand(command)
+
+        val oauthSignupToken = oauthSignupTokenProvider.parseToken(command.signupToken)
+        requireSupportedProvider(oauthSignupToken.provider)
+
+        val existingOauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(
+            oauthSignupToken.provider,
+            oauthSignupToken.providerUserId,
+        )
+        if (existingOauthAccount != null) {
+            if (existingOauthAccount.deletedAt != null || existingOauthAccount.user.deletedAt != null) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
+            return createOauthLoginResult(existingOauthAccount.user, oauthSignupToken.provider)
+        }
+
+        val existingEmailUser = memberRepository.findByEmail(command.email)
+        if (existingEmailUser != null) {
+            if (existingEmailUser.deletedAt != null) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
+            throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+        }
+
+        val createdUser = memberRepository.save(
+            User(
+                loginId = null,
+                passwordHash = null,
+                email = command.email,
+                name = command.name,
+                nickname = command.nickname,
+                phone = command.phone,
+                agreeSms = command.agreeSms,
+                agreeMarketing = command.agreeMarketing,
+            )
+        )
+
+        oauthAccountRepository.save(
+            OauthAccount(
+                user = createdUser,
+                provider = oauthSignupToken.provider,
+                providerUserId = oauthSignupToken.providerUserId,
+            )
+        )
+
+        return createOauthLoginResult(createdUser, oauthSignupToken.provider)
+    }
+
+    private fun createOauthCallbackResult(oauthUserProfile: OauthUserProfile): OauthCallbackResult {
+        val oauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(
+            oauthUserProfile.provider,
+            oauthUserProfile.providerUserId,
+        )
+        if (oauthAccount != null) {
+            if (oauthAccount.deletedAt != null || oauthAccount.user.deletedAt != null) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
+            return OauthCallbackResult.Login(createOauthLoginResult(oauthAccount.user, oauthUserProfile.provider))
+        }
+
+        return OauthCallbackResult.SignupRequired(
+            signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
+            profile = OauthSignupProfile(
+                email = oauthUserProfile.email,
+                name = oauthUserProfile.name,
+                nickname = oauthUserProfile.nickname,
+                phone = oauthUserProfile.phone,
+            ),
+        )
+    }
+
+    private fun createOauthLoginResult(user: User, provider: String): AuthResult {
+        val principal = createOauthPrincipal(user, provider)
         val authentication = UsernamePasswordAuthenticationToken(principal, "", principal.authorities)
         val tokenInfo = jwtTokenProvider.createToken(authentication)
 
@@ -120,8 +199,29 @@ class MemberService(
             accessToken = tokenInfo.accessToken,
             refreshToken = tokenInfo.refreshToken,
             user = user,
-            provider = oauthUserProfile.provider,
+            provider = provider,
         )
+    }
+
+    private fun validateOauthSignupCommand(command: OauthSignupCommand) {
+        val phone = command.phone?.trim()
+
+        if (
+            command.signupToken.isBlank() ||
+            command.email.isBlank() ||
+            command.name.isBlank() ||
+            command.nickname.isBlank()
+        ) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!EMAIL_PATTERN.matches(command.email.trim())) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
     }
 
     fun logoutWithOauthCallback(provider: String, refreshToken: String?) {
@@ -167,50 +267,6 @@ class MemberService(
         return newTokenInfo
     }
 
-    private fun findOrCreateOauthUser(profile: OauthUserProfile): User {
-        val oauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(
-            profile.provider,
-            profile.providerUserId,
-        )
-        if (oauthAccount != null) {
-            if (oauthAccount.deletedAt != null || oauthAccount.user.deletedAt != null) {
-                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
-            }
-            return oauthAccount.user
-        }
-
-        val existingUser = memberRepository.findByEmail(profile.email)
-        if (existingUser != null) {
-            if (existingUser.deletedAt != null) {
-                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
-            }
-            return existingUser
-        }
-
-        val createdUser = memberRepository.save(
-            User(
-                loginId = null,
-                passwordHash = null,
-                email = profile.email,
-                name = profile.name,
-                nickname = profile.nickname,
-                phone = profile.phone,
-                agreeSms = false,
-                agreeMarketing = false,
-            )
-        )
-
-        oauthAccountRepository.save(
-            OauthAccount(
-                user = createdUser,
-                provider = profile.provider,
-                providerUserId = profile.providerUserId,
-            )
-        )
-
-        return createdUser
-    }
-
     private fun createOauthPrincipal(user: User, provider: String): CustomUser {
         val principalId = user.loginId ?: "oauth:$provider:${user.id}"
 
@@ -230,5 +286,7 @@ class MemberService(
 
     companion object {
         private const val SUPPORTED_PROVIDER = "kakao"
+        private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+        private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
     }
 }

@@ -1,7 +1,7 @@
 import { Palette, Check, Loader2 } from 'lucide-react'
 import type { StoryProject, StylePresetCode } from '../../model/types'
-import { StepHeader } from '../../ui/StepHeader'
-import { NextButton } from '../../ui/NextButton'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
 import { useStylePresetsQuery } from '../model/useStylePresetsQuery'
 import { useStoryStylePatch } from '../model/useStoryStylePatch'
 
@@ -33,9 +33,9 @@ export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      <StepHeader stepNumber={5} stepTitle="삽화 스타일 선택" onBack={onBack} />
+      <CreationHeader currentStep={5} />
       <div className="bookshelf-scroll">
-        <main className="py-12 px-6 bookshelf-fade-in">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8 text-[#f0e6c0]">
               <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
@@ -95,17 +95,17 @@ export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext
               })}
             </div>
 
-            <div className="bg-[#f0e6c0] p-6 mt-10 rounded-2xl">
-              <NextButton
-                onClick={handleNext}
-                disabled={!data.style || stylePatch.isPending}
-              >
-                {stylePatch.isPending ? '저장 중...' : '보이스 녹음하러 가기'}
-              </NextButton>
-            </div>
           </div>
         </main>
       </div>
+
+      <CreationFooter
+        currentStep={5}
+        onBack={onBack}
+        onNext={handleNext}
+        nextLabel={stylePatch.isPending ? '저장 중...' : '보이스 녹음하러 가기'}
+        nextDisabled={!data.style || stylePatch.isPending}
+      />
     </div>
   )
 }

@@ -97,13 +97,22 @@ class PhotoService(
     }
 
     /**
-     * DB soft delete + S3 객체 hard delete.
+     * DB soft delete + S3 객체 hard delete + 남은 사진 displayOrder 0..N-1 로 compact.
+     *
      * "사용자가 명시적으로 삭제한 사진" = 복구 의도 없음 으로 간주, 스토리지 낭비 방지.
      *
      * S3 삭제는 **트랜잭션 커밋 직후** 별도 리스너(`S3CleanupEventListener`)가 수행.
      * 트랜잭션 내에서 직접 호출하면 "S3 삭제 성공 → DB 커밋 실패" 시 broken image
      * (DB 에는 사진이 있지만 S3 에는 파일 없음 → NoSuchKey) 가 발생할 수 있어 event 분리.
      * 반대 실패 (DB 커밋 성공 → S3 삭제 실패) 는 orphan 만 남고 배치 정리로 복구 가능.
+     *
+     * displayOrder compaction (0-indexed 연속 보장):
+     *  - 삭제만 하고 끝내면 [0,1,2,3] → A 삭제 → [1,2,3] 으로 갭 발생.
+     *  - addPhoto 의 nextOrder = max+1 로직과 결합되면 새 업로드는 4 로 들어가 갭 영구화.
+     *  - reorderPhotos 가 한 번 실행되면 자동 압축되지만, 사용자가 reorder 를 안 하면
+     *    displayOrder 가 0-indexed 연속이 아닌 상태로 AI 처리 / 디버깅 시 혼란.
+     *  - 따라서 삭제 트랜잭션 안에서 즉시 compact: 남은 사진 ASC 순 그대로 0..N-1 재할당.
+     *  - JPA dirty checking 이라 추가 SQL UPDATE 만 발생, 별도 INSERT/DELETE 없음.
      */
     fun removePhoto(userId: Long, storyId: Long, photoId: Long) {
         ownedStory(userId, storyId)
@@ -114,6 +123,13 @@ class PhotoService(
             throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         }
         photo.deletedAt = LocalDateTime.now()
+
+        // 남은 활성 사진들 displayOrder 0..N-1 로 압축.
+        // (deletedAt = now 가 같은 영속성 컨텍스트라 flush 시점에 따라 쿼리에 포함될 수도 있어
+        //  명시적으로 photoId 필터링 — defensive.)
+        photoRepository.findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(storyId)
+            .filter { it.id != photoId }
+            .forEachIndexed { index, p -> p.displayOrder = index.toLong() }
 
         // 실제 S3 DeleteObject 는 S3CleanupEventListener 가 AFTER_COMMIT 에 수행.
         eventPublisher.publishEvent(S3DeletionEvent(photo.imageUrl))

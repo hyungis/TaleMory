@@ -1,38 +1,63 @@
 # TTS Notes
 
-## 1. Current Behavior
+## 1. Current Architecture
 
-현재 AI TTS는 `CosyVoice inference_cross_lingual` 기준으로 동작한다.
+현재 TTS는 CosyVoice `inference_cross_lingual` 기준으로 동작한다.
 
-- reference voice: `app/ai/.runtime/storage/voices/{voiceId}/reference.wav`
-- preview: `POST /api/v1/voices/{voiceId}/preview`
-- story: `POST /api/v1/tts/story`
-- storage:
-  - 로컬 파일 생성
-  - S3 업로드
-  - 응답에는 `audioUrl`, `s3Key` 포함
+- preview endpoint: `POST /api/voices/{voiceId}/preview`
+- story TTS endpoint: `POST /api/tts/story`
+- MQ request routing key: `ai.gpu.tts.generate`
+- MQ result routing keys:
+  - `ai.result.tts.generate.completed`
+  - `ai.result.tts.generate.failed`
 
-감정 제어는 현재 정교하게 쓰지 않는다. 실제 엔진 호출은 안정화된 prefix를 붙인 plain cloning 중심이다.
+생성 방식은 문장별 순차 호출이다.
 
-```text
-You are a helpful assistant. Read slowly.<|endofprompt|>
+- sentence 1개당 CosyVoice 1회 호출
+- `generateFullBookAudio=true`면 sentence wav 생성 후 full-book wav를 추가로 합친다
+
+## 2. Reference Audio Resolution
+
+이제 AI는 로컬 `voices/{voiceId}/reference.wav`만 보지 않는다.
+
+우선순위:
+
+1. 로컬 캐시 파일 존재 시 재사용
+   - `app/ai/.runtime/storage/voices/{voiceId}/reference.wav`
+2. `referenceAudioS3Key`가 있으면 S3에서 다운로드
+3. `referenceAudioUrl`이 있으면 다운로드
+4. `referenceAudioUrl` 값이 실제 URL이 아니라 `stories/...` 형태의 raw S3 key면 S3 key로 간주
+
+즉 현재는 아래 두 방식 모두 허용한다.
+
+```json
+{
+  "referenceAudioS3Key": "stories/voice/42/reference.wav"
+}
 ```
 
-## 2. Key Files
+```json
+{
+  "referenceAudioUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/stories/voice/42/reference.wav"
+}
+```
 
-- `app/ai/app/api/routes/tts.py`
-  - preview/story HTTP 진입점
-- `app/ai/app/services/dev_tts_service.py`
-  - voice reference 조회
-  - preview 생성
-  - story sentence TTS 생성
-  - manifest 기록
-- `app/ai/app/services/cosyvoice_client.py`
-  - CosyVoice HTTP 호출
-- `app/ai/app/services/storage_service.py`
-  - local/S3 저장 추상화
-- `app/ai/app/schemas/tts.py`
-  - preview/story request schema
+또는 backward compatibility:
+
+```json
+{
+  "referenceAudioUrl": "stories/voice/42/reference.wav"
+}
+```
+
+주의:
+
+- 현재 AI는 **다운로드된 파일이 wav라고 가정**한다.
+- 즉 장기적으로는 DB에서 원본 업로드와 TTS용 reference를 분리하는 것이 맞다.
+- 권장 구조:
+  - `audio_url`: 원본 녹음
+  - `reference_audio_s3_key`: TTS용 trim/정제 reference
+  - `tts_voice_url`: 마지막 preview/sample 음성
 
 ## 3. Runtime Paths
 
@@ -48,146 +73,48 @@ app/ai/.runtime/manifests/jobs/{jobId}.json
 설명:
 
 - `voices/...`
-  - reference voice cache
+  - reference voice local cache
 - `generated/voice-preview/...`
-  - preview 산출물
+  - preview 결과
 - `generated/story-tts/...`
   - sentence별 TTS 및 full-book 산출물
 - `manifests/jobs/...`
-  - 로컬 개발용 job 상태 기록
+  - 로컬 job 상태 기록
 
-## 4. Preview Flow
+## 4. Backend Integration Status
 
-1. `voiceId`로 `reference.wav` 확인
-2. prefix + text 조합
-3. CosyVoice `inference_cross_lingual` 호출
-4. 결과 오디오를 local + S3 저장
-5. `previewId`, `audioUrl`, `s3Key`, `durationMs` 반환
+백엔드 기준으로 현재 구현된 것은 아래와 같다.
 
-요청 예시:
+### Voice / Preview
 
-```json
-{
-  "text": "Mina looked at the sea and smiled quietly.",
-  "language": "en-US",
-  "format": "wav",
-  "options": {
-    "emotion": "NEUTRAL",
-    "stylePrompt": null,
-    "speakingRate": null,
-    "pitch": null,
-    "volumeGain": null,
-    "useSsml": false
-  }
-}
-```
+- voice profile CRUD 구현됨
+- preview endpoint 구현됨
+- backend는 voice profile의 저장 값을 보고
+  - `stories/...`면 `referenceAudioS3Key`
+  - 그 외면 `referenceAudioUrl`
+  로 AI preview API를 호출한다
 
-## 5. Story Flow
-
-1. story request 수신
-2. sentence별로 CosyVoice 호출
-3. sentence wav를 local + S3 저장
-4. 필요하면 full-book wav 생성 후 local + S3 저장
-5. manifest에 결과 기록
-
-결과 구조 핵심:
-
-- `items[]`
-  - sentence별 오디오 결과
-- `sceneSentenceUpdates[]`
-  - backend가 sentence audio URL 갱신할 때 쓰기 쉬운 구조
-- `fullBookAudio`
-  - 전체 오디오북 결과
-
-## 6. Storage
-
-현재 TTS 결과는 local과 S3를 함께 쓴다.
-
-- preview
-  - local 저장
-  - S3 업로드
-  - 응답은 S3 URL 반환
-- story
-  - sentence별 local 저장
-  - sentence별 S3 업로드
-  - full-book local 저장
-  - full-book S3 업로드
-
-기본 S3 prefix:
+현재 backend preview 호출 경로:
 
 ```text
-stories/tts
+POST /api/voices/{voiceId}/preview
 ```
 
-예시 key:
+### Story TTS
 
-```text
-stories/tts/generated/voice-preview/test-mom/preview_xxx.wav
-stories/tts/generated/story-tts/1201/sentences/5001.wav
-stories/tts/generated/story-tts/1201/full-book/full-book.wav
-```
+- confirm 시 `StoryGenerationJob(jobType=TTS)` 생성
+- 문장 캐시 lookup 수행
+- cache miss sentence만 MQ로 publish
+- AI 결과 consume 후
+  - `scene_sentences.tts_audio_url` 반영
+  - `story_generation_jobs` 상태 업데이트
+  - Redis TTS cache 저장
 
-## 7. Environment Variables
+즉 backend는 이미 AI worker 결과를 소비할 수 있는 상태다.
 
-핵심 TTS env:
+## 5. MQ Request Message Shape
 
-```env
-COSYVOICE_BASE_URL=http://localhost:8001
-COSYVOICE_CROSS_LINGUAL_PATH=/inference_cross_lingual
-COSYVOICE_TIMEOUT_SEC=180
-
-TTS_STORAGE_MODE=s3
-TTS_PUBLIC_BASE_URL=/static
-TTS_STORAGE_ROOT=app/ai/.runtime/storage
-TTS_MANIFEST_ROOT=app/ai/.runtime/manifests
-
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_REGION=ap-northeast-2
-AWS_S3_BUCKET=s210-iportfolio-dev
-AWS_S3_PREFIX=stories/tts
-AWS_S3_PUBLIC_BASE_URL=
-```
-
-## 8. MQ Integration
-
-### 목적
-
-story TTS를 HTTP background task 대신 MQ worker로 돌릴 수 있게 AI 쪽 준비를 해둔다.
-
-backend는 아직 건드리지 않는다. 즉 AI는 아래 메시지를 받을 준비만 한다.
-
-- request routing key: `ai.gpu.tts.generate`
-- result completed routing key: `ai.result.tts.generate.completed`
-- result failed routing key: `ai.result.tts.generate.failed`
-
-그리고 storyboard 결과 queue와는 분리해서 TTS 전용 result queue를 쓴다.
-
-### AI-side MQ files
-
-- `app/ai/app/schemas/mq_tts.py`
-  - TTS request/result envelope
-- `app/ai/app/consumers/tts_consumer.py`
-  - TTS request consume
-  - TTS success/failure publish
-- `app/ai/app/mq/publisher.py`
-  - `TtsResultPublisher`
-- `app/ai/app/mq/client.py`
-  - TTS request queue bind
-  - TTS result queue bind
-- `app/ai/worker_tts.py`
-  - TTS 전용 worker entrypoint
-
-### AI-side TTS MQ flow
-
-1. `ai.gpu.tts.generate` 메시지 consume
-2. manifest에 `PENDING -> RUNNING` 기록
-3. 기존 TTS 본체 로직 실행
-4. 성공 시 `ai.result.tts.generate.completed` publish
-5. 실패 시 `ai.result.tts.generate.failed` publish
-6. manifest에 `SUCCESS` 또는 `FAILED` 기록
-
-### Request Message Shape
+공통 envelope:
 
 ```json
 {
@@ -196,7 +123,9 @@ backend는 아직 건드리지 않는다. 즉 AI는 아래 메시지를 받을 �
   "storyId": 1201,
   "payload": {
     "storyId": 1201,
-    "voiceId": "test-mom",
+    "voiceId": "42",
+    "referenceAudioUrl": null,
+    "referenceAudioS3Key": "stories/voice/42/reference.wav",
     "language": "en-US",
     "format": "wav",
     "options": {
@@ -224,7 +153,25 @@ backend는 아직 건드리지 않는다. 즉 AI는 아래 메시지를 받을 �
 }
 ```
 
-### Result Message Shape
+허용 emotion:
+
+- `NEUTRAL`
+- `WARM`
+- `HAPPY`
+- `EXCITED`
+- `CALM`
+- `SAD`
+- `SOFT`
+- `SERIOUS`
+- `ANGRY`
+- `NARRATION`
+
+주의:
+
+- `emotion`, `stylePrompt`, `speakingRate`, `pitch`, `volumeGain`은 현재 실제 CosyVoice 생성 파라미터로는 반영되지 않는다
+- metadata 성격으로만 남는다
+
+## 6. MQ Result Message Shape
 
 성공:
 
@@ -236,13 +183,37 @@ backend는 아직 건드리지 않는다. 즉 AI는 아래 메시지를 받을 �
   "status": "COMPLETED",
   "payload": {
     "storyId": 1201,
-    "voiceId": "test-mom",
-    "items": [],
-    "sceneSentenceUpdates": [],
+    "voiceId": "42",
+    "items": [
+      {
+        "sentenceId": 5001,
+        "appliedStyle": {
+          "emotion": "NEUTRAL",
+          "stylePrompt": null
+        },
+        "audio": {
+          "audioUrl": "https://...",
+          "s3Key": "stories/tts/generated/story-tts/1201/sentences/5001.wav",
+          "durationMs": 2100,
+          "format": "wav"
+        }
+      }
+    ],
+    "sceneSentenceUpdates": [
+      {
+        "sentenceId": 5001,
+        "ttsAudioUrl": "https://...",
+        "ttsAudioS3Key": "stories/tts/generated/story-tts/1201/sentences/5001.wav"
+      }
+    ],
     "summary": {
-      "sentenceCount": 0
+      "sentenceCount": 1
     },
-    "fullBookAudio": null
+    "fullBookAudio": {
+      "audioUrl": "https://...",
+      "s3Key": "stories/tts/generated/story-tts/1201/full-book/full-book.wav",
+      "format": "wav"
+    }
   }
 }
 ```
@@ -262,50 +233,217 @@ backend는 아직 건드리지 않는다. 즉 AI는 아래 메시지를 받을 �
 }
 ```
 
-### MQ Env Keys
+## 7. Files Changed for S3 Reference Support
+
+이번 변경으로 수정된 핵심 파일:
+
+- `app/ai/app/schemas/tts.py`
+  - `PreviewRequest.referenceAudioUrl`
+  - `PreviewRequest.referenceAudioS3Key`
+  - `StoryTtsRequest.referenceAudioS3Key`
+- `app/ai/app/services/storage_service.py`
+  - `download_s3_bytes()` 추가
+- `app/ai/app/services/dev_tts_service.py`
+  - `resolve_reference_voice()` 추가
+  - preview/story TTS에서 공통 resolver 사용
+- `app/ai/app/api/routes/tts.py`
+  - preview API가 `referenceAudioUrl`, `referenceAudioS3Key`를 전달
+- `app/ai/app/consumers/tts_consumer.py`
+  - worker 사전 다운로드 로직 제거
+  - service 공통 resolver에 위임
+
+backend 쪽 같이 맞춘 파일:
+
+- `app/backend/.../VoicePreviewRequest.kt`
+  - `referenceAudioS3Key` 추가
+- `app/backend/.../StoryTtsPayload.kt`
+  - `referenceAudioS3Key` 추가
+- `app/backend/.../VoicePreviewService.kt`
+  - 저장 값이 S3 key면 `referenceAudioS3Key`로 전송
+  - preview URI를 `/api/voices/{voiceId}/preview`로 수정
+- `app/backend/.../StoryConfirmService.kt`
+  - TTS MQ payload 생성 시 S3 key / URL 분기
+
+## 8. Local Test Guide
+
+### 8-1. Infra
+
+RabbitMQ / Redis / MySQL:
+
+```powershell
+cd infra\compose
+docker compose -f docker-compose.infra-local.yml up -d
+```
+
+확인:
+
+```powershell
+docker ps
+```
+
+RabbitMQ 관리 페이지:
+
+```text
+http://localhost:15673
+```
+
+### 8-2. CosyVoice
+
+CosyVoice 서버는 별도 포트에서 먼저 띄운다.
+
+예:
+
+```bash
+cd ~/work/CosyVoice/runtime/python/fastapi
+python server.py --port 8001 --model_dir ~/work/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B
+```
+
+AI `.env`:
 
 ```env
-RABBITMQ_TTS_GENERATE_QUEUE=ai.gpu.request.queue
-RABBITMQ_TTS_RESULT_QUEUE=ai.result.tts.queue
-RABBITMQ_TTS_GENERATE_ROUTING_KEY=ai.gpu.tts.generate
-RABBITMQ_TTS_RESULT_BINDING_KEY=ai.result.tts.#
-RABBITMQ_TTS_GENERATE_COMPLETED_ROUTING_KEY=ai.result.tts.generate.completed
-RABBITMQ_TTS_GENERATE_FAILED_ROUTING_KEY=ai.result.tts.generate.failed
+COSYVOICE_BASE_URL=http://localhost:8001
+COSYVOICE_CROSS_LINGUAL_PATH=/inference_cross_lingual
+COSYVOICE_TIMEOUT_SEC=180
 ```
 
-## 9. Run Commands
+### 8-3. AI API / Worker
 
-기존 storyboard/image worker:
+같은 가상환경에서 실행하는 것이 중요하다.
+
+```powershell
+cd app\ai
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+worker:
+
+```powershell
+cd app\ai
+python .\worker_tts.py
+```
+
+### 8-4. Preview API Test
+
+body 예시:
+
+```json
+{
+  "text": "Hello, Lina.",
+  "language": "en-US",
+  "format": "wav",
+  "referenceAudioS3Key": "stories/voice/42/reference.wav",
+  "options": {
+    "emotion": "NEUTRAL",
+    "stylePrompt": null,
+    "speakingRate": null,
+    "pitch": null,
+    "volumeGain": null,
+    "useSsml": false
+  }
+}
+```
+
+호출:
 
 ```bash
-python app/ai/worker.py
+curl -X POST http://localhost:8000/api/voices/42/preview ^
+  -H "Content-Type: application/json" ^
+  -d @preview.json
 ```
 
-TTS 전용 worker:
+예상:
 
-```bash
-python app/ai/worker_tts.py
+- `app/ai/.runtime/storage/voices/42/reference.wav` 생성
+- preview audio 생성
+- `audioUrl`, `s3Key`, `durationMs` 반환
+
+### 8-5. Story MQ Test
+
+1. 요청 큐 purge
+   - `ai.gpu.request.queue`
+2. 필요하면 결과 큐 purge
+   - `ai.result.tts.queue`
+3. 아래 메시지 publish
+
+```json
+{
+  "jobId": "story_tts_test_s3_001",
+  "jobType": "TTS",
+  "storyId": 1,
+  "payload": {
+    "storyId": 1,
+    "voiceId": "42",
+    "referenceAudioS3Key": "stories/voice/42/reference.wav",
+    "language": "en-US",
+    "format": "wav",
+    "options": {
+      "defaultEmotion": "NEUTRAL",
+      "defaultStylePrompt": null,
+      "generateFullBookAudio": false,
+      "speakingRate": null,
+      "pitch": null,
+      "volumeGain": null,
+      "useSsml": false
+    },
+    "sentences": [
+      {
+        "sentenceId": 1001,
+        "pageNumber": 1,
+        "sentenceOrder": 1,
+        "text": "Lina looked at the sea and smiled quietly.",
+        "speakerKey": "narrator",
+        "emotion": "NEUTRAL",
+        "stylePrompt": null,
+        "ssml": null
+      }
+    ]
+  }
+}
 ```
 
-로컬 API:
+exchange / routing:
 
-```bash
-cd app/ai
-python -m uvicorn app.main:app --reload --port 8000
+```text
+exchange: ai.request
+routing key: ai.gpu.tts.generate
 ```
 
-## 10. Current Boundaries
+예상:
 
-현재 문서 기준으로 AI가 맡는 범위:
+- local cache:
+  - `app/ai/.runtime/storage/voices/42/reference.wav`
+- sentence output:
+  - `app/ai/.runtime/storage/generated/story-tts/1/sentences/1001.wav`
+- result event:
+  - `ai.result.tts.generate.completed`
 
-- reference voice 기반 preview/story 생성
-- local/S3 저장
-- TTS MQ consume/publish
-- local manifest 기록
+### 8-6. Troubleshooting
 
-현재 아직 backend에서 정해야 할 범위:
+`voice not found`
 
-- voice profile과 AI `voiceId` 매핑 정책
-- MQ request 발행
-- MQ result consume 후 DB 저장
-- full-book audio를 backend DB 어디에 저장할지
+- 로컬 cache 없음
+- `referenceAudioS3Key` / `referenceAudioUrl` 둘 다 없음
+
+`StorageDownloadError`
+
+- S3 key 오타
+- AWS credential / bucket / region 설정 문제
+
+`CosyVoiceInvocationError`
+
+- CosyVoice 서버 미기동
+- `COSYVOICE_BASE_URL` / path mismatch
+
+`Ready > 0` on `ai.result.tts.queue`
+
+- AI가 결과를 publish 했지만 backend consumer가 안 먹고 있는 상태
+
+## 9. Remaining Boundaries
+
+현재 아직 남아 있는 구조적 과제:
+
+- `voice_profiles.audio_url`와 TTS용 reference 분리
+- `reference_audio_s3_key` 컬럼 정식 도입
+- 원본이 wav가 아닐 때의 변환/정제 파이프라인
+- 긴 story TTS의 job 분할 또는 병렬화
+- worker reconnect / publish reconnect 강화

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -16,9 +15,14 @@ import {
   type SceneDto,
   type OutroDto,
 } from '../../highlight-outro/api/highlightOutroApi'
+import { CreationHeader } from '../../ui/CreationHeader'
+import { CreationFooter } from '../../ui/CreationFooter'
+import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
 
 interface FinalPreviewStepProps {
   storyId: number | null
+  /** TTS 잡 jobId (HighlightOutroStep confirm 응답). null 이면 폴링 없이 즉시 scenes fetch. */
+  storyGenerationJobId: number | null
   onBack: () => void
   /** "내 책장 보관하기" — 제작 플로우 종료 후 메인(서점) 으로 복귀. */
   onSaveToBookshelf: () => void
@@ -32,28 +36,37 @@ interface FinalPreviewStepProps {
  * STEP 08 — "완성된 동화책"
  *
  * 서버에서 scenes + outro 를 조회하여 실제 삽화/본문/TTS 를 표시한다.
+ * storyGenerationJobId 가 있으면 TTS 잡이 SUCCESS 될 때까지 폴링하고,
+ * SUCCESS(또는 jobId=null) 시점에 scenes/outro 를 fetch 한다.
  */
 export function FinalPreviewStep({
   storyId,
+  storyGenerationJobId,
   onBack,
   onSaveToBookshelf,
   onOpenViewer,
   onShare,
 }: FinalPreviewStepProps) {
+  const jobQuery = useGenerationJobQuery(storyGenerationJobId)
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [outro, setOutro] = useState<OutroDto | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadingScenes, setLoadingScenes] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
   useEffect(() => {
     if (!storyId) {
-      setLoading(false)
+      setLoadingScenes(false)
       setError('스토리 ID가 없습니다.')
       return
     }
+
+    // jobId 가 없거나 SUCCESS 도달 시점에만 scenes/outro fetch
+    const shouldFetch = !storyGenerationJobId || jobQuery.data?.status === 'SUCCESS'
+    if (!shouldFetch) return
+
     let cancelled = false
-    setLoading(true)
+    setLoadingScenes(true)
     Promise.all([getScenes(storyId), getOutro(storyId)])
       .then(([scenesData, outroData]) => {
         if (cancelled) return
@@ -66,12 +79,12 @@ export function FinalPreviewStep({
         setError('동화 데이터를 불러오지 못했습니다.')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoadingScenes(false)
       })
     return () => {
       cancelled = true
     }
-  }, [storyId])
+  }, [storyId, jobQuery.data?.status, storyGenerationJobId])
 
   const totalPages = scenes.length
   const currentScene = scenes[resultPageIndex] ?? null
@@ -102,10 +115,36 @@ export function FinalPreviewStep({
     }
   }, [onShare])
 
-  if (loading) {
+  // TTS 잡이 PENDING/RUNNING 인 경우 또는 scenes fetch 중인 경우 blocking
+  const isJobInProgress =
+    !!storyGenerationJobId &&
+    (jobQuery.data?.status === 'PENDING' || jobQuery.data?.status === 'RUNNING')
+  const blocking = isJobInProgress || loadingScenes
+
+  if (blocking) {
+    const message = jobQuery.data?.currentStep ?? '동화책 만드는 중...'
     return (
       <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-[#b4dc8c] animate-spin" />
+        <p className="ml-4 text-[#f0e6c0] text-lg">{message}</p>
+      </div>
+    )
+  }
+
+  if (jobQuery.data?.status === 'FAILED') {
+    return (
+      <div className="bookshelf-modal step-forest-modal flex items-center justify-center flex-col gap-4">
+        <p className="text-red-400 text-lg">동화 음성 생성에 실패했습니다.</p>
+        {jobQuery.data.errorMessage && (
+          <p className="text-[#f0e6c0] text-sm">{jobQuery.data.errorMessage}</p>
+        )}
+        <button
+          type="button"
+          onClick={onBack}
+          className="bg-[#f0e6c0] text-[#2d5a27] px-6 py-2 rounded-full border-2 border-[#b4dc8c] hover:bg-[#b4dc8c] transition-all font-bold"
+        >
+          이전 단계로
+        </button>
       </div>
     )
   }
@@ -122,26 +161,10 @@ export function FinalPreviewStep({
 
   return (
     <div className="bookshelf-modal step-forest-modal">
-      {/* Step 헤더 */}
-      <div className="flex items-center justify-between py-4 px-8 border-b border-[#4a3a24] bg-[#2a1b12]/60 shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="이전 단계"
-            className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">STEP 08 / 09</span>
-          <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">
-            완성된 동화책
-          </span>
-        </div>
-      </div>
+      <CreationHeader currentStep={8} />
 
       <div className="bookshelf-scroll">
-        <main className="py-10 px-4 md:px-10 bookshelf-fade-in">
+        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
           <div className="max-w-6xl mx-auto pb-12">
             {/* 성공 배지 */}
             <div className="text-center mb-8">
@@ -221,6 +244,8 @@ export function FinalPreviewStep({
           </div>
         </main>
       </div>
+
+      <CreationFooter currentStep={8} onBack={onBack} />
     </div>
   )
 }
