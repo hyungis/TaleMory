@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import wave
 from datetime import UTC, datetime
@@ -98,15 +99,23 @@ def _is_http_url(value: str) -> bool:
     return lowered.startswith("http://") or lowered.startswith("https://")
 
 
+_S3_KEY_PATTERN = re.compile(r"^([a-z][a-z0-9-]*/)?stories/")
+
+
 def _looks_like_s3_key(value: str) -> bool:
     """
-    raw S3 key (not URL) 인지 휴리스틱 판정.
-    env-prefix(local/dev/prod) 가 앞에 붙은 키도 인식하도록 — http(s):// 가 아니면서
-    path 안에 `stories/` 가 들어있으면 raw key 로 간주.
+    raw S3 key (not URL) 인지 판정.
+
+    허용 패턴:
+      - 레거시 raw key: `stories/...`
+      - env-prefixed: `local/stories/...`, `dev/stories/...`, `prod/stories/...` 등
+
+    단순 `"stories/" in value` 보다 좁혀 — 자유 텍스트 안에 우연히 "stories/" 가 끼어든
+    false-positive 를 차단하기 위해 path-shaped 첫 segment 만 허용.
     """
     if _is_http_url(value):
         return False
-    return "stories/" in value
+    return bool(_S3_KEY_PATTERN.match(value))
 
 
 def _download_url_bytes(url: str) -> bytes:

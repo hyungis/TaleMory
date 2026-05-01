@@ -74,12 +74,21 @@ class VoicePreviewService(
     }
 
     /**
-     * 입력이 S3 key 인지(URL 이 아닌지) 휴리스틱 판정.
-     * env-prefix(local/dev/prod) 가 앞에 붙은 키도 인식하도록 — http(s):// 가 아니면서 path 안에
-     * `stories/` 또는 `voices/` 가 들어있으면 raw key 로 간주.
+     * 입력이 S3 key 인지(URL 이 아닌지) 판정.
+     *
+     * 허용 패턴:
+     *  - 레거시 raw key: `stories/...`, `voices/...`
+     *  - env-prefixed: `local/stories/...`, `dev/stories/...`, `prod/stories/...` 등
+     *
+     * 단순 `contains("stories/")` 보다 좁혀 — 자유 텍스트 안에 우연히 "stories/" 가 끼어든
+     * false-positive 를 차단하기 위해 path-shaped 첫 segment 만 허용.
      */
     private fun looksLikeS3Key(value: String): Boolean {
         if (value.startsWith("http://") || value.startsWith("https://")) return false
-        return value.contains("stories/") || value.contains("voices/")
+        return S3_KEY_PATTERN.containsMatchIn(value)
+    }
+
+    companion object {
+        private val S3_KEY_PATTERN = Regex("^([a-z][a-z0-9-]*/)?(stories|voices)/")
     }
 }
