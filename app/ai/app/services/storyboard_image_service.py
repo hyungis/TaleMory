@@ -125,7 +125,11 @@ def _unique_refs(values: list[str], limit: int) -> list[str]:
 def regenerate_storyboard_image(
     request_model: StoryboardImageRegenerateRequest,
 ) -> StoryboardImageRegenerateResponse:
-    regenerate_item = _build_regenerate_item(request_model.item, request_model.userPrompt)
+    baseline_item = ensure_storyboard_character_reference_for_regenerate(
+        request_model.storyId,
+        request_model.item,
+    )
+    regenerate_item = _build_regenerate_item(baseline_item, request_model.userPrompt)
     result = generate_storyboard_image_item(
         request_model.storyId,
         regenerate_item,
@@ -138,6 +142,21 @@ def regenerate_storyboard_image(
         seed=request_model.seed,
         outputVersion=request_model.outputVersion,
         result=result,
+    )
+
+
+def ensure_storyboard_character_reference_for_regenerate(
+    story_id: int,
+    item: StoryboardImageGenerateItemRequest,
+) -> StoryboardImageGenerateItemRequest:
+    if item.characterReferenceImageUrls or item.characterReferenceImageS3Keys:
+        return item
+
+    character_s3_key = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
+    return item.model_copy(
+        update={
+            "characterReferenceImageS3Keys": [character_s3_key],
+        }
     )
 
 
