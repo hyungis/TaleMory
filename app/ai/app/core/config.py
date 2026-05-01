@@ -45,6 +45,9 @@ class Settings(BaseModel):
     AWS_REGION: str = getenv("AWS_REGION", "ap-northeast-2")
     AWS_S3_BUCKET: str = getenv("AWS_S3_BUCKET", "")
     AWS_S3_PREFIX: str = getenv("AWS_S3_PREFIX", "stories/tts")
+    # 같은 버킷에서 환경(local/dev/prod) 격리용 — 모든 S3 key 앞에 prepend.
+    # 미설정 시 default `local` — 로컬 개발자 사고 방지.
+    AWS_S3_ENV_PREFIX: str = getenv("AWS_S3_ENV_PREFIX", "local")
     AWS_S3_PUBLIC_BASE_URL: str | None = getenv("AWS_S3_PUBLIC_BASE_URL")
     OPENAI_API_KEY: str | None = getenv("OPENAI_API_KEY")
     GEMINI_API_KEY: str | None = getenv("GEMINI_API_KEY", getenv("GOOGLE_API_KEY"))

@@ -136,6 +136,8 @@ RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY=ai.result.final-illustrati
 
 RABBITMQ_TTS_PREVIEW_QUEUE=ai.gpu.preview.request.queue
 RABBITMQ_TTS_PREVIEW_ROUTING_KEY=ai.gpu.tts.preview
+
+AWS_S3_ENV_PREFIX=dev
 ```
 
 - [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
@@ -284,6 +286,8 @@ RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY=ai.result.final-illustrati
 
 RABBITMQ_TTS_PREVIEW_QUEUE=ai.gpu.preview.request.queue
 RABBITMQ_TTS_PREVIEW_ROUTING_KEY=ai.gpu.tts.preview
+
+AWS_S3_ENV_PREFIX=prod
 ```
 
 - [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료

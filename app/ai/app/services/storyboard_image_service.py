@@ -31,8 +31,25 @@ _FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
 )
 
 _GEMINI_RETRY_DELAY_SECONDS = 0.5
-_CHARACTER_REFERENCE_OBJECT_PATH = "stories/{story_id}/storyboard-character/reference.png"
+_CHARACTER_REFERENCE_OBJECT_PATH_TEMPLATE = "stories/{story_id}/storyboard-character/reference.png"
 _MAX_GEMINI_REFERENCE_IMAGES = 3
+
+
+def _apply_env_prefix(relative_key: str) -> str:
+    """
+    같은 버킷 내에서 환경(local/dev/prod) 격리를 위해 모든 object path 앞에 prepend.
+    upload + 응답 반환(BE 가 grounding 용으로 다시 보내옴) 모두 동일 키 형식 유지를 위해
+    path 빌더에서 prefix 를 박는다.
+    """
+    env_prefix = (settings.AWS_S3_ENV_PREFIX or "").strip("/")
+    if not env_prefix:
+        return relative_key
+    return f"{env_prefix}/{relative_key}"
+
+
+def _character_reference_object_path(story_id: int) -> str:
+    """env-prefixed `{env}/stories/{story_id}/storyboard-character/reference.png`."""
+    return _apply_env_prefix(_CHARACTER_REFERENCE_OBJECT_PATH_TEMPLATE.format(story_id=story_id))
 
 
 def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
@@ -89,7 +106,7 @@ def ensure_storyboard_character_reference(
             referenceImageUrls=reference_image_urls,
         )
     )
-    character_s3_key = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
+    character_s3_key = _character_reference_object_path(story_id)
     return [
         item.model_copy(
             update={
@@ -152,7 +169,7 @@ def ensure_storyboard_character_reference_for_regenerate(
     if item.characterReferenceImageUrls or item.characterReferenceImageS3Keys:
         return item
 
-    character_s3_key = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
+    character_s3_key = _character_reference_object_path(story_id)
     return item.model_copy(
         update={
             "characterReferenceImageS3Keys": [character_s3_key],
@@ -664,12 +681,13 @@ def _upload_and_resolve_url(
 
 
 def _storyboard_image_object_path(story_id: int, page_number: int, output_version: int | None = None) -> str:
+    """env-prefixed `{env}/stories/{story_id}/storyboard-image/{page_number}/v{version}.png`."""
     version = output_version or 1
-    return f"stories/{story_id}/storyboard-image/{page_number}/v{version}.png"
+    return _apply_env_prefix(f"stories/{story_id}/storyboard-image/{page_number}/v{version}.png")
 
 
 def _upload_and_resolve_character_reference_url(story_id: int, image_bytes: bytes) -> str:
-    object_path = _CHARACTER_REFERENCE_OBJECT_PATH.format(story_id=story_id)
+    object_path = _character_reference_object_path(story_id)
     if _has_s3_upload_config():
         _upload_to_s3(object_path, image_bytes)
         return _resolve_public_url(object_path)
