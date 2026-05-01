@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -250,11 +250,83 @@ export function StoryboardEditorStep({
   const [currentImageJobId, setCurrentImageJobId] = useState<number | null>(null)
   const imageJobQuery = useGenerationJobQuery(currentImageJobId)
 
+  /**
+   * 이번 mount 사이클에서 polling 까지 완료된 (terminal status 도달한) IMAGE 잡 id 들을 기억.
+   *
+   * 왜 필요한가:
+   *  cleanup effect 가 currentImageJobId=null 로 풀어주는 시점에 storyboard-state cache 는 여전히
+   *  "활성 잡" 으로 그 jobId 를 들고 있다 (refetch 가 async 라 race). 가드 없으면 mount-recovery effect
+   *  가 stale latestImageJob/activeImageRegenerateJob 을 보고 종결된 잡을 다시 setCurrentImageJobId
+   *  로 살려내며 cleanup ↔ recovery 가 무한 루프 → regen-status / pages / versions 폭주.
+   *
+   * ref 로 두는 이유: recovery effect 가 dep 변화로 재실행될 때 즉시 보이는 동기 source 가 필요.
+   * useState 면 setState → re-render → effect 재실행 사이에 한 tick 뒤늦게 반영되어 race 가 또 생김.
+   */
+  const finishedImageJobIdsRef = useRef<Set<number>>(new Set())
+
+  // ────────────────────────────────────────────────────────────
+  // IMAGE 배치 잡 새로고침 복구 — sessionStorage 가 비어 있는 엣지케이스(탭 닫고 재진입,
+  // 새로고침) 에서도 BE state 의 latestImageJob 을 진실로 polling 을 자동 재개.
+  //
+  // 트리거 조건:
+  //  - currentImageJobId 가 아직 null (사용자가 새 배치를 막 시작한 경우는 안 건드림)
+  //  - STORY 잡이 활성 아님 (재생성 시나리오에서 STORY 가 다시 RUNNING 인 경우 옛 IMAGE 결과 의미 없음)
+  //  - latestImageJob.status 가 PENDING/RUNNING
+  //
+  // SUCCESS / FAILED 는 polling 안 함 — 페이지 query 가 image_url 로 결과 또는 빈 상태를 그대로 렌더.
+  // ────────────────────────────────────────────────────────────
+  const latestImageJob = stateData?.latestImageJob ?? null
+  useEffect(() => {
+    if (currentImageJobId !== null) return         // 이미 polling 중 → 건드리지 않음
+    if (effectiveStoryJobId !== null && isStoryJobInProgress) return  // STORY 진행 중 → IMAGE 복구 스킵
+    if (!latestImageJob) return
+    // 이번 세션에서 이미 종결된 잡이면 무시 — stale state cache 로 인한 cleanup ↔ recovery 무한 루프 차단.
+    if (finishedImageJobIdsRef.current.has(latestImageJob.jobId)) return
+    if (latestImageJob.status === 'PENDING' || latestImageJob.status === 'RUNNING') {
+      setCurrentImageJobId(latestImageJob.jobId)
+    }
+  }, [
+    latestImageJob?.jobId,
+    latestImageJob?.status,
+    currentImageJobId,
+    effectiveStoryJobId,
+    isStoryJobInProgress,
+  ])
+
   // 어떤 페이지가 현재 재생성 요청 중인지 추적 — 페이지별 spinner / 에러 표시에 사용.
   // (regenerateImageMut 자체는 페이지 무관 단일 instance 라 별도 ref 필요.)
   // 폴링이 끝날 때까지 유지되어 mutate inflight 뿐 아니라 server 폴링 동안에도 스피너 노출.
   const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null)
   const [regenerateErrors, setRegenerateErrors] = useState<Record<number, string>>({})
+
+  // ────────────────────────────────────────────────────────────
+  // 페이지 재생성 잡 새로고침 복구 — 단일 페이지 재생성 polling 도 동일 패턴으로 자동 재개.
+  //
+  // BE 의 동시성 가드(StoryboardImageGenerationService) 로 한 스토리당 활성 재생성은 1개만 허용 →
+  // activeImageRegenerateJob 은 항상 단일 jobId.
+  //
+  // 트리거 조건은 배치 복구와 같음: currentImageJobId 가 비어있고 STORY 활성 아니면 적용.
+  // jobId 와 함께 pageNumber 도 즉시 set → 해당 페이지 카드의 스피너가 새로고침 직후부터 보임.
+  //
+  // 잡 종결(SUCCESS/FAILED) 처리는 기존 cleanup effect (imageJobQuery.data?.status 분기) 가
+  // currentImageJobId / regeneratingPageNumber 둘 다 정리하므로 추가 로직 불필요.
+  // ────────────────────────────────────────────────────────────
+  const activeRegenerateJob = stateData?.activeImageRegenerateJob ?? null
+  useEffect(() => {
+    if (currentImageJobId !== null) return
+    if (effectiveStoryJobId !== null && isStoryJobInProgress) return
+    if (!activeRegenerateJob) return
+    // 이번 세션에서 이미 종결된 잡이면 무시 — 무한 루프 방어 (배치 복구와 동일 가드).
+    if (finishedImageJobIdsRef.current.has(activeRegenerateJob.jobId)) return
+    setCurrentImageJobId(activeRegenerateJob.jobId)
+    setRegeneratingPageNumber(activeRegenerateJob.pageNumber)
+  }, [
+    activeRegenerateJob?.jobId,
+    activeRegenerateJob?.pageNumber,
+    currentImageJobId,
+    effectiveStoryJobId,
+    isStoryJobInProgress,
+  ])
 
   // 진행 중 폴링이 갱신될 때마다 페이지 캐시도 invalidate → 페이지마다 image_url 즉시 표시.
   useEffect(() => {
@@ -270,6 +342,8 @@ export function StoryboardEditorStep({
       currentImageJobId !== null &&
       (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut)
     ) {
+      // 종결 표식 — recovery effect 가 stale state cache 로 같은 잡을 다시 살리는 것을 차단.
+      finishedImageJobIdsRef.current.add(currentImageJobId)
       setCurrentImageJobId(null)
       // 단일 페이지 재생성 폴링 종료 — 페이지별 스피너 해제 + 실패 시 메시지 / 성공 시 캐시버스터.
       if (regeneratingPageNumber !== null) {
@@ -292,6 +366,12 @@ export function StoryboardEditorStep({
         // 카운터 / picker 도 갱신 — SUCCESS/FAILED 모두 status 카운트가 +1 되고,
         // SUCCESS 시 versions 리스트에 새 버전 entry 가 추가됨.
         void queryClient.refetchQueries({ queryKey: ['storyboard-regen-status', storyId] })
+        // storyboard-state(latestImageJob / activeImageRegenerateJob) 도 같이 — 그렇지 않으면
+        // 캐시된 활성 잡 정보가 stale 한 상태로 남아 mount-recovery effect 가 종결된 잡을
+        // 다시 setCurrentImageJobId 로 살려내며 cleanup ↔ recovery 가 무한 루프에 빠진다.
+        // 트리거: 배치 생성 마지막 페이지 SUCCESS 도착 시 cleanup → recovery → re-poll(SUCCESS) → cleanup ...
+        // 증상: 짧은 시간 안에 regen-status / pages(presigned v{N}.png URL) 호출이 폭주.
+        void queryClient.refetchQueries({ queryKey: ['storyboard-state', storyId] })
         if (regeneratingPageNumber !== null) {
           void queryClient.refetchQueries({
             queryKey: ['storyboard-image-versions', storyId, regeneratingPageNumber],
@@ -405,7 +485,8 @@ export function StoryboardEditorStep({
             setCurrentImageJobId(res.jobId)
             setRegeneratePrompts(prev => ({ ...prev, [pageNumber]: '' }))
             // 카운터 SoT 는 BE — mutate 직후 status 캐시 invalidate 해 used+1 즉시 반영.
-            // (PENDING/RUNNING 은 BE used 에 미포함이지만 이후 polling 종료 effect 에서 한 번 더 갱신.)
+            // BE 가 이제 PENDING/RUNNING 까지 used 에 포함하므로 사용자는 버튼 누른 직후
+            // 헤더 카운터가 차감되어 보인다. (이후 polling 종료 effect 에서 한 번 더 갱신.)
             if (storyId !== null) {
               void queryClient.invalidateQueries({
                 queryKey: ['storyboard-regen-status', storyId],

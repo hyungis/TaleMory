@@ -172,12 +172,15 @@ class StoryboardImageGenerationService(
         val page = storyboardPageRepository.findByStoryBoardIdAndPageNumber(storyBoard.id, pageNumber)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
-        // 1) 한도 검사 — 스토리당 STORYBOARD_IMAGE_REGENERATE 잡 SUCCESS+FAILED 카운트가 한도 이상이면 거부.
-        //    (배치 첫 생성 STORYBOARD_IMAGE 와 분리된 enum 이라 카운트가 정확.)
+        // 1) 한도 검사 — 스토리당 STORYBOARD_IMAGE_REGENERATE 잡 PENDING/RUNNING/SUCCESS/FAILED 합이
+        //    한도 이상이면 거부. PENDING/RUNNING 까지 포함하는 이유는 `getRegenStatus` 헤더 카운터가
+        //    동일 정책으로 사용자에게 "요청 즉시 차감" 을 보장하기 때문 — 양쪽이 같은 식을 써야
+        //    카운터 표시와 한도 검증이 어긋나지 않는다. (배치 첫 생성 STORYBOARD_IMAGE 와 분리된
+        //    enum 이라 카운트가 정확.)
         val regenCount = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
             storyId,
             JobType.STORYBOARD_IMAGE_REGENERATE,
-            listOf(JobStatus.SUCCESS, JobStatus.FAILED),
+            listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS, JobStatus.FAILED),
         )
         if (regenCount >= StoryboardImageRegenPolicy.LIMIT_PER_STORY) {
             throw BusinessException(StoryErrorCode.STORYBOARD_REGEN_LIMIT_EXCEEDED)

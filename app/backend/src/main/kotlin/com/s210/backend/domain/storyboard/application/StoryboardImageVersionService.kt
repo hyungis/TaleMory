@@ -116,7 +116,10 @@ class StoryboardImageVersionService(
     /**
      * 헤더 카운터용 — 동화 단위 재생성 사용량 / 한도 / 남은 횟수 조회.
      *
-     * - `regenerateOne` 한도 검사와 동일한 카운트 (SUCCESS + FAILED).
+     * - `regenerateOne` 한도 검사와 동일한 카운트 (PENDING + RUNNING + SUCCESS + FAILED).
+     * - PENDING/RUNNING 도 used 에 포함 → 사용자가 재생성 버튼을 누른 즉시 카운터가 깎여서
+     *   "결과를 받아야 비로소 차감되는" 헷갈림을 방지. AI 잡이 FAILED 로 끝나도 이미 차감된
+     *   카운트가 그대로 유지되며 한도 정책상 일관됨.
      * - 카운트는 `JobType.STORYBOARD_IMAGE_REGENERATE` 만 — 배치 첫 생성은 제외.
      */
     @Transactional(readOnly = true)
@@ -126,7 +129,7 @@ class StoryboardImageVersionService(
         val used = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
             storyId,
             JobType.STORYBOARD_IMAGE_REGENERATE,
-            listOf(JobStatus.SUCCESS, JobStatus.FAILED),
+            listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS, JobStatus.FAILED),
         ).toInt()
 
         val limit = StoryboardImageRegenPolicy.LIMIT_PER_STORY
