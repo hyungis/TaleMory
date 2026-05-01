@@ -360,7 +360,7 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
     ) -> dict:
         captured_prompt["value"] = final_prompt
         assert character_reference_image_urls == []
-        assert character_reference_image_s3_keys == []
+        assert character_reference_image_s3_keys == ["stories/1/storyboard-character/reference.png"]
         assert reference_image_urls == ["https://example.com/reference.png"]
         assert reference_image_s3_keys == []
         assert seed == 4321
@@ -424,6 +424,75 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
     assert "## Additional Instruction" in captured_prompt["value"]
     assert "- 따뜻한 동화책 느낌" in captured_prompt["value"]
     assert "User regeneration request: 리나 표정을 더 신나게 바꿔줘" in captured_prompt["value"]
+
+
+def test_regenerate_storyboard_image_uses_default_character_reference_when_missing() -> None:
+    settings.GEMINI_API_KEY = "test-key"
+    captured_character_refs: dict[str, list[str]] = {}
+
+    def fake_call_gemini_image_api(
+        final_prompt: str,
+        character_reference_image_urls: list[str],
+        character_reference_image_s3_keys: list[str],
+        reference_image_urls: list[str],
+        reference_image_s3_keys: list[str],
+        seed: int,
+    ) -> dict:
+        del final_prompt, reference_image_urls, reference_image_s3_keys, seed
+        captured_character_refs["urls"] = character_reference_image_urls
+        captured_character_refs["s3_keys"] = character_reference_image_s3_keys
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "inlineData": {
+                                    "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8J9sAAAAASUVORK5CYII="
+                                }
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {},
+        }
+
+    original_call = storyboard_image_service._call_gemini_image_api
+    storyboard_image_service._call_gemini_image_api = fake_call_gemini_image_api
+    try:
+        storyboard_image_service.regenerate_storyboard_image(
+            storyboard_image_service.StoryboardImageRegenerateRequest.model_validate(
+                {
+                    "storyId": 1,
+                    "seed": 4321,
+                    "outputVersion": 2,
+                    "userPrompt": "리나 표정을 더 신나게 바꿔줘",
+                    "item": {
+                        "pageNumber": 1,
+                        "storyboard": {
+                            "title": "리나의 와이키키 모험",
+                            "synopsis": "가족과 함께한 따뜻한 여행 이야기",
+                        },
+                        "page": {
+                            "pageNumber": 1,
+                            "sceneSummary": "리나가 와이키키에 도착한 장면",
+                            "englishText": "Lina arrived at Waikiki with her family.",
+                            "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
+                            "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
+                        },
+                        "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
+                        "companions": ["엄마", "아빠"],
+                        "referenceImageUrls": ["https://example.com/reference.png"],
+                    },
+                }
+            )
+        )
+    finally:
+        storyboard_image_service._call_gemini_image_api = original_call
+
+    assert captured_character_refs["urls"] == []
+    assert captured_character_refs["s3_keys"] == ["stories/1/storyboard-character/reference.png"]
 
 
 def test_regenerate_storyboard_image_requires_user_prompt() -> None:
