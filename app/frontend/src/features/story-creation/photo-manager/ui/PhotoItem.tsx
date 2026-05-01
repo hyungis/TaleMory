@@ -245,6 +245,12 @@ function CommittedFields({
     }
   }
 
+  // input 안에서 친 mousedown 이 root 카드까지 버블링되면 dnd-kit PointerSensor 의 8px distance 가
+  // 통과되며 카드가 reorder drag 로 들어가 텍스트 드래그-선택이 깨진다.
+  // → input 위에서만 stopPropagation 으로 끊어 텍스트 선택은 살리고, 카드의 다른 영역은 그대로 drag 가능.
+  // (root 전체 stopPropagation 은 카드 정렬 드래그 자체를 죽이므로 input 한정이 핵심)
+  const stopDragPointer = (e: React.PointerEvent) => e.stopPropagation()
+
   return (
     <div className="space-y-4">
       <div>
@@ -255,6 +261,7 @@ function CommittedFields({
           value={descLocal}
           onChange={e => setDescLocal(e.target.value)}
           onBlur={handleDescBlur}
+          onPointerDown={stopDragPointer}
           className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60"
         />
       </div>
@@ -266,6 +273,7 @@ function CommittedFields({
           value={tagsLocal}
           onChange={e => setTagsLocal(e.target.value)}
           onBlur={handleTagsBlur}
+          onPointerDown={stopDragPointer}
           className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60 font-bold"
         />
       </div>

@@ -47,3 +47,55 @@ export interface JobStartResponse {
   jobType: string
   status: string
 }
+
+/**
+ * 페이지 이미지 버전 1건 — `GET /storyboard/pages/{n}/image/versions` 응답의 versions 요소.
+ *
+ * - `version`: 1 = 배치 첫 생성본, 2+ = 재생성본.
+ * - `url`: 해당 버전의 versioned S3 URL (`stories/.../v{N}.png`).
+ * - `prompt`: 재생성 시 유저 자유 입력. 배치본(v1) 은 null.
+ * - `createdAt`: ISO-8601. Redis 에 저장된 시점.
+ * - `jobId`: 해당 버전을 만든 STORYBOARD_IMAGE_REGENERATE 잡 id. v1 은 null.
+ */
+export interface StoryboardImageVersionEntry {
+  version: number
+  url: string
+  prompt: string | null
+  createdAt: string | null
+  jobId: number | null
+}
+
+/**
+ * `GET /storyboard/pages/{n}/image/versions` 응답.
+ *
+ * 재생성 이력이 없는 페이지는 `current = null, versions = []` 로 200 응답 →
+ * FE 는 picker 자체를 숨긴다.
+ */
+export interface StoryboardImageVersionsResponse {
+  storyId: number
+  pageNumber: number
+  current: number | null
+  versions: StoryboardImageVersionEntry[]
+}
+
+/**
+ * `POST /storyboard/pages/{n}/image/select` 요청 body.
+ *
+ * `version` 은 1 이상의 정수. BE 가 Redis 에 실제 존재하는 버전인지 검증.
+ */
+export interface SelectStoryboardImageVersionRequest {
+  version: number
+}
+
+/**
+ * `GET /storyboard/regen-status` 응답.
+ *
+ * Step 4 헤더 우측 카운터에 사용. used = SUCCESS+FAILED 합산, limit = BE 정책 상수.
+ * `remaining = limit - used` 의 음수 clamp 까지 BE 가 처리해서 내려옴.
+ */
+export interface StoryboardRegenStatusResponse {
+  storyId: number
+  used: number
+  limit: number
+  remaining: number
+}

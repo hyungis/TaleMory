@@ -80,12 +80,17 @@ data class StoryboardImageRegenerateMessage(
 
 /**
  * 재생성 페이로드.
+ *
  * - userPrompt: 유저가 입력한 자유 텍스트 (1..2000). AI 가 additionalInstruction 으로 합쳐 사용.
+ * - outputVersion: AI 워커가 S3 에 저장할 때 사용할 버전 번호 (versioned key `v{N}.png`).
+ *   BE 가 Redis INCR 로 계산해 2, 3, 4, ... 채워 보냄. AI 측 스키마는 `payload.outputVersion`
+ *   (top-level, ge=1) 로 받음 — 배치 generate 메시지에는 이 필드가 없음 (항상 v1 deterministic).
  * - item: 배치와 동일한 구조의 페이지 1개 입력.
  */
 data class StoryboardImageRegeneratePayload(
     val storyId: Long,
     val seed: Int,
     val userPrompt: String,
+    val outputVersion: Int,
     val item: StoryboardImageItem,
 )

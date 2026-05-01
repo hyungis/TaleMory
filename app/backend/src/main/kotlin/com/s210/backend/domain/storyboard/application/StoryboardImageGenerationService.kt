@@ -15,6 +15,7 @@ import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
+import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
@@ -57,6 +58,7 @@ class StoryboardImageGenerationService(
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
+    private val pageVersionRepository: StoryboardPageImageVersionRedisRepository,
 ) {
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
@@ -148,6 +150,28 @@ class StoryboardImageGenerationService(
         val page = storyboardPageRepository.findByStoryBoardIdAndPageNumber(storyBoard.id, pageNumber)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
+        // 1) 한도 검사 — 스토리당 STORYBOARD_IMAGE_REGENERATE 잡 SUCCESS+FAILED 카운트가 한도 이상이면 거부.
+        //    (배치 첫 생성 STORYBOARD_IMAGE 와 분리된 enum 이라 카운트가 정확.)
+        val regenCount = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
+            storyId,
+            JobType.STORYBOARD_IMAGE_REGENERATE,
+            listOf(JobStatus.SUCCESS, JobStatus.FAILED),
+        )
+        if (regenCount >= StoryboardImageRegenPolicy.LIMIT_PER_STORY) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_REGEN_LIMIT_EXCEEDED)
+        }
+
+        // 2) 동시성 검사 — 같은 스토리에 이미 PENDING/RUNNING 인 재생성 잡이 있으면 거부.
+        //    더블클릭 / 다른 탭에서 동시 호출 시 outputVersion / S3 / Redis race 방지.
+        val activeJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORYBOARD_IMAGE_REGENERATE,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeJob != null) {
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
         val storyPayload = loadLastSuccessStoryPayload(storyId)
         val origPage = storyPayload.pages.firstOrNull { it.pageNumber == pageNumber }
         val sourcePhotoIds = origPage?.sourcePhotoIds ?: emptyList()
@@ -179,17 +203,25 @@ class StoryboardImageGenerationService(
         val trimmedUserPrompt = userPrompt.trim()
         if (trimmedUserPrompt.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
+        // 3) 다음 outputVersion 계산 — Redis INCR (atomic).
+        //    첫 호출 시 max-version 키가 없으면 1 로 init (배치 v1 reserve) 후 INCR → 2 반환.
+        //    이후 호출은 3, 4, ... 반환. AI 워커가 v{N}.png 키 suffix 로 사용.
+        //    AI 측 스키마는 `payload.outputVersion` (top-level) 로 받으므로 item 내부가 아니라
+        //    payload 에 직접 부여.
+        val nextVersion = pageVersionRepository.computeNextVersion(page.id)
+
         val payload = StoryboardImageRegeneratePayload(
             storyId = storyId,
             seed = seed,
             userPrompt = trimmedUserPrompt,
+            outputVersion = nextVersion,
             item = item,
         )
 
         val job = jobRepository.save(
             StoryGenerationJob(
                 storyId = storyId,
-                jobType = JobType.STORYBOARD_IMAGE,
+                jobType = JobType.STORYBOARD_IMAGE_REGENERATE,
                 status = JobStatus.PENDING,
                 requestPayload = objectMapper.writeValueAsString(payload),
             ),
@@ -208,7 +240,7 @@ class StoryboardImageGenerationService(
 
         return StartGenerationResult(
             jobId = job.id,
-            jobType = JobType.STORYBOARD_IMAGE.name,
+            jobType = JobType.STORYBOARD_IMAGE_REGENERATE.name,
             status = JobStatus.PENDING.name,
         )
     }

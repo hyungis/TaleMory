@@ -2,6 +2,7 @@ package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -14,6 +15,7 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRep
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryResultEnvelope
+import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import com.s210.backend.domain.tts.application.TtsResultHandler
@@ -54,6 +56,7 @@ class StoryboardResultListener(
     private val ttsResultHandler: TtsResultHandler,
     private val sceneRepository: SceneRepository,
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
+    private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -367,11 +370,23 @@ class StoryboardResultListener(
             return
         }
 
+        // 재생성 분기에서 v1 lazy push 에 사용할 직전 URL 을 갱신 전에 캡처.
+        // (한 번도 재생성 안 한 페이지의 imageUrl = 배치 생성본 v1 의 deterministic URL)
+        val previousImageUrl = page.imageUrl
+
         page.imageUrl = resultData.imageUrl
         // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
 
         val isRegenerate = envelope.type.startsWith("REGENERATE_")
         if (isRegenerate) {
+            // 페이지 versioning push (Step 4 — Redis 설계 v4 §1.5).
+            // best-effort: Redis 장애 시 page.imageUrl 갱신은 살아있고 잡 SUCCESS 흐름은 유지.
+            runCatching {
+                pushPageVersionForRegenerate(job, page.id, previousImageUrl, resultData.imageUrl)
+            }.onFailure { e ->
+                log.warn("Redis storyboard-image version push failed jobId={}: {}", job.id, e.message)
+            }
+
             // 단일 페이지 재생성 — 1장 도달 = 즉시 마무리.
             finalizeImageJobSuccess(job, payload.seed, totalPagesDone = 1)
             return
@@ -388,6 +403,76 @@ class StoryboardResultListener(
                 job.id, resultData.pageNumber,
                 pages.count { !it.imageUrl.isNullOrBlank() }, pages.size,
             )
+        }
+    }
+
+    /**
+     * Step 4 페이지 이미지 재생성 SUCCESS 처리 시 Redis 버전관리 push.
+     *
+     * 동작:
+     *  1) job.requestPayload (StoryboardImageRegeneratePayload JSON) 에서
+     *     - userPrompt
+     *     - item.outputVersion (BE 가 publish 시점에 채운 값)
+     *     를 안전하게 추출.
+     *  2) 첫 재생성 (current 가 없음) 이면 v1 lazy push — 직전 page.imageUrl 을 v1 으로 보존.
+     *  3) 새 outputVersion 으로 push (versions 리스트 LPUSH + LTRIM 10 + current 갱신).
+     *
+     * 실패 시:
+     *  - extractRegeneratePayload 가 null 을 반환하면 push 스킵 + warn 로그 (외부에서 catch).
+     *  - Redis 자체 실패는 호출자(handleImageSuccess) 의 runCatching 에서 흡수.
+     *
+     * 주의:
+     *  - newImageUrl = AI 워커가 versioned key (`stories/.../v{N}.png`) 로 저장한 결과 URL.
+     *  - previousImageUrl 이 null 인 케이스 (배치 v1 이 아직 안 채워졌는데 재생성이 들어옴) 는
+     *    데이터 정합성 깨짐 — 그래도 새 버전만 push 해 흐름 유지 (잡 SUCCESS 보존).
+     */
+    private fun pushPageVersionForRegenerate(
+        job: StoryGenerationJob,
+        pageId: Long,
+        previousImageUrl: String?,
+        newImageUrl: String,
+    ) {
+        val req = extractRegeneratePayload(job) ?: run {
+            log.warn(
+                "Skipping version push — failed to parse regenerate request payload jobId={}",
+                job.id,
+            )
+            return
+        }
+        val outputVersion = req.outputVersion
+
+        // 첫 재생성 — current 가 없으면 직전 imageUrl 을 v1 으로 lazy push (배치 생성본 보존).
+        if (storyboardPageImageVersionRepository.getCurrent(pageId) == null && !previousImageUrl.isNullOrBlank()) {
+            storyboardPageImageVersionRepository.pushVersion(
+                pageId = pageId,
+                version = 1,
+                url = previousImageUrl,
+                prompt = null,        // 배치 생성본은 사용자 프롬프트 없음
+                jobId = null,         // 배치 잡 id 는 추적 안 함 (별도 필요해지면 추가)
+            )
+        }
+
+        // 새 outputVersion 으로 push.
+        storyboardPageImageVersionRepository.pushVersion(
+            pageId = pageId,
+            version = outputVersion,
+            url = newImageUrl,
+            prompt = req.userPrompt,
+            jobId = job.id,
+        )
+    }
+
+    /**
+     * job.requestPayload (JSON) 를 StoryboardImageRegeneratePayload 로 deserialize.
+     * 파싱 실패 시 null 반환 (호출자가 분기).
+     */
+    private fun extractRegeneratePayload(job: StoryGenerationJob): StoryboardImageRegeneratePayload? {
+        val raw = job.requestPayload ?: return null
+        return try {
+            objectMapper.readValue(raw, StoryboardImageRegeneratePayload::class.java)
+        } catch (e: Exception) {
+            log.warn("Failed to parse StoryboardImageRegeneratePayload jobId={}: {}", job.id, e.message)
+            null
         }
     }
 

@@ -25,4 +25,5 @@ enum class StoryErrorCode(
     REGENERATION_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "STORY_015", "삽화 재생성 횟수를 초과했습니다."),
     BGM_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_016", "존재하지 않는 BGM 프리셋입니다."),
     SCENE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_017", "씬을 찾을 수 없습니다."),
+    STORYBOARD_REGEN_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "STORY_018", "스토리보드 페이지 이미지 재생성은 동화당 3회까지 가능합니다."),
 }
