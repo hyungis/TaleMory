@@ -16,6 +16,7 @@ from app.schemas.final_illustration import (
     FinalIllustrationUsage,
 )
 from app.services.storyboard_image_service import (
+    _apply_env_prefix,
     _download_reference_image,
     _download_reference_image_from_s3,
     _has_s3_upload_config,
@@ -333,7 +334,8 @@ def _download_generated_image_bytes(image_url: str) -> bytes:
 
 
 def _upload_and_resolve_url(story_id: int, item: FinalIllustrationGenerateItemRequest, image_bytes: bytes) -> str:
-    object_path = f"stories/{story_id}/final-illustration/{item.pageNumber}.png"
+    # env-prefix(local/dev/prod) 포함 — storyboard_image_service 와 동일 헬퍼 재사용.
+    object_path = _apply_env_prefix(f"stories/{story_id}/final-illustration/{item.pageNumber}.png")
     if _has_s3_upload_config():
         _upload_to_s3(object_path, image_bytes)
         return _resolve_final_public_url(object_path)

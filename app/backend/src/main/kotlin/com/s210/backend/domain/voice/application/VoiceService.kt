@@ -77,7 +77,8 @@ class VoiceService(
         val trimmedTitle = title.trim()
         if (trimmedTitle.isBlank()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
-        val expectedPrefix = "stories/voice/$userId/"
+        // env-prefix(local/dev/prod) 적용된 풀 prefix 로 검증.
+        val expectedPrefix = s3Service.applyEnvPrefix("stories/voice/$userId/")
         if (!s3Key.startsWith(expectedPrefix)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
@@ -123,11 +124,13 @@ class VoiceService(
 
     private fun extractS3Key(storedReference: String): String? {
         val withoutQuery = storedReference.substringBefore("?")
-        if (withoutQuery.startsWith("stories/")) return withoutQuery
-
-        val marker = "/stories/"
-        val markerIndex = withoutQuery.indexOf(marker)
-        if (markerIndex < 0) return null
-        return withoutQuery.substring(markerIndex + 1)
+        // URL 이 아니면 이미 raw S3 key (env-prefix 가 붙었든 안 붙었든 그대로 통과).
+        if (!withoutQuery.startsWith("http://") && !withoutQuery.startsWith("https://")) {
+            return withoutQuery
+        }
+        // URL 에서 path 만 추출 → 그게 곧 env-prefix 포함된 풀 key.
+        return runCatching {
+            java.net.URI(withoutQuery).path?.removePrefix("/")?.takeIf { it.isNotBlank() }
+        }.getOrNull()
     }
 }

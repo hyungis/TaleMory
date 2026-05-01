@@ -155,6 +155,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` | ✅ | `s210-backend-s3` IAM user Secret Access Key |
 | `ENV_DEV_APP_AWS_REGION` | — | `ap-northeast-2` (AWS SDK 표준 env 이름 — region 자동 인식용) |
 | `ENV_DEV_APP_AWS_S3_BUCKET` | — | `s210-iportfolio-dev` — 사용자 사진 + 생성 이미지 저장 버킷 |
+| `ENV_DEV_APP_AWS_S3_ENV_PREFIX` | — | `dev` — 같은 버킷에서 환경(local/dev/prod) 격리용 root prefix. BE/AI 워커가 모든 S3 key 앞에 prepend |
 | `ENV_DEV_APP_FRONTEND_PORT` | — | `3001` (호스트 publish 포트) |
 | `ENV_DEV_APP_VITE_API_BASE_URL` | — | `/api` (Vite build-time 주입) |
 | `ENV_DEV_APP_OPENAI_API_KEY` | ✅ | OpenAI API 키 |
@@ -246,6 +247,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `RABBITMQ_PORT` | `5673` | `5672` |
 | `RABBITMQ_MANAGEMENT_PORT` | `15673` | `15672` |
 | `AI_WORKER_REPLICAS` | `1` | `2` (권장 — 병렬 OpenAI 처리량 확보) |
+| `AWS_S3_ENV_PREFIX` | `dev` | `prod` |
 
 Kakao Developers console registration guide:
 - Redirect URI: `http://k14s210.p.ssafy.io:3001/auth/kakao/callback`, `https://k14s210.p.ssafy.io:3443/auth/kakao/callback`, `https://k14s210.p.ssafy.io/auth/kakao/callback`

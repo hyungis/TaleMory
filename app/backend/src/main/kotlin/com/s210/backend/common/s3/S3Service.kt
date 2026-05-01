@@ -28,7 +28,26 @@ class S3Service(
     private val s3Presigner: S3Presigner,
     @Value("\${aws.s3.bucket}") private val bucket: String,
     @Value("\${aws.s3.region}") private val region: String,
+    @Value("\${aws.s3.env-prefix}") private val envPrefix: String,
 ) {
+    /**
+     * 환경별(local/dev/prod) 격리용 prefix 를 모든 S3 key 앞에 prepend.
+     * 같은 버킷 안에서 환경 분리를 위해 사용 — env 가 비어있으면 raw key 그대로 반환.
+     *
+     * 예: envPrefix="dev" + relativeKey="stories/42/photos/abc.jpg"
+     *     → "dev/stories/42/photos/abc.jpg"
+     *
+     * 신규 key 를 만드는 모든 빌더 (presign*, upload*) 가 이 헬퍼를 거치도록 일원화.
+     * 외부에서 받은 s3Key 인자(presignGetUrl/deleteObject/uploadFile)는 이미 완성된 키이므로 가공하지 않는다.
+     *
+     * 공개 메서드로 노출 — PhotoService / VoiceService / HighlightOutroService 등의
+     * commit-단계 prefix 검증(`s3Key.startsWith(expectedPrefix)`)이 환경 prefix 를 인지하도록.
+     */
+    fun applyEnvPrefix(relativeKey: String): String {
+        val cleaned = envPrefix.trim().trim('/')
+        return if (cleaned.isEmpty()) relativeKey else "$cleaned/$relativeKey"
+    }
+
     /**
      * 버킷 존재 + 현재 IAM user 의 접근 권한을 한 번에 검증.
      * 권한 없으면 `S3Exception` 이 그대로 던져진다.
@@ -45,12 +64,12 @@ class S3Service(
 
     /**
      * Step 2 사진 업로드용 presigned PUT URL 발급.
-     * key 규칙: `stories/{storyId}/photos/{uuid}.{ext}`.
+     * key 규칙: `{envPrefix}/stories/{storyId}/photos/{uuid}.{ext}`.
      * URL 유효 시간 5분.
      */
     fun presignPhotoPutUrl(storyId: Long, contentType: String): PresignedUpload {
         val extension = extensionOf(contentType)
-        val key = "stories/$storyId/photos/${UUID.randomUUID()}.$extension"
+        val key = applyEnvPrefix("stories/$storyId/photos/${UUID.randomUUID()}.$extension")
         val putRequest = PutObjectRequest.builder()
             .bucket(bucket)
             .key(key)
@@ -126,11 +145,11 @@ class S3Service(
 
     /**
      * 음성 녹음 업로드용 presigned PUT URL 발급.
-     * key 규칙: `voice-profiles/{userId}/{uuid}.{ext}`.
+     * key 규칙: `{envPrefix}/stories/voice/{userId}/{uuid}.{ext}`.
      */
     fun presignVoicePutUrl(userId: Long, contentType: String): PresignedUpload {
         val extension = audioExtensionOf(contentType)
-        val key = "stories/voice/$userId/${UUID.randomUUID()}.$extension"
+        val key = applyEnvPrefix("stories/voice/$userId/${UUID.randomUUID()}.$extension")
         val putRequest = PutObjectRequest.builder()
             .bucket(bucket)
             .key(key)
@@ -153,21 +172,21 @@ class S3Service(
 
     /**
      * 강조 녹음 업로드용 presigned PUT URL 발급.
-     * key 규칙: `stories/{storyId}/highlight-voices/{sentenceId}/{uuid}.{ext}`.
+     * key 규칙: `{envPrefix}/stories/{storyId}/highlight-voices/{sentenceId}/{uuid}.{ext}`.
      */
     fun presignHighlightVoicePutUrl(storyId: Long, sentenceId: Long, contentType: String): PresignedUpload {
         val extension = audioExtensionOf(contentType)
-        val key = "stories/$storyId/highlight-voices/$sentenceId/${UUID.randomUUID()}.$extension"
+        val key = applyEnvPrefix("stories/$storyId/highlight-voices/$sentenceId/${UUID.randomUUID()}.$extension")
         return presignAudioPutUrl(key, contentType)
     }
 
     /**
      * 아웃트로 녹음 업로드용 presigned PUT URL 발급.
-     * key 규칙: `stories/{storyId}/outro-voice/{uuid}.{ext}`.
+     * key 규칙: `{envPrefix}/stories/{storyId}/outro-voice/{uuid}.{ext}`.
      */
     fun presignOutroVoicePutUrl(storyId: Long, contentType: String): PresignedUpload {
         val extension = audioExtensionOf(contentType)
-        val key = "stories/$storyId/outro-voice/${UUID.randomUUID()}.$extension"
+        val key = applyEnvPrefix("stories/$storyId/outro-voice/${UUID.randomUUID()}.$extension")
         return presignAudioPutUrl(key, contentType)
     }
 

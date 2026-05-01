@@ -33,14 +33,26 @@ def storage_mode() -> str:
 
 
 def build_storage_key(path: Path) -> str | None:
+    """
+    최종 S3 key 형식: `{AWS_S3_ENV_PREFIX}/{AWS_S3_PREFIX}/{relative}`
+      - AWS_S3_ENV_PREFIX: 환경 격리 (`local`/`dev`/`prod`)
+      - AWS_S3_PREFIX: TTS 자체 sub-organization (`stories/tts`)
+      - relative: 파일 경로 상의 위치
+    예: "local/stories/tts/runs/abc.wav"
+    """
     if storage_mode() != "s3":
         return None
 
     relative = path.relative_to(settings.TTS_STORAGE_ROOT).as_posix()
-    prefix = settings.AWS_S3_PREFIX.strip("/")
-    if prefix:
-        return f"{prefix}/{relative}"
-    return relative
+    parts: list[str] = []
+    env_prefix = (settings.AWS_S3_ENV_PREFIX or "").strip("/")
+    if env_prefix:
+        parts.append(env_prefix)
+    sub_prefix = settings.AWS_S3_PREFIX.strip("/")
+    if sub_prefix:
+        parts.append(sub_prefix)
+    parts.append(relative)
+    return "/".join(parts)
 
 
 def build_public_url(path: Path) -> str:
