@@ -99,7 +99,14 @@ def _is_http_url(value: str) -> bool:
 
 
 def _looks_like_s3_key(value: str) -> bool:
-    return value.startswith("stories/")
+    """
+    raw S3 key (not URL) 인지 휴리스틱 판정.
+    env-prefix(local/dev/prod) 가 앞에 붙은 키도 인식하도록 — http(s):// 가 아니면서
+    path 안에 `stories/` 가 들어있으면 raw key 로 간주.
+    """
+    if _is_http_url(value):
+        return False
+    return "stories/" in value
 
 
 def _download_url_bytes(url: str) -> bytes:

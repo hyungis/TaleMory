@@ -18,6 +18,8 @@ def setup_function() -> None:
     settings.STORYBOARD_IMAGE_S3_ACCESS_KEY_ID = None
     settings.STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY = None
     settings.STORYBOARD_IMAGE_S3_ENDPOINT_URL = None
+    # 환경 prefix 비활성화 — 테스트 assertion 이 환경 격리에 영향 없이 결정적으로 동작.
+    settings.AWS_S3_ENV_PREFIX = ""
 
 
 def test_generate_storyboard_images_uses_local_fallback_when_gemini_key_missing() -> None:
