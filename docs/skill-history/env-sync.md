@@ -1,5 +1,21 @@
 # env-sync — Skill History
 
+## v0.11 - 2026-05-01
+
+- Summary: `add-mode.md` 의 `docs/gitlab-variables.md` 갱신 절차 (§3) 에 **신규 env 키 위치 컨벤션** 을 명시적으로 박음. 각 환경 (dev / master) 코드 블록의 맨 마지막 줄 다음에 빈 줄 한 칸 띄우고 append 하라는 규칙 + 잘못된/올바른 diff 예시 + git log 로 선례 검토 가이드 포함.
+- Reason: AWS_S3_KEY_PREFIX 신규 추가 작업 (#d516457) 에서 agent 가 카테고리 옆 (`AWS_S3_BUCKET=` 다음 줄) 에 끼워넣었고, 사용자가 "왜 컨벤션 안 지키냐" 고 정정 요청 → #e409e13 으로 위치 정정. v0.10 의 `gitlab-vars-mode.md` 에는 "신규 비민감 키는 빈 줄 분리" 가 명시돼 있었지만 `add-mode.md` (직접 편집 시 참조) 에는 없어서 agent 가 직관에 의존한 결과. 같은 컨벤션을 두 곳에 모두 박아 재발 방지.
+- Changed files:
+  - `.agents/skills/env-sync/references/add-mode.md` — §3 안에 "위치 컨벤션" 서브섹션 신규 추가 (잘못된/올바른 diff 예시 포함)
+  - `docs/skill-history/env-sync.md` (이 항목)
+- User approval: Approved retroactively (B 옵션 — 변경 유지 + 누락된 절차 사후 채움). 사용자가 직접 편집을 먼저 발견하고 절차 위반을 지적한 후, 변경 자체는 유효하므로 사후 승인하기로 결정.
+- Impact:
+  - `/env-sync add` 또는 `add-mode.md` 만 보고 작업하는 agent 도 "코드 블럭 맨 뒤 + 빈 줄" 룰을 즉시 인지 가능.
+  - dev / master 양쪽 block 에 동일하게 적용한다는 점이 룰에 명시됨.
+  - 의심 시 `git log -p docs/gitlab-variables.md` 로 선례 확인 가이드 — 직관 의존 차단.
+- Process Note (재발 방지):
+  - 이번 변경은 `managing-skill-evolution` 의 Flow B 절차 (사용자 확인 → before/after 비교 → one-off vs permanent → 최종 승인 → history 기록) 를 사전에 거치지 않고 단독 편집했다가 사용자에게 지적받음. 사후에 비교/승인/history 를 채워 정상화.
+  - 앞으로 스킬 파일 편집 전 **항상** managing-skill-evolution 의 Flow A/B 를 먼저 검토할 것.
+
 ## v0.10 - 2026-04-27
 
 - Summary: Strengthened `gitlab-vars` output rules so newly added non-sensitive File Variable keys MUST be rendered as a separate append group: existing env lines first, exactly one blank line, then new keys.
