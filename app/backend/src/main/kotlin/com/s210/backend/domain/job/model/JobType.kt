@@ -19,4 +19,11 @@ enum class JobType {
 
     /** 스토리보드 줄거리(요약) 생성 작업 — V9 ENUM 추가. */
     STORYBOARD_STORY_SUMMARY,
+
+    /**
+     * 스토리보드 페이지 이미지 재생성 작업 — V11 ENUM 추가.
+     * 배치 생성(STORYBOARD_IMAGE)과 분리해 "스토리당 3회" 한도 카운트를 정확히 집계.
+     * Step 4 의 페이지별 [재생성하기] 버튼 흐름에서만 사용.
+     */
+    STORYBOARD_IMAGE_REGENERATE,
 }

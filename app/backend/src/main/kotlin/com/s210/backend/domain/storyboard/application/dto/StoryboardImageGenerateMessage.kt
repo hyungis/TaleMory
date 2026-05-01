@@ -20,10 +20,17 @@ data class StoryboardImageGenerateMessage(
 /**
  * 배치 페이로드. seed 는 페이지 간 화풍 일관성을 위해 storyId 단위로 결정적인 값을 부여한다.
  * items 는 1..20 (AI 측 max=20 제약).
+ *
+ * `characterSourceImageS3Keys` — Step 2 에서 사용자가 "대표 사진" 으로 마킹한 사진 (`purpose IN (CHARACTER_REF, BOTH)`)
+ * 의 s3Key 들 (max 3). AI 가 이 사진들을 모아 reference.png 를 생성한 뒤 모든 페이지의 일러스트
+ * 에 캐릭터 일관성 baseline 으로 적용한다. AI schema 의 동명 필드와 1:1 매칭.
+ *  - 빈 배열로 보내면 AI 가 페이지별 referenceImageS3Keys 를 fallback 으로 사용 (AI 측 로직).
+ *    그러나 BE 는 Step 3 진입 검증으로 보통 ≥ 1 보장.
  */
 data class StoryboardImageGeneratePayload(
     val storyId: Long,
     val seed: Int,
+    val characterSourceImageS3Keys: List<String> = emptyList(),
     val items: List<StoryboardImageItem>,
 )
 
@@ -80,12 +87,17 @@ data class StoryboardImageRegenerateMessage(
 
 /**
  * 재생성 페이로드.
+ *
  * - userPrompt: 유저가 입력한 자유 텍스트 (1..2000). AI 가 additionalInstruction 으로 합쳐 사용.
+ * - outputVersion: AI 워커가 S3 에 저장할 때 사용할 버전 번호 (versioned key `v{N}.png`).
+ *   BE 가 Redis INCR 로 계산해 2, 3, 4, ... 채워 보냄. AI 측 스키마는 `payload.outputVersion`
+ *   (top-level, ge=1) 로 받음 — 배치 generate 메시지에는 이 필드가 없음 (항상 v1 deterministic).
  * - item: 배치와 동일한 구조의 페이지 1개 입력.
  */
 data class StoryboardImageRegeneratePayload(
     val storyId: Long,
     val seed: Int,
     val userPrompt: String,
+    val outputVersion: Int,
     val item: StoryboardImageItem,
 )

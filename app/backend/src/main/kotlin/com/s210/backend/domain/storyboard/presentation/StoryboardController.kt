@@ -4,17 +4,21 @@ import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.storyboard.application.StoryboardGenerationService
 import com.s210.backend.domain.storyboard.application.StoryboardImageGenerationService
+import com.s210.backend.domain.storyboard.application.StoryboardImageVersionService
 import com.s210.backend.domain.storyboard.application.StoryboardPageService
 import com.s210.backend.domain.storyboard.application.StoryboardSummaryService
 import com.s210.backend.domain.storyboard.application.SummaryResponseData
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
 import com.s210.backend.domain.storyboard.application.dto.StoryBoardResult
+import com.s210.backend.domain.storyboard.application.dto.StoryboardImageVersionsResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPageResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPagesResult
+import com.s210.backend.domain.storyboard.application.dto.StoryboardRegenStatusResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardStateResult
 import com.s210.backend.domain.storyboard.presentation.request.GenerateStoryRequest
 import com.s210.backend.domain.storyboard.presentation.request.RegenerateStoryboardImageRequest
 import com.s210.backend.domain.storyboard.presentation.request.RegenerateSummaryRequest
+import com.s210.backend.domain.storyboard.presentation.request.SelectStoryboardImageVersionRequest
 import com.s210.backend.domain.storyboard.presentation.request.UpdateStoryboardPageRequest
 import com.s210.backend.domain.storyboard.presentation.request.UpdateStoryboardSummaryRequest
 import jakarta.validation.Valid
@@ -42,6 +46,7 @@ class StoryboardController(
     private val storyboardGenerationService: StoryboardGenerationService,
     private val storyboardPageService: StoryboardPageService,
     private val storyboardImageGenerationService: StoryboardImageGenerationService,
+    private val storyboardImageVersionService: StoryboardImageVersionService,
     private val storyboardSummaryService: StoryboardSummaryService,
 ) {
 
@@ -164,6 +169,69 @@ class StoryboardController(
             userPrompt = request.userPrompt,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
+    }
+
+    /**
+     * 한 페이지의 이미지 버전 list + 현재 선택 조회.
+     *
+     * Step 4 페이지 카드의 드롭다운 picker 가 사용. 재생성 이력이 없는 페이지면
+     * `current = null, versions = []` 가 내려가며 FE 는 picker 자체를 숨긴다.
+     */
+    @GetMapping("/pages/{pageNumber}/image/versions")
+    fun listStoryboardPageImageVersions(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @PathVariable pageNumber: Int,
+    ): ResponseEntity<ApiResponse<StoryboardImageVersionsResult>> {
+        val result = storyboardImageVersionService.listVersions(
+            userId = user.userId,
+            storyId = storyId,
+            pageNumber = pageNumber,
+        )
+        return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    /**
+     * 한 페이지에 대해 특정 이미지 버전 선택.
+     *
+     * `storyboard_pages.image_url` 을 해당 버전 url 로 갱신하고 Redis `current` 도 같은 값으로 set.
+     * 응답은 갱신 후의 단일 페이지 정보 (`StoryboardPageResult`).
+     */
+    @PostMapping("/pages/{pageNumber}/image/select")
+    fun selectStoryboardPageImageVersion(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @PathVariable pageNumber: Int,
+        @Valid @RequestBody request: SelectStoryboardImageVersionRequest,
+    ): ResponseEntity<ApiResponse<StoryboardPageResult>> {
+        storyboardImageVersionService.selectVersion(
+            userId = user.userId,
+            storyId = storyId,
+            pageNumber = pageNumber,
+            version = request.version,
+        )
+        // 갱신 후 페이지 단건 응답 — FE 가 동일 형태로 즉시 반영 가능.
+        val result = storyboardPageService.listPages(user.userId, storyId).pages
+            .first { it.pageNumber == pageNumber }
+        return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    /**
+     * 동화(스토리) 단위 재생성 카운터 조회 — Step 4 헤더 우측 표시용.
+     *
+     * `JobType.STORYBOARD_IMAGE_REGENERATE` 의 SUCCESS+FAILED 합산 카운트와
+     * 한도(`StoryboardImageRegenPolicy.LIMIT_PER_STORY`) 를 반환.
+     */
+    @GetMapping("/regen-status")
+    fun storyboardRegenStatusGet(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<StoryboardRegenStatusResult>> {
+        val result = storyboardImageVersionService.getRegenStatus(
+            userId = user.userId,
+            storyId = storyId,
+        )
+        return ResponseEntity.ok(ApiResponse(data = result))
     }
 
     /**

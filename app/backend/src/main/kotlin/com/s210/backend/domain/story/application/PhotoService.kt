@@ -4,6 +4,9 @@ import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.s3.S3DeletionEvent
 import com.s210.backend.common.s3.S3Service
+import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.application.dto.CreatePhotoCommand
 import com.s210.backend.domain.story.application.dto.ModifyPhotoCommand
 import com.s210.backend.domain.story.application.dto.PhotoResult
@@ -12,6 +15,7 @@ import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.story.model.PhotoPurpose
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,15 +39,30 @@ class PhotoService(
     private val storyRepository: StoryRepository,
     private val s3Service: S3Service,
     private val eventPublisher: ApplicationEventPublisher,
+    private val jobRepository: StoryGenerationJobRepository,
 ) {
 
     /**
      * Step 2 업로드용 presigned PUT URL 발급.
      * 소유권 검증 후 `stories/{storyId}/photos/{uuid}.{ext}` 패턴 key 생성.
+     *
+     * 추억 사진 업로드 (`STORYBOARD`) / 대표 사진 별도 업로드 (`CHARACTER_REF`) 모두 같은
+     * S3 path 패턴을 사용 — purpose 구분은 commit 단계에서.
+     * 단, `CHARACTER_REF` 업로드 의도이면 lock 검증 (배치 generate 시작 후 거부).
      */
     @Transactional(readOnly = true)
-    fun presignUpload(userId: Long, storyId: Long, contentType: String): S3Service.PresignedUpload {
+    fun presignUpload(
+        userId: Long,
+        storyId: Long,
+        contentType: String,
+        purpose: PhotoPurpose = PhotoPurpose.STORYBOARD,
+    ): S3Service.PresignedUpload {
         ownedStory(userId, storyId)
+        // 줄거리(SUMMARY) 가 이미 생성/진행되었으면 Step 2 mutation 전체를 막아 downstream 일관성 보호.
+        ensureStorySummaryNotStarted(storyId)
+        if (purpose == PhotoPurpose.CHARACTER_REF) {
+            ensureNotLocked(storyId)
+        }
         return s3Service.presignPhotoPutUrl(storyId, contentType)
     }
 
@@ -54,6 +73,10 @@ class PhotoService(
      *  - 소유권 (`ownedStory`)
      *  - `s3Key` prefix 가 정확히 `stories/{storyId}/photos/` 여야 함
      *    → FE 가 다른 story 의 key 를 보내서 오염시키는 것 방지.
+     *  - `purpose` 는 `STORYBOARD` 또는 `CHARACTER_REF` 만 허용 (`BOTH` 는 토글 endpoint 전용).
+     *  - `CHARACTER_REF` commit 시:
+     *      · max-3 검증 (CHARACTER_REF + BOTH 합산)
+     *      · Lock 검증 (첫 STORYBOARD_IMAGE 잡 시작 후엔 거부)
      *  - NOTE: S3 에 실제 객체가 있는지(headObject) 는 이번 MR 에선 스킵.
      *          AWS SDK 호출 1회 추가 & 권한 요구 증가. orphan 정리는 배치로 처리 예정.
      *
@@ -61,10 +84,19 @@ class PhotoService(
      */
     fun addPhoto(command: CreatePhotoCommand): PhotoResult {
         ownedStory(command.userId, command.storyId)
+        ensureStorySummaryNotStarted(command.storyId)
 
         val expectedPrefix = "stories/${command.storyId}/photos/"
         if (!command.s3Key.startsWith(expectedPrefix)) {
             throw BusinessException(StoryErrorCode.INVALID_PHOTO_FORMAT)
+        }
+        if (command.purpose != PhotoPurpose.STORYBOARD && command.purpose != PhotoPurpose.CHARACTER_REF) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (command.purpose == PhotoPurpose.CHARACTER_REF) {
+            ensureNotLocked(command.storyId)
+            ensureCharacterRefCapacity(command.storyId, delta = 1)
         }
 
         val nextOrder = photoRepository
@@ -75,6 +107,7 @@ class PhotoService(
             PhotoAlbumItem(
                 storyId = command.storyId,
                 imageUrl = command.s3Key,   // 실제로는 s3 key — presign GET 으로 변환해서 내려줌
+                purpose = command.purpose,
                 takenAt = command.takenAt,
                 description = command.description,
                 tagsJson = command.tagsJson,
@@ -82,6 +115,52 @@ class PhotoService(
             )
         )
         return PhotoResult.from(saved)
+    }
+
+    /**
+     * Step 2 추억 사진 카드의 별 토글 (`PUT /photos/{photoId}/character-ref-toggle`).
+     *
+     *  - `on=true`  : purpose `STORYBOARD` → `BOTH`
+     *  - `on=false` : purpose `BOTH` → `STORYBOARD`
+     *
+     * 별도 업로드된 `CHARACTER_REF` 사진은 토글 대상이 아니므로 거부.
+     * `on=true` 시 max-3 검증 (CHARACTER_REF + BOTH 합산 ≤ 3).
+     * Lock (첫 STORYBOARD_IMAGE 잡 시작 후) 검증.
+     */
+    fun toggleCharacterRef(userId: Long, storyId: Long, photoId: Long, on: Boolean): PhotoResult {
+        ownedStory(userId, storyId)
+        ensureStorySummaryNotStarted(storyId)
+        ensureNotLocked(storyId)
+
+        val photo = photoRepository.findById(photoId).orElseThrow {
+            BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        }
+        if (photo.storyId != storyId || photo.deletedAt != null) {
+            throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        }
+
+        if (on) {
+            // STORYBOARD → BOTH 만 허용. 이미 BOTH 면 idempotent (변경 없이 반환).
+            // CHARACTER_REF 는 별도 업로드된 reference 라 토글 대상 아님.
+            when (photo.purpose) {
+                PhotoPurpose.BOTH -> return PhotoResult.from(photo)
+                PhotoPurpose.STORYBOARD -> {
+                    ensureCharacterRefCapacity(storyId, delta = 1)
+                    photo.purpose = PhotoPurpose.BOTH
+                }
+                PhotoPurpose.CHARACTER_REF ->
+                    throw BusinessException(CommonErrorCode.INVALID_INPUT)
+            }
+        } else {
+            // BOTH → STORYBOARD 만. 이미 STORYBOARD 면 idempotent.
+            when (photo.purpose) {
+                PhotoPurpose.STORYBOARD -> return PhotoResult.from(photo)
+                PhotoPurpose.BOTH -> photo.purpose = PhotoPurpose.STORYBOARD
+                PhotoPurpose.CHARACTER_REF ->
+                    throw BusinessException(CommonErrorCode.INVALID_INPUT)
+            }
+        }
+        return PhotoResult.from(photo)
     }
 
     /**
@@ -116,11 +195,17 @@ class PhotoService(
      */
     fun removePhoto(userId: Long, storyId: Long, photoId: Long) {
         ownedStory(userId, storyId)
+        ensureStorySummaryNotStarted(storyId)
         val photo = photoRepository.findById(photoId).orElseThrow {
             BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         }
         if (photo.storyId != storyId || photo.deletedAt != null) {
             throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        }
+        // CHARACTER_REF / BOTH 사진의 삭제는 reference set 변경에 해당 → lock 적용.
+        // 순수 STORYBOARD 사진은 reference 와 무관하므로 lock 후에도 삭제 허용.
+        if (photo.purpose == PhotoPurpose.CHARACTER_REF || photo.purpose == PhotoPurpose.BOTH) {
+            ensureNotLocked(storyId)
         }
         photo.deletedAt = LocalDateTime.now()
 
@@ -141,6 +226,7 @@ class PhotoService(
      */
     fun modifyPhoto(command: ModifyPhotoCommand): PhotoResult {
         ownedStory(command.userId, command.storyId)
+        ensureStorySummaryNotStarted(command.storyId)
         val photo = photoRepository.findById(command.photoId).orElseThrow {
             BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         }
@@ -172,6 +258,7 @@ class PhotoService(
      */
     fun reorderPhotos(userId: Long, storyId: Long, orderedPhotoIds: List<Long>): List<PhotoResult> {
         ownedStory(userId, storyId)
+        ensureStorySummaryNotStarted(storyId)
 
         if (orderedPhotoIds.size != orderedPhotoIds.toSet().size) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
@@ -201,5 +288,76 @@ class PhotoService(
         if (story.deletedAt != null) throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
+    }
+
+    /**
+     * "줄거리(SUMMARY) 잡이 한 번이라도 시작됐는가" 검증 — Step 1+2 lock 의 BE 측 가드.
+     *
+     * Step 3 의 "스토리 만들기" 가 실행되어 STORYBOARD_STORY_SUMMARY 잡이 발행되면 (PENDING/RUNNING/SUCCESS)
+     * 이후 Step 4 ~ 의 모든 산출물이 그 시점의 사진/메타에 의존한다. 따라서 Step 2 mutation 전체를 막아
+     * downstream 일관성을 보호한다.
+     *
+     * (FAILED 만 있는 상태는 줄거리 자체가 성립 안 한 것이라 허용 — 사용자가 사진을 바꾸고 다시 시도 가능.)
+     *
+     * NOTE: `ensureNotLocked` (CHARACTER_REF 한정 락) 와 별도로 동작.
+     *  - SUMMARY 가 시작되었지만 IMAGE 잡이 아직 없는 경우 → SUMMARY lock 만 hit
+     *  - IMAGE 잡까지 진입한 경우 → 두 lock 모두 hit (어느 하나가 먼저 throw 해도 결과 동일)
+     */
+    private fun ensureStorySummaryNotStarted(storyId: Long) {
+        val existing = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORYBOARD_STORY_SUMMARY,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS),
+        )
+        if (existing != null) {
+            throw BusinessException(StoryErrorCode.STEP_LOCKED_BY_SUMMARY)
+        }
+    }
+
+    /**
+     * "대표 사진 set 이 잠겼는가" 검증 — A안 + (b) 시점.
+     *
+     * 첫 STORYBOARD_IMAGE 배치 잡이 한 번이라도 발행됐으면 (PENDING/RUNNING/SUCCESS)
+     * AI 측 reference.png 가 이미 만들어졌거나 진행 중이므로 reference set 변경 불가.
+     * (FAILED 만 있는 상태는 잡 자체가 아직 성립 안 한 거라 허용 — 사용자가 사진 바꾸고 재시도 가능.)
+     */
+    private fun ensureNotLocked(storyId: Long) {
+        val pendingOrRunning = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORYBOARD_IMAGE,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (pendingOrRunning != null) {
+            throw BusinessException(StoryErrorCode.CHARACTER_PHOTOS_LOCKED)
+        }
+        val success = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId = storyId,
+            jobType = JobType.STORYBOARD_IMAGE,
+            status = JobStatus.SUCCESS,
+        )
+        if (success != null) {
+            throw BusinessException(StoryErrorCode.CHARACTER_PHOTOS_LOCKED)
+        }
+    }
+
+    /**
+     * "이번 변경 후 reference set 이 max 3 을 넘는가" 검증.
+     * `delta` = 변경 후 증가하는 개수 (toggle ON / addCharacterRef commit 모두 +1).
+     *
+     * AI schema 의 `characterSourceImageS3Keys: max_length=3` 와 매칭.
+     */
+    private fun ensureCharacterRefCapacity(storyId: Long, delta: Int) {
+        val current = photoRepository.countByStoryIdAndPurposeInAndDeletedAtIsNull(
+            storyId,
+            listOf(PhotoPurpose.CHARACTER_REF, PhotoPurpose.BOTH),
+        )
+        if (current + delta > MAX_CHARACTER_PHOTOS) {
+            throw BusinessException(StoryErrorCode.MAX_CHARACTER_PHOTOS_EXCEEDED)
+        }
+    }
+
+    companion object {
+        /** AI schema characterSourceImageS3Keys 의 max_length 와 일치. */
+        private const val MAX_CHARACTER_PHOTOS = 3
     }
 }

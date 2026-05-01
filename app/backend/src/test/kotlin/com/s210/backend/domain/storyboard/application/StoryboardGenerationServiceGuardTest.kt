@@ -478,8 +478,231 @@ class StoryboardGenerationServiceGuardTest {
     }
 
     // -----------------------------------------------------------------------
+    // findStoryboardState — Step 4 IMAGE 배치 잡 새로고침 복구
+    //
+    // FE 가 새로고침 / 탭 재진입 했을 때 currentImageJobId(useState) 가 잃어버린 상태에서도
+    // BE 응답의 latestImageJob 으로 polling 재개 / 결과 표시 / 재시도 UI 분기가 가능하도록
+    // 가장 최근 STORYBOARD_IMAGE 배치 잡 1건의 status 를 노출한다.
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `findStoryboardState returns null latestImageJob when no IMAGE batch exists`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        // STORYBOARD_IMAGE 잡 자체가 없음 — 신규 스토리.
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE)
+        ).thenReturn(null)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.latestImageJob)
+    }
+
+    @Test
+    fun `findStoryboardState returns latestImageJob with RUNNING status for in-progress IMAGE batch`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        val runningImageJob = buildJob(200L, JobType.STORYBOARD_IMAGE, JobStatus.RUNNING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE)
+        ).thenReturn(runningImageJob)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNotNull(result.latestImageJob)
+        assertEquals(200L, result.latestImageJob!!.jobId)
+        assertEquals(JobStatus.RUNNING, result.latestImageJob.status)
+    }
+
+    @Test
+    fun `findStoryboardState returns latestImageJob with SUCCESS status when batch completed`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        val successImageJob = buildJob(201L, JobType.STORYBOARD_IMAGE, JobStatus.SUCCESS, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE)
+        ).thenReturn(successImageJob)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertEquals(JobStatus.SUCCESS, result.latestImageJob!!.status)
+    }
+
+    @Test
+    fun `findStoryboardState returns latestImageJob with FAILED status when batch failed`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        val failedImageJob = buildJob(202L, JobType.STORYBOARD_IMAGE, JobStatus.FAILED, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE)
+        ).thenReturn(failedImageJob)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertEquals(JobStatus.FAILED, result.latestImageJob!!.status)
+    }
+
+    // -----------------------------------------------------------------------
+    // findStoryboardState — Step 4 페이지 재생성 잡 새로고침 복구
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `findStoryboardState returns null activeImageRegenerateJob when no regenerate in progress`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        stubNoBatchImageJob()
+        // 활성 재생성 잡 없음 (또는 SUCCESS/FAILED 만)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId,
+                JobType.STORYBOARD_IMAGE_REGENERATE,
+                listOf(JobStatus.PENDING, JobStatus.RUNNING),
+            )
+        ).thenReturn(null)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.activeImageRegenerateJob)
+    }
+
+    @Test
+    fun `findStoryboardState returns activeImageRegenerateJob with parsed pageNumber when regenerate is RUNNING`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        stubNoBatchImageJob()
+        // BE 가 만들어 저장한 requestPayload JSON — item.pageNumber=3.
+        // 실제 직렬화 형태와 동일한 키 구조 (StoryboardImageGenerateMessage.kt 의 data class 들 그대로).
+        val payload = """
+            {
+              "storyId": $storyId,
+              "seed": 42,
+              "userPrompt": "더 밝게",
+              "outputVersion": 2,
+              "item": {
+                "pageNumber": 3,
+                "storyboard": {"title":"t","synopsis":"s"},
+                "page": {"pageNumber":3,"sceneSummary":"ss","englishText":"e","koreanText":"k","imagePrompt":"i"},
+                "children": [],
+                "companions": [],
+                "referenceImageS3Keys": []
+              }
+            }
+        """.trimIndent()
+        val regenJob = StoryGenerationJob(
+            id = 300L,
+            storyId = storyId,
+            jobType = JobType.STORYBOARD_IMAGE_REGENERATE,
+            status = JobStatus.RUNNING,
+            requestPayload = payload,
+        )
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId,
+                JobType.STORYBOARD_IMAGE_REGENERATE,
+                listOf(JobStatus.PENDING, JobStatus.RUNNING),
+            )
+        ).thenReturn(regenJob)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNotNull(result.activeImageRegenerateJob)
+        assertEquals(300L, result.activeImageRegenerateJob!!.jobId)
+        assertEquals(3, result.activeImageRegenerateJob.pageNumber)
+        assertEquals(JobStatus.RUNNING, result.activeImageRegenerateJob.status)
+    }
+
+    @Test
+    fun `findStoryboardState returns null activeImageRegenerateJob when payload JSON parse fails (defensive)`() {
+        stubOwnedStory()
+        stubNoStoryJobs()
+        stubNoBatchImageJob()
+        // 손상된 JSON — parseRegeneratePageNumber 가 null 반환 → 잡 없음 효과로 무시.
+        val regenJob = StoryGenerationJob(
+            id = 301L,
+            storyId = storyId,
+            jobType = JobType.STORYBOARD_IMAGE_REGENERATE,
+            status = JobStatus.PENDING,
+            requestPayload = "{ malformed json",
+        )
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId,
+                JobType.STORYBOARD_IMAGE_REGENERATE,
+                listOf(JobStatus.PENDING, JobStatus.RUNNING),
+            )
+        ).thenReturn(regenJob)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNull(result.activeImageRegenerateJob)
+    }
+
+    @Test
+    fun `findStoryboardState returns latestImageJob alongside activeStoryJob (rare regenerate scenario)`() {
+        // 사용자가 IMAGE 배치 끝낸 뒤 Step 3 으로 회귀해 STORY 재생성을 트리거한 시나리오.
+        // BE 는 두 정보 모두 그대로 노출 — FE 가 activeJob (STORY) 우선 처리하고 IMAGE 복구는 스킵.
+        stubOwnedStory()
+        val activeStory = buildJob(101L, JobType.STORYBOARD_STORY, JobStatus.RUNNING, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(activeStory)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(null)
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 0L
+            )
+        ).thenReturn(0L)
+        val oldImageJob = buildJob(199L, JobType.STORYBOARD_IMAGE, JobStatus.SUCCESS, null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE)
+        ).thenReturn(oldImageJob)
+
+        val result = service.findStoryboardState(userId, storyId)
+
+        assertNotNull(result.activeJob)
+        assertNotNull(result.latestImageJob)
+        assertEquals(JobStatus.SUCCESS, result.latestImageJob!!.status)
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    /** IMAGE 배치 잡 stub — latest 없음. 재생성 테스트 fixture 용. */
+    private fun stubNoBatchImageJob() {
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE)
+        ).thenReturn(null)
+    }
+
+    /** STORY 잡 stub — 활성 없음, SUCCESS 없음, FAILED 카운트 0, latest 없음. IMAGE 테스트 fixture 용. */
+    private fun stubNoStoryJobs() {
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, listOf(JobStatus.PENDING, JobStatus.RUNNING)
+            )
+        ).thenReturn(null)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.SUCCESS
+            )
+        ).thenReturn(null)
+        `when`(
+            jobRepository.countByStoryIdAndJobTypeAndStatusAndIdGreaterThan(
+                storyId, JobType.STORYBOARD_STORY, JobStatus.FAILED, 0L
+            )
+        ).thenReturn(0L)
+        `when`(
+            jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY)
+        ).thenReturn(null)
+    }
 
     private fun stubOwnedStory() {
         val story = Story(

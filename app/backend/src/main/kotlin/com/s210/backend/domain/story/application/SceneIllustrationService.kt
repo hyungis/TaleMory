@@ -137,10 +137,15 @@ class SceneIllustrationService(
         )
 
         val seed = ((storyId * 2654435761L) and 0x7FFFFFFFL).toInt()
+        // 씬 일러스트 재생성용 outputVersion — AI 워커가 새 versioned S3 키 (`v{N}.png`) 로 저장하도록.
+        // 기존 confirm 시점 v1 을 보존하기 위해 항상 (current ?: 1) + 1 로 부여.
+        // listener 의 handleSceneImageSuccess 에서 같은 newVersion 으로 Redis push → URL 일관성 유지.
+        val nextSceneVersion = (illustrationVersionRedisRepository.getCurrent(sceneId) ?: 1) + 1
         val payload = StoryboardImageRegeneratePayload(
             storyId = storyId,
             seed = seed,
             userPrompt = trimmedPrompt,
+            outputVersion = nextSceneVersion,
             item = item,
         )
 

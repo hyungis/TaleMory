@@ -13,8 +13,10 @@ import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
+import com.s210.backend.domain.story.model.PhotoPurpose
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
+import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
@@ -57,6 +59,7 @@ class StoryboardImageGenerationService(
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
+    private val pageVersionRepository: StoryboardPageImageVersionRedisRepository,
 ) {
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
@@ -102,8 +105,29 @@ class StoryboardImageGenerationService(
             )
         }
 
+        // Step 2 에서 사용자가 "대표 사진" 으로 마킹한 사진 (max 3) 을 AI reference 베이스로 전달.
+        // AI 워커가 이 사진들로 reference.png 를 한 번 만들어 모든 페이지 generate 의 캐릭터 baseline
+        // 으로 사용. 보통 Step 3 진입 검증 (StoryboardSummaryService.requireCharacterRefAtLeastOne)
+        // 으로 ≥ 1 보장되지만, 사용자가 Step 3 통과 후 Step 2 로 돌아가 reference 를 모두 지웠을
+        // 가능성 방어용 안전망 검증을 여기 한 번 더 둔다 (lock 은 첫 generate 후에 걸리므로 그 전엔 변경 가능).
+        val characterSourceS3Keys = photoRepository
+            .findAllByStoryIdAndPurposeInAndDeletedAtIsNullOrderByDisplayOrderAsc(
+                storyId,
+                listOf(PhotoPurpose.CHARACTER_REF, PhotoPurpose.BOTH),
+            )
+            .take(MAX_CHARACTER_SOURCE_IMAGES)
+            .map { it.imageUrl }
+        if (characterSourceS3Keys.isEmpty()) {
+            throw BusinessException(StoryErrorCode.CHARACTER_PHOTOS_REQUIRED)
+        }
+
         val seed = deterministicSeed(storyId)
-        val payload = StoryboardImageGeneratePayload(storyId = storyId, seed = seed, items = items)
+        val payload = StoryboardImageGeneratePayload(
+            storyId = storyId,
+            seed = seed,
+            characterSourceImageS3Keys = characterSourceS3Keys,
+            items = items,
+        )
 
         // 6) job INSERT (PENDING). request_payload 에 그대로 저장 → 후에 P5 가 items.size 카운트에 사용.
         val job = jobRepository.save(
@@ -148,6 +172,31 @@ class StoryboardImageGenerationService(
         val page = storyboardPageRepository.findByStoryBoardIdAndPageNumber(storyBoard.id, pageNumber)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
+        // 1) 한도 검사 — 스토리당 STORYBOARD_IMAGE_REGENERATE 잡 PENDING/RUNNING/SUCCESS/FAILED 합이
+        //    한도 이상이면 거부. PENDING/RUNNING 까지 포함하는 이유는 `getRegenStatus` 헤더 카운터가
+        //    동일 정책으로 사용자에게 "요청 즉시 차감" 을 보장하기 때문 — 양쪽이 같은 식을 써야
+        //    카운터 표시와 한도 검증이 어긋나지 않는다. (배치 첫 생성 STORYBOARD_IMAGE 와 분리된
+        //    enum 이라 카운트가 정확.)
+        val regenCount = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
+            storyId,
+            JobType.STORYBOARD_IMAGE_REGENERATE,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS, JobStatus.FAILED),
+        )
+        if (regenCount >= StoryboardImageRegenPolicy.LIMIT_PER_STORY) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_REGEN_LIMIT_EXCEEDED)
+        }
+
+        // 2) 동시성 검사 — 같은 스토리에 이미 PENDING/RUNNING 인 재생성 잡이 있으면 거부.
+        //    더블클릭 / 다른 탭에서 동시 호출 시 outputVersion / S3 / Redis race 방지.
+        val activeJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORYBOARD_IMAGE_REGENERATE,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeJob != null) {
+            throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
+        }
+
         val storyPayload = loadLastSuccessStoryPayload(storyId)
         val origPage = storyPayload.pages.firstOrNull { it.pageNumber == pageNumber }
         val sourcePhotoIds = origPage?.sourcePhotoIds ?: emptyList()
@@ -179,17 +228,25 @@ class StoryboardImageGenerationService(
         val trimmedUserPrompt = userPrompt.trim()
         if (trimmedUserPrompt.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
+        // 3) 다음 outputVersion 계산 — Redis INCR (atomic).
+        //    첫 호출 시 max-version 키가 없으면 1 로 init (배치 v1 reserve) 후 INCR → 2 반환.
+        //    이후 호출은 3, 4, ... 반환. AI 워커가 v{N}.png 키 suffix 로 사용.
+        //    AI 측 스키마는 `payload.outputVersion` (top-level) 로 받으므로 item 내부가 아니라
+        //    payload 에 직접 부여.
+        val nextVersion = pageVersionRepository.computeNextVersion(page.id)
+
         val payload = StoryboardImageRegeneratePayload(
             storyId = storyId,
             seed = seed,
             userPrompt = trimmedUserPrompt,
+            outputVersion = nextVersion,
             item = item,
         )
 
         val job = jobRepository.save(
             StoryGenerationJob(
                 storyId = storyId,
-                jobType = JobType.STORYBOARD_IMAGE,
+                jobType = JobType.STORYBOARD_IMAGE_REGENERATE,
                 status = JobStatus.PENDING,
                 requestPayload = objectMapper.writeValueAsString(payload),
             ),
@@ -208,7 +265,7 @@ class StoryboardImageGenerationService(
 
         return StartGenerationResult(
             jobId = job.id,
-            jobType = JobType.STORYBOARD_IMAGE.name,
+            jobType = JobType.STORYBOARD_IMAGE_REGENERATE.name,
             status = JobStatus.PENDING.name,
         )
     }
@@ -302,5 +359,11 @@ class StoryboardImageGenerationService(
     companion object {
         /** AI 측 referenceImageS3Keys max_length = 3. */
         private const val MAX_REFERENCE_IMAGES = 3
+
+        /**
+         * AI 측 characterSourceImageS3Keys max_length = 3.
+         * 사용자가 Step 2 에서 마킹한 "대표 사진" 의 상한과도 일치 (PhotoService.MAX_CHARACTER_PHOTOS).
+         */
+        private const val MAX_CHARACTER_SOURCE_IMAGES = 3
     }
 }

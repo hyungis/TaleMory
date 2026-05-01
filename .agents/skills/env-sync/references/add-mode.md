@@ -61,6 +61,31 @@ compose 파일(`infra/compose/docker-compose.{app,infra}-local.yml`)도 필요 �
 
 `gitlab-vars` 모드 로직으로 바로 재생성. 체크박스 상태는 보존. 상세는 `gitlab-vars-mode.md`.
 
+**중요 — 위치 컨벤션 (env code-block 안에서)**:
+- 신규 env 키는 **각 환경 (dev / master) code-block 의 맨 마지막 줄 다음에 빈 줄 한 칸 띄우고 append**.
+- 카테고리 옆에 끼워넣지 않는다 — git diff 가 무관한 줄까지 건드리는 걸 막고, 신규 키 위치를 일관되게 유지.
+- 예시 (잘못된 케이스):
+
+  ```diff
+    AWS_REGION=ap-northeast-2
+    AWS_S3_BUCKET=s210-iportfolio-dev
+  + AWS_S3_KEY_PREFIX=dev          ← 카테고리 옆에 끼워넣기 (X)
+    FRONTEND_PORT=3001
+  ```
+
+- 올바른 케이스:
+
+  ```diff
+    RABBITMQ_TTS_PREVIEW_QUEUE=ai.gpu.preview.request.queue
+    RABBITMQ_TTS_PREVIEW_ROUTING_KEY=ai.gpu.tts.preview
+  +
+  + AWS_S3_KEY_PREFIX=dev          ← 맨 뒤에 빈 줄 한 칸 띄우고 추가 (O)
+    ```
+  ```
+
+- 같은 컨벤션을 dev block 과 master block **둘 다** 적용.
+- 의심되면 `git log -p docs/gitlab-variables.md` 로 직전 추가들이 어떤 위치 패턴이었는지 확인.
+
 ### 4. 서비스 코드 수정 힌트 (편집 금지)
 
 서비스별 수정 위치만 안내:

@@ -13,7 +13,10 @@ import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.storyboard.application.dto.ActiveImageRegenerateJob
 import com.s210.backend.domain.storyboard.application.dto.ActiveStoryJob
+import com.s210.backend.domain.storyboard.application.dto.LatestImageJob
+import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
@@ -288,13 +291,52 @@ class StoryboardGenerationService(
             )?.status
         }
 
+        // Step 4 IMAGE 배치 잡 복구 — 가장 최근 STORYBOARD_IMAGE 잡 1건 (status 무관).
+        val latestImageJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
+            storyId, JobType.STORYBOARD_IMAGE,
+        )?.let { LatestImageJob(jobId = it.id, status = it.status) }
+
+        // Step 4 IMAGE 재생성 잡 복구 — 진행 중(PENDING/RUNNING) 단일 페이지 재생성 잡 1건.
+        // BE 동시성 가드로 한 스토리당 활성 1개만 보장되므로 first 가 유일.
+        // pageNumber 는 jobs.requestPayload(JSON) 의 `item.pageNumber` 를 파싱해 내려준다.
+        // 파싱 실패 시 null 처리(=잡 없음 효과) — defensive: 옛 데이터 / payload 스키마 변경 방어.
+        val activeRegenJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORYBOARD_IMAGE_REGENERATE,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        val activeImageRegenerateJob = activeRegenJob?.let { job ->
+            val pageNumber = parseRegeneratePageNumber(job.requestPayload)
+            if (pageNumber == null) null
+            else ActiveImageRegenerateJob(
+                jobId = job.id,
+                pageNumber = pageNumber,
+                status = job.status,
+            )
+        }
+
         return StoryboardStateResult(
             activeJob = activeJob?.let {
                 ActiveStoryJob(jobId = it.id, status = it.status, createdAt = it.createdAt)
             },
             latestFinalStatus = latestFinalStatus,
             failedCountSinceLastSuccess = failedCount,
+            latestImageJob = latestImageJob,
+            activeImageRegenerateJob = activeImageRegenerateJob,
         )
+    }
+
+    /**
+     * jobs.requestPayload(JSON, StoryboardImageRegeneratePayload 직렬화 결과) 에서 pageNumber 추출.
+     * 파싱 실패 시 null 반환 — 호출자가 분기 (잡 없음으로 처리).
+     */
+    private fun parseRegeneratePageNumber(requestPayload: String?): Int? {
+        if (requestPayload.isNullOrBlank()) return null
+        return try {
+            objectMapper.readValue(requestPayload, StoryboardImageRegeneratePayload::class.java).item.pageNumber
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun ownedStory(userId: Long, storyId: Long): Story {

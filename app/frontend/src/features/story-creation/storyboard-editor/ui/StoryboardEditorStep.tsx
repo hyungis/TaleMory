@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   CheckCircle,
+  History,
   ImageIcon,
   Loader2,
   Pencil,
@@ -13,12 +14,15 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react'
-import { MAX_PER_PAGE_REFINE } from '../lib/defaults'
 import {
   useGenerateStoryboardImagesPost,
   useRegenerateStoryboardImagePost,
+  useSelectStoryboardPageImageVersionPost,
+  useStoryboardPageImageVersionsQuery,
   useStoryboardPagePatch,
   useStoryboardPagesQuery,
+  useStoryboardRegenStatusQuery,
+  type StoryboardImageVersionEntry,
   type StoryboardPageItem,
 } from '../../storyboard-pages'
 import {
@@ -36,37 +40,6 @@ import { StepTitleBlock } from '../../ui/StepTitleBlock'
 const FAILED_LIMIT = 3
 /** 한도 초과 시 자동 메인 이동까지의 카운트다운(ms). 사용자가 메시지를 읽을 시간 + "지금 이동" 으로 단축 가능. */
 const LIMIT_EXCEEDED_REDIRECT_MS = 5_000
-
-/**
- * 페이지별 cache-buster (재생성 SUCCESS 시 ++) 와 재생성 남은 횟수를 storyId 별로 sessionStorage 에 보관.
- * 페이지 이탈 후 재진입 시 state 가 리셋되어도 캐시버스터/카운터가 살아남도록 한다.
- *
- * BE 가 페이지 row 에 image_updated_at 또는 refine_remaining 을 노출하기 전 까지의 임시 패치.
- */
-const imageVersionStorageKey = (storyId: number | null) =>
-  `talemory:storyboard-editor:image-version:${storyId ?? 'unknown'}`
-const refineRemainingStorageKey = (storyId: number | null) =>
-  `talemory:storyboard-editor:refine-remaining:${storyId ?? 'unknown'}`
-
-function loadStoredJson<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback
-  try {
-    const raw = window.sessionStorage.getItem(key)
-    if (!raw) return fallback
-    return JSON.parse(raw) as T
-  } catch {
-    return fallback
-  }
-}
-
-function saveStoredJson(key: string, value: unknown): void {
-  if (typeof window === 'undefined') return
-  try {
-    window.sessionStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // QuotaExceeded / serialization error — 캐시버스터는 best-effort 라 무시.
-  }
-}
 
 interface StoryboardEditorStepProps {
   storyId: number | null
@@ -109,6 +82,9 @@ export function StoryboardEditorStep({
   const patchMut = useStoryboardPagePatch(storyId)
   const generateImagesMut = useGenerateStoryboardImagesPost(storyId)
   const regenerateImageMut = useRegenerateStoryboardImagePost(storyId)
+  const selectVersionMut = useSelectStoryboardPageImageVersionPost(storyId)
+  // 동화(스토리) 단위 재생성 카운터 — 헤더 우측 카운터 + 한도 검사용. BE 가 SoT.
+  const regenStatusQuery = useStoryboardRegenStatusQuery(storyId)
   // "다시 시도" 버튼 클릭 시 본문 발행 재시도 — Step 3 의 publish 흐름과 동일.
   const publishStoryMut = useGenerateStoryboardStoryPost(storyId)
 
@@ -274,21 +250,83 @@ export function StoryboardEditorStep({
   const [currentImageJobId, setCurrentImageJobId] = useState<number | null>(null)
   const imageJobQuery = useGenerationJobQuery(currentImageJobId)
 
+  /**
+   * 이번 mount 사이클에서 polling 까지 완료된 (terminal status 도달한) IMAGE 잡 id 들을 기억.
+   *
+   * 왜 필요한가:
+   *  cleanup effect 가 currentImageJobId=null 로 풀어주는 시점에 storyboard-state cache 는 여전히
+   *  "활성 잡" 으로 그 jobId 를 들고 있다 (refetch 가 async 라 race). 가드 없으면 mount-recovery effect
+   *  가 stale latestImageJob/activeImageRegenerateJob 을 보고 종결된 잡을 다시 setCurrentImageJobId
+   *  로 살려내며 cleanup ↔ recovery 가 무한 루프 → regen-status / pages / versions 폭주.
+   *
+   * ref 로 두는 이유: recovery effect 가 dep 변화로 재실행될 때 즉시 보이는 동기 source 가 필요.
+   * useState 면 setState → re-render → effect 재실행 사이에 한 tick 뒤늦게 반영되어 race 가 또 생김.
+   */
+  const finishedImageJobIdsRef = useRef<Set<number>>(new Set())
+
+  // ────────────────────────────────────────────────────────────
+  // IMAGE 배치 잡 새로고침 복구 — sessionStorage 가 비어 있는 엣지케이스(탭 닫고 재진입,
+  // 새로고침) 에서도 BE state 의 latestImageJob 을 진실로 polling 을 자동 재개.
+  //
+  // 트리거 조건:
+  //  - currentImageJobId 가 아직 null (사용자가 새 배치를 막 시작한 경우는 안 건드림)
+  //  - STORY 잡이 활성 아님 (재생성 시나리오에서 STORY 가 다시 RUNNING 인 경우 옛 IMAGE 결과 의미 없음)
+  //  - latestImageJob.status 가 PENDING/RUNNING
+  //
+  // SUCCESS / FAILED 는 polling 안 함 — 페이지 query 가 image_url 로 결과 또는 빈 상태를 그대로 렌더.
+  // ────────────────────────────────────────────────────────────
+  const latestImageJob = stateData?.latestImageJob ?? null
+  useEffect(() => {
+    if (currentImageJobId !== null) return         // 이미 polling 중 → 건드리지 않음
+    if (effectiveStoryJobId !== null && isStoryJobInProgress) return  // STORY 진행 중 → IMAGE 복구 스킵
+    if (!latestImageJob) return
+    // 이번 세션에서 이미 종결된 잡이면 무시 — stale state cache 로 인한 cleanup ↔ recovery 무한 루프 차단.
+    if (finishedImageJobIdsRef.current.has(latestImageJob.jobId)) return
+    if (latestImageJob.status === 'PENDING' || latestImageJob.status === 'RUNNING') {
+      setCurrentImageJobId(latestImageJob.jobId)
+    }
+  }, [
+    latestImageJob?.jobId,
+    latestImageJob?.status,
+    currentImageJobId,
+    effectiveStoryJobId,
+    isStoryJobInProgress,
+  ])
+
   // 어떤 페이지가 현재 재생성 요청 중인지 추적 — 페이지별 spinner / 에러 표시에 사용.
   // (regenerateImageMut 자체는 페이지 무관 단일 instance 라 별도 ref 필요.)
   // 폴링이 끝날 때까지 유지되어 mutate inflight 뿐 아니라 server 폴링 동안에도 스피너 노출.
   const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null)
   const [regenerateErrors, setRegenerateErrors] = useState<Record<number, string>>({})
-  // 페이지별 이미지 캐시 버스터 — AI 워커가 같은 S3 key 에 덮어쓰는 케이스에서
-  // URL 이 동일해 브라우저가 옛 이미지를 cached 로 보여주는 문제 방지.
-  // 재생성 SUCCESS 시 해당 페이지 카운터를 ++ 하고 <img src> 에 ?v={n} 으로 붙인다.
-  // sessionStorage 에 storyId 별로 persist — 페이지 이탈 후 재진입 시에도 캐시버스터 유지.
-  const [imageVersion, setImageVersion] = useState<Record<number, number>>(() =>
-    loadStoredJson<Record<number, number>>(imageVersionStorageKey(storyId), {}),
-  )
+
+  // ────────────────────────────────────────────────────────────
+  // 페이지 재생성 잡 새로고침 복구 — 단일 페이지 재생성 polling 도 동일 패턴으로 자동 재개.
+  //
+  // BE 의 동시성 가드(StoryboardImageGenerationService) 로 한 스토리당 활성 재생성은 1개만 허용 →
+  // activeImageRegenerateJob 은 항상 단일 jobId.
+  //
+  // 트리거 조건은 배치 복구와 같음: currentImageJobId 가 비어있고 STORY 활성 아니면 적용.
+  // jobId 와 함께 pageNumber 도 즉시 set → 해당 페이지 카드의 스피너가 새로고침 직후부터 보임.
+  //
+  // 잡 종결(SUCCESS/FAILED) 처리는 기존 cleanup effect (imageJobQuery.data?.status 분기) 가
+  // currentImageJobId / regeneratingPageNumber 둘 다 정리하므로 추가 로직 불필요.
+  // ────────────────────────────────────────────────────────────
+  const activeRegenerateJob = stateData?.activeImageRegenerateJob ?? null
   useEffect(() => {
-    saveStoredJson(imageVersionStorageKey(storyId), imageVersion)
-  }, [imageVersion, storyId])
+    if (currentImageJobId !== null) return
+    if (effectiveStoryJobId !== null && isStoryJobInProgress) return
+    if (!activeRegenerateJob) return
+    // 이번 세션에서 이미 종결된 잡이면 무시 — 무한 루프 방어 (배치 복구와 동일 가드).
+    if (finishedImageJobIdsRef.current.has(activeRegenerateJob.jobId)) return
+    setCurrentImageJobId(activeRegenerateJob.jobId)
+    setRegeneratingPageNumber(activeRegenerateJob.pageNumber)
+  }, [
+    activeRegenerateJob?.jobId,
+    activeRegenerateJob?.pageNumber,
+    currentImageJobId,
+    effectiveStoryJobId,
+    isStoryJobInProgress,
+  ])
 
   // 진행 중 폴링이 갱신될 때마다 페이지 캐시도 invalidate → 페이지마다 image_url 즉시 표시.
   useEffect(() => {
@@ -304,17 +342,12 @@ export function StoryboardEditorStep({
       currentImageJobId !== null &&
       (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut)
     ) {
+      // 종결 표식 — recovery effect 가 stale state cache 로 같은 잡을 다시 살리는 것을 차단.
+      finishedImageJobIdsRef.current.add(currentImageJobId)
       setCurrentImageJobId(null)
       // 단일 페이지 재생성 폴링 종료 — 페이지별 스피너 해제 + 실패 시 메시지 / 성공 시 캐시버스터.
       if (regeneratingPageNumber !== null) {
-        if (status === 'SUCCESS') {
-          // 성공: 해당 페이지 imageVersion 증가 → <img src> 가 ?v=N 으로 강제 reload.
-          const successPage = regeneratingPageNumber
-          setImageVersion(prev => ({
-            ...prev,
-            [successPage]: (prev[successPage] ?? 0) + 1,
-          }))
-        } else if (status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut) {
+        if (status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut) {
           const failedPage = regeneratingPageNumber
           setRegenerateErrors(prev => ({
             ...prev,
@@ -326,11 +359,27 @@ export function StoryboardEditorStep({
                   : '그림 재생성이 너무 오래 걸려 중단됐어요.',
           }))
         }
-        setRegeneratingPageNumber(null)
       }
       if (storyId !== null) {
         // 단순 invalidate 가 아닌 refetch — staleTime/observer 상태와 무관하게 반드시 새로 받도록.
         void queryClient.refetchQueries({ queryKey: ['storyboard-pages', storyId] })
+        // 카운터 / picker 도 갱신 — SUCCESS/FAILED 모두 status 카운트가 +1 되고,
+        // SUCCESS 시 versions 리스트에 새 버전 entry 가 추가됨.
+        void queryClient.refetchQueries({ queryKey: ['storyboard-regen-status', storyId] })
+        // storyboard-state(latestImageJob / activeImageRegenerateJob) 도 같이 — 그렇지 않으면
+        // 캐시된 활성 잡 정보가 stale 한 상태로 남아 mount-recovery effect 가 종결된 잡을
+        // 다시 setCurrentImageJobId 로 살려내며 cleanup ↔ recovery 가 무한 루프에 빠진다.
+        // 트리거: 배치 생성 마지막 페이지 SUCCESS 도착 시 cleanup → recovery → re-poll(SUCCESS) → cleanup ...
+        // 증상: 짧은 시간 안에 regen-status / pages(presigned v{N}.png URL) 호출이 폭주.
+        void queryClient.refetchQueries({ queryKey: ['storyboard-state', storyId] })
+        if (regeneratingPageNumber !== null) {
+          void queryClient.refetchQueries({
+            queryKey: ['storyboard-image-versions', storyId, regeneratingPageNumber],
+          })
+        }
+      }
+      if (regeneratingPageNumber !== null) {
+        setRegeneratingPageNumber(null)
       }
     }
   }, [
@@ -366,25 +415,11 @@ export function StoryboardEditorStep({
   // 페이지별 재생성 input 값.
   const [regeneratePrompts, setRegeneratePrompts] = useState<Record<number, string>>({})
 
-  // 페이지당 재생성 남은 횟수. 페이지가 처음 로드될 때 MAX_PER_PAGE_REFINE 로 초기화.
-  // sessionStorage 에 storyId 별로 persist — 페이지 이탈 후 재진입 시에도 카운터 유지.
-  const [refineRemaining, setRefineRemaining] = useState<Record<number, number>>(() =>
-    loadStoredJson<Record<number, number>>(refineRemainingStorageKey(storyId), {}),
-  )
-  useEffect(() => {
-    setRefineRemaining(prev => {
-      const next = { ...prev }
-      for (const p of pages) {
-        if (next[p.pageNumber] === undefined) {
-          next[p.pageNumber] = MAX_PER_PAGE_REFINE
-        }
-      }
-      return next
-    })
-  }, [pages])
-  useEffect(() => {
-    saveStoredJson(refineRemainingStorageKey(storyId), refineRemaining)
-  }, [refineRemaining, storyId])
+  // 동화 단위 재생성 한도/사용량 — BE 가 SoT. 한도 도달이면 모든 페이지의 재생성 버튼 disabled.
+  const regenStatus = regenStatusQuery.data
+  const regenLimit = regenStatus?.limit ?? FAILED_LIMIT // 데이터 도착 전 임시 fallback (UI 만)
+  const regenUsed = regenStatus?.used ?? 0
+  const regenRemaining = regenStatus?.remaining ?? Math.max(0, regenLimit - regenUsed)
 
   // 보기 모드 — 'grid' (한 줄 3장 갤러리) / 'individual' (페이지마다 글+이미지+재생성).
   // 그리드에서 사진 클릭 시 individual 모드로 전환 + 해당 페이지로 스크롤.
@@ -434,8 +469,7 @@ export function StoryboardEditorStep({
     (pageNumber: number) => {
       const userPrompt = (regeneratePrompts[pageNumber] ?? '').trim()
       if (userPrompt.length === 0) return
-      const remaining = refineRemaining[pageNumber] ?? MAX_PER_PAGE_REFINE
-      if (remaining <= 0) return // 페이지당 한도 소진 — 호출 자체 차단.
+      if (regenRemaining <= 0) return // 동화 한도 소진 — 호출 자체 차단.
       setRegeneratingPageNumber(pageNumber)
       // 이 페이지 이전 에러는 새 시도 시 리셋.
       setRegenerateErrors(prev => {
@@ -450,23 +484,58 @@ export function StoryboardEditorStep({
           onSuccess: res => {
             setCurrentImageJobId(res.jobId)
             setRegeneratePrompts(prev => ({ ...prev, [pageNumber]: '' }))
-            setRefineRemaining(prev => ({
-              ...prev,
-              [pageNumber]: Math.max(0, (prev[pageNumber] ?? MAX_PER_PAGE_REFINE) - 1),
-            }))
+            // 카운터 SoT 는 BE — mutate 직후 status 캐시 invalidate 해 used+1 즉시 반영.
+            // BE 가 이제 PENDING/RUNNING 까지 used 에 포함하므로 사용자는 버튼 누른 직후
+            // 헤더 카운터가 차감되어 보인다. (이후 polling 종료 effect 에서 한 번 더 갱신.)
+            if (storyId !== null) {
+              void queryClient.invalidateQueries({
+                queryKey: ['storyboard-regen-status', storyId],
+              })
+            }
             // regeneratingPageNumber 는 폴링이 끝날 때(아래 useEffect) 까지 유지 — 스피너 계속 노출.
           },
           onError: err => {
+            // 한도 초과를 BE 에서 거부한 케이스 (`STORY_018`) 메시지 그대로 노출.
             setRegenerateErrors(prev => ({
               ...prev,
               [pageNumber]: err.message || '그림 재생성 요청에 실패했어요.',
             }))
             setRegeneratingPageNumber(null)
+            // 한도 거부였을 가능성에 대비해 카운터 동기화.
+            if (storyId !== null) {
+              void queryClient.invalidateQueries({
+                queryKey: ['storyboard-regen-status', storyId],
+              })
+            }
           },
         },
       )
     },
-    [regenerateImageMut, regeneratePrompts, refineRemaining],
+    [regenerateImageMut, regeneratePrompts, regenRemaining, queryClient, storyId],
+  )
+
+  /**
+   * 드롭다운 picker 에서 다른 버전 선택 → BE 에 반영 + 페이지 캐시 갱신.
+   * 동화 카운터에는 영향 없음 (선택은 카운트하지 않음).
+   */
+  const handleSelectVersion = useCallback(
+    (pageNumber: number, version: number) => {
+      if (storyId === null) return
+      selectVersionMut.mutate(
+        { pageNumber, version },
+        {
+          onSuccess: () => {
+            // 페이지 imageUrl 갱신 → 카드 즉시 리렌더.
+            void queryClient.refetchQueries({ queryKey: ['storyboard-pages', storyId] })
+            // picker 의 current 표시도 갱신.
+            void queryClient.invalidateQueries({
+              queryKey: ['storyboard-image-versions', storyId, pageNumber],
+            })
+          },
+        },
+      )
+    },
+    [selectVersionMut, queryClient, storyId],
   )
 
   // 진행 중 여부 — 어떤 이미지 잡이든 PENDING/RUNNING 이면 모든 image 액션 disable.
@@ -492,6 +561,28 @@ export function StoryboardEditorStep({
               title="스토리보드를 다듬어주세요"
               subtitle="한 페이지씩 글과 그림을 손봐 우리 가족만의 동화책으로 완성해보세요"
             />
+
+            {/* 동화 단위 재생성 카운터 — 헤더 우측 위치. 한도 도달 시 빨간색 강조.
+                pages 가 있는 경우에만 노출 (Step 4 본 화면). */}
+            {pages.length > 0 && regenStatusQuery.data && (
+              <div className="flex justify-end mb-4">
+                <span
+                  className={`inline-flex items-center gap-1.5 font-bold text-sm px-3 py-1.5 rounded-full border-2 shadow-sm ${
+                    regenRemaining > 0
+                      ? 'bg-[#E9DBBE] border-[#9A7548]/50 text-[#6B4A28]'
+                      : 'bg-[#F8C8C7] border-[#a3413f] text-[#a3413f]'
+                  }`}
+                  title={
+                    regenRemaining > 0
+                      ? '이 동화에서 그림을 다시 그릴 수 있는 횟수예요.'
+                      : '재생성 한도에 도달했어요. 더는 재생성할 수 없어요.'
+                  }
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  그림 재생성 {regenUsed} / {regenLimit}
+                </span>
+              </div>
+            )}
 
             {/* 보기 모드 토글 — 페이지가 있을 때만 노출.
                 grid: 한 줄 3장 사진 갤러리. 사진 클릭 → individual 모드 + 해당 페이지로 스크롤.
@@ -660,7 +751,6 @@ export function StoryboardEditorStep({
               <PageGrid
                 pages={pages}
                 onSelect={handleSelectPageFromGrid}
-                imageVersionMap={imageVersion}
               />
             )}
 
@@ -673,6 +763,7 @@ export function StoryboardEditorStep({
                     style={{ scrollMarginTop: '24px' }}
                   >
                     <PageCard
+                      storyId={storyId}
                       page={page}
                       draft={drafts[page.pageNumber] ?? ''}
                       onDraftChange={value => handleDraftChange(page.pageNumber, value)}
@@ -684,10 +775,12 @@ export function StoryboardEditorStep({
                       onRegenerateImage={() => handleRegenerateImage(page.pageNumber)}
                       regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending}
                       patchPending={patchMut.isPending}
-                      refineRemaining={refineRemaining[page.pageNumber] ?? MAX_PER_PAGE_REFINE}
+                      regenRemaining={regenRemaining}
+                      regenLimit={regenLimit}
                       isRegeneratingThis={regeneratingPageNumber === page.pageNumber}
                       regenerateError={regenerateErrors[page.pageNumber] ?? null}
-                      imageVersion={imageVersion[page.pageNumber] ?? 0}
+                      onSelectVersion={handleSelectVersion}
+                      isSelectingVersion={selectVersionMut.isPending}
                     />
                   </div>
                 ))}
@@ -722,12 +815,14 @@ export function StoryboardEditorStep({
 /**
  * 페이지 1장 카드 — 새 디자인 (스크린샷 기준 pastel forest 톤).
  *
- * 좌측: 이미지(또는 placeholder) + "그림 다시 그리기" 입력/버튼/카운터를 같은 컬럼에 묶음.
+ * 좌측: 이미지(또는 placeholder) + 버전 picker(있을 때) + "그림 다시 그리기" 입력/버튼.
  * 우측: 큰 따옴표 + 영어 본문(메인) + 한글 해석(textarea, blur 자동 저장).
  *
- * 페이지당 재생성은 MAX_PER_PAGE_REFINE 회까지 허용. refineRemaining = 0 이면 input/button 모두 disable.
+ * 동화 단위 한도(`regenRemaining`) 가 0 이면 input/button 모두 disable.
+ * BE 가 versioned S3 key (`v{N}.png`) 로 저장하므로 cache-buster query 불필요 — page.imageUrl 그대로 사용.
  */
 function PageCard(props: {
+  storyId: number | null
   page: StoryboardPageItem
   draft: string
   onDraftChange: (value: string) => void
@@ -737,15 +832,21 @@ function PageCard(props: {
   onRegenerateImage: () => void
   regenerateDisabled: boolean
   patchPending: boolean
-  refineRemaining: number
+  /** 동화 단위 남은 재생성 횟수. 0 이면 모든 페이지 input/button disabled. */
+  regenRemaining: number
+  /** 동화 단위 한도 (UI 안내 문구에 사용). */
+  regenLimit: number
   /** 이 페이지가 현재 재생성 요청 중 (mutate inflight 또는 폴링 중)인지. spinner 노출용. */
   isRegeneratingThis: boolean
   /** 이 페이지의 마지막 재생성 시도 에러 메시지. null 이면 표시 없음. */
   regenerateError: string | null
-  /** 재생성 SUCCESS 마다 ++ 되는 카운터. <img src> 에 ?v=N 으로 붙어 브라우저 캐시 우회. */
-  imageVersion: number
+  /** 버전 선택 mutation handler. */
+  onSelectVersion: (pageNumber: number, version: number) => void
+  /** 선택 mutation 진행 중인지 (드롭다운 disable 용). */
+  isSelectingVersion: boolean
 }) {
   const {
+    storyId,
     page,
     draft,
     onDraftChange,
@@ -755,20 +856,19 @@ function PageCard(props: {
     onRegenerateImage,
     regenerateDisabled,
     patchPending,
-    refineRemaining,
+    regenRemaining,
+    regenLimit,
     isRegeneratingThis,
     regenerateError,
-    imageVersion,
+    onSelectVersion,
+    isSelectingVersion,
   } = props
 
-  // S3 같은 deterministic key 덮어쓰기 케이스 대비 — 버전 > 0 일 때만 cache-buster 부착.
-  const imageSrc = page.imageUrl
-    ? imageVersion > 0
-      ? `${page.imageUrl}${page.imageUrl.includes('?') ? '&' : '?'}v=${imageVersion}`
-      : page.imageUrl
-    : null
+  // BE 가 versioned key (`stories/.../v{N}.png`) 로 저장 → URL 자체가 버전마다 달라
+  // 브라우저 캐시 collision 없음. cache-buster query 불필요.
+  const imageSrc = page.imageUrl ?? null
 
-  const refineExhausted = refineRemaining <= 0
+  const refineExhausted = regenRemaining <= 0
   const inputDisabled = regenerateDisabled || refineExhausted || isRegeneratingThis
   const buttonDisabled =
     regenerateDisabled ||
@@ -823,7 +923,15 @@ function PageCard(props: {
             )}
           </div>
 
-          {/* 재생성 UI — 사진 바로 밑. 입력 + 버튼 + 남은 횟수 카운터. */}
+          {/* 버전 picker — 재생성 이력이 있는 페이지에서만 표시. */}
+          <VersionPicker
+            storyId={storyId}
+            pageNumber={page.pageNumber}
+            disabled={isRegeneratingThis || regenerateDisabled || isSelectingVersion}
+            onChange={version => onSelectVersion(page.pageNumber, version)}
+          />
+
+          {/* 재생성 UI — 사진 바로 밑. 입력 + 버튼. 동화 단위 카운터는 헤더에 있음. */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[#3F6B2E] font-bold text-xs flex items-center gap-1.5">
@@ -835,9 +943,10 @@ function PageCard(props: {
                     ? 'text-[#9A7548]/70 border-[#9A7548]/30 bg-[#E9DBBE]/50'
                     : 'text-[#3F6B2E] border-[#3F6B2E]/30 bg-[#B9D38F]/25'
                 }`}
+                title="동화 단위 재생성 한도예요. 모든 페이지가 합산해 사용해요."
               >
                 <RefreshCw className="w-2.5 h-2.5" />
-                {refineRemaining} / {MAX_PER_PAGE_REFINE} 남음
+                동화 전체 {regenRemaining} / {regenLimit} 남음
               </span>
             </div>
             <div className="flex gap-1.5">
@@ -943,21 +1052,15 @@ function PageCard(props: {
 function PageGrid({
   pages,
   onSelect,
-  imageVersionMap,
 }: {
   pages: StoryboardPageItem[]
   onSelect: (pageNumber: number) => void
-  imageVersionMap: Record<number, number>
 }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
       {pages.map(page => {
-        const v = imageVersionMap[page.pageNumber] ?? 0
-        const src = page.imageUrl
-          ? v > 0
-            ? `${page.imageUrl}${page.imageUrl.includes('?') ? '&' : '?'}v=${v}`
-            : page.imageUrl
-          : null
+        // BE 가 versioned key 로 저장 → URL 마다 고유. cache-buster 불필요.
+        const src = page.imageUrl ?? null
         return (
         <button
           key={page.pageNumber}
@@ -986,6 +1089,80 @@ function PageGrid({
         </button>
         )
       })}
+    </div>
+  )
+}
+
+/**
+ * 버전 picker — 한 페이지의 이미지 재생성 이력 dropdown.
+ *
+ * 동작:
+ *  - `useStoryboardPageImageVersionsQuery` 로 versions 조회 (BE Redis SoT).
+ *  - versions.length === 0 (= 재생성 이력 없음) 이면 picker 자체를 렌더하지 않음.
+ *  - select onChange → 부모의 `onChange(version)` 호출. 부모가 select mutation 트리거 + 캐시 갱신.
+ *
+ * UX 정책:
+ *  - 옵션 라벨: `v{N} · 첫 생성` (v1) / `v{N} · {prompt 일부}` (v2+) / `v{N}` (prompt null fallback).
+ *  - current 가 선택된 상태로 표시. 같은 값을 선택해도 onChange 가 호출되지 않도록 controlled.
+ *  - disabled: 부모가 progress 중이거나 select API 호출 중일 때 잠금.
+ */
+function VersionPicker({
+  storyId,
+  pageNumber,
+  disabled,
+  onChange,
+}: {
+  storyId: number | null
+  pageNumber: number
+  disabled: boolean
+  onChange: (version: number) => void
+}) {
+  const versionsQuery = useStoryboardPageImageVersionsQuery(storyId, pageNumber)
+  const data = versionsQuery.data
+  if (!data || data.versions.length === 0) return null
+
+  // version 내림차순으로 정렬 (BE 도 정렬해 내려오지만 안전망).
+  const sorted: StoryboardImageVersionEntry[] = [...data.versions].sort(
+    (a, b) => b.version - a.version,
+  )
+  const currentValue = data.current ?? sorted[0].version
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = parseInt(e.target.value, 10)
+    if (!Number.isFinite(next) || next === currentValue) return
+    onChange(next)
+  }
+
+  const formatLabel = (entry: StoryboardImageVersionEntry): string => {
+    if (entry.version === 1) return `v1 · 첫 생성`
+    const trimmed = entry.prompt?.trim()
+    if (!trimmed) return `v${entry.version}`
+    const head = trimmed.length > 18 ? trimmed.slice(0, 18) + '…' : trimmed
+    return `v${entry.version} · ${head}`
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <label
+        className="text-[#3F6B2E] font-bold text-xs inline-flex items-center gap-1.5"
+        htmlFor={`version-picker-${pageNumber}`}
+      >
+        <History className="w-3.5 h-3.5" /> 이전 버전
+      </label>
+      <select
+        id={`version-picker-${pageNumber}`}
+        value={currentValue}
+        onChange={handleChange}
+        disabled={disabled}
+        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-xs text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        aria-label={`페이지 ${pageNumber} 이미지 버전 선택`}
+      >
+        {sorted.map(entry => (
+          <option key={entry.version} value={entry.version}>
+            {formatLabel(entry)}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

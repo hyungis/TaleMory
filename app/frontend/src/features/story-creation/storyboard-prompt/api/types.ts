@@ -84,6 +84,32 @@ export interface StoryboardStateResponse {
   } | null
   latestFinalStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED' | null
   failedCountSinceLastSuccess: number
+  /**
+   * Step 4 IMAGE 배치 잡 새로고침 복구용 — 가장 최근 STORYBOARD_IMAGE 잡 1건 (status 무관).
+   *
+   * Step 4 mount 시 currentImageJobId(useState) 가 비어있더라도 이 필드로 polling 재개 / 결과 표시 /
+   * 재시도 UI 분기를 결정.
+   *  - PENDING/RUNNING → 그 jobId 로 polling 재개
+   *  - SUCCESS         → polling 안 함, 페이지 query 가 이미 image_url 채워서 렌더
+   *  - FAILED          → polling 안 함, "다시 생성" 버튼
+   *  - null            → 한 번도 발행 안 함 (idle)
+   */
+  latestImageJob: {
+    jobId: number
+    status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
+  } | null
+  /**
+   * 진행 중인 단일 페이지 재생성 잡 — STORYBOARD_IMAGE_REGENERATE 의 PENDING/RUNNING 1건.
+   *
+   * BE 의 동시성 가드로 한 스토리당 활성 재생성은 동시 1개. 새로고침/탭 재진입 시 이 jobId 로
+   * 폴링 재개 + pageNumber 로 페이지별 스피너 즉시 노출.
+   * pageNumber 는 BE 가 jobs.requestPayload(JSON) 의 `item.pageNumber` 를 파싱해 내려준 값.
+   */
+  activeImageRegenerateJob: {
+    jobId: number
+    pageNumber: number
+    status: 'PENDING' | 'RUNNING'
+  } | null
 }
 
 /** `PATCH /api/stories/{storyId}/storyboard/summary` 응답 — 저장된 story_board 스냅샷. */

@@ -14,11 +14,17 @@ export { getStoryboardPages } from './api/getStoryboardPages'
 export { patchStoryboardPage } from './api/patchStoryboardPage'
 export { postGenerateStoryboardImages } from './api/postGenerateStoryboardImages'
 export { postRegenerateStoryboardImage } from './api/postRegenerateStoryboardImage'
+export { getStoryboardPageImageVersions } from './api/getStoryboardPageImageVersions'
+export { postSelectStoryboardPageImageVersion } from './api/postSelectStoryboardPageImageVersion'
+export { getStoryboardRegenStatus } from './api/getStoryboardRegenStatus'
 
 export { useStoryboardPagesQuery } from './model/useStoryboardPagesQuery'
 export { useStoryboardPagePatch } from './model/useStoryboardPagePatch'
 export { useGenerateStoryboardImagesPost } from './model/useGenerateStoryboardImagesPost'
 export { useRegenerateStoryboardImagePost } from './model/useRegenerateStoryboardImagePost'
+export { useStoryboardPageImageVersionsQuery } from './model/useStoryboardPageImageVersionsQuery'
+export { useSelectStoryboardPageImageVersionPost } from './model/useSelectStoryboardPageImageVersionPost'
+export { useStoryboardRegenStatusQuery } from './model/useStoryboardRegenStatusQuery'
 
 export type {
   StoryboardPageItem,
@@ -27,4 +33,8 @@ export type {
   UpdateStoryboardPageResponse,
   RegenerateStoryboardImageRequest,
   JobStartResponse,
+  StoryboardImageVersionEntry,
+  StoryboardImageVersionsResponse,
+  SelectStoryboardImageVersionRequest,
+  StoryboardRegenStatusResponse,
 } from './api/types'
