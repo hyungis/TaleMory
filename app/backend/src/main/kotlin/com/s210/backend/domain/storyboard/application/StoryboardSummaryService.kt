@@ -13,6 +13,7 @@ import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.story.model.PhotoPurpose
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
 import com.s210.backend.domain.storyboard.application.dto.StartGenerationResult
 import com.s210.backend.domain.storyboard.application.dto.StoryGeneratePayload
@@ -79,6 +80,11 @@ class StoryboardSummaryService(
             throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
         }
 
+        // Step 2 → 3 전환의 BE 측 가드 — 대표 사진(캐릭터 reference) 이 1장 이상이어야 진행.
+        // FE 의 "다음" 버튼 비활성과 함께 이중 방어. 이게 Step 3 진입의 실질적 첫 BE 호출이라
+        // 여기서 막으면 사용자가 텍스트 입력 화면에 들어가기 전에 Step 2 로 되돌려보낼 수 있다.
+        requireCharacterRefAtLeastOne(storyId)
+
         val payload = buildPayload(story, prompt)
         val requestPayloadJson = objectMapper.writeValueAsString(payload)
 
@@ -138,6 +144,9 @@ class StoryboardSummaryService(
             log.warn("[SUMMARY:REGEN] blocked — active story job exists jobId={}", activeStoryJob.id)
             throw BusinessException(StoryErrorCode.STORY_ALREADY_IN_PROGRESS)
         }
+
+        // generate 와 동일 — 사용자가 Step 2 로 돌아가 reference 를 모두 지웠을 가능성 방어.
+        requireCharacterRefAtLeastOne(storyId)
 
         val previousJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
             storyId = storyId,
@@ -290,8 +299,13 @@ class StoryboardSummaryService(
         val travelPlace = story.travelPlace?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
+        // 추억 사진(=스토리 본문 베이스) 만 입력. 별도 업로드된 reference 전용(`CHARACTER_REF`) 은 제외.
+        // (BOTH 는 추억이면서 reference 도 겸하므로 포함.)
         val photos = photoRepository
-            .findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(story.id)
+            .findAllByStoryIdAndPurposeInAndDeletedAtIsNullOrderByDisplayOrderAsc(
+                story.id,
+                listOf(PhotoPurpose.STORYBOARD, PhotoPurpose.BOTH),
+            )
         if (photos.size !in PHOTO_COUNT_MIN..PHOTO_COUNT_MAX) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
@@ -350,6 +364,22 @@ class StoryboardSummaryService(
         if (story.deletedAt != null) throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
+    }
+
+    /**
+     * "대표 사진(캐릭터 reference)" 이 1장 이상 마킹돼 있는지 검증.
+     *
+     * Step 2 → 3 전환 시점의 BE 가드. FE 다음 버튼 비활성과 함께 이중 방어.
+     * `purpose IN (CHARACTER_REF, BOTH)` 인 활성 사진 카운트.
+     */
+    private fun requireCharacterRefAtLeastOne(storyId: Long) {
+        val refCount = photoRepository.countByStoryIdAndPurposeInAndDeletedAtIsNull(
+            storyId,
+            listOf(PhotoPurpose.CHARACTER_REF, PhotoPurpose.BOTH),
+        )
+        if (refCount < 1) {
+            throw BusinessException(StoryErrorCode.CHARACTER_PHOTOS_REQUIRED)
+        }
     }
 
     companion object {

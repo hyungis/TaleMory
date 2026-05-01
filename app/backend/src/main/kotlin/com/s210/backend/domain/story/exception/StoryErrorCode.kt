@@ -26,4 +26,8 @@ enum class StoryErrorCode(
     BGM_PRESET_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_016", "존재하지 않는 BGM 프리셋입니다."),
     SCENE_NOT_FOUND(HttpStatus.NOT_FOUND, "STORY_017", "씬을 찾을 수 없습니다."),
     STORYBOARD_REGEN_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "STORY_018", "스토리보드 페이지 이미지 재생성은 동화당 3회까지 가능합니다."),
+    CHARACTER_PHOTOS_REQUIRED(HttpStatus.BAD_REQUEST, "STORY_019", "대표 사진을 1장 이상 선택해주세요."),
+    MAX_CHARACTER_PHOTOS_EXCEEDED(HttpStatus.BAD_REQUEST, "STORY_020", "대표 사진은 최대 3장까지 선택할 수 있습니다."),
+    CHARACTER_PHOTOS_LOCKED(HttpStatus.CONFLICT, "STORY_021", "스토리보드 생성이 시작되어 대표 사진을 변경할 수 없습니다."),
+    STEP_LOCKED_BY_SUMMARY(HttpStatus.CONFLICT, "STORY_022", "본문(줄거리)이 이미 생성되어 변경할 수 없습니다."),
 }

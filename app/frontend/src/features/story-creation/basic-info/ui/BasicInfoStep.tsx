@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Lock } from 'lucide-react'
 import { ApiError } from '../../../../shared/api'
 import type { StoryChild, StoryProject } from '../../model/types'
 import { CreationHeader } from '../../ui/CreationHeader'
@@ -14,6 +14,7 @@ import { usePersonsQuery } from '../model/usePersonsQuery'
 import { usePersonPost } from '../model/usePersonPost'
 import { useStoryPost } from '../model/useStoryPost'
 import { useStoryUpdate } from '../model/useStoryUpdate'
+import { useStoryboardSummaryQuery } from '../../storyboard-prompt'
 import {
   apiGenderToStoryChild,
   levelToDifficulty,
@@ -80,6 +81,20 @@ export function BasicInfoStep({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   /**
+   * Step 1 락 — SUMMARY 잡이 PENDING/RUNNING/SUCCESS 면 메타 변경(PATCH /api/stories) 금지.
+   * BE 의 STEP_LOCKED_BY_SUMMARY (STORY_022) 와 1:1 매칭. 신규 스토리 (storyId === null) 는
+   * SUMMARY 가 있을 수 없으므로 query 를 보내지 않음 (`useStoryboardSummaryQuery` 가 disabled).
+   *
+   * 사용자가 Step 3 진입 후 Step 1 으로 회귀했을 때 메타를 바꾸면 downstream(이미지/스토리)이
+   * 입력과 어긋나 깨지므로 차단. UI 는 read-only 배너 + fieldset disabled 로 안내.
+   * "사진 선택하러 가기" 버튼은 잠금 시에도 활성 — PATCH 스킵하고 onNext 만 호출.
+   */
+  const summaryQuery = useStoryboardSummaryQuery(storyId)
+  const summaryStatus = summaryQuery.data?.jobStatus ?? null
+  const isSummaryLocked =
+    summaryStatus === 'PENDING' || summaryStatus === 'RUNNING' || summaryStatus === 'SUCCESS'
+
+  /**
    * TravelDatePicker → travelDates 배열 변환.
    * - end 가 null 이거나 start 와 같음: 단일 일정 → [start]
    * - 다름: 범위 → [start, end]
@@ -113,6 +128,13 @@ export function BasicInfoStep({
    */
   const handleNext = useCallback(async () => {
     setSubmitError(null)
+
+    // 락 활성 시: PATCH 거부될 게 확실하므로 API 호출 스킵하고 바로 다음 단계로.
+    // (storyId 는 SUMMARY 가 있다는 건 이미 존재한다는 뜻 — null 가드는 형식적.)
+    if (isSummaryLocked && storyId !== null) {
+      onStoryCreated(storyId)
+      return
+    }
 
     const validChildren = data.children.filter(c => c.name.trim() && c.age.trim())
     if (validChildren.length === 0) {
@@ -195,6 +217,7 @@ export function BasicInfoStep({
     data,
     firstDate,
     lastDate,
+    isSummaryLocked,
     onChildUpdate,
     onStaleStoryIdReset,
     onStoryCreated,
@@ -216,7 +239,31 @@ export function BasicInfoStep({
               title="가족을 소개해주세요"
               subtitle="이 동화책의 주인공과 등장인물을 알려주세요"
             />
+
+            {/* SUMMARY 락 안내 — 본문 생성이 시작/완료된 스토리는 Step 1 메타 변경 불가. */}
+            {isSummaryLocked && (
+              <div
+                className="bg-[#fff7d6] border-2 border-[#E8A832]/60 text-[#8b6a14] text-sm px-4 py-3 rounded-xl mb-4 flex items-start gap-2"
+                role="status"
+              >
+                <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+                <div>
+                  <p className="font-bold">본문이 생성되어 이 단계는 읽기 전용이에요.</p>
+                  <p className="text-xs mt-1 opacity-90">
+                    가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 본문/이미지를 이어 작업할 수 있어요.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="bg-[#f0e6c0] p-8 md:p-10 rounded-2xl shadow-sm border border-[#9A7548]/40">
+              {/* fieldset disabled — 안에 있는 모든 native form control(input/button) 을 한 번에 비활성.
+                  ChildrenList / LevelPicker / TravelDatePicker 의 input·button 도 모두 같이 잠긴다.
+                  border:0 padding:0 으로 fieldset 의 기본 시각 영향 제거 — div 와 동일하게 보이도록. */}
+              <fieldset
+                disabled={isSummaryLocked}
+                className="border-0 p-0 m-0 disabled:opacity-70"
+              >
               <div className="space-y-6">
               <ChildrenList
                 children={data.children}
@@ -260,6 +307,7 @@ export function BasicInfoStep({
                 />
               </div>
             </div>
+              </fieldset>
 
               {submitError && (
                 <div className="mt-6 bg-[#8b3a2a]/15 border border-[#8b3a2a]/40 text-[#8b3a2a] text-sm px-4 py-3 rounded-xl flex items-center gap-2">
@@ -276,7 +324,13 @@ export function BasicInfoStep({
         currentStep={1}
         onBack={onBack}
         onNext={handleNext}
-        nextLabel={isSubmitting ? '저장 중…' : '사진 선택하러 가기'}
+        nextLabel={
+          isSubmitting
+            ? '저장 중…'
+            : isSummaryLocked
+              ? '사진 단계로 이동'
+              : '사진 선택하러 가기'
+        }
         nextDisabled={isSubmitting}
       />
     </div>

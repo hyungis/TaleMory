@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { presignPhoto } from '../api/presignPhoto'
 import { postPhoto } from '../api/postPhoto'
+import type { UploadablePhotoPurpose } from '../api/types'
 
 /**
  * 업로드 중인 한 장의 로컬 상태.
@@ -30,7 +31,10 @@ export interface PendingPhoto {
  *
  * 여러 파일을 동시에 올리려면 `uploadMany` 사용 — 각 파일이 독립적으로 병렬 진행.
  */
-export function usePhotoUpload(storyId: number | null) {
+export function usePhotoUpload(
+  storyId: number | null,
+  purpose: UploadablePhotoPurpose = 'STORYBOARD',
+) {
   const queryClient = useQueryClient()
   const [pending, setPending] = useState<PendingPhoto[]>([])
 
@@ -59,8 +63,8 @@ export function usePhotoUpload(storyId: number | null) {
       ])
 
       try {
-        // Phase 1: presign
-        const presigned = await presignPhoto(storyId, { contentType: file.type })
+        // Phase 1: presign — purpose 가 CHARACTER_REF 이면 BE 가 lock 검증을 함께 수행.
+        const presigned = await presignPhoto(storyId, { contentType: file.type, purpose })
         // Phase 2: PUT to S3 (BE 통과 없음)
         const putRes = await fetch(presigned.uploadUrl, {
           method: 'PUT',
@@ -70,8 +74,8 @@ export function usePhotoUpload(storyId: number | null) {
         if (!putRes.ok) {
           throw new Error(`S3 업로드 실패 (${putRes.status})`)
         }
-        // Phase 3: commit
-        await postPhoto(storyId, { s3Key: presigned.s3Key })
+        // Phase 3: commit — purpose 그대로 전달. CHARACTER_REF 면 BE 가 max-3 + lock 검증.
+        await postPhoto(storyId, { s3Key: presigned.s3Key, purpose })
 
         // 성공 — pending 제거 + 서버 목록 invalidate
         setPending(prev => prev.filter(p => p.tempId !== tempId))
@@ -84,7 +88,7 @@ export function usePhotoUpload(storyId: number | null) {
         )
       }
     },
-    [storyId, queryClient],
+    [storyId, purpose, queryClient],
   )
 
   /** 여러 파일을 병렬로 업로드. */

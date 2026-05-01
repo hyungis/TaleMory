@@ -5,6 +5,9 @@ import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
 import com.s210.backend.common.s3.S3DeletionEvent
+import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.application.dto.CreateStoryCommand
 import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.application.dto.StoryResult
@@ -48,6 +51,7 @@ class StoryService(
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val jobRepository: StoryGenerationJobRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     /**
@@ -88,6 +92,9 @@ class StoryService(
      */
     fun modifyStory(userId: Long, storyId: Long, command: ModifyStoryCommand): StoryResult {
         val story = ownedStory(userId, storyId)
+        // Step 1 락 — 줄거리(SUMMARY) 가 한 번이라도 시작됐으면 Step 1 메타 변경 차단.
+        // PhotoService 와 동일한 가드 (BE STORY_022). FAILED 만 있으면 통과 — 사용자가 메타 바꾸고 재시도 가능.
+        ensureStorySummaryNotStarted(storyId)
         command.title?.let { story.title = it }
         command.difficulty?.let { story.difficulty = it }
         command.companionsJson?.let { story.companionsJson = it }
@@ -96,6 +103,28 @@ class StoryService(
         command.travelStartDate?.let { story.travelStartDate = it }
         command.travelEndDate?.let { story.travelEndDate = it }
         return StoryResult.from(story)
+    }
+
+    /**
+     * "줄거리(SUMMARY) 잡이 한 번이라도 시작됐는가" 검증 — Step 1 lock 의 BE 측 가드.
+     *
+     * Step 3 의 "스토리 만들기" 가 실행되어 STORYBOARD_STORY_SUMMARY 잡이 발행되면 (PENDING/RUNNING/SUCCESS)
+     * 이후 단계가 그 시점의 메타에 의존한다. Step 1 메타(제목/주인공/여행지 등) 변경을 막아 downstream
+     * 일관성을 보호한다. (FAILED 만 있는 상태는 줄거리 자체가 성립 안 한 것이라 허용.)
+     *
+     * NOTE: PhotoService.ensureStorySummaryNotStarted 와 같은 패턴 (Step 1·2 lock 묶음).
+     *  - SUMMARY 가 시작되면 Step 1·2 모두 동일한 STORY_022 로 거부.
+     *  - 두 서비스가 같은 helper 를 정의하지만 직접 의존하면 복잡해져 각자 보유.
+     */
+    private fun ensureStorySummaryNotStarted(storyId: Long) {
+        val existing = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORYBOARD_STORY_SUMMARY,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS),
+        )
+        if (existing != null) {
+            throw BusinessException(StoryErrorCode.STEP_LOCKED_BY_SUMMARY)
+        }
     }
 
     /**

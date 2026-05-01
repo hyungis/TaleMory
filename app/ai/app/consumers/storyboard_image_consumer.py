@@ -99,7 +99,16 @@ def _dispatch_regenerate_message(
 
 def handle_generate_batch_message(body: bytes, publisher: StoryboardImageJobPublisher) -> None:
     message = StoryboardImageGenerateJobMessage.model_validate_json(body)
-    items = ensure_storyboard_character_reference(message.payload.storyId, message.payload.seed, message.payload.items)
+    # BE 가 보낸 사용자 선택 character source 사진(`characterSourceImageS3Keys`)을 helper 로 전달.
+    # 누락 시 helper 가 fallback 으로 페이지별 referenceImage 들을 pool 해서 사용 (= 사용자 선택 무시).
+    # HTTP REST 진입점 (services.storyboard_image_service.generate_storyboard_images) 과 동일한 시그니처.
+    items = ensure_storyboard_character_reference(
+        message.payload.storyId,
+        message.payload.seed,
+        message.payload.items,
+        message.payload.characterSourceImageUrls,
+        message.payload.characterSourceImageS3Keys,
+    )
 
     for item in items:
         publisher.publish_generate_item_job(

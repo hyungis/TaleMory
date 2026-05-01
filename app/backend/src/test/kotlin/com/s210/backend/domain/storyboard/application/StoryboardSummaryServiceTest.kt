@@ -13,6 +13,7 @@ import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRep
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.model.Difficulty
+import com.s210.backend.domain.story.model.PhotoPurpose
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
 import com.s210.backend.domain.storyboard.application.dto.UsageInfo
 import org.junit.jupiter.api.Assertions.*
@@ -123,6 +124,8 @@ class StoryboardSummaryServiceTest {
     @Test
     fun `regenerateSummary throws SUMMARY_NOT_FOUND when no prior SUCCESS summary job exists`() {
         stubOwnedStory()
+        // reference 가드를 통과시켜 검사 대상인 SUMMARY_NOT_FOUND 분기까지 도달하도록.
+        stubCharacterRefCount(1)
 
         `when`(
             jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
@@ -169,6 +172,8 @@ class StoryboardSummaryServiceTest {
     @Test
     fun `regenerateSummary throws SUMMARY_NOT_FOUND when prior SUCCESS job has null resultPayload`() {
         stubOwnedStory()
+        // reference 가드 통과시켜 SUMMARY_NOT_FOUND 분기까지 도달.
+        stubCharacterRefCount(1)
 
         val brokenJob = buildJob(52L, JobType.STORYBOARD_STORY_SUMMARY, JobStatus.SUCCESS, null)
         `when`(
@@ -464,14 +469,36 @@ class StoryboardSummaryServiceTest {
     }
 
     private fun stubPhotos() {
+        // 추억 사진(=스토리 본문 베이스) 모음 — buildPayload 가 STORYBOARD + BOTH 만 필터.
         val photo = PhotoAlbumItem(
             id = 1L,
             storyId = storyId,
             imageUrl = "s3://bucket/photo.jpg",
             displayOrder = 0L,
         )
-        `when`(photoRepository.findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(storyId))
-            .thenReturn(listOf(photo))
+        `when`(
+            photoRepository.findAllByStoryIdAndPurposeInAndDeletedAtIsNullOrderByDisplayOrderAsc(
+                storyId,
+                listOf(PhotoPurpose.STORYBOARD, PhotoPurpose.BOTH),
+            )
+        ).thenReturn(listOf(photo))
+        // 대표 사진(reference) 카운트 ≥ 1 — Step 2→3 전환 가드 통과용.
+        stubCharacterRefCount(1)
+    }
+
+    /**
+     * 대표 사진(`CHARACTER_REF + BOTH`) 카운트 stub — Step 3 진입 가드용.
+     * 0 으로 두면 generate/regenerateSummary 가 CHARACTER_PHOTOS_REQUIRED 로 실패한다.
+     * SUMMARY_NOT_FOUND / STORY_ALREADY_IN_PROGRESS 등 다른 가드를 검증하는 테스트에선
+     * 이 stub 으로 reference 검증을 통과시킨 뒤 검사하려는 가드까지 도달하게 한다.
+     */
+    private fun stubCharacterRefCount(count: Long) {
+        `when`(
+            photoRepository.countByStoryIdAndPurposeInAndDeletedAtIsNull(
+                storyId,
+                listOf(PhotoPurpose.CHARACTER_REF, PhotoPurpose.BOTH),
+            )
+        ).thenReturn(count)
     }
 
     private fun stubParticipants() {

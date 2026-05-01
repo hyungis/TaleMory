@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { Trash2, Image as ImageIcon, Loader2, AlertCircle, ChevronUp, ChevronDown, GripVertical } from 'lucide-react'
+import { Trash2, Image as ImageIcon, Loader2, AlertCircle, ChevronUp, ChevronDown, GripVertical, Star } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { PhotoPurposeApi } from '../api/types'
 
 /**
  * tagsJson (DB 의 JSON 컬럼) ↔ UI 의 plain 텍스트 변환.
@@ -35,6 +36,30 @@ interface PhotoItemCommittedProps {
   isLast: boolean
   isRemoving?: boolean
   isReordering?: boolean
+  /**
+   * 사진의 현재 purpose. 별 토글 채움/비움 판단 + 입력 영역 노출 여부 결정.
+   *  - `STORYBOARD` : 일반 추억 사진 (별 비움)
+   *  - `BOTH`       : 추억 + reference (별 채움)
+   *  - `CHARACTER_REF`: reference 전용 (별도 업로드) — 본 카드 자체가 reference zone 에 있어 별 토글 X
+   */
+  purpose?: PhotoPurposeApi
+  /**
+   * 별 토글 핸들러 — provided 면 footer 에 별 버튼 노출. 추억 zone 의 카드만 전달.
+   * 호출자는 next state(`true` = ON, `false` = OFF) 를 받아 mutation 호출.
+   */
+  onCharacterRefToggle?: (next: boolean) => void
+  /** 토글 mutation 진행 중. 별 버튼 spinner. */
+  isCharacterRefToggling?: boolean
+  /** 토글 비활성 (배치 generate 시작 후 lock). 별 버튼 disabled + 안내 tooltip. */
+  isCharacterRefLocked?: boolean
+  /**
+   * Step 2 전체 mutation 잠금 (SUMMARY 잡 시작 후, BE STORY_022 와 1:1 매칭).
+   *
+   * true 면 카드의 모든 인터랙션 — 이동/삭제/별토글/설명·태그 input — 을 비활성화한다.
+   * `isCharacterRefLocked` 와 별개 가드: 후자는 별 토글만 막는데, 이 가드는 전체 mutation 을 막는
+   * 더 큰 gate. UX 상 보통 이 lock 이 활성이면 Step 2 전체가 read-only 배너로 안내된다.
+   */
+  isMutationLocked?: boolean
 }
 
 interface PhotoItemUploadingProps {
@@ -76,9 +101,11 @@ export function PhotoItem(props: PhotoItemProps) {
  *  - isReordering(서버 mutation 진행 중) 때는 추가 변경 막기 위해 disabled.
  */
 function SortablePhotoItem(props: PhotoItemCommittedProps) {
+  // SUMMARY lock 활성 시 dnd-kit 의 sortable 자체를 비활성 — 카드 잡고 끌어도 reorder 안 됨.
+  const sortableDisabled = props.isReordering || !!props.isMutationLocked
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.id,
-    disabled: props.isReordering,
+    disabled: sortableDisabled,
   })
 
   const style: CSSProperties = {
@@ -86,7 +113,7 @@ function SortablePhotoItem(props: PhotoItemCommittedProps) {
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 50 : 'auto',
-    cursor: props.isReordering ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
+    cursor: sortableDisabled ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
   }
 
   return (
@@ -111,39 +138,43 @@ function SortablePhotoItem(props: PhotoItemCommittedProps) {
 
       {/* 우상단 액션 버튼 세트. dnd-kit listener 가 root 에 붙어있어 button 클릭도 drag 로 갈 수 있는데
           PointerSensor distance:8 제약으로 짧은 클릭은 통과 → 정상 동작. 추가로 onPointerDown stopPropagation
-          은 의도적으로 안 함 (텍스트 선택 등 다른 native 동작도 막혀버림). */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <button
-          type="button"
-          onClick={props.onMoveUp}
-          disabled={props.isFirst || props.isReordering}
-          title="위로 이동"
-          aria-label="위로 이동"
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ChevronUp className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onClick={props.onMoveDown}
-          disabled={props.isLast || props.isReordering}
-          title="아래로 이동"
-          aria-label="아래로 이동"
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ChevronDown className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onClick={props.onRemove}
-          disabled={props.isRemoving}
-          title="사진 삭제"
-          aria-label="사진 삭제"
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] hover:bg-[#a84a35] transition-colors disabled:opacity-50"
-        >
-          {props.isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </button>
-      </div>
+          은 의도적으로 안 함 (텍스트 선택 등 다른 native 동작도 막혀버림).
+          isMutationLocked (SUMMARY lock) 시 카드 자체를 read-only 로 두기 위해 액션 버튼 그룹 미렌더 —
+          group-hover 로도 안 보이게 해서 사용자가 잠긴 카드를 변경 가능한 것으로 오해하지 않게 함. */}
+      {!props.isMutationLocked && (
+        <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <button
+            type="button"
+            onClick={props.onMoveUp}
+            disabled={props.isFirst || props.isReordering}
+            title="위로 이동"
+            aria-label="위로 이동"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={props.onMoveDown}
+            disabled={props.isLast || props.isReordering}
+            title="아래로 이동"
+            aria-label="아래로 이동"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={props.onRemove}
+            disabled={props.isRemoving}
+            title="사진 삭제"
+            aria-label="사진 삭제"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] hover:bg-[#a84a35] transition-colors disabled:opacity-50"
+          >
+            {props.isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
 
       {/* 썸네일 — left grip 공간 만큼 살짝 이격 (ml-3). */}
       <div className="ml-3">
@@ -156,6 +187,11 @@ function SortablePhotoItem(props: PhotoItemCommittedProps) {
           description={props.description}
           tagsJson={props.tagsJson}
           onUpdate={props.onUpdate}
+          purpose={props.purpose}
+          onCharacterRefToggle={props.onCharacterRefToggle}
+          isCharacterRefToggling={props.isCharacterRefToggling}
+          isCharacterRefLocked={props.isCharacterRefLocked}
+          isMutationLocked={props.isMutationLocked}
         />
       </div>
     </div>
@@ -215,10 +251,20 @@ function CommittedFields({
   description,
   tagsJson,
   onUpdate,
+  purpose,
+  onCharacterRefToggle,
+  isCharacterRefToggling,
+  isCharacterRefLocked,
+  isMutationLocked,
 }: {
   description: string | null
   tagsJson: string | null
   onUpdate: (patch: { description?: string; tagsJson?: string }) => void
+  purpose?: PhotoPurposeApi
+  onCharacterRefToggle?: (next: boolean) => void
+  isCharacterRefToggling?: boolean
+  isCharacterRefLocked?: boolean
+  isMutationLocked?: boolean
 }) {
   const [descLocal, setDescLocal] = useState(description ?? '')
   const [tagsLocal, setTagsLocal] = useState(parseTagsJson(tagsJson))
@@ -262,7 +308,9 @@ function CommittedFields({
           onChange={e => setDescLocal(e.target.value)}
           onBlur={handleDescBlur}
           onPointerDown={stopDragPointer}
-          className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60"
+          readOnly={!!isMutationLocked}
+          disabled={!!isMutationLocked}
+          className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60 disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </div>
       <div>
@@ -274,9 +322,84 @@ function CommittedFields({
           onChange={e => setTagsLocal(e.target.value)}
           onBlur={handleTagsBlur}
           onPointerDown={stopDragPointer}
-          className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60 font-bold"
+          readOnly={!!isMutationLocked}
+          disabled={!!isMutationLocked}
+          className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </div>
+
+      {onCharacterRefToggle && (
+        <CharacterRefToggleRow
+          isOn={purpose === 'BOTH'}
+          isPending={!!isCharacterRefToggling}
+          // SUMMARY lock 활성 시 별 토글도 잠금 — 둘 중 하나라도 true 면 disabled.
+          isLocked={!!isCharacterRefLocked || !!isMutationLocked}
+          onToggle={onCharacterRefToggle}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * 추억 사진 카드의 별 토글 footer.
+ *
+ *  - `isOn=false` : 회색 빈 별 + "대표로 지정" — 클릭 시 BOTH 로 변경
+ *  - `isOn=true`  : 앰버 채운 별 + "대표 ★" — 클릭 시 STORYBOARD 로 되돌림
+ *  - `isLocked`   : 비활성 + 안내 text — 첫 STORYBOARD_IMAGE 배치 시작 후 잠김
+ *
+ * 카드 root 의 dnd-kit listener 가 button 클릭도 drag 로 가로챌 수 있는데,
+ * PointerSensor distance:8 제약으로 짧은 클릭은 통과 → 정상 토글 동작.
+ */
+function CharacterRefToggleRow({
+  isOn,
+  isPending,
+  isLocked,
+  onToggle,
+}: {
+  isOn: boolean
+  isPending: boolean
+  isLocked: boolean
+  onToggle: (next: boolean) => void
+}) {
+  const stopDragPointer = (e: React.PointerEvent) => e.stopPropagation()
+  const disabled = isPending || isLocked
+  return (
+    <div className="pt-3 border-t border-[#8b7a52]/30">
+      <button
+        type="button"
+        onClick={() => onToggle(!isOn)}
+        onPointerDown={stopDragPointer}
+        disabled={disabled}
+        title={
+          isLocked
+            ? '스토리보드 생성이 시작되어 변경할 수 없어요'
+            : isOn
+              ? '대표 해제'
+              : '이 사진을 캐릭터 reference 로도 사용 (대표로 지정)'
+        }
+        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 font-bold text-sm transition-colors ${
+          isOn
+            ? 'bg-[#fff7d6] text-[#8b6a14] border-[#E8A832]'
+            : 'bg-[#e8ddb4] text-[#3E2A18] border-[#9A7548]/40 hover:bg-[#d9be82]'
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        {isPending ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Star
+            className="w-4 h-4"
+            fill={isOn ? '#E8A832' : 'none'}
+            stroke={isOn ? '#E8A832' : 'currentColor'}
+          />
+        )}
+        <span>{isOn ? '대표 ★' : '대표로 지정'}</span>
+      </button>
+      {isLocked && (
+        <p className="mt-2 text-xs text-[#8b7a52]">
+          스토리보드 생성이 시작되어 대표 사진을 변경할 수 없어요.
+        </p>
+      )}
     </div>
   )
 }

@@ -3,6 +3,8 @@ package com.s210.backend.domain.story.presentation
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.PhotoService
+import com.s210.backend.domain.story.model.PhotoPurpose
+import com.s210.backend.domain.story.presentation.request.CharacterRefToggleRequest
 import com.s210.backend.domain.story.presentation.request.CreatePhotoRequest
 import com.s210.backend.domain.story.presentation.request.ModifyPhotoRequest
 import com.s210.backend.domain.story.presentation.request.PhotoOrderRequest
@@ -45,6 +47,9 @@ class PhotoController(
     /**
      * presigned PUT URL 발급. 유효 5분.
      * 반환 `s3Key` 는 commit 단계(`POST /photos`)에서 그대로 다시 보내야 함.
+     *
+     * `purpose` 가 `CHARACTER_REF` (대표 사진 별도 업로드) 면 lock 검증이 추가되며,
+     * `BOTH` 는 거부 (BOTH 도달은 별 토글 endpoint 로만 가능).
      */
     @PostMapping("/presigned-url")
     fun photoPresignAdd(
@@ -52,7 +57,11 @@ class PhotoController(
         @PathVariable storyId: Long,
         @RequestBody @Valid request: PresignPhotoRequest,
     ): ResponseEntity<ApiResponse<PresignPhotoResponse>> {
-        val result = photoService.presignUpload(user.userId, storyId, request.contentType)
+        val purpose = request.purpose ?: PhotoPurpose.STORYBOARD
+        if (purpose == PhotoPurpose.BOTH) {
+            throw IllegalArgumentException("purpose=BOTH 는 토글 endpoint 로만 도달 가능합니다.")
+        }
+        val result = photoService.presignUpload(user.userId, storyId, request.contentType, purpose)
         return ResponseEntity.ok(
             ApiResponse(
                 data = PresignPhotoResponse(
@@ -62,6 +71,25 @@ class PhotoController(
                 )
             )
         )
+    }
+
+    /**
+     * 추억 사진 카드의 별 토글 — `STORYBOARD` ↔ `BOTH`.
+     *
+     * 별도 업로드된 `CHARACTER_REF` 사진은 토글 대상이 아니므로 거부 (400).
+     * Lock 후엔 거부 (409). on=true 시 max-3 합산 검증.
+     */
+    @PutMapping("/{photoId}/character-ref-toggle")
+    fun photoCharacterRefToggle(
+        @AuthenticationPrincipal user: CustomUser,
+        @PathVariable storyId: Long,
+        @PathVariable photoId: Long,
+        @RequestBody @Valid request: CharacterRefToggleRequest,
+    ): ResponseEntity<ApiResponse<PhotoItemResponse>> {
+        val on = requireNotNull(request.on) { "`on` 은 필수입니다." }
+        val updated = photoService.toggleCharacterRef(user.userId, storyId, photoId, on)
+        val presigned = photoService.presignGetUrl(updated.s3Key)
+        return ResponseEntity.ok(ApiResponse(data = PhotoItemResponse.from(updated, presigned)))
     }
 
     /**
