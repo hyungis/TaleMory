@@ -85,7 +85,8 @@ class HighlightOutroService(
             BusinessException(StoryErrorCode.SENTENCE_NOT_FOUND)
         }
 
-        val expectedPrefix = "stories/$storyId/highlight-voices/$sentenceId/"
+        // env-prefix(local/dev/prod) 적용된 풀 prefix 로 검증.
+        val expectedPrefix = s3Service.applyEnvPrefix("stories/$storyId/highlight-voices/$sentenceId/")
         if (!s3Key.startsWith(expectedPrefix)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
@@ -168,7 +169,8 @@ class HighlightOutroService(
     fun commitOutroVoice(storyId: Long, s3Key: String): OutroResponse {
         verifyStoryExists(storyId)
 
-        val expectedPrefix = "stories/$storyId/outro-voice/"
+        // env-prefix(local/dev/prod) 적용된 풀 prefix 로 검증.
+        val expectedPrefix = s3Service.applyEnvPrefix("stories/$storyId/outro-voice/")
         if (!s3Key.startsWith(expectedPrefix)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }

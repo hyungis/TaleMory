@@ -282,5 +282,13 @@ class StoryConfirmService(
         )
     }
 
-    private fun looksLikeS3Key(value: String): Boolean = value.startsWith("stories/")
+    /**
+     * 입력이 S3 key 인지(URL 이 아닌지) 휴리스틱 판정.
+     * env-prefix(local/dev/prod) 가 앞에 붙은 키도 인식하도록 — http(s):// 가 아니면서 path 안에
+     * `stories/` 가 들어있으면 raw key 로 간주.
+     */
+    private fun looksLikeS3Key(value: String): Boolean {
+        if (value.startsWith("http://") || value.startsWith("https://")) return false
+        return value.contains("stories/")
+    }
 }

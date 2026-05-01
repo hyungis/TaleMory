@@ -86,7 +86,9 @@ class PhotoService(
         ownedStory(command.userId, command.storyId)
         ensureStorySummaryNotStarted(command.storyId)
 
-        val expectedPrefix = "stories/${command.storyId}/photos/"
+        // env-prefix(local/dev/prod) + 본 prefix 모두 일치 검증.
+        // S3Service.applyEnvPrefix 가 presign 시점에 env-prefix 를 박아주므로 여기서도 동일 헬퍼 사용.
+        val expectedPrefix = s3Service.applyEnvPrefix("stories/${command.storyId}/photos/")
         if (!command.s3Key.startsWith(expectedPrefix)) {
             throw BusinessException(StoryErrorCode.INVALID_PHOTO_FORMAT)
         }

@@ -39,8 +39,11 @@ class S3Service(
      *
      * 신규 key 를 만드는 모든 빌더 (presign*, upload*) 가 이 헬퍼를 거치도록 일원화.
      * 외부에서 받은 s3Key 인자(presignGetUrl/deleteObject/uploadFile)는 이미 완성된 키이므로 가공하지 않는다.
+     *
+     * 공개 메서드로 노출 — PhotoService / VoiceService / HighlightOutroService 등의
+     * commit-단계 prefix 검증(`s3Key.startsWith(expectedPrefix)`)이 환경 prefix 를 인지하도록.
      */
-    private fun applyEnvPrefix(relativeKey: String): String {
+    fun applyEnvPrefix(relativeKey: String): String {
         val cleaned = envPrefix.trim().trim('/')
         return if (cleaned.isEmpty()) relativeKey else "$cleaned/$relativeKey"
     }
