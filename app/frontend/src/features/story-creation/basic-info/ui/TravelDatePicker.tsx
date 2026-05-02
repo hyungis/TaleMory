@@ -169,14 +169,8 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   const handleReset = () => onChange(null, null)
   const handlePrevMonth = () =>
     setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
-  const handleNextMonth = () => {
-    // 미래 달 너무 많이 가는 건 막아둠 — 오늘이 포함된 달까지만 nav 가능.
-    setViewMonth(prev => {
-      const next = new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
-      const todayMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-      return next > todayMonth ? prev : next
-    })
-  }
+  const handleNextMonth = () =>
+    setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
 
   const isInRange = (day: Date) => {
     if (!start || !end) return false
@@ -184,11 +178,6 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   }
 
   const monthLabel = `${viewMonth.getFullYear()}년 ${MONTH_NAMES[viewMonth.getMonth()]}`
-
-  // 다음 달 버튼 비활성화 — 표시 중인 달이 이미 오늘 달이라면.
-  const isOnTodayMonth =
-    viewMonth.getFullYear() === today.getFullYear() &&
-    viewMonth.getMonth() === today.getMonth()
 
   const triggerLabel = (() => {
     if (start && end) {
@@ -256,13 +245,8 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
             <button
               type="button"
               onClick={handleNextMonth}
-              disabled={isOnTodayMonth}
               aria-label="다음 달"
-              style={{
-                ...NAV_BTN_STYLE,
-                opacity: isOnTodayMonth ? 0.3 : 1,
-                cursor: isOnTodayMonth ? 'not-allowed' : 'pointer',
-              }}
+              style={NAV_BTN_STYLE}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
