@@ -50,6 +50,14 @@
     transform 0.75s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* opening 단계 — 문이 열리자마자 따뜻한 글로우가 새어 나오도록 (zoom 시작 전).
+   이 단계에선 scale/opacity 를 적당히 두어 "문 안쪽 불빛" 정도로만 표현. */
+.scene.is-opening .door-light {
+  opacity: 0.85;
+  transform: translate(-50%, 0) scale(1);
+}
+
+/* zooming 단계 — 빨려들어가는 burst. is-opening 보다 뒤에 정의해서 override. */
 .scene.is-entering .door-light {
   opacity: 1;
   transform: translate(-50%, 0) scale(1.6);
@@ -85,14 +93,17 @@
 }
 
 .layer--background img {
-  width: 110%;
-  height: 110%;
+  width: 100%;
+  height: 100%;
   max-width: none;
-  /* Tailwind preflight 가 img { max-width: 100% } 를 걸기 때문에 명시 해제 */
+  /* Tailwind preflight 가 img { max-width: 100% } 를 걸기 때문에 명시 해제.
+     cover 로 viewport 를 항상 꽉 채움 — 모니터 비율이 16:9 가 아니어도 좌우 빈 공간이 생기지 않도록.
+     세로로 살짝 잘릴 수 있으나 핵심 요소는 중앙에 배치해 안전. */
   object-fit: cover;
+  object-position: center;
   position: absolute;
-  top: -5%;
-  left: -5%;
+  top: 0;
+  left: 0;
 }
 
 .layer--tree {
@@ -126,20 +137,32 @@
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  animation: bobbing 6s ease-in-out infinite;
   pointer-events: none;
 }
 
 .house-img {
-  height: 110vh;
+  height: 90vh;
   width: auto;
   max-width: none;
   object-fit: contain;
-  margin-bottom: -7vh;
+  margin-bottom: 11vh;
   filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
-  transition: transform 0.3s ease-out, filter 0.3s ease-out;
+  /* transform 은 transition 에서 제외 — src 가 openhouse 로 바뀔 때 보정 transform 이
+     0.3s 동안 보간되며 들썩이는 모션이 생기는 것을 방지. filter(hover glow) 만 부드럽게. */
+  transition: filter 0.3s ease-out;
   pointer-events: none;
   /* 클릭은 형제 .house-hitbox 가 받는다. 투명 여백까지 클릭되는 것을 방지. */
+}
+
+/* openhouse.png 와 house.png 가 같은 dimensions(1672×941) 지만 그림 영역이 캔버스 안에서
+   미세하게 다르게 그려져있어 src 교체 시 위치가 튀는 것을 보정.
+   동시에 hover 와 같은 시각적 효과(살짝 확대 + sage glow) 를 default 로 적용 — 문이
+   열린 상태가 "선택된" 느낌이 들도록. transform 트랜지션은 비활성화돼 있어 위치는 즉시
+   적용되고, filter 트랜지션은 유지되어 글로우가 부드럽게 fade-in. */
+.house-img[src*="openhouse"] {
+  transform-origin: center bottom;
+  transform: translateY(2vh) scale(1.05);
+  filter: drop-shadow(0 30px 60px rgba(180, 220, 140, 0.4));
 }
 
 /* hitbox hover 시 시각적으로 집이 살짝 떠오르도록 (기존 hover 효과 유지) */
@@ -148,15 +171,17 @@
   filter: drop-shadow(0 30px 60px rgba(180, 220, 140, 0.4));
 }
 
-/* 집 실루엣 크기로 좁힌 투명 클릭 영역.
+/* 집 실루엣 크기로 좁힌 투명 클릭/호버 영역.
+   - bottom: house-img 의 margin-bottom(14vh) 과 맞춰 집 아래 빈 공간을 호버 영역에서 제외.
+   - height/width: 성(castle) silhouette 의 본체에 맞춰 조정. 외곽 타워는 일부 빠질 수 있음.
    값은 /house.png 의 실제 silhouette 비율에 맞춰 튜닝 가능. */
 .house-hitbox {
   position: absolute;
   left: 50%;
-  bottom: 0;
+  bottom: 14vh;
   transform: translateX(-50%);
-  width: 22vw;
-  height: 55vh;
+  width: 45vw;
+  height: 65vh;
   background: transparent;
   border: 0;
   padding: 0;
@@ -183,8 +208,8 @@
    pointer-events: none 으로 클릭은 hitbox 가 받음. */
 .house-knock-marker {
   position: absolute;
-  left: 49%;
-  bottom: 17vh; /* 문 위 — house-hitbox(55vh) 상단 부근. /house.png 실루엣에 맞춰 튜닝 */
+  left: 51.1%;
+  bottom: 22vh; /* 문 위 — house-hitbox(55vh) 상단 부근. /house.png 실루엣에 맞춰 튜닝 */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
