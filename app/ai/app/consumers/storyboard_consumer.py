@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 from app.core.config import settings
-from app.mq.client import create_channel, create_connection, declare_storyboard_topology
+from app.mq.client import create_channel, create_connection, declare_ai_topology
 from app.mq.publisher import StoryResultPublisher
 from app.schemas.mq_storyboard import StoryError, StoryGenerateJobMessage, StoryRegenerateJobMessage
 from app.schemas.mq_storyboard_summary import (
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 def consume_storyboard_jobs() -> None:
     connection = create_connection()
     channel = create_channel(connection)
-    declare_storyboard_topology(channel)
+    declare_ai_topology(channel)
     register_storyboard_consumers(channel)
     try:
         channel.start_consuming()

@@ -24,7 +24,7 @@ def create_channel(connection: Any) -> Any:
     return channel
 
 
-def declare_storyboard_topology(channel: Any) -> None:
+def declare_ai_topology(channel: Any) -> None:
     channel.exchange_declare(
         exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
         exchange_type="topic",

@@ -2,7 +2,7 @@ from app.consumers.final_illustration_consumer import register_final_illustratio
 from app.consumers.storyboard_consumer import register_storyboard_consumers
 from app.consumers.storyboard_image_consumer import register_storyboard_image_consumers
 from app.consumers.tts_consumer import register_tts_consumers
-from worker_common import run_worker
+from app.worker_common import run_worker
 
 
 def main() -> None:

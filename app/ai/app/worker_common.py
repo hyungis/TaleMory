@@ -3,7 +3,7 @@ import os
 from collections.abc import Callable
 from typing import Any
 
-from app.mq.client import create_channel, create_connection, declare_storyboard_topology
+from app.mq.client import create_channel, create_connection, declare_ai_topology
 
 
 ConsumerRegistrar = Callable[[Any], None]
@@ -26,7 +26,7 @@ def run_worker(name: str, register_consumers: ConsumerRegistrar) -> None:
     logger.info("%s starting", name)
     connection = create_connection()
     channel = create_channel(connection)
-    declare_storyboard_topology(channel)
+    declare_ai_topology(channel)
     register_consumers(channel)
     logger.info("%s ready", name)
     try:

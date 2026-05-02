@@ -1,5 +1,5 @@
 from app.consumers.storyboard_consumer import register_storyboard_consumers
-from worker_common import run_worker
+from app.worker_common import run_worker
 
 
 def main() -> None:

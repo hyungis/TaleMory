@@ -1,5 +1,5 @@
 from app.consumers.final_illustration_consumer import register_final_illustration_consumers
-from worker_common import run_worker
+from app.worker_common import run_worker
 
 
 def main() -> None:
