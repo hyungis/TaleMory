@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { Person } from '../../entities/person'
 import type { UserProfile } from '../../entities/user'
 import { buildOauthLogoutUrl, clearAuthSession, setAuthSession, useAuthSession, useLogout } from '../../features/auth'
+import { BookshelfDoodles } from '../../features/bookshelf'
 import {
   DangerZone,
   PersonEditModal,
   PersonsSection,
   ProfileEditModal,
   ProfileSection,
-  VoiceProfileDetailsModal,
   VoiceProfilesSection,
   WithdrawDialog,
   useMeQuery,
@@ -19,22 +19,26 @@ import {
   usePersonsQuery,
   usePersonUpdate,
   useVoiceProfileDelete,
-  useVoiceProfileQuery,
   useVoiceProfilesQuery,
   useWithdraw,
 } from '../../features/mypage'
 import { isApiError } from '../../shared/api'
 import { ROUTES } from '../../shared/constants'
+import './styles/mypage.css'
 
 type Modal =
   | { kind: 'none' }
   | { kind: 'profile-edit' }
   | { kind: 'withdraw' }
   | { kind: 'person-edit'; person?: Person }
-  | { kind: 'voice-detail'; voiceProfileId: number }
 
 export function MypagePage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  // 진입 시 TopRightMenu 가 state.from = 'main' | 'bookshelf' 로 기록.
+  // 모르면 (직접 URL 진입 등) 'bookshelf' 로 fallback — 기존 동작 유지.
+  const fromState = (location.state as { from?: 'main' | 'bookshelf' } | null)?.from
+  const enteredFrom: 'main' | 'bookshelf' = fromState ?? 'bookshelf'
   const authSession = useAuthSession()
   const meQuery = useMeQuery(authSession.isAuthenticated)
   const meUpdate = useMeUpdate()
@@ -62,8 +66,6 @@ export function MypagePage() {
 
   const [modal, setModal] = useState<Modal>({ kind: 'none' })
   const voiceProfilesQuery = useVoiceProfilesQuery(authSession.isAuthenticated)
-  const selectedVoiceProfileId = modal.kind === 'voice-detail' ? modal.voiceProfileId : null
-  const voiceProfileQuery = useVoiceProfileQuery(selectedVoiceProfileId, authSession.isAuthenticated)
   const voiceProfileDelete = useVoiceProfileDelete()
   const withdraw = useWithdraw()
 
@@ -86,38 +88,34 @@ export function MypagePage() {
   // 가드 없이 두면 alert + window.location.assign 사이에 "로그인이 필요한 페이지" 가
   // 한 프레임 깜빡이며 노출되는 문제 방지.
   if (isLoggingOut) {
-    return <div className="h-full bg-[#F4E4BC]" aria-hidden="true" />
+    return <div className="mypage-shell" aria-hidden="true" />
   }
 
   if (!authSession.isAuthenticated || hasMissingUserError) {
     return (
-      <div className="h-full overflow-y-auto bg-[#F4E4BC]">
-        <main className="max-w-3xl mx-auto px-6 md:px-8 py-16">
-          <section className="rounded-3xl bg-[#E9DBBE] border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] p-8 text-center space-y-4">
-            <h1 className="text-2xl font-bold text-[#3E2A18]">로그인이 필요한 페이지예요</h1>
-            <p className="text-sm text-[#6B4A28]">
-              마이페이지는 로그인한 사용자만 확인할 수 있어요.
-            </p>
-            <Link
-              to={ROUTES.home}
-              className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-[#8DBA64] text-[#1F3318] text-sm font-bold border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all"
-            >
-              홈으로 이동
-            </Link>
+      <div className="mypage-shell">
+        <div className="mp-doodles-bg" aria-hidden="true">
+          <BookshelfDoodles />
+        </div>
+        <main className="mp-auth-required">
+          <section className="mp-auth-required-card">
+            <h1>로그인이 필요해요</h1>
+            <p>마이페이지는 로그인한 사용자만 확인할 수 있어요.</p>
+            <Link to={ROUTES.home}>홈으로 이동</Link>
           </section>
         </main>
       </div>
     )
   }
 
-  const goToBookshelf = () => {
-    // 마이페이지는 BookstoreScene(=BookshelfModal) 안의 in-world 버튼에서 진입한다.
-    // 따라서 복귀도 ForestScene 재생 없이 곧장 책장 씬으로 들어가야 한다.
-    // `/main/bookshelf` 라우트로 직행하면 MainPage 의 `isBookshelfOpen` 이 true 로 마운트되어
-    // 책장 모달이 첫 프레임부터 열린 상태가 된다 (CreationPage.goToBookshelf 패턴과 동일).
+  const handleBack = () => {
+    // 진입 발화 지점에 따라 분기:
+    //  - main(ForestScene) 에서 햄버거로 들어왔으면 → /main 으로 복귀 (숲 씬)
+    //  - bookshelf(BookstoreScene) 에서 들어왔으면 → /main/bookshelf 로 복귀 (책장 모달)
     // replace: true 로 `/mypage` 를 히스토리에서 치워 브라우저 뒤로가기가 마이페이지로
     // 다시 빨려 들어가지 않도록 한다.
-    navigate(ROUTES.mainBookshelf, { replace: true })
+    const target = enteredFrom === 'main' ? ROUTES.main : ROUTES.mainBookshelf
+    navigate(target, { replace: true })
   }
 
   const handleProfileSave = async (
@@ -197,39 +195,44 @@ export function MypagePage() {
 
   return (
     <>
-      <div className="h-full overflow-y-auto bg-[#F4E4BC] [animation:mypageEntry_0.45s_ease-out_forwards]">
-        <header className="h-14 px-6 bg-[#E9DBBE] border-b-2 border-[#9A7548]/30 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+      <div className="mypage-shell" style={{ animation: 'mpFadeIn 0.45s ease-out' }}>
+        <div className="mp-doodles-bg" aria-hidden="true">
+          <BookshelfDoodles />
+        </div>
+
+        <header className="mp-nav">
           <button
             type="button"
-            onClick={goToBookshelf}
-            className="flex items-center gap-1.5 bg-[#F4E4BC] text-[#3E2A18] px-4 py-1.5 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-colors font-bold text-sm"
-            aria-label="책장으로 돌아가기"
+            onClick={handleBack}
+            className="mp-back-btn"
+            aria-label={enteredFrom === 'main' ? '메인으로 돌아가기' : '책장으로 돌아가기'}
           >
             <span aria-hidden="true">{'←'}</span>
             <span>돌아가기</span>
           </button>
-          <Link
-            to={ROUTES.home}
-            className="text-[#3F6B2E] text-2xl font-bold tracking-wider"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            TaleMory
+          <Link to={ROUTES.home} className="mp-logo">
+            Tale<span className="accent">Mory</span>
           </Link>
         </header>
 
-        <main className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 py-10 space-y-6 pb-16">
-          <h1
-            className="text-3xl md:text-4xl font-bold text-[#3E2A18]"
-            style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}
+        <main className="mp-content">
+          <h1 className="mp-page-title">마이페이지</h1>
+          <svg
+            className="mp-page-title-underline"
+            viewBox="0 0 200 6"
+            preserveAspectRatio="none"
+            aria-hidden="true"
           >
-            마이페이지
-          </h1>
+            <path
+              d="M2,3 Q40,0 80,3 T160,3 T198,3"
+              stroke="#c47254"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+            />
+          </svg>
 
-          {pageError && (
-            <div className="bg-[#F4E4BC] border-2 border-[#a3413f]/40 text-[#a3413f] text-sm px-4 py-3 rounded-xl font-bold">
-              {pageError}
-            </div>
-          )}
+          {pageError && <div className="mp-page-error">{pageError}</div>}
 
           {currentUser ? (
             <ProfileSection
@@ -237,8 +240,9 @@ export function MypagePage() {
               onEditClick={() => setModal({ kind: 'profile-edit' })}
             />
           ) : (
-            <section className="rounded-3xl bg-[#E9DBBE] border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] p-6 md:p-8">
-              <p className="text-sm text-[#6B4A28]">내 정보를 불러오는 중이에요.</p>
+            <section className="mp-loading-card">
+              <span className="mp-tape" aria-hidden="true" />
+              내 정보를 불러오는 중이에요.
             </section>
           )}
 
@@ -254,7 +258,6 @@ export function MypagePage() {
           <VoiceProfilesSection
             voiceProfiles={voiceProfilesQuery.data ?? []}
             onAddClick={() => navigate(ROUTES.mypageVoiceClone)}
-            onDetailsClick={profile => setModal({ kind: 'voice-detail', voiceProfileId: profile.id })}
             onDeleteClick={profile => handleVoiceDelete(profile.id, profile.title)}
             isLoading={voiceProfilesQuery.isPending}
             isBusy={voiceProfileDelete.isPending}
@@ -285,14 +288,6 @@ export function MypagePage() {
       )}
       {modal.kind === 'person-edit' && (
         <PersonEditModal initial={modal.person} onClose={closeModal} onSave={handlePersonSave} />
-      )}
-      {modal.kind === 'voice-detail' && (
-        <VoiceProfileDetailsModal
-          profile={voiceProfileQuery.data}
-          isLoading={voiceProfileQuery.isPending}
-          errorMessage={getFirstErrorMessage(voiceProfileQuery.error)}
-          onClose={closeModal}
-        />
       )}
     </>
   )

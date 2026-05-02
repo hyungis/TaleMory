@@ -107,7 +107,7 @@
   /* Tailwind preflight 의 img { max-width: 100% } 해제 필수 */
   object-fit: cover;
   position: absolute;
-  top: -12%;
+  top: -15%;
   left: -12%;
   animation: sway 10s ease-in-out infinite;
 }
@@ -135,7 +135,7 @@
   width: auto;
   max-width: none;
   object-fit: contain;
-  margin-bottom: -5vh;
+  margin-bottom: -7vh;
   filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
   transition: transform 0.3s ease-out, filter 0.3s ease-out;
   pointer-events: none;
@@ -184,7 +184,7 @@
 .house-knock-marker {
   position: absolute;
   left: 49%;
-  bottom: 19vh; /* 문 위 — house-hitbox(55vh) 상단 부근. /house.png 실루엣에 맞춰 튜닝 */
+  bottom: 17vh; /* 문 위 — house-hitbox(55vh) 상단 부근. /house.png 실루엣에 맞춰 튜닝 */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -578,31 +578,30 @@
   z-index: 50;
 }
 
+/* Claude .icon-btn 정확히 — 48x48 paper bg + ink-soft border + 0 2px 0 shadow. */
 .top-right-menu__trigger {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   padding: 0;
-  border-radius: 999px;
-  background: rgba(253, 250, 240, 0.85);
-  border: 2px solid #b4dc8c;
-  color: #2a1b12;
-  display: flex;
+  border-radius: 50%;
+  background: #f6ecd4;        /* --paper */
+  border: 2px solid #6b5638;  /* --ink-soft */
+  color: #6b5638;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
+  box-shadow: 0 2px 0 rgba(74, 59, 42, 0.2);
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
 .top-right-menu__trigger:hover,
 .top-right-menu__trigger[aria-expanded='true'] {
-  background: #b4dc8c;
-  color: #0a150a;
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 10px 25px rgba(180, 220, 140, 0.5);
+  background: #efe1c2;        /* --paper-2 */
+  transform: translateY(-1px);
 }
 
+/* paper-craft 톤 — cream gradient + caramel-deep border + 손그림 입체 shadow. */
 .top-right-menu__panel {
   position: absolute;
   top: calc(100% + 12px);
@@ -612,11 +611,10 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px;
-  background: rgba(253, 250, 240, 0.95);
-  border: 2px solid #b4dc8c;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid #a37548;
   border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 0 #a37548, 0 12px 28px rgba(140, 100, 60, 0.28);
   z-index: 60;
   animation: topRightMenuEntry 0.18s ease-out;
 }
@@ -632,17 +630,19 @@
   }
 }
 
+/* paper-craft 메뉴 항목 — Gaegu 손글씨 + 호버 시 sage hint. */
 .top-right-menu__item {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 14px;
+  padding: 11px 14px;
   background: transparent;
   border: 0;
   border-radius: 12px;
-  color: #2a1b12;
-  font-size: 1rem;
+  color: #4a3b2a;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 18px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -650,24 +650,24 @@
 }
 
 .top-right-menu__item:hover {
-  background: #b4dc8c;
-  color: #0a150a;
+  background: rgba(122, 153, 104, 0.18);  /* sage tint */
+  color: #5f7d50;                         /* sage-deep */
 }
 
-/* 드롭다운에 들어간 LogoutButton(.bookstore-action-btn.logout-btn) 의 기존 시각을
-   메뉴 항목 톤으로 override. 글로벌 .logout-btn 스타일은 건드리지 않고 스코프드 selector 로만. */
+/* 드롭다운 LogoutButton override — rust 톤. */
 .top-right-menu__panel .bookstore-action-btn.logout-btn {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
   width: 100%;
-  padding: 12px 14px;
+  padding: 11px 14px;
   background: transparent;
   border: 0;
   border-radius: 12px;
-  color: #8b3a2a;
-  font-size: 1rem;
+  color: #c47254;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 18px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -677,8 +677,8 @@
 }
 
 .top-right-menu__panel .bookstore-action-btn.logout-btn:hover:not(:disabled) {
-  background: #8b3a2a;
-  color: #fff7e8;
+  background: rgba(196, 114, 84, 0.16);  /* rust tint */
+  color: #8c3a1f;
   transform: none;
   box-shadow: none;
   border-color: transparent;
@@ -688,5 +688,5 @@
   opacity: 0.6;
   cursor: wait;
   background: transparent;
-  color: #8b3a2a;
+  color: #c47254;
 }

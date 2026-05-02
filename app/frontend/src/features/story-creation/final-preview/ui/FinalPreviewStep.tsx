@@ -17,27 +17,21 @@ import {
 } from '../../highlight-outro/api/highlightOutroApi'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
+import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
+import '../../styles/creation-paper.css'
 
 interface FinalPreviewStepProps {
   storyId: number | null
-  /** TTS 잡 jobId (HighlightOutroStep confirm 응답). null 이면 폴링 없이 즉시 scenes fetch. */
   storyGenerationJobId: number | null
   onBack: () => void
-  /** "내 책장 보관하기" — 제작 플로우 종료 후 메인(서점) 으로 복귀. */
   onSaveToBookshelf: () => void
-  /** "뷰어로 열기" — 풀스크린 react-pageflip 뷰어로 이동. */
   onOpenViewer: () => void
-  /** "링크 공유하기" — navigator.share API 또는 fallback. */
   onShare?: () => void
 }
 
 /**
- * STEP 08 — "완성된 동화책"
- *
- * 서버에서 scenes + outro 를 조회하여 실제 삽화/본문/TTS 를 표시한다.
- * storyGenerationJobId 가 있으면 TTS 잡이 SUCCESS 될 때까지 폴링하고,
- * SUCCESS(또는 jobId=null) 시점에 scenes/outro 를 fetch 한다.
+ * STEP 08 — paper-craft 톤 (Claude offline.html 1:1).
  */
 export function FinalPreviewStep({
   storyId,
@@ -61,7 +55,6 @@ export function FinalPreviewStep({
       return
     }
 
-    // jobId 가 없거나 SUCCESS 도달 시점에만 scenes/outro fetch
     const shouldFetch = !storyGenerationJobId || jobQuery.data?.status === 'SUCCESS'
     if (!shouldFetch) return
 
@@ -115,7 +108,6 @@ export function FinalPreviewStep({
     }
   }, [onShare])
 
-  // TTS 잡이 PENDING/RUNNING 인 경우 또는 scenes fetch 중인 경우 blocking
   const isJobInProgress =
     !!storyGenerationJobId &&
     (jobQuery.data?.status === 'PENDING' || jobQuery.data?.status === 'RUNNING')
@@ -124,25 +116,32 @@ export function FinalPreviewStep({
   if (blocking) {
     const message = jobQuery.data?.currentStep ?? '동화책 만드는 중...'
     return (
-      <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-[#b4dc8c] animate-spin" />
-        <p className="ml-4 text-[#f0e6c0] text-lg">{message}</p>
+      <div className="cr-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Loader2 className="w-10 h-10 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
+          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-ink)', margin: 0 }}>
+            {message}
+          </p>
+        </div>
       </div>
     )
   }
 
   if (jobQuery.data?.status === 'FAILED') {
     return (
-      <div className="bookshelf-modal step-forest-modal flex items-center justify-center flex-col gap-4">
-        <p className="text-red-400 text-lg">동화 음성 생성에 실패했습니다.</p>
+      <div
+        className="cr-shell"
+        style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}
+      >
+        <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-rust)' }}>
+          동화 음성 생성에 실패했어요.
+        </p>
         {jobQuery.data.errorMessage && (
-          <p className="text-[#f0e6c0] text-sm">{jobQuery.data.errorMessage}</p>
+          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-ink-soft)' }}>
+            {jobQuery.data.errorMessage}
+          </p>
         )}
-        <button
-          type="button"
-          onClick={onBack}
-          className="bg-[#f0e6c0] text-[#2d5a27] px-6 py-2 rounded-full border-2 border-[#b4dc8c] hover:bg-[#b4dc8c] transition-all font-bold"
-        >
+        <button type="button" onClick={onBack} className="cr-btn-back">
           이전 단계로
         </button>
       </div>
@@ -151,96 +150,206 @@ export function FinalPreviewStep({
 
   if (error || !currentScene) {
     return (
-      <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
-        <p className="text-[#f0e6c0] text-lg">
-          {error ?? '씬 데이터가 없습니다. 이전 단계를 확인하세요.'}
+      <div className="cr-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-ink)' }}>
+          {error ?? '씬 데이터가 없어요. 이전 단계를 확인하세요.'}
         </p>
       </div>
     )
   }
 
   return (
-    <div className="bookshelf-modal step-forest-modal">
+    <div className="cr-shell">
+      <CreationDoodlesBg />
       <CreationHeader currentStep={8} />
 
-      <div className="bookshelf-scroll">
-        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
-          <div className="max-w-6xl mx-auto pb-12">
-            {/* 성공 배지 */}
-            <div className="text-center mb-8">
-              <div className="inline-block bg-[#2d5a27] text-[#b4dc8c] px-5 py-2 rounded-full text-base mb-4 border border-[#b4dc8c]/50 shadow-[0_0_20px_rgba(180,220,140,0.4)] font-bold">
-                세상에 하나뿐인 동화책 완성!
-              </div>
-            </div>
+      <div className="cr-scroll">
+        <main className="cr-shell-inner cr-fade-in" style={{ maxWidth: 1300 }}>
+          {/* 성공 배지 */}
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--cr-sage)',
+                color: '#fdf6dc',
+                padding: '8px 22px',
+                borderRadius: 999,
+                border: '2px solid var(--cr-sage-deep)',
+                boxShadow: '0 3px 0 var(--cr-sage-deep), 0 6px 14px rgba(95,125,80,0.25)',
+                fontFamily: 'var(--cr-font-serif)',
+                fontWeight: 800,
+                fontSize: 16,
+              }}
+            >
+              ✦ 세상에 하나뿐인 동화책 완성!
+            </span>
+          </div>
 
-            {/* 펼쳐진 책 + 좌우 chevron */}
-            <div className="relative">
-              <BookSpread scene={currentScene} pageIndex={resultPageIndex} />
+          {/* 펼쳐진 책 + 좌우 chevron */}
+          <div style={{ position: 'relative' }}>
+            <BookSpread scene={currentScene} pageIndex={resultPageIndex} />
 
-              <button
-                type="button"
-                onClick={prevPage}
-                disabled={resultPageIndex === 0}
-                aria-label="이전 페이지"
-                className="absolute left-[-18px] md:left-[-24px] top-1/2 -translate-y-1/2 bg-[#f0e6c0] text-[#2d5a27] p-3 md:p-4 rounded-full shadow-lg border-2 border-[#2d5a27] transition-all z-30 hover:scale-110 hover:bg-[#b4dc8c] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
+            <button
+              type="button"
+              onClick={prevPage}
+              disabled={resultPageIndex === 0}
+              aria-label="이전 페이지"
+              style={{
+                position: 'absolute',
+                left: -18,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: 'var(--cr-paper)',
+                color: 'var(--cr-ink)',
+                border: '2px solid var(--cr-caramel-deep)',
+                boxShadow: '0 3px 0 var(--cr-caramel-deep), 0 6px 14px rgba(140,100,60,0.2)',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: resultPageIndex === 0 ? 'not-allowed' : 'pointer',
+                opacity: resultPageIndex === 0 ? 0.4 : 1,
+                zIndex: 30,
+              }}
+            >
+              <ChevronLeft className="w-7 h-7" />
+            </button>
+            <button
+              type="button"
+              onClick={nextPage}
+              disabled={resultPageIndex >= totalPages - 1}
+              aria-label="다음 페이지"
+              style={{
+                position: 'absolute',
+                right: -18,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: 'var(--cr-paper)',
+                color: 'var(--cr-ink)',
+                border: '2px solid var(--cr-caramel-deep)',
+                boxShadow: '0 3px 0 var(--cr-caramel-deep), 0 6px 14px rgba(140,100,60,0.2)',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: resultPageIndex >= totalPages - 1 ? 'not-allowed' : 'pointer',
+                opacity: resultPageIndex >= totalPages - 1 ? 0.4 : 1,
+                zIndex: 30,
+              }}
+            >
+              <ChevronRight className="w-7 h-7" />
+            </button>
+          </div>
+
+          {/* 페이지 표시 */}
+          <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#fbf2da',
+                color: 'var(--cr-ink-soft)',
+                padding: '6px 16px',
+                borderRadius: 999,
+                border: '1.5px solid var(--cr-caramel)',
+                fontFamily: 'var(--cr-font-serif)',
+                fontWeight: 700,
+                fontSize: 14,
+              }}
+            >
+              <BookOpen className="w-4 h-4" />
+              Page {resultPageIndex + 1} / {totalPages}
+            </span>
+          </div>
+
+          {/* 아웃트로 */}
+          {outro && (
+            <div
+              style={{
+                marginTop: 32,
+                maxWidth: 640,
+                marginInline: 'auto',
+                position: 'relative',
+                background: 'linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%)',
+                border: '2.5px solid var(--cr-caramel-deep)',
+                borderRadius: 22,
+                padding: '22px 26px',
+                boxShadow: '0 2px 0 var(--cr-caramel-deep), 0 8px 22px rgba(140,100,60,0.16)',
+              }}
+            >
+              <span className="cr-tape" aria-hidden="true" />
+              <p
+                style={{
+                  fontFamily: 'var(--cr-font-serif)',
+                  fontSize: 18,
+                  color: 'var(--cr-ink)',
+                  lineHeight: 1.6,
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                  margin: 0,
+                }}
               >
-                <ChevronLeft className="w-6 h-6 md:w-8 md:h-8" />
-              </button>
-              <button
-                type="button"
-                onClick={nextPage}
-                disabled={resultPageIndex >= totalPages - 1}
-                aria-label="다음 페이지"
-                className="absolute right-[-18px] md:right-[-24px] top-1/2 -translate-y-1/2 bg-[#f0e6c0] text-[#2d5a27] p-3 md:p-4 rounded-full shadow-lg border-2 border-[#2d5a27] transition-all z-30 hover:scale-110 hover:bg-[#b4dc8c] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
-              </button>
-            </div>
-
-            {/* 페이지 표시 */}
-            <div className="text-center mt-6">
-              <span className="inline-flex items-center gap-2 bg-[#2a1b12]/70 text-[#b4dc8c] px-4 py-1.5 rounded-full text-sm font-bold border border-[#4a3a24]">
-                <BookOpen className="w-4 h-4" />
-                Page {resultPageIndex + 1} / {totalPages}
-              </span>
-            </div>
-
-            {/* 아웃트로 표시 (있을 때만) */}
-            {outro && (
-              <div className="mt-8 max-w-2xl mx-auto bg-[#f0e6c0]/90 rounded-2xl p-6 border border-[#8b7a52]/30 shadow-inner">
-                <p className="text-[#2a1b12] text-lg leading-relaxed text-center italic">
-                  {outro.outroText}
+                {outro.outroText}
+              </p>
+              {outro.signature && (
+                <p
+                  style={{
+                    textAlign: 'right',
+                    fontFamily: 'var(--cr-font-gaegu)',
+                    fontSize: 16,
+                    color: 'var(--cr-ink-soft)',
+                    fontWeight: 700,
+                    margin: '12px 0 0',
+                  }}
+                >
+                  — {outro.signature}
                 </p>
-                {outro.signature && (
-                  <p className="text-right text-[#8b7a52] mt-3 font-bold">— {outro.signature}</p>
-                )}
-              </div>
-            )}
-
-            {/* 하단 액션 */}
-            <div className="mt-12 flex flex-col sm:flex-row flex-wrap justify-center gap-4">
-              <button
-                type="button"
-                onClick={onSaveToBookshelf}
-                className="bg-[#f0e6c0] text-[#2d5a27] text-xl px-10 py-4 rounded-full shadow-md border-2 border-[#b4dc8c] hover:bg-[#b4dc8c] transition-all flex items-center justify-center gap-2 font-bold"
-              >
-                <Library className="w-6 h-6" /> 내 책장 보관하기
-              </button>
-              <button
-                type="button"
-                onClick={onOpenViewer}
-                className="bg-[#2d5a27] text-[#f0e6c0] text-xl px-10 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_6px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] transition-all font-bold flex items-center justify-center gap-2"
-              >
-                <Maximize className="w-6 h-6" /> 뷰어로 열기
-              </button>
-              <button
-                type="button"
-                onClick={handleShareFallback}
-                className="bg-[#c97b4a] text-[#f0e6c0] text-xl px-10 py-4 rounded-full shadow-[0_6px_0_#8b3a2a] hover:translate-y-1 hover:shadow-[0_2px_0_#8b3a2a] hover:bg-[#d88a58] transition-all font-bold flex items-center justify-center gap-2"
-              >
-                <Share2 className="w-6 h-6" /> 링크 공유하기
-              </button>
+              )}
             </div>
+          )}
+
+          {/* 하단 액션 */}
+          <div
+            style={{
+              marginTop: 40,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: 14,
+            }}
+          >
+            <button type="button" onClick={onSaveToBookshelf} className="cr-btn-back" style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 17 }}>
+              <Library className="w-5 h-5" /> 내 책장 보관하기
+            </button>
+            <button type="button" onClick={onOpenViewer} className="cr-btn-next" style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 17 }}>
+              <Maximize className="w-5 h-5" /> 뷰어로 열기
+            </button>
+            <button
+              type="button"
+              onClick={handleShareFallback}
+              style={{
+                background: 'var(--cr-rust)',
+                color: '#fdf6dc',
+                border: '2px solid #8a4a32',
+                borderRadius: 999,
+                padding: '14px 24px',
+                fontFamily: 'var(--cr-font-serif)',
+                fontWeight: 700,
+                fontSize: 17,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 3px 0 #8a4a32, 0 6px 14px rgba(140,60,40,0.25)',
+              }}
+            >
+              <Share2 className="w-5 h-5" /> 링크 공유하기
+            </button>
           </div>
         </main>
       </div>

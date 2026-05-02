@@ -301,24 +301,25 @@
   z-index: 5100;
   width: 44px;
   height: 44px;
-  /* 더 부드러운 honey 톤 + 어둡지 않은 텍스트 */
-  background: #C9A874;
-  border: 2px solid #D9BE82;
-  color: #3E2A18;
-  font-size: 1.8rem;
+  /* paper-cream 동그란 닫기 버튼 — 손그림 톤 brown border. */
+  background: #F0DBA8;
+  border: 2px solid rgba(163, 117, 72, 0.6);
+  color: #6B4A28;
+  font-size: 1.6rem;
+  font-weight: 700;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(154, 117, 72, 0.2);
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 0 rgba(163, 117, 72, 0.35);
 }
 
 .modal-close-btn:hover {
-  background: #B9D38F;
-  color: #1F3318;
-  transform: rotate(90deg) scale(1.1);
+  background: #E8D08F;
+  color: #3E2A18;
+  transform: rotate(90deg);
 }
 
 /* ===== Pastel Forest Library Theme (우리가족 책장 컨테이너) =====
@@ -327,30 +328,75 @@
    - 우상단: 부드러운 햇살 spotlight (옅은 노랑)
    - 좌하단: 파스텔 틸/그린 hint
    - 전반: 옅은 세이지 그린 + 따뜻한 크림 wash */
+/* ===== Paper-craft palette (Claude 디자인 시스템 1:1 이식) =====
+   crayon/colored-pencil 무드 — 모든 톤은 cream/caramel/sage 손그림 기반. */
 .bookshelf-modal {
+  /* paper tones */
+  --paper: #f6ecd4;
+  --paper-2: #efe1c2;
+  --paper-deep: #e6d4ad;
+  /* ink */
+  --ink: #4a3b2a;
+  --ink-soft: #6b5638;
+  /* sage */
+  --sage: #7a9968;
+  --sage-deep: #5f7d50;
+  /* caramel */
+  --caramel: #c89968;
+  --caramel-deep: #a37548;
+  /* accent */
+  --rust: #c47254;
+  --sky: #a8c4d8;
+  --rose: #d99a9a;
+  --butter: #f0c97a;
+
   width: 100%;
   height: 100%;
   max-width: none;
+  /* multi-layer cream wash — 우상단 spotlight + 우하단 deep + 중앙 cream-to-deep. */
   background:
-    /* 우상단 햇살 — soft yellow spotlight */
-    radial-gradient(ellipse at 88% 0%, rgba(255, 250, 224, 0.85), transparent 55%),
-    /* 좌하단 hint — pastel teal */
-    radial-gradient(ellipse at 0% 100%, rgba(215, 236, 239, 0.45), transparent 55%),
-    /* 전반 세이지 wash */
-    radial-gradient(ellipse at 20% 0%, rgba(207, 224, 138, 0.18), transparent 60%),
-    radial-gradient(ellipse at 80% 100%, rgba(226, 235, 192, 0.25), transparent 60%),
-    /* 크림 베이스 그라디언트 */
-    linear-gradient(160deg, #FBF6E0 0%, #FBF6E4 60%, #F2EBD2 100%);
-  color: #3E2A18;
+    radial-gradient(ellipse at 20% 10%, #fbf3dc 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 90%, #ead7ad 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 50%, #f5e9cb 0%, #ead7a8 100%);
+  color: var(--ink);
   border: none;
   border-radius: 0;
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
-  font-family: var(--font-body);
-  /* 부드러운 inset glow — 다크의 깊은 vignette 가 아니라 페이지 가장자리만 살짝 강조 */
-  box-shadow: inset 0 0 80px rgba(154, 117, 72, 0.08);
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+}
+
+/* 종이 grain 텍스처 — SVG noise multiply blend */
+.bookshelf-modal .bookshelf-bg-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.25  0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* 크레용 스크리블 텍스처 — 살짝 거친 종이 느낌 추가 */
+.bookshelf-modal .bookshelf-bg-crayon {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.32;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='c'><feTurbulence type='turbulence' baseFrequency='0.012 0.04' numOctaves='3' seed='7'/><feColorMatrix values='0 0 0 0 0.78  0 0 0 0 0.62  0 0 0 0 0.36  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+}
+
+/* 손그림 wavy 구분선 — filters 아래 점선 대신 사용 */
+.bookshelf-divider {
+  height: 6px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 6' preserveAspectRatio='none'><path d='M0,3 Q 30 0, 60 3 T 120 3 T 180 3 T 240 3 T 300 3 T 360 3 T 420 3 T 480 3 T 540 3 T 600 3' stroke='%23a37548' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: 0.6;
 }
 
 .bookshelf-modal .bookshelf-title-display {

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Copy, Share2, CheckCircle2, PartyPopper, Loader2 } from 'lucide-react'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
+import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { publishStory, getShareLink } from '../../../bookshelf'
+import '../../styles/creation-paper.css'
 
 interface PublishStoryStepProps {
   storyId: number | null
@@ -11,9 +13,7 @@ interface PublishStoryStepProps {
 }
 
 /**
- * STEP 09 — 동화책 발행 완료 화면.
- *
- * storyId 가 있으면 publish API 를 호출하고, 성공 시 shareUrl 을 표시한다.
+ * STEP 09 — paper-craft 톤. 동화책 발행 + 공유 링크.
  */
 export function PublishStoryStep({ storyId, onBack, onExit }: PublishStoryStepProps) {
   const [copied, setCopied] = useState(false)
@@ -24,15 +24,12 @@ export function PublishStoryStep({ storyId, onBack, onExit }: PublishStoryStepPr
 
   useEffect(() => {
     if (!storyId) return
-    // 이미 발행된 동화라면 share-link 조회 시도
     getShareLink(storyId)
       .then(data => {
         setShareUrl(data.shareUrl)
         setPublished(true)
       })
-      .catch(() => {
-        // 아직 미발행 상태 — 정상
-      })
+      .catch(() => {})
   }, [storyId])
 
   const handlePublish = useCallback(async () => {
@@ -44,7 +41,7 @@ export function PublishStoryStep({ storyId, onBack, onExit }: PublishStoryStepPr
       setShareUrl(data.shareUrl)
       setPublished(true)
     } catch {
-      setError('발행에 실패했습니다. 다시 시도해주세요.')
+      setError('발행에 실패했어요. 다시 시도해주세요.')
     } finally {
       setPublishing(false)
     }
@@ -56,86 +53,182 @@ export function PublishStoryStep({ storyId, onBack, onExit }: PublishStoryStepPr
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [shareUrl])
 
   return (
-    <div className="bookshelf-modal step-forest-modal">
+    <div className="cr-shell">
+      <CreationDoodlesBg />
       <CreationHeader currentStep={9} />
-      <div className="bookshelf-scroll">
-        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
-          <div className="max-w-2xl mx-auto bg-[#f0e6c0] p-8 md:p-12 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-2 border-[#2a1b12] text-center">
-            <div className="w-20 h-20 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-5 border-2 border-[#b4dc8c] shadow-[0_0_25px_rgba(180,220,140,0.5)]">
-              <PartyPopper className="w-10 h-10 text-[#f0e6c0]" />
+      <div className="cr-scroll">
+        <main className="cr-shell-inner cr-fade-in" style={{ maxWidth: 640 }}>
+          <div
+            className="cr-card"
+            style={{
+              padding: '40px 32px',
+              textAlign: 'center',
+            }}
+          >
+            <span className="cr-tape" aria-hidden="true" />
+
+            <div
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: '50%',
+                background: 'var(--cr-sage-darker)',
+                color: '#fdf6dc',
+                display: 'inline-grid',
+                placeItems: 'center',
+                margin: '0 auto 20px',
+                border: '3px solid var(--cr-sage)',
+                boxShadow: '0 4px 0 #2a3f1f, 0 8px 18px rgba(63,92,48,0.3)',
+              }}
+            >
+              <PartyPopper className="w-10 h-10" />
             </div>
 
             {published && shareUrl ? (
               <>
-                <h2 className="text-3xl text-[#2d5a27] font-bold mb-2">동화책이 완성됐어요!</h2>
-                <p className="text-[#8b7a52] mb-8">
+                <h2
+                  style={{
+                    fontFamily: 'var(--cr-font-serif)',
+                    fontWeight: 800,
+                    fontSize: 32,
+                    color: 'var(--cr-ink)',
+                    margin: '0 0 8px',
+                    letterSpacing: '-0.5px',
+                  }}
+                >
+                  동화책이 완성됐어요!
+                </h2>
+                <p
+                  style={{
+                    fontFamily: 'var(--cr-font-gaegu)',
+                    fontSize: 17,
+                    color: 'var(--cr-ink-soft)',
+                    margin: '0 0 28px',
+                  }}
+                >
                   아래 링크를 공유하면 가족이 함께 볼 수 있어요.
                 </p>
 
-                <div className="bg-[#e8ddb4] border-2 border-[#8b7a52]/50 rounded-xl p-4 mb-6 flex items-center gap-3">
-                  <code className="flex-1 text-sm text-[#2d5a27] text-left truncate">
+                <div
+                  style={{
+                    background: '#fdf6dc',
+                    border: '2px dashed var(--cr-caramel)',
+                    borderRadius: 14,
+                    padding: '12px 14px',
+                    marginBottom: 24,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <code
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: 'var(--cr-ink)',
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'ui-monospace, monospace',
+                    }}
+                  >
                     {shareUrl}
                   </code>
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="shrink-0 bg-[#2d5a27] text-[#f0e6c0] px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 hover:bg-[#3d6f34] transition-colors"
+                    style={{
+                      background: 'var(--cr-sage)',
+                      color: '#fdf6dc',
+                      border: '2px solid var(--cr-sage-deep)',
+                      borderRadius: 999,
+                      padding: '6px 14px',
+                      fontFamily: 'var(--cr-font-gaegu)',
+                      fontWeight: 700,
+                      fontSize: 14,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 0 var(--cr-sage-deep)',
+                      flexShrink: 0,
+                    }}
                   >
-                    {copied ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
+                    {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     {copied ? '복사됨' : '복사'}
                   </button>
                 </div>
 
-                <div className="flex gap-3 justify-center">
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() =>
-                      navigator.share?.({ url: shareUrl, title: '우리 가족 동화책' }).catch(() => {})
+                      navigator.share
+                        ?.({ url: shareUrl, title: '우리 가족 동화책' })
+                        .catch(() => {})
                     }
-                    className="bg-[#8b7a52] text-[#f0e6c0] px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-[#a89664] transition-colors"
+                    className="cr-btn-back"
+                    style={{ justifySelf: 'auto' }}
                   >
                     <Share2 className="w-4 h-4" /> 공유
                   </button>
-                  <button
-                    type="button"
-                    onClick={onExit}
-                    className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full font-bold border border-[#b4dc8c]/40 hover:bg-[#3d6f34] transition-colors"
-                  >
-                    책장으로 가기
+                  <button type="button" onClick={onExit} className="cr-btn-next" style={{ justifySelf: 'auto' }}>
+                    <span>책장으로 가기</span>
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <h2 className="text-3xl text-[#2d5a27] font-bold mb-2">동화책을 발행할까요?</h2>
-                <p className="text-[#8b7a52] mb-8">
+                <h2
+                  style={{
+                    fontFamily: 'var(--cr-font-serif)',
+                    fontWeight: 800,
+                    fontSize: 32,
+                    color: 'var(--cr-ink)',
+                    margin: '0 0 8px',
+                    letterSpacing: '-0.5px',
+                  }}
+                >
+                  동화책을 발행할까요?
+                </h2>
+                <p
+                  style={{
+                    fontFamily: 'var(--cr-font-gaegu)',
+                    fontSize: 17,
+                    color: 'var(--cr-ink-soft)',
+                    margin: '0 0 28px',
+                  }}
+                >
                   발행하면 공유 링크가 생성되어 가족에게 보낼 수 있어요.
                 </p>
 
-                {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+                {error && (
+                  <p
+                    style={{
+                      fontFamily: 'var(--cr-font-gaegu)',
+                      fontSize: 14,
+                      color: 'var(--cr-rust)',
+                      marginBottom: 14,
+                    }}
+                  >
+                    {error}
+                  </p>
+                )}
 
                 <button
                   type="button"
                   onClick={handlePublish}
                   disabled={publishing || !storyId}
-                  className="bg-[#2d5a27] text-[#f0e6c0] px-10 py-4 rounded-full text-xl font-bold border border-[#b4dc8c]/40 shadow-[0_6px_0_#1a3a14] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                  className="cr-big-cta"
+                  style={{ width: 'auto', display: 'inline-flex', minWidth: 240 }}
                 >
-                  {publishing ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <PartyPopper className="w-6 h-6" />
-                  )}
-                  {publishing ? '발행 중...' : '발행하기'}
+                  {publishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <PartyPopper className="w-5 h-5" />}
+                  <span>{publishing ? '발행 중...' : '발행하기'}</span>
                 </button>
               </>
             )}

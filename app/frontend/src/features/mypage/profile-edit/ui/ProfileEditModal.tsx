@@ -9,7 +9,7 @@ interface Props {
 }
 
 /**
- * 프로필 편집 모달 — Pastel Forest 톤.
+ * 프로필 편집 모달 — paper-craft 톤.
  */
 export function ProfileEditModal({ user, onClose, onSave, isPending = false }: Props) {
   const [name, setName] = useState(user.name)
@@ -42,7 +42,7 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#3E2A18]/60 flex items-center justify-center p-4"
+      className="mp-modal-back"
       onClick={() => {
         if (!isPending) {
           onClose()
@@ -50,12 +50,8 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
       }}
       role="presentation"
     >
-      <form
-        onSubmit={handleSubmit}
-        onClick={event => event.stopPropagation()}
-        className="w-full max-w-md rounded-3xl bg-[#FFFEF8] border-2 border-[#B9D38F]/55 shadow-[0_12px_32px_rgba(154,117,72,0.25)] p-6 space-y-4"
-      >
-        <h2 className="text-xl font-bold text-[#3E2A18]">프로필 수정</h2>
+      <form onSubmit={handleSubmit} onClick={event => event.stopPropagation()} className="mp-modal">
+        <h3>프로필 수정</h3>
 
         <Field label="이름">
           <input
@@ -63,7 +59,7 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
             onChange={event => setName(event.target.value)}
             required
             disabled={isPending}
-            className="w-full px-3 py-2 rounded-xl bg-[#F4E4BC]/60 border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold focus:border-[#3F6B2E] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mp-input"
           />
         </Field>
 
@@ -73,7 +69,7 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
             onChange={event => setNickname(event.target.value)}
             required
             disabled={isPending}
-            className="w-full px-3 py-2 rounded-xl bg-[#F4E4BC]/60 border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold focus:border-[#3F6B2E] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mp-input"
           />
         </Field>
 
@@ -83,11 +79,11 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
             onChange={event => setPhone(event.target.value)}
             placeholder="010-0000-0000"
             disabled={isPending}
-            className="w-full px-3 py-2 rounded-xl bg-[#F4E4BC]/60 border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold placeholder-[#9A7548]/50 focus:border-[#3F6B2E] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mp-input"
           />
         </Field>
 
-        <div className="space-y-2 pt-2">
+        <div style={{ paddingTop: 4 }}>
           <Toggle
             label="SMS 수신 동의"
             checked={agreeSms}
@@ -102,20 +98,16 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
           />
         </div>
 
-        <div className="flex gap-2 pt-2">
+        <div className="mp-modal-actions">
           <button
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="flex-1 px-4 py-2.5 rounded-full border-2 border-[#9A7548]/40 text-[#3E2A18] font-bold bg-[#E9DBBE] hover:bg-[#D9BE82] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mp-btn mp-btn-cream"
           >
             취소
           </button>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="flex-1 px-4 py-2.5 rounded-full bg-[#8DBA64] text-[#1F3318] font-bold border border-[#B9D38F] shadow-[0_3px_0_#3F6B2E] hover:translate-y-0.5 hover:shadow-[0_1px_0_#3F6B2E] hover:bg-[#A6CB45] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_3px_0_#3F6B2E]"
-          >
+          <button type="submit" disabled={isPending} className="mp-btn mp-btn-sage">
             {isPending ? '저장 중...' : '저장'}
           </button>
         </div>
@@ -126,8 +118,8 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-sm text-[#6B4A28] font-bold">{label}</span>
+    <label className="mp-field" style={{ display: 'block' }}>
+      <span className="mp-field-label">{label}</span>
       {children}
     </label>
   )
@@ -145,25 +137,16 @@ function Toggle({
   isPending?: boolean
 }) {
   return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-sm text-[#3E2A18] font-bold">{label}</span>
+    <div className="mp-toggle-row">
+      <span>{label}</span>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         disabled={isPending}
-        className={`relative w-11 h-6 rounded-full transition-colors border ${
-          checked
-            ? 'bg-[#8DBA64] border-[#3F6B2E]'
-            : 'bg-[#E9DBBE] border-[#9A7548]/50'
-        } disabled:opacity-50 disabled:cursor-not-allowed`}
+        className={`mp-switch${checked ? ' on' : ''}`}
         aria-pressed={checked}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform ${
-            checked ? 'translate-x-5 bg-[#FFFEF8]' : 'bg-[#9A7548]'
-          }`}
-        />
-      </button>
-    </label>
+        aria-label={label}
+      />
+    </div>
   )
 }
