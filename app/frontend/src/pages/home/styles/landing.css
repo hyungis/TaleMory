@@ -1,8 +1,8 @@
 /* ==========================================================================
    HomePage (랜딩) 전용 스타일.
-   App.css 원본(story-forest)에서 추출, feature-local 으로 이관.
-   Tailwind 유틸로 치환 가능한 부분(단순 spacing/color)도 있으나,
-   clamp() 기반 타이포 + mask-image 기반 원형 디졸브 전환은 CSS 유지가 자연스러워 원본 그대로 이관.
+   paper-craft 톤(cream + caramel + sage)으로 정돈.
+   - 비디오는 그대로 유지하되 타이포/CTA 를 동화책장과 같은 손글씨 톤으로 통일.
+   - mask-image 기반 원형 디졸브 전환 로직은 원본 보존.
    ========================================================================== */
 
 /* ===== Landing Screen (autoplay hero video) ===== */
@@ -23,7 +23,7 @@
   height: 100%;
   object-fit: cover;
   pointer-events: none;
-  filter: brightness(0.55) saturate(0.95);
+  filter: brightness(0.6) saturate(0.92);
 }
 
 .landing-overlay {
@@ -34,14 +34,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 8vh 0 10vh;
-  color: #fff;
+  color: #fdfaf0;
   text-align: center;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.6) 0%,
-    rgba(0, 0, 0, 0.35) 30%,
-    rgba(0, 0, 0, 0.25) 60%,
-    rgba(0, 0, 0, 0.65) 100%
+    rgba(46, 32, 18, 0.55) 0%,
+    rgba(46, 32, 18, 0.28) 30%,
+    rgba(46, 32, 18, 0.22) 60%,
+    rgba(46, 32, 18, 0.6) 100%
   );
   animation: landingFadeIn 1.2s ease-out 0.2s both;
 }
@@ -50,49 +50,108 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+}
+
+/* 워시 테이프 데코 — title 위쪽에 살짝 비껴 붙은 종이 테이프 */
+.landing-text-block::before,
+.landing-text-block::after {
+  content: '';
+  position: absolute;
+  top: -22px;
+  width: 96px;
+  height: 26px;
+  border: 1px dashed rgba(160, 120, 60, 0.55);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.landing-text-block::before {
+  left: calc(50% - 96px);
+  background: rgba(255, 230, 140, 0.78);
+  transform: rotate(-5deg);
+}
+.landing-text-block::after {
+  left: calc(50% + 4px);
+  background: rgba(216, 165, 124, 0.62);
+  transform: rotate(7deg);
 }
 
 .landing-title {
-  font-size: clamp(2.5rem, 6vw, 5rem);
-  margin: 0 0 0.6rem;
-  letter-spacing: 0.05em;
-  color: #3ca55c;
-  text-shadow:
-    0 0 18px rgba(60, 165, 92, 0.5),
-    0 4px 24px rgba(0, 0, 0, 0.75);
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: clamp(3rem, 7vw, 5.6rem);
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.04em;
+  color: #f7eccd;
   font-weight: 700;
+  -webkit-text-stroke: 0.6px #5f7d50;
+  text-shadow:
+    0 2px 0 rgba(95, 125, 80, 0.85),
+    0 0 22px rgba(247, 236, 205, 0.45),
+    0 6px 28px rgba(0, 0, 0, 0.55);
 }
 
 .landing-subtitle {
-  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: clamp(1.05rem, 2vw, 1.55rem);
   margin: 0 0 2.5rem;
-  opacity: 0.92;
-  letter-spacing: 0.08em;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  opacity: 0.96;
+  letter-spacing: 0.06em;
+  color: #fdfaf0;
+  font-weight: 700;
+  text-shadow:
+    0 1px 0 rgba(74, 59, 42, 0.7),
+    0 2px 14px rgba(0, 0, 0, 0.55);
 }
 
+/* 손그림 wavy 구분선 — subtitle 아래 */
+.landing-subtitle::after {
+  content: '';
+  display: block;
+  margin: 14px auto 0;
+  width: 140px;
+  height: 8px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8' preserveAspectRatio='none'><path d='M0,4 Q 25 0, 50 4 T 100 4 T 150 4 T 200 4' stroke='%23f0c97a' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: 0.85;
+}
+
+/* paper-craft sage pill CTA — 로그인/회원가입 버튼과 동일한 톤 */
 .landing-start-btn {
-  padding: 0.95rem 2.8rem;
-  font-size: 1.1rem;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  padding: 0.95rem 3rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fdfaf0;
+  background: #7a9968;
+  border: 2.5px solid #5f7d50;
   border-radius: 999px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    0 3px 0 #5f7d50,
+    0 8px 22px rgba(95, 125, 80, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
   transition:
-    transform 0.3s ease,
-    background 0.3s ease,
-    border-color 0.3s ease;
-  letter-spacing: 0.08em;
-  font-weight: 500;
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 
 .landing-start-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: #fff;
+  background: #88a875;
   transform: translateY(-2px);
+  box-shadow:
+    0 5px 0 #5f7d50,
+    0 12px 28px rgba(95, 125, 80, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.landing-start-btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 #5f7d50,
+    0 4px 12px rgba(95, 125, 80, 0.35);
 }
 
 .landing-start-btn:disabled {
@@ -189,21 +248,21 @@
     opacity: 1;
     transform: scale(1);
     filter: brightness(1);
-    background: rgba(255, 255, 255, 0.12);
+    background: #7a9968;
   }
   30% {
-    opacity: 0.9;
+    opacity: 0.95;
     transform: scale(1.18);
-    filter: brightness(1.8);
-    background: rgba(255, 240, 180, 0.55);
-    border-color: rgba(255, 255, 220, 0.9);
+    filter: brightness(1.7);
+    background: #f0c97a;
+    border-color: #fdfaf0;
   }
   100% {
     opacity: 0;
     transform: scale(0.55);
     filter: brightness(2.4);
-    background: rgba(255, 220, 120, 0);
-    border-color: rgba(255, 255, 220, 0);
+    background: rgba(240, 201, 122, 0);
+    border-color: rgba(253, 250, 240, 0);
   }
 }
 
@@ -246,9 +305,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .landing-video {
-    filter: brightness(0.55) saturate(0.95) contrast(1);
+    filter: brightness(0.6) saturate(0.92) contrast(1);
   }
   .landing-overlay {
+    animation: none;
+  }
+  .landing-text-block::before,
+  .landing-text-block::after {
     animation: none;
   }
   .landing-screen.exiting,
