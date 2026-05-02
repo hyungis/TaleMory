@@ -1,4 +1,4 @@
-import { post, get, deleteRequest } from '../../../../shared/api/client'
+import { post, get, patch, deleteRequest } from '../../../../shared/api/client'
 
 const VOICE_PROFILE_ENDPOINT = '/voice-profiles'
 const VOICE_RECORDING_SCRIPT_ENDPOINT = '/voice-recording-script'
@@ -42,6 +42,20 @@ export async function commitVoiceProfile(
   s3Key: string,
 ): Promise<VoiceProfileDto> {
   return post<VoiceProfileDto>(VOICE_PROFILE_ENDPOINT, { title, s3Key })
+}
+
+/**
+ * 보이스 프로필을 동화에 연결한다 — `PATCH /api/stories/{storyId}/voice-profile`.
+ *
+ * 보이스 클론 commit 또는 기존 음성 load 직후에 호출해야 한다.
+ * 이걸 호출하지 않으면 Step 7 → 8 confirm 단계에서
+ * `voice_profile_id IS NULL` 가드(409 INVALID_STORY_STATE)에 걸린다.
+ */
+export async function attachVoiceProfileToStory(
+  storyId: number,
+  voiceProfileId: number,
+): Promise<void> {
+  await patch<unknown>(`/stories/${storyId}/voice-profile`, { voiceProfileId })
 }
 
 /** GET /api/voice-profiles — 내 보이스 프로필 목록 */
