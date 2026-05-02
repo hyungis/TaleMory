@@ -14,6 +14,7 @@ import com.s210.backend.domain.story.presentation.request.OutroVoiceCommitReques
 import com.s210.backend.domain.story.presentation.request.PresignedUrlRequest
 import com.s210.backend.domain.story.presentation.request.ProgressRequest
 import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
+import com.s210.backend.domain.story.presentation.request.VoiceProfileModifyRequest
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRegenerateResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRollbackResponse
@@ -144,14 +145,16 @@ class SceneController(
         return ResponseEntity.ok(ApiResponse(data = null))
     }
 
-    // 보이스 프로필 선택
+    // 보이스 프로필 선택 — Step 5 보이스 클론 commit/load 직후 FE 가 호출.
+    // Story.voiceProfileId 를 채워야 Step 7 → 8 confirm 가드를 통과한다.
     @PatchMapping("/voice-profile")
     fun storyVoiceProfileModify(
         @PathVariable storyId: Long,
-        @RequestBody request: Map<String, Long>
+        @RequestBody request: VoiceProfileModifyRequest,
+        @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<Unit>> {
-        // TODO: StoryService.modifyVoiceProfile(storyId, voiceProfileId)
-        TODO("Not yet implemented")
+        storyService.modifyVoiceProfile(user.userId, storyId, request.voiceProfileId)
+        return ResponseEntity.ok(ApiResponse(data = null))
     }
 
     // 동화 전체 생성 (AI)
