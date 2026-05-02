@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -46,45 +46,40 @@ function sameDay(a: Date, b: Date): boolean {
   )
 }
 
+/** start-of-day Date 를 만든다 (시/분/초 0). 미래 비교용. */
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
 /**
- * 여행 일정 — 입력박스 + 달력 아이콘 트리거 → 클릭 시 팝오버 캘린더.
+ * 여행 일정 — paper-craft 톤 트리거 + 팝오버 캘린더.
+ * 오늘 날짜 이후는 선택 불가 (여행은 이미 다녀온 일정이므로).
  *
- * 트리거(접힌 상태):
- *  - 다른 인풋들과 같은 톤(베이지 #e8ddb4 + 따뜻한 브라운 보더)으로 통일.
- *  - 좌측에 선택된 일정 요약(또는 placeholder), 우측에 달력 아이콘.
- *
- * 팝오버(펼친 상태):
- *  - 트리거 바로 아래 absolute 로 띄움 (z-20).
- *  - 6주 × 7요일 = 42칸 고정 그리드 + 월 네비게이션 + 초기화 버튼.
- *  - 외부 클릭 / Esc / 범위 선택 완료 시 자동 닫힘.
+ * 트리거: cr-input 톤 (cream + caramel border + sage focus) + 우측 달력 아이콘.
+ * 팝오버: cream gradient + caramel-deep 입체 그림자 + sage 선택/범위 표시.
  *
  * 동작:
- *  - 첫 클릭 → 출발일 (팝오버는 열린 채 유지).
+ *  - 첫 클릭 → 출발일.
  *  - 두 번째 클릭 → 도착일 + 자동 닫힘.
  *  - 두 날짜 모두 선택된 상태에서 다시 클릭 → 새 출발일로 리셋.
- *  - 출발일과 같은 날 재클릭 → 단일 일정으로 끝 (열린 채 유지).
+ *  - 출발일과 같은 날 재클릭 → 단일 일정으로 끝.
+ *  - 오늘 이후 날짜 → 비활성 (클릭 무시 + opacity 30%).
  */
 export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePickerProps) {
-  const today = useMemo(() => new Date(), [])
+  const today = useMemo(() => startOfDay(new Date()), [])
   const start = useMemo(() => fromIso(startDate), [startDate])
   const end = useMemo(() => fromIso(endDate), [endDate])
 
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
-  // 휠 이벤트 throttle 용 — 마지막 fire 시각.
   const lastWheelMsRef = useRef(0)
 
-  // 표시 중인 월(1일 기준). 초기엔 startDate 가 있으면 그 월을, 없으면 오늘 월을.
   const [viewMonth, setViewMonth] = useState(() => {
     const ref = start ?? today
     return new Date(ref.getFullYear(), ref.getMonth(), 1)
   })
 
-  /**
-   * 외부 클릭 / Esc 로 팝오버 닫기.
-   * isOpen 이 false 면 listener 부착 X (불필요한 글로벌 핸들러 회피).
-   */
   useEffect(() => {
     if (!isOpen) return
     const onClickOutside = (e: MouseEvent) => {
@@ -103,14 +98,6 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
     }
   }, [isOpen])
 
-  /**
-   * 휠 스크롤로 월 이동.
-   * React 의 onWheel SyntheticEvent 는 passive 로 등록돼서 preventDefault 가 안 먹는다.
-   * 따라서 ref + native addEventListener({ passive: false }) 로 직접 부착.
-   *
-   * 200ms throttle: 트랙패드 한 번 스와이프가 10+ 이벤트 발생시키는 것을 한 달 이동으로 묶음.
-   * deltaY > 0 (아래로 스크롤) → 다음 달, < 0 (위로 스크롤) → 이전 달.
-   */
   useEffect(() => {
     if (!isOpen) return
     const popover = popoverRef.current
@@ -133,15 +120,11 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
     return () => popover.removeEventListener('wheel', onWheel)
   }, [isOpen])
 
-  /**
-   * 6주(42셀) 고정 그리드. 첫 주의 빈 칸은 이전 달 마지막 날들로,
-   * 마지막 주의 빈 칸은 다음 달 시작 날들로 채워 회색 톤으로 표시.
-   */
   const monthGrid = useMemo(() => {
     const year = viewMonth.getFullYear()
     const month = viewMonth.getMonth()
     const firstDay = new Date(year, month, 1)
-    const startWeekday = firstDay.getDay() // 0=Sun ~ 6=Sat
+    const startWeekday = firstDay.getDay()
     const cells: { date: Date; inMonth: boolean }[] = []
 
     for (let i = startWeekday - 1; i >= 0; i--) {
@@ -162,14 +145,15 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   }, [viewMonth])
 
   const handleDayClick = (day: Date) => {
+    // 오늘 이후는 선택 불가 (여행은 이미 다녀온 일정).
+    if (day > today) return
+
     const iso = toIso(day)
 
-    // 새 사이클 시작
     if (!start || end) {
       onChange(iso, null)
       return
     }
-    // start 만 있고 end 없음 → end 선택 중
     if (sameDay(day, start)) {
       onChange(iso, null)
       return
@@ -179,14 +163,20 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
       return
     }
     onChange(toIso(start), iso)
-    setIsOpen(false) // 범위 완성 시 자동 닫기
+    setIsOpen(false)
   }
 
   const handleReset = () => onChange(null, null)
   const handlePrevMonth = () =>
     setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
-  const handleNextMonth = () =>
-    setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+  const handleNextMonth = () => {
+    // 미래 달 너무 많이 가는 건 막아둠 — 오늘이 포함된 달까지만 nav 가능.
+    setViewMonth(prev => {
+      const next = new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+      const todayMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+      return next > todayMonth ? prev : next
+    })
+  }
 
   const isInRange = (day: Date) => {
     if (!start || !end) return false
@@ -195,7 +185,11 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
 
   const monthLabel = `${viewMonth.getFullYear()}년 ${MONTH_NAMES[viewMonth.getMonth()]}`
 
-  // 트리거에 표시할 요약 텍스트
+  // 다음 달 버튼 비활성화 — 표시 중인 달이 이미 오늘 달이라면.
+  const isOnTodayMonth =
+    viewMonth.getFullYear() === today.getFullYear() &&
+    viewMonth.getMonth() === today.getMonth()
+
   const triggerLabel = (() => {
     if (start && end) {
       const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
@@ -208,23 +202,34 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   })()
 
   return (
-    <div ref={containerRef} className="relative">
-      {/* 트리거 — 다른 인풋과 동일 톤. 클릭 시 팝오버 토글. */}
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      {/* 트리거 — cr-input 톤. */}
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        className={`w-full p-4 bg-[#e8ddb4] border-2 rounded-xl outline-none text-left text-lg text-black flex items-center justify-between gap-3 transition-colors ${
-          isOpen
-            ? 'border-[#2d5a27]'
-            : 'border-[#8b7a52]/60 hover:border-[#2d5a27]/60'
-        }`}
+        className="cr-input"
+        style={{
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          cursor: 'pointer',
+          borderColor: isOpen ? 'var(--cr-sage)' : 'var(--cr-caramel)',
+          boxShadow: isOpen ? '0 0 0 3px rgba(122, 153, 104, 0.18)' : 'none',
+        }}
       >
-        <span className={start || end ? 'text-black' : 'text-black/60'}>
+        <span
+          style={{
+            color: start || end ? 'var(--cr-ink)' : '#b29d72',
+            fontStyle: start || end ? 'normal' : 'italic',
+          }}
+        >
           {triggerLabel}
         </span>
-        <CalendarIcon className="w-5 h-5 text-[#2d5a27] shrink-0" />
+        <CalendarIcon className="w-5 h-5" style={{ color: 'var(--cr-caramel-deep)', flexShrink: 0 }} />
       </button>
 
       {/* 팝오버 캘린더 */}
@@ -233,41 +238,54 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
           ref={popoverRef}
           role="dialog"
           aria-label="여행 일정 선택 — 휠 스크롤로 월 이동 가능"
-          className="absolute top-full left-0 mt-2 z-20 w-full max-w-sm bg-[#f0e6c0] border-2 border-[#8b7a52]/60 rounded-xl p-3 shadow-[0_8px_24px_rgba(0,0,0,0.25)] select-none"
+          style={POPOVER_STYLE}
         >
-          {/* 헤더: 이전 / 월 표시 / 다음 */}
-          <div className="flex items-center justify-between mb-2">
+          {/* 헤더: 이전 / 월 / 다음 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <button
               type="button"
               onClick={handlePrevMonth}
               aria-label="이전 달"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-black hover:bg-[#8b7a52]/25 active:bg-[#8b7a52]/40 transition-colors"
+              style={NAV_BTN_STYLE}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-base font-bold text-black">{monthLabel}</span>
+            <span style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 17, color: 'var(--cr-ink)' }}>
+              {monthLabel}
+            </span>
             <button
               type="button"
               onClick={handleNextMonth}
+              disabled={isOnTodayMonth}
               aria-label="다음 달"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-black hover:bg-[#8b7a52]/25 active:bg-[#8b7a52]/40 transition-colors"
+              style={{
+                ...NAV_BTN_STYLE,
+                opacity: isOnTodayMonth ? 0.3 : 1,
+                cursor: isOnTodayMonth ? 'not-allowed' : 'pointer',
+              }}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
           {/* 요일 행 */}
-          <div className="grid grid-cols-7 mb-1.5 text-center text-xs font-bold">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              marginBottom: 6,
+              fontFamily: 'var(--cr-font-gaegu)',
+              fontWeight: 700,
+              fontSize: 13,
+              textAlign: 'center',
+            }}
+          >
             {WEEKDAYS.map((w, i) => (
               <span
                 key={w}
-                className={
-                  i === 0
-                    ? 'text-[#8b3a2a]'
-                    : i === 6
-                      ? 'text-[#2d5a27]'
-                      : 'text-black/70'
-                }
+                style={{
+                  color: i === 0 ? 'var(--cr-rust)' : i === 6 ? 'var(--cr-sage-deep)' : 'var(--cr-ink-soft)',
+                }}
               >
                 {w}
               </span>
@@ -275,35 +293,21 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
           </div>
 
           {/* 날짜 그리드 */}
-          <div className="grid grid-cols-7 gap-1">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {monthGrid.map(({ date, inMonth }) => {
               const isStart = !!start && sameDay(date, start)
               const isEnd = !!end && sameDay(date, end)
               const inRange = isInRange(date)
               const isToday = sameDay(date, today)
-
-              const base =
-                'aspect-square flex items-center justify-center rounded-md text-sm font-medium cursor-pointer transition-colors'
-              let stateCls: string
-              if (!inMonth) {
-                stateCls = 'text-black/25 hover:bg-[#8b7a52]/15'
-              } else if (isStart || isEnd) {
-                stateCls =
-                  'bg-[#2d5a27] text-[#f0e6c0] font-bold shadow-sm hover:bg-[#3d6f34]'
-              } else if (inRange) {
-                stateCls = 'bg-[#2d5a27]/25 text-black hover:bg-[#2d5a27]/40'
-              } else {
-                stateCls = 'text-black hover:bg-[#8b7a52]/30'
-              }
-              const todayCls =
-                isToday && !(isStart || isEnd) ? 'ring-2 ring-[#2d5a27]/60' : ''
+              const isFuture = date > today
 
               return (
                 <button
                   type="button"
                   key={toIso(date)}
                   onClick={() => handleDayClick(date)}
-                  className={`${base} ${stateCls} ${todayCls}`}
+                  disabled={isFuture}
+                  style={getDayCellStyle({ inMonth, isStart, isEnd, inRange, isToday, isFuture })}
                 >
                   {date.getDate()}
                 </button>
@@ -312,12 +316,34 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
           </div>
 
           {/* 푸터: 초기화 + 닫기 */}
-          <div className="mt-3 pt-2 border-t border-[#8b7a52]/30 flex items-center justify-between text-xs">
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: '1.5px dashed rgba(163, 117, 72, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
             <button
               type="button"
               onClick={handleReset}
-              className="flex items-center gap-1 text-[#8b3a2a] hover:text-[#a84a35] hover:underline disabled:opacity-30 disabled:cursor-not-allowed disabled:no-underline"
               disabled={!start && !end}
+              style={{
+                background: 'transparent',
+                border: 0,
+                color: 'var(--cr-rust)',
+                fontFamily: 'var(--cr-font-gaegu)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: !start && !end ? 'not-allowed' : 'pointer',
+                opacity: !start && !end ? 0.4 : 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: 0,
+              }}
             >
               <RotateCcw className="w-3 h-3" />
               초기화
@@ -325,7 +351,18 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="px-3 py-1 rounded-md bg-[#2d5a27] text-[#f0e6c0] hover:bg-[#3d6f34] transition-colors font-bold"
+              style={{
+                background: 'var(--cr-sage)',
+                color: '#fdf6dc',
+                border: '2px solid var(--cr-sage-deep)',
+                borderRadius: 999,
+                padding: '5px 16px',
+                fontFamily: 'var(--cr-font-gaegu)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 0 var(--cr-sage-deep)',
+              }}
             >
               닫기
             </button>
@@ -334,4 +371,109 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
       )}
     </div>
   )
+}
+
+/* ============================================================================
+ * 인라인 스타일
+ * ========================================================================= */
+
+const POPOVER_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 8px)',
+  left: 0,
+  right: 0,
+  zIndex: 30,
+  maxWidth: 360,
+  background: 'linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%)',
+  border: '2px solid var(--cr-caramel-deep)',
+  borderRadius: 16,
+  padding: 14,
+  boxShadow: '0 3px 0 var(--cr-caramel-deep), 0 12px 28px rgba(140, 100, 60, 0.28)',
+  userSelect: 'none',
+}
+
+const NAV_BTN_STYLE: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 10,
+  background: 'transparent',
+  border: 0,
+  color: 'var(--cr-ink)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  transition: 'background 0.12s ease',
+}
+
+function getDayCellStyle(opts: {
+  inMonth: boolean
+  isStart: boolean
+  isEnd: boolean
+  inRange: boolean
+  isToday: boolean
+  isFuture: boolean
+}): CSSProperties {
+  const { inMonth, isStart, isEnd, inRange, isToday, isFuture } = opts
+
+  const base: CSSProperties = {
+    aspectRatio: '1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    border: 'none',
+    fontFamily: 'var(--cr-font-gaegu)',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: isFuture ? 'not-allowed' : 'pointer',
+    transition: 'background 0.12s ease, color 0.12s ease',
+    background: 'transparent',
+    color: 'var(--cr-ink)',
+  }
+
+  if (isFuture) {
+    return {
+      ...base,
+      color: 'rgba(74, 59, 42, 0.25)',
+      background: 'transparent',
+      cursor: 'not-allowed',
+    }
+  }
+
+  if (!inMonth) {
+    return {
+      ...base,
+      color: 'rgba(74, 59, 42, 0.3)',
+    }
+  }
+
+  if (isStart || isEnd) {
+    return {
+      ...base,
+      background: 'var(--cr-sage-darker)',
+      color: '#fdf6dc',
+      fontWeight: 800,
+      boxShadow: '0 2px 0 #2a3f1f',
+    }
+  }
+
+  if (inRange) {
+    return {
+      ...base,
+      background: 'rgba(122, 153, 104, 0.28)',
+      color: 'var(--cr-ink)',
+    }
+  }
+
+  if (isToday) {
+    return {
+      ...base,
+      boxShadow: 'inset 0 0 0 2px rgba(95, 125, 80, 0.55)',
+      color: 'var(--cr-sage-deep)',
+      fontWeight: 800,
+    }
+  }
+
+  return base
 }

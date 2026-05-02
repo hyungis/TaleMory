@@ -5,24 +5,29 @@ const LEVELS: readonly Level[] = ['초급', '중급', '고급'] as const
 interface LevelPickerProps {
   value: Level
   onChange: (level: Level) => void
+  /** 잠금 상태 시 모든 버튼 disabled (예: SUMMARY 락). */
+  disabled?: boolean
 }
 
-/** 3-column 난이도 선택 버튼 세트. */
-export function LevelPicker({ value, onChange }: LevelPickerProps) {
+/**
+ * 3-column 난이도 선택 — paper-craft segmented control.
+ * `.cr-seg` 클래스로 active(`.on`) 상태 시 sage-darker 배경 + cream 글자.
+ */
+export function LevelPicker({ value, onChange, disabled = false }: LevelPickerProps) {
   return (
-    <div>
-      <label className="block text-black text-2xl mb-3 font-bold">난이도</label>
-      <div className="grid grid-cols-3 gap-3">
+    <div className="cr-field">
+      <label className="cr-label">
+        난이도 <span className="star">*</span>
+      </label>
+      <div className="cr-seg">
         {LEVELS.map(lv => (
           <button
             key={lv}
             type="button"
             onClick={() => onChange(lv)}
-            className={`block text-center p-4 border-2 rounded-xl text-lg transition-all font-bold ${
-              value === lv
-                ? 'bg-[#2d5a27] border-[#b4dc8c] text-[#f0e6c0] shadow-[0_0_14px_rgba(180,220,140,0.45)]'
-                : 'bg-[#e8ddb4] border-[#8b7a52]/60 text-black hover:border-[#2d5a27]'
-            }`}
+            disabled={disabled}
+            className={value === lv ? 'on' : ''}
+            aria-pressed={value === lv}
           >
             {lv}
           </button>

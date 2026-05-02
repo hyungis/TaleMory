@@ -12,6 +12,8 @@ import {
 import type { StoryProject } from '../../model/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
+import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import {
   getScenes,
   presignHighlightVoice,
@@ -24,6 +26,7 @@ import {
   type SceneDto,
 } from '../api/highlightOutroApi'
 import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
+import '../../styles/creation-paper.css'
 
 interface HighlightOutroStepProps {
   storyId?: number | null
@@ -47,7 +50,6 @@ type RecordingTarget =
   | { kind: 'outro' }
   | null
 
-/** 마침표·느낌표·물음표 기준으로 문장을 분리한다. */
 function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+/)
@@ -56,16 +58,8 @@ function splitSentences(text: string): string[] {
 }
 
 /**
- * STEP 07 — "강조 녹음 & 아웃트로"
- *
- * 2 섹션:
- *  1. 강조 문장 선택 + 부모 직접 녹음
- *     - 스토리보드 페이지별 문장 중 하나를 선택
- *     - 선택된 문장을 부모가 직접 읽어 녹음
- *  2. 아웃트로 멘트 작성 + 녹음
- *     - 마무리 인사 텍스트 입력
- *     - 서명 입력
- *     - 부모가 직접 읽어 녹음
+ * STEP 07 — paper-craft 톤 (Claude offline.html 1:1).
+ * 강조 문장 선택/녹음 + 아웃트로 멘트/녹음. 모든 백엔드 로직 그대로 보존.
  */
 export function HighlightOutroStep({
   storyId,
@@ -76,11 +70,9 @@ export function HighlightOutroStep({
 }: HighlightOutroStepProps) {
   const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
   const [confirmError, setConfirmError] = useState<string | null>(null)
-  // --- 씬 데이터 (백엔드 연동 시 사용) ---
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(false)
 
-  // 백엔드에서 씬을 가져오거나, 없으면 step4.pages fallback
   useEffect(() => {
     if (!storyId) return
     setLoadingScenes(true)
@@ -88,11 +80,10 @@ export function HighlightOutroStep({
       .then(data => {
         if (data.length > 0) setScenes(data)
       })
-      .catch(() => { /* fallback to step4.pages */ })
+      .catch(() => {})
       .finally(() => setLoadingScenes(false))
   }, [storyId])
 
-  // 씬 기반 또는 step4.pages fallback 으로 표시할 페이지 데이터
   const displayPages: Array<{
     pageIndex: number
     sentences: Array<{ sentenceId: number | null; en: string; ko: string | null }>
@@ -118,25 +109,21 @@ export function HighlightOutroStep({
         }
       })
 
-  // --- 강조 문장 ---
   const [highlights, setHighlights] = useState<HighlightSentence[]>([])
   const [selectedPage, setSelectedPage] = useState<number | null>(null)
 
-  // --- 아웃트로 ---
   const [outroText, setOutroText] = useState('')
   const [outroSignature, setOutroSignature] = useState('')
   const [outroAudioUrl, setOutroAudioUrl] = useState<string | null>(null)
   const [outroUploading, setOutroUploading] = useState(false)
   const [outroSaving, setOutroSaving] = useState(false)
 
-  // --- 녹음 공용 ---
   const [recordingTarget, setRecordingTarget] = useState<RecordingTarget>(null)
   const [isRecording, setIsRecording] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  // --- 재생 ---
   const [playingUrl, setPlayingUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -156,142 +143,141 @@ export function HighlightOutroStep({
       reader.readAsDataURL(blob)
     })
 
-  /** 3-phase 업로드: presign → S3 PUT → DB commit */
-  const uploadHighlightVoice = useCallback(async (
-    pageIndex: number,
-    sentenceIndex: number,
-    sentenceId: number,
-    blob: Blob,
-  ) => {
-    if (!storyId) return
-
-    setHighlights(prev =>
-      prev.map(h =>
-        h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex
-          ? { ...h, uploading: true }
-          : h,
-      ),
-    )
-
-    try {
-      const { uploadUrl, s3Key } = await presignHighlightVoice(storyId, sentenceId, blob.type || 'audio/webm')
-      await uploadAudioToS3(uploadUrl, blob)
-      const result = await commitHighlightVoice(storyId, sentenceId, s3Key)
-
+  const uploadHighlightVoice = useCallback(
+    async (pageIndex: number, sentenceIndex: number, sentenceId: number, blob: Blob) => {
+      if (!storyId) return
       setHighlights(prev =>
         prev.map(h =>
           h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex
-            ? { ...h, audioUrl: result.audioUrl, uploading: false }
+            ? { ...h, uploading: true }
             : h,
         ),
       )
-    } catch (err) {
-      console.error('Highlight voice upload failed:', err)
-      // fallback: 로컬 data URL 사용
-      const localUrl = await blobToDataUrl(blob)
-      setHighlights(prev =>
-        prev.map(h =>
-          h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex
-            ? { ...h, audioUrl: localUrl, uploading: false }
-            : h,
-        ),
-      )
-    }
-  }, [storyId])
-
-  const uploadOutroVoiceToServer = useCallback(async (blob: Blob) => {
-    if (!storyId) return
-
-    setOutroUploading(true)
-    try {
-      const { uploadUrl, s3Key } = await presignOutroVoice(storyId, blob.type || 'audio/webm')
-      await uploadAudioToS3(uploadUrl, blob)
-      const result = await commitOutroVoice(storyId, s3Key)
-      setOutroAudioUrl(result.audioUrl)
-    } catch (err) {
-      console.error('Outro voice upload failed:', err)
-      const localUrl = await blobToDataUrl(blob)
-      setOutroAudioUrl(localUrl)
-    } finally {
-      setOutroUploading(false)
-    }
-  }, [storyId])
-
-  const startRecording = useCallback(async (target: RecordingTarget) => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const rec = new MediaRecorder(stream)
-      recorderRef.current = rec
-      chunksRef.current = []
-
-      rec.ondataavailable = e => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+      try {
+        const { uploadUrl, s3Key } = await presignHighlightVoice(storyId, sentenceId, blob.type || 'audio/webm')
+        await uploadAudioToS3(uploadUrl, blob)
+        const result = await commitHighlightVoice(storyId, sentenceId, s3Key)
+        setHighlights(prev =>
+          prev.map(h =>
+            h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex
+              ? { ...h, audioUrl: result.audioUrl, uploading: false }
+              : h,
+          ),
+        )
+      } catch (err) {
+        console.error('Highlight voice upload failed:', err)
+        const localUrl = await blobToDataUrl(blob)
+        setHighlights(prev =>
+          prev.map(h =>
+            h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex
+              ? { ...h, audioUrl: localUrl, uploading: false }
+              : h,
+          ),
+        )
       }
-      rec.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+    },
+    [storyId],
+  )
 
-        if (target?.kind === 'highlight') {
-          const highlight = highlights.find(
-            h => h.pageIndex === target.pageIndex && h.sentenceIndex === target.sentenceIndex,
-          )
-          if (highlight?.sentenceId && storyId) {
-            // 백엔드 연동: 3-phase upload
-            void uploadHighlightVoice(target.pageIndex, target.sentenceIndex, highlight.sentenceId, blob)
-          } else {
-            // fallback: local data URL
-            const url = await blobToDataUrl(blob)
-            setHighlights(prev =>
-              prev.map(h =>
-                h.pageIndex === target.pageIndex && h.sentenceIndex === target.sentenceIndex
-                  ? { ...h, audioUrl: url }
-                  : h,
-              ),
+  const uploadOutroVoiceToServer = useCallback(
+    async (blob: Blob) => {
+      if (!storyId) return
+      setOutroUploading(true)
+      try {
+        const { uploadUrl, s3Key } = await presignOutroVoice(storyId, blob.type || 'audio/webm')
+        await uploadAudioToS3(uploadUrl, blob)
+        const result = await commitOutroVoice(storyId, s3Key)
+        setOutroAudioUrl(result.audioUrl)
+      } catch (err) {
+        console.error('Outro voice upload failed:', err)
+        const localUrl = await blobToDataUrl(blob)
+        setOutroAudioUrl(localUrl)
+      } finally {
+        setOutroUploading(false)
+      }
+    },
+    [storyId],
+  )
+
+  const startRecording = useCallback(
+    async (target: RecordingTarget) => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        streamRef.current = stream
+        const rec = new MediaRecorder(stream)
+        recorderRef.current = rec
+        chunksRef.current = []
+
+        rec.ondataavailable = e => {
+          if (e.data.size > 0) chunksRef.current.push(e.data)
+        }
+        rec.onstop = async () => {
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+          if (target?.kind === 'highlight') {
+            const highlight = highlights.find(
+              h => h.pageIndex === target.pageIndex && h.sentenceIndex === target.sentenceIndex,
             )
+            if (highlight?.sentenceId && storyId) {
+              void uploadHighlightVoice(target.pageIndex, target.sentenceIndex, highlight.sentenceId, blob)
+            } else {
+              const url = await blobToDataUrl(blob)
+              setHighlights(prev =>
+                prev.map(h =>
+                  h.pageIndex === target.pageIndex && h.sentenceIndex === target.sentenceIndex
+                    ? { ...h, audioUrl: url }
+                    : h,
+                ),
+              )
+            }
+          } else if (target?.kind === 'outro') {
+            if (storyId) {
+              void uploadOutroVoiceToServer(blob)
+            } else {
+              const url = await blobToDataUrl(blob)
+              setOutroAudioUrl(url)
+            }
           }
-        } else if (target?.kind === 'outro') {
-          if (storyId) {
-            void uploadOutroVoiceToServer(blob)
-          } else {
-            const url = await blobToDataUrl(blob)
-            setOutroAudioUrl(url)
-          }
+          setIsRecording(false)
+          setRecordingTarget(null)
+          cleanupStream()
         }
 
+        setRecordingTarget(target)
+        setIsRecording(true)
+        rec.start()
+      } catch {
         setIsRecording(false)
         setRecordingTarget(null)
         cleanupStream()
+        alert('마이크 권한이 필요합니다.')
       }
-
-      setRecordingTarget(target)
-      setIsRecording(true)
-      rec.start()
-    } catch {
-      setIsRecording(false)
-      setRecordingTarget(null)
-      cleanupStream()
-      alert('마이크 권한이 필요합니다.')
-    }
-  }, [cleanupStream, highlights, storyId, uploadHighlightVoice, uploadOutroVoiceToServer])
+    },
+    [cleanupStream, highlights, storyId, uploadHighlightVoice, uploadOutroVoiceToServer],
+  )
 
   const stopRecording = useCallback(() => {
     const rec = recorderRef.current
     if (rec && rec.state !== 'inactive') rec.stop()
   }, [])
 
-  const toggleHighlight = useCallback((pageIndex: number, sentenceIndex: number, sentenceId: number | null, text: string) => {
-    setHighlights(prev => {
-      const exists = prev.find(h => h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex)
-      if (exists) {
-        // 선택 해제 시 서버에서도 삭제
-        if (exists.sentenceId && storyId && exists.audioUrl) {
-          deleteHighlightVoice(storyId, exists.sentenceId).catch(() => {})
+  const toggleHighlight = useCallback(
+    (pageIndex: number, sentenceIndex: number, sentenceId: number | null, text: string) => {
+      setHighlights(prev => {
+        const exists = prev.find(h => h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex)
+        if (exists) {
+          if (exists.sentenceId && storyId && exists.audioUrl) {
+            deleteHighlightVoice(storyId, exists.sentenceId).catch(() => {})
+          }
+          return prev.filter(h => !(h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex))
         }
-        return prev.filter(h => !(h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex))
-      }
-      return [...prev, { pageIndex, sentenceIndex, sentenceId: sentenceId ?? 0, text, audioUrl: null, uploading: false }]
-    })
-  }, [storyId])
+        return [
+          ...prev,
+          { pageIndex, sentenceIndex, sentenceId: sentenceId ?? 0, text, audioUrl: null, uploading: false },
+        ]
+      })
+    },
+    [storyId],
+  )
 
   const handleSaveOutro = useCallback(async () => {
     if (!storyId || !outroText.trim()) return
@@ -309,30 +295,24 @@ export function HighlightOutroStep({
     if (!storyId) return
     setConfirmError(null)
     try {
-      // 1) 아웃트로 저장 (텍스트가 있는 경우)
       if (outroText.trim()) {
         await saveOutro(storyId, outroText.trim(), outroSignature.trim() || null)
       }
-      // 2) storyboard confirm → TTS 잡 시작
       const job = await confirmStoryboard(storyId)
-      // 3) jobId 부모로 전달
       setStoryGenerationJobId(job.jobId)
-      // 4) Step 8 진입
       onNext()
     } catch (err: unknown) {
       const apiErr = err as { status?: number; message?: string }
       if (apiErr?.status === 409) {
-        setConfirmError('선행 단계가 완료되지 않았습니다. 이전 단계를 확인해 주세요.')
+        setConfirmError('선행 단계가 완료되지 않았어요. 이전 단계를 확인해 주세요.')
       } else {
-        setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했습니다.')
+        setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했어요.')
       }
     }
   }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, onNext])
 
   const playAudio = useCallback((url: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
+    if (audioRef.current) audioRef.current.pause()
     const audio = new Audio(url)
     audioRef.current = audio
     setPlayingUrl(url)
@@ -346,336 +326,459 @@ export function HighlightOutroStep({
   }, [])
 
   const isHighlightRecording = (pageIndex: number, sentenceIndex: number) =>
-    isRecording && recordingTarget?.kind === 'highlight' && recordingTarget.pageIndex === pageIndex && recordingTarget.sentenceIndex === sentenceIndex
+    isRecording &&
+    recordingTarget?.kind === 'highlight' &&
+    recordingTarget.pageIndex === pageIndex &&
+    recordingTarget.sentenceIndex === sentenceIndex
   const isOutroRecording = isRecording && recordingTarget?.kind === 'outro'
 
+  const recBtnStyle = (active: boolean): React.CSSProperties => ({
+    background: active ? '#fcefe7' : 'var(--cr-rust)',
+    color: active ? 'var(--cr-rust)' : '#fdf6dc',
+    border: `2px solid ${active ? 'var(--cr-rust)' : '#8a4a32'}`,
+    borderRadius: 999,
+    padding: '8px 18px',
+    fontFamily: 'var(--cr-font-gaegu)',
+    fontWeight: 700,
+    fontSize: 14,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    boxShadow: active ? 'none' : '0 2px 0 #8a4a32',
+  })
+
   return (
-    <div className="bookshelf-modal step-forest-modal">
+    <div className="cr-shell">
+      <CreationDoodlesBg />
       <CreationHeader currentStep={7} />
 
-      <div className="bookshelf-scroll">
-        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
-          <div className="max-w-4xl mx-auto pb-12">
-            {/* 타이틀 */}
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <Star className="w-8 h-8 text-[#f0e6c0]" />
+      <div className="cr-scroll">
+        <main className="cr-shell-inner cr-fade-in">
+          <StepTitleBlock
+            stepNumber={7}
+            title="특별한 문장을 직접 읽어주세요"
+            subtitle="각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요"
+          />
+
+          {loadingScenes && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+              <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
+            </div>
+          )}
+
+          {/* Section 1: 강조 문장 선택 + 녹음 */}
+          <section className="cr-card">
+            <span className="cr-tape" aria-hidden="true" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'var(--cr-sage-darker)',
+                  color: '#fdf6dc',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Star className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="cr-step-label" style={{ marginBottom: 2 }}>
+                  강조 문장
+                </div>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                  페이지별 강조 문장 선택 & 녹음
+                </h3>
               </div>
-              <h2 className="text-3xl text-[#f0e6c0] font-bold">
-                특별한 문장을 직접 읽어주세요
-              </h2>
-              <p className="text-[#b4c4a4] mt-2">
-                각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요.
-              </p>
             </div>
 
-            {loadingScenes && (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 text-[#b4dc8c] animate-spin" />
-              </div>
-            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {displayPages.map(({ pageIndex, sentences }) => {
+                const pageHighlights = highlights.filter(h => h.pageIndex === pageIndex)
+                const isExpanded = selectedPage === pageIndex
+                const hasSelection = pageHighlights.length > 0
 
-            <div className="flex flex-col gap-6">
-              {/* Section 1: 강조 문장 선택 + 녹음 */}
-              <section className="bg-[#f0e6c0] p-6 md:p-8 rounded-[2rem] border-2 border-[#2a1b12] shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#2d5a27] flex items-center justify-center text-[#b4dc8c] border border-[#b4dc8c]/40">
-                    <Star className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[#8b7a52] text-sm">강조 문장</p>
-                    <h3 className="text-2xl text-[#2d5a27] font-bold">
-                      페이지별 강조 문장 선택 & 녹음
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {displayPages.map(({ pageIndex, sentences }) => {
-                    const pageHighlights = highlights.filter(h => h.pageIndex === pageIndex)
-                    const isExpanded = selectedPage === pageIndex
-
-                    return (
-                      <div
-                        key={pageIndex}
-                        className={`rounded-[1.5rem] border-2 p-5 transition-colors ${
-                          pageHighlights.length > 0
-                            ? 'border-[#2d5a27] bg-[#d4eac8]'
-                            : 'border-[#8b7a52]/40 bg-[#e8ddb4]'
-                        }`}
-                      >
-                        {/* 페이지 헤더 */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPage(isExpanded ? null : pageIndex)}
-                          className="flex items-center justify-between w-full mb-3"
+                return (
+                  <div
+                    key={pageIndex}
+                    style={{
+                      borderRadius: 16,
+                      border: `2px ${hasSelection ? 'solid' : 'dashed'} ${
+                        hasSelection ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'
+                      }`,
+                      background: hasSelection ? '#eaf4dc' : '#fdf6dc',
+                      padding: '16px 18px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPage(isExpanded ? null : pageIndex)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        background: 'transparent',
+                        border: 0,
+                        cursor: 'pointer',
+                        padding: 0,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: 'var(--cr-sage-darker)',
+                            color: '#fdf6dc',
+                            display: 'grid',
+                            placeItems: 'center',
+                            fontFamily: 'var(--cr-font-serif)',
+                            fontWeight: 800,
+                            fontSize: 13,
+                          }}
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#2d5a27] text-[#f0e6c0] text-sm font-bold">
-                              {pageIndex + 1}
-                            </span>
-                            <span className="text-[#8b7a52] text-sm font-bold">
-                              Page {pageIndex + 1}
-                            </span>
-                            {pageHighlights.length > 0 && (
-                              <span className="text-[#2d5a27] text-xs font-bold ml-1">
-                                ({pageHighlights.length}개 선택)
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[#8b7a52] text-sm">
-                            {isExpanded ? '접기 ▲' : '펼치기 ▼'}
+                          {pageIndex + 1}
+                        </span>
+                        <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, fontWeight: 700, color: 'var(--cr-ink-soft)' }}>
+                          Page {pageIndex + 1}
+                        </span>
+                        {hasSelection && (
+                          <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, fontWeight: 700, color: 'var(--cr-sage-deep)' }}>
+                            ({pageHighlights.length}개 선택)
                           </span>
-                        </button>
-
-                        {/* 영어(녹음 대상) 미리보기 — 접힌 상태에서도 표시 */}
-                        {!isExpanded && (
-                          <p className="text-[#2d5a27] text-base leading-relaxed line-clamp-2">
-                            {sentences.map(s => s.en).join(' ')}
-                          </p>
-                        )}
-
-                        {/* 문장별 선택 UI — 펼친 상태 */}
-                        {isExpanded && (
-                          <div className="space-y-3 mt-2">
-                            {sentences.map((sentence, sIdx) => {
-                              const highlight = highlights.find(
-                                h => h.pageIndex === pageIndex && h.sentenceIndex === sIdx,
-                              )
-                              const isSelected = !!highlight
-                              const recording = isHighlightRecording(pageIndex, sIdx)
-
-                              return (
-                                <div
-                                  key={sIdx}
-                                  className={`rounded-xl border-2 p-4 transition-colors ${
-                                    isSelected
-                                      ? 'border-[#2d5a27] bg-[#c8e6b8]'
-                                      : 'border-[#8b7a52]/30 bg-[#f0e6c0]'
-                                  }`}
-                                >
-                                  <div className="flex items-start justify-between gap-3 mb-2">
-                                    <span className="text-[#8b7a52] text-xs font-bold shrink-0 mt-1">
-                                      {sIdx + 1}/{sentences.length}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en)}
-                                      disabled={isRecording}
-                                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors shrink-0 ${
-                                        isSelected
-                                          ? 'bg-[#8b3a2a] text-[#f0e6c0] hover:bg-[#a84a35]'
-                                          : 'bg-[#2d5a27] text-[#f0e6c0] hover:bg-[#3d6f34]'
-                                      } disabled:opacity-40 disabled:cursor-not-allowed`}
-                                    >
-                                      {isSelected ? '해제' : '선택'}
-                                    </button>
-                                  </div>
-
-                                  {/* 영어 — 크게 (녹음 대상) */}
-                                  <p className="text-[#2d5a27] text-lg leading-relaxed font-medium">
-                                    {sentence.en}
-                                  </p>
-                                  {/* 한국어 — 작게 (참고용) */}
-                                  {sentence.ko && (
-                                    <p className="text-[#8b7a52] text-sm mt-1 italic">
-                                      {sentence.ko}
-                                    </p>
-                                  )}
-
-                                  {/* 녹음 컨트롤 */}
-                                  {isSelected && (
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                      {highlight.uploading ? (
-                                        <span className="px-4 py-2 rounded-full bg-[#8b7a52]/30 text-[#2d5a27] flex items-center gap-2 text-sm font-bold">
-                                          <Loader2 className="w-4 h-4 animate-spin" /> 업로드 중...
-                                        </span>
-                                      ) : !recording ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => void startRecording({ kind: 'highlight', pageIndex, sentenceIndex: sIdx })}
-                                          disabled={isRecording}
-                                          className="px-4 py-2 rounded-full bg-[#8b3a2a] text-[#f0e6c0] hover:bg-[#a84a35] transition-colors flex items-center gap-2 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-                                        >
-                                          <Mic className="w-4 h-4" />
-                                          {highlight.audioUrl ? '다시 녹음' : '녹음하기'}
-                                        </button>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={stopRecording}
-                                          className="px-4 py-2 rounded-full bg-[#c97b4a] text-[#f0e6c0] hover:bg-[#d88a58] transition-colors flex items-center gap-2 text-sm font-bold animate-pulse"
-                                        >
-                                          <Square className="w-4 h-4" /> 녹음 중지
-                                        </button>
-                                      )}
-
-                                      {highlight.audioUrl && !recording && !highlight.uploading && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              playingUrl === highlight.audioUrl
-                                                ? stopAudio()
-                                                : playAudio(highlight.audioUrl!)
-                                            }
-                                            className="px-4 py-2 rounded-full bg-[#2d5a27] text-[#f0e6c0] hover:bg-[#3d6f34] transition-colors flex items-center gap-2 text-sm font-bold"
-                                          >
-                                            {playingUrl === highlight.audioUrl ? (
-                                              <><Pause className="w-4 h-4" /> 정지</>
-                                            ) : (
-                                              <><Play className="w-4 h-4" /> 듣기</>
-                                            )}
-                                          </button>
-                                          <span className="text-[#2d5a27] text-xs font-bold">녹음 완료</span>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
                         )}
                       </div>
-                    )
-                  })}
-                </div>
-
-                {highlights.length > 0 && (
-                  <p className="mt-4 text-[#2d5a27] text-sm font-bold text-center">
-                    {highlights.length}개 문장 선택됨 · {highlights.filter(h => h.audioUrl).length}개 녹음 완료
-                  </p>
-                )}
-              </section>
-
-              {/* Section 2: 아웃트로 멘트 */}
-              <section className="bg-[#f0e6c0] p-6 md:p-8 rounded-[2rem] border-2 border-[#2a1b12] shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#c97b4a] flex items-center justify-center text-[#f0e6c0]">
-                    <MessageSquareHeart className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[#8b7a52] text-sm">아웃트로</p>
-                    <h3 className="text-2xl text-[#2d5a27] font-bold">
-                      마무리 인사를 남겨주세요
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.5rem] border-2 border-[#8b7a52]/40 bg-[#e8ddb4] p-6 space-y-4">
-                  <div>
-                    <label className="block text-[#8b7a52] text-sm mb-2 font-bold">
-                      마무리 멘트
-                    </label>
-                    <textarea
-                      value={outroText}
-                      onChange={e => setOutroText(e.target.value)}
-                      onBlur={handleSaveOutro}
-                      rows={4}
-                      placeholder="예: 해솔아, 오늘도 씩씩했어. 잘 자, 내 작은 용감이. 사랑해!"
-                      className="w-full p-4 rounded-2xl border-2 border-[#8b7a52]/60 bg-[#f0e6c0] text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/40 resize-none placeholder-[#8b7a52]/60"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[#8b7a52] text-sm mb-2 font-bold">
-                      서명 (선택)
-                    </label>
-                    <input
-                      type="text"
-                      value={outroSignature}
-                      onChange={e => setOutroSignature(e.target.value)}
-                      onBlur={handleSaveOutro}
-                      placeholder="예: — 사랑하는 엄마가"
-                      className="w-full p-3 rounded-2xl border-2 border-[#8b7a52]/60 bg-[#f0e6c0] text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/40 placeholder-[#8b7a52]/60"
-                    />
-                  </div>
-
-                  {outroSaving && (
-                    <p className="text-[#8b7a52] text-xs flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" /> 저장 중...
-                    </p>
-                  )}
-
-                  {/* 아웃트로 녹음 */}
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
-                    {outroUploading ? (
-                      <span className="px-6 py-3 rounded-full bg-[#8b7a52]/30 text-[#2d5a27] flex items-center gap-2 font-bold">
-                        <Loader2 className="w-4 h-4 animate-spin" /> 업로드 중...
+                      <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)' }}>
+                        {isExpanded ? '접기 ▲' : '펼치기 ▼'}
                       </span>
-                    ) : !isOutroRecording ? (
-                      <button
-                        type="button"
-                        onClick={() => void startRecording({ kind: 'outro' })}
-                        disabled={isRecording || !outroText.trim()}
-                        className="px-6 py-3 rounded-full bg-[#8b3a2a] text-[#f0e6c0] hover:bg-[#a84a35] transition-colors flex items-center gap-2 font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                    </button>
+
+                    {!isExpanded && (
+                      <p
+                        style={{
+                          fontFamily: 'var(--cr-font-gaegu)',
+                          fontSize: 15,
+                          color: 'var(--cr-ink)',
+                          margin: 0,
+                          lineHeight: 1.5,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
                       >
-                        <Mic className="w-4 h-4" />
-                        {outroAudioUrl ? '아웃트로 다시 녹음' : '아웃트로 녹음하기'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={stopRecording}
-                        className="px-6 py-3 rounded-full bg-[#c97b4a] text-[#f0e6c0] hover:bg-[#d88a58] transition-colors flex items-center gap-2 font-bold animate-pulse"
-                      >
-                        <Square className="w-4 h-4" /> 녹음 중지
-                      </button>
+                        {sentences.map(s => s.en).join(' ')}
+                      </p>
                     )}
 
-                    {outroAudioUrl && !isOutroRecording && !outroUploading && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            playingUrl === outroAudioUrl
-                              ? stopAudio()
-                              : playAudio(outroAudioUrl)
-                          }
-                          className="px-5 py-3 rounded-full bg-[#2d5a27] text-[#f0e6c0] hover:bg-[#3d6f34] transition-colors flex items-center gap-2 font-bold"
-                        >
-                          {playingUrl === outroAudioUrl ? (
-                            <><Pause className="w-4 h-4" /> 정지</>
-                          ) : (
-                            <><Play className="w-4 h-4" /> 듣기</>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setOutroAudioUrl(null)}
-                          className="px-4 py-3 rounded-full bg-[#e8ddb4] border-2 border-[#8b7a52]/40 text-[#2d5a27] hover:bg-[#f0e6c0] transition-colors flex items-center gap-2 font-bold"
-                        >
-                          <RotateCcw className="w-4 h-4" /> 삭제
-                        </button>
-                        <span className="text-[#2d5a27] text-sm font-bold">녹음 완료</span>
-                      </>
+                    {isExpanded && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+                        {sentences.map((sentence, sIdx) => {
+                          const highlight = highlights.find(
+                            h => h.pageIndex === pageIndex && h.sentenceIndex === sIdx,
+                          )
+                          const isSelected = !!highlight
+                          const recording = isHighlightRecording(pageIndex, sIdx)
+
+                          return (
+                            <div
+                              key={sIdx}
+                              style={{
+                                borderRadius: 14,
+                                border: `2px solid ${isSelected ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'}`,
+                                background: isSelected ? '#dceec8' : 'var(--cr-paper)',
+                                padding: '12px 14px',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                                <span
+                                  style={{
+                                    fontFamily: 'var(--cr-font-gaegu)',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: 'var(--cr-ink-soft)',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {sIdx + 1}/{sentences.length}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en)}
+                                  disabled={isRecording}
+                                  style={{
+                                    padding: '4px 12px',
+                                    borderRadius: 999,
+                                    fontFamily: 'var(--cr-font-gaegu)',
+                                    fontWeight: 700,
+                                    fontSize: 12,
+                                    background: isSelected ? 'var(--cr-rust)' : 'var(--cr-sage-darker)',
+                                    color: '#fdf6dc',
+                                    border: `1.5px solid ${isSelected ? '#8a4a32' : '#2a3f1f'}`,
+                                    cursor: isRecording ? 'not-allowed' : 'pointer',
+                                    opacity: isRecording ? 0.5 : 1,
+                                  }}
+                                >
+                                  {isSelected ? '해제' : '선택'}
+                                </button>
+                              </div>
+
+                              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, fontWeight: 600, color: 'var(--cr-ink)', margin: 0, lineHeight: 1.5 }}>
+                                {sentence.en}
+                              </p>
+                              {sentence.ko && (
+                                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)', margin: '4px 0 0', fontStyle: 'italic' }}>
+                                  {sentence.ko}
+                                </p>
+                              )}
+
+                              {isSelected && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                                  {highlight.uploading ? (
+                                    <span style={{ ...recBtnStyle(true), background: '#fbf2da', color: 'var(--cr-ink-soft)', borderColor: 'var(--cr-caramel)', boxShadow: 'none' }}>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> 업로드 중...
+                                    </span>
+                                  ) : !recording ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void startRecording({ kind: 'highlight', pageIndex, sentenceIndex: sIdx })}
+                                      disabled={isRecording}
+                                      style={{
+                                        ...recBtnStyle(false),
+                                        opacity: isRecording ? 0.4 : 1,
+                                        cursor: isRecording ? 'not-allowed' : 'pointer',
+                                      }}
+                                    >
+                                      <Mic className="w-3.5 h-3.5" />
+                                      {highlight.audioUrl ? '다시 녹음' : '녹음하기'}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={stopRecording}
+                                      style={recBtnStyle(true)}
+                                    >
+                                      <Square className="w-3.5 h-3.5" /> 녹음 중지
+                                    </button>
+                                  )}
+
+                                  {highlight.audioUrl && !recording && !highlight.uploading && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          playingUrl === highlight.audioUrl
+                                            ? stopAudio()
+                                            : playAudio(highlight.audioUrl!)
+                                        }
+                                        style={{
+                                          background: 'var(--cr-sage)',
+                                          color: '#fdf6dc',
+                                          border: '2px solid var(--cr-sage-deep)',
+                                          borderRadius: 999,
+                                          padding: '6px 14px',
+                                          fontFamily: 'var(--cr-font-gaegu)',
+                                          fontWeight: 700,
+                                          fontSize: 13,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 6,
+                                          boxShadow: '0 2px 0 var(--cr-sage-deep)',
+                                        }}
+                                      >
+                                        {playingUrl === highlight.audioUrl ? (
+                                          <><Pause className="w-3.5 h-3.5" /> 정지</>
+                                        ) : (
+                                          <><Play className="w-3.5 h-3.5" /> 듣기</>
+                                        )}
+                                      </button>
+                                      <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontWeight: 700, fontSize: 12, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
+                                        녹음 완료
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
-
-                  {/* 미리보기 */}
-                  {outroText.trim() && (
-                    <div className="mt-4 rounded-[1.25rem] bg-[#f0e6c0] border-2 border-[#8b7a52]/40 p-5">
-                      <p className="text-[#8b7a52] text-sm mb-2 font-bold">미리보기</p>
-                      <p className="text-[#2d5a27] text-lg whitespace-pre-line leading-relaxed">
-                        {outroText}
-                      </p>
-                      {outroSignature && (
-                        <p className="text-[#8b7a52] text-base mt-3 italic">{outroSignature}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </section>
+                )
+              })}
             </div>
 
-            {/* 다음 단계 confirm 진행 중 에러 메시지 — 푸터 위에 자리. 네비 버튼은 CreationFooter 가 담당. */}
-            {confirmError && (
-              <p className="mt-6 text-center text-sm font-bold text-[#8b3a2a] bg-[#F4E4BC] rounded-2xl px-4 py-3 border-2 border-[#8b3a2a]/40">
-                {confirmError}
+            {highlights.length > 0 && (
+              <p style={{ marginTop: 14, textAlign: 'center', fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-sage-deep)', fontWeight: 700 }}>
+                {highlights.length}개 문장 선택됨 · {highlights.filter(h => h.audioUrl).length}개 녹음 완료
               </p>
             )}
-          </div>
+          </section>
+
+          {/* Section 2: 아웃트로 */}
+          <section className="cr-card">
+            <span className="cr-tape" aria-hidden="true" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'var(--cr-rust)',
+                  color: '#fdf6dc',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <MessageSquareHeart className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="cr-step-label" style={{ marginBottom: 2 }}>
+                  아웃트로
+                </div>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                  마무리 인사를 남겨주세요
+                </h3>
+              </div>
+            </div>
+
+            <div className="cr-field">
+              <label className="cr-label" style={{ fontSize: 16 }}>마무리 멘트</label>
+              <textarea
+                value={outroText}
+                onChange={e => setOutroText(e.target.value)}
+                onBlur={handleSaveOutro}
+                rows={4}
+                placeholder="예: 해솔아, 오늘도 씩씩했어. 잘 자, 내 작은 용감이. 사랑해!"
+                className="cr-textarea"
+              />
+            </div>
+
+            <div className="cr-field">
+              <label className="cr-label" style={{ fontSize: 16 }}>서명 (선택)</label>
+              <input
+                type="text"
+                value={outroSignature}
+                onChange={e => setOutroSignature(e.target.value)}
+                onBlur={handleSaveOutro}
+                placeholder="예: — 사랑하는 엄마가"
+                className="cr-input"
+              />
+            </div>
+
+            {outroSaving && (
+              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)', display: 'inline-flex', alignItems: 'center', gap: 4, margin: 0 }}>
+                <Loader2 className="w-3 h-3 animate-spin" /> 저장 중...
+              </p>
+            )}
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+              {outroUploading ? (
+                <span style={recBtnStyle(true)}>
+                  <Loader2 className="w-4 h-4 animate-spin" /> 업로드 중...
+                </span>
+              ) : !isOutroRecording ? (
+                <button
+                  type="button"
+                  onClick={() => void startRecording({ kind: 'outro' })}
+                  disabled={isRecording || !outroText.trim()}
+                  style={{
+                    ...recBtnStyle(false),
+                    opacity: isRecording || !outroText.trim() ? 0.4 : 1,
+                    cursor: isRecording || !outroText.trim() ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Mic className="w-4 h-4" />
+                  {outroAudioUrl ? '아웃트로 다시 녹음' : '아웃트로 녹음하기'}
+                </button>
+              ) : (
+                <button type="button" onClick={stopRecording} style={recBtnStyle(true)}>
+                  <Square className="w-4 h-4" /> 녹음 중지
+                </button>
+              )}
+
+              {outroAudioUrl && !isOutroRecording && !outroUploading && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => (playingUrl === outroAudioUrl ? stopAudio() : playAudio(outroAudioUrl))}
+                    style={{
+                      background: 'var(--cr-sage)',
+                      color: '#fdf6dc',
+                      border: '2px solid var(--cr-sage-deep)',
+                      borderRadius: 999,
+                      padding: '8px 18px',
+                      fontFamily: 'var(--cr-font-gaegu)',
+                      fontWeight: 700,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      boxShadow: '0 2px 0 var(--cr-sage-deep)',
+                    }}
+                  >
+                    {playingUrl === outroAudioUrl ? (
+                      <><Pause className="w-4 h-4" /> 정지</>
+                    ) : (
+                      <><Play className="w-4 h-4" /> 듣기</>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOutroAudioUrl(null)}
+                    className="cr-btn-back"
+                    style={{ justifySelf: 'auto' }}
+                  >
+                    <RotateCcw className="w-4 h-4" /> 삭제
+                  </button>
+                  <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, fontWeight: 700, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
+                    녹음 완료
+                  </span>
+                </>
+              )}
+            </div>
+
+            {outroText.trim() && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: '14px 18px',
+                  background: '#fbf2da',
+                  border: '2px dashed var(--cr-caramel)',
+                  borderRadius: 14,
+                }}
+              >
+                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-caramel-deep)', fontWeight: 700, margin: '0 0 6px' }}>
+                  미리보기
+                </p>
+                <p style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 17, color: 'var(--cr-ink)', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 }}>
+                  {outroText}
+                </p>
+                {outroSignature && (
+                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-ink-soft)', fontStyle: 'italic', margin: '8px 0 0' }}>
+                    {outroSignature}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+
+          {confirmError && (
+            <div className="cr-banner error" role="alert" style={{ marginTop: 16 }}>
+              {confirmError}
+            </div>
+          )}
         </main>
       </div>
 

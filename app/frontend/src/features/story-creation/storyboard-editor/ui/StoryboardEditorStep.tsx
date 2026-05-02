@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
+  AlignJustify,
   CheckCircle,
   History,
   ImageIcon,
+  LayoutGrid,
   Loader2,
   Pencil,
   Quote,
@@ -34,7 +36,9 @@ import { deleteStory } from '../../basic-info'
 import { ROUTES } from '../../../../shared/constants'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
+import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
+import '../../styles/creation-paper.css'
 
 /** "마지막 SUCCESS 이후 FAILED" 한도. 이 값 이상이면 사용자에게 사과 + 메인 페이지 이동. */
 const FAILED_LIMIT = 3
@@ -550,11 +554,12 @@ export function StoryboardEditorStep({
   const someImagesReady = pages.some(p => !!p.imageUrl)
 
   return (
-    <div className="bookshelf-modal step-forest-modal">
+    <div className="cr-shell">
+      <CreationDoodlesBg />
       <CreationHeader currentStep={4} />
 
-      <div className="bookshelf-scroll">
-        <main className="py-10 px-6 md:px-12 lg:px-24 xl:px-32 2xl:px-40 bookshelf-fade-in">
+      <div className="cr-scroll">
+        <main className="cr-shell-inner cr-fade-in" style={{ maxWidth: 'min(100%, 1500px)' }}>
           <div className="max-w-7xl mx-auto pb-12">
             <StepTitleBlock
               stepNumber={4}
@@ -588,31 +593,31 @@ export function StoryboardEditorStep({
                 grid: 한 줄 3장 사진 갤러리. 사진 클릭 → individual 모드 + 해당 페이지로 스크롤.
                 individual: 페이지마다 글/이미지/재생성 카드 (기본). */}
             {pages.length > 0 && (
-              <div className="mb-6 flex justify-center">
-                <div className="inline-flex bg-[#E9DBBE] border-2 border-[#9A7548]/40 rounded-full p-1 gap-1 shadow-sm">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-start',
+                  marginBottom: 24,
+                }}
+              >
+                <div className="cr-view-toggle">
                   <button
                     type="button"
                     onClick={() => setViewMode('grid')}
                     aria-pressed={viewMode === 'grid'}
-                    className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${
-                      viewMode === 'grid'
-                        ? 'bg-[#3F6B2E] text-[#FFFFE5] shadow'
-                        : 'text-[#6B4A28] hover:bg-[#9A7548]/10'
-                    }`}
+                    className={`cr-view-toggle-btn${viewMode === 'grid' ? ' on' : ''}`}
                   >
-                    그림으로 한번에 보기
+                    <LayoutGrid className="w-4 h-4" />
+                    스토리보드 한번에 보기
                   </button>
                   <button
                     type="button"
                     onClick={() => setViewMode('individual')}
                     aria-pressed={viewMode === 'individual'}
-                    className={`px-5 py-2 rounded-full font-bold text-sm transition-colors ${
-                      viewMode === 'individual'
-                        ? 'bg-[#3F6B2E] text-[#FFFFE5] shadow'
-                        : 'text-[#6B4A28] hover:bg-[#9A7548]/10'
-                    }`}
+                    className={`cr-view-toggle-btn${viewMode === 'individual' ? ' on' : ''}`}
                   >
-                    개별 페이지 보기
+                    <AlignJustify className="w-4 h-4" />
+                    나란히 페이지 보기
                   </button>
                 </div>
               </div>
@@ -620,14 +625,15 @@ export function StoryboardEditorStep({
 
             {/* 전체 이미지 생성 버튼 */}
             {pages.length > 0 && !someImagesReady && (
-              <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] shadow-md p-6 md:p-8 mb-8">
+              <div className="cr-card">
+                <span className="cr-tape" aria-hidden="true" />
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <h3 className="text-xl text-[#2d5a27] font-bold mb-1 flex items-center gap-2">
+                    <h3 className="text-xl font-bold mb-1 flex items-center gap-2" style={{ fontFamily: 'var(--cr-font-serif)', color: 'var(--cr-ink)' }}>
                       <ImageIcon className="w-6 h-6" />
                       모든 페이지 그림 만들기
                     </h3>
-                    <p className="text-[#8b7a52]">
+                    <p style={{ fontFamily: 'var(--cr-font-gaegu)', color: 'var(--cr-ink-soft)' }}>
                       AI 가 페이지마다 한 장씩 그림을 그려요.
                     </p>
                   </div>
@@ -662,8 +668,15 @@ export function StoryboardEditorStep({
 
             {/* 진행 중 안내 (이미 일부 페이지가 생성됐어도 동일한 표시) */}
             {isImageJobInProgress && (
-              <div className="bg-[#2a1b12]/60 border-2 border-[#b4dc8c]/40 rounded-2xl p-4 mb-8 text-center">
-                <p className="text-[#b4dc8c] font-bold inline-flex items-center gap-2">
+              <div
+                className="cr-card"
+                style={{ textAlign: 'center', padding: '14px 18px', marginBottom: 32 }}
+              >
+                <span className="cr-tape" aria-hidden="true" />
+                <p
+                  className="font-bold inline-flex items-center gap-2"
+                  style={{ color: 'var(--cr-sage-deep)', fontFamily: 'var(--cr-font-gaegu)', fontSize: 16 }}
+                >
                   <Loader2 className="w-5 h-5 animate-spin" />
                   AI 가 페이지를 그리는 중이에요. 완성된 페이지부터 자동으로 표시됩니다.
                 </p>
@@ -685,7 +698,8 @@ export function StoryboardEditorStep({
             {/* STORY 잡 진행 중 — 페이지 카드 대신 큰 로딩 카드를 표시.
                 Step 3 에서 "스토리 확정하고 다음" 직후 도달하는 정상 케이스 + recovery (탭 닫고 재진입) 모두 동일 화면. */}
             {!isLimitExceeded && isStoryJobInProgress && pages.length === 0 && (
-              <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+              <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
+                <span className="cr-tape" aria-hidden="true" />
                 <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
                 <p className="text-[#2d5a27] font-bold mb-2">동화 본문을 만들고 있어요</p>
                 <p className="text-[#8b7a52]">
@@ -713,7 +727,8 @@ export function StoryboardEditorStep({
               !isStoryJobFailed &&
               storyGenerationJobId === null &&
               stateQuery.isLoading && (
-                <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+                <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
+                <span className="cr-tape" aria-hidden="true" />
                   <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
                   <p className="text-[#2d5a27] font-bold">상태 확인 중...</p>
                 </div>
@@ -725,7 +740,8 @@ export function StoryboardEditorStep({
               !isStoryJobFailed &&
               !stateQuery.isLoading &&
               pagesQuery.isLoading && (
-                <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+                <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
+                <span className="cr-tape" aria-hidden="true" />
                   <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
                   <p className="text-[#2d5a27] font-bold">페이지를 불러오는 중...</p>
                 </div>
@@ -738,7 +754,8 @@ export function StoryboardEditorStep({
               !stateQuery.isLoading &&
               !pagesQuery.isLoading &&
               pages.length === 0 && (
-                <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
+                <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
+                <span className="cr-tape" aria-hidden="true" />
                   <p className="text-[#2d5a27] font-bold mb-2">아직 동화 본문이 만들어지지 않았어요</p>
                   <p className="text-[#8b7a52]">이전 단계에서 줄거리를 만들고 본문을 확정해주세요.</p>
                 </div>
@@ -879,18 +896,16 @@ function PageCard(props: {
   // 한글 해석 — 기본은 read-only 표시. "직접 편집" 클릭 시 textarea 로 전환.
   // blur 시 onDraftBlur (PATCH) + 표시 모드 복귀.
   const [editingKorean, setEditingKorean] = useState(false)
+  // 그림 다시 그리기 패널 토글 — 이미지 위 hover 아이콘 클릭 시 input 영역이 펼쳐짐.
+  const [regenOpen, setRegenOpen] = useState(false)
   const koreanText = draft.trim()
 
   return (
-    <div className="bg-[#E9DBBE] rounded-2xl border-2 border-[#B9D38F]/55 shadow-[0_4px_14px_rgba(154,117,72,0.14)] overflow-hidden">
+    <div className="cr-card" style={{ padding: 0 }}>
+      <span className="cr-tape" aria-hidden="true" />
       {/* Header — Page 배지 + 저장 중 인디케이터 */}
       <div className="flex items-center justify-between px-5 pt-3 pb-2">
-        <span
-          className="inline-flex items-center bg-[#B9D38F]/45 text-[#3F6B2E] font-bold px-3 py-1 rounded-full text-sm border border-[#3F6B2E]/40"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          Page {page.pageNumber}
-        </span>
+        <span className="cr-page-badge">페이지 {page.pageNumber}</span>
         {patchPending && (
           <span className="text-[#9A7548] text-xs inline-flex items-center gap-1.5">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> 저장 중
@@ -901,8 +916,10 @@ function PageCard(props: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 md:px-5 pb-4 md:pb-5">
         {/* ── 좌측: 이미지 + 재생성 ─────────────────────────── */}
         <div className="flex flex-col gap-2.5">
-          {/* 이미지 영역 — 가로폭 대비 짧게 (4:3) 잡아 카드 높이 축소. */}
-          <div className="aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden">
+          {/* 이미지 영역 — hover 시 흑백 + 어둡게 + 중앙에 새로고침 버튼 노출. */}
+          <div
+            className={`cr-sketch-image-wrap aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
+          >
             {imageSrc ? (
               <img
                 src={imageSrc}
@@ -921,6 +938,26 @@ function PageCard(props: {
                 )}
               </div>
             )}
+
+            {/* hover 오버레이 — 그림 다시 그리기 아이콘 (재생성 패널 토글). */}
+            <button
+              type="button"
+              onClick={() => setRegenOpen(prev => !prev)}
+              disabled={regenerateDisabled || isRegeneratingThis}
+              aria-label={regenOpen ? '재생성 패널 닫기' : '그림 다시 그리기'}
+              title={
+                refineExhausted
+                  ? `재생성 횟수를 모두 사용했어요 (${regenLimit - regenRemaining} / ${regenLimit})`
+                  : '그림 다시 그리기'
+              }
+              className={`cr-sketch-edit-btn${regenOpen ? ' open' : ''}`}
+            >
+              {isRegeneratingThis ? (
+                <Loader2 className="w-7 h-7 animate-spin" />
+              ) : (
+                <RefreshCw className="w-7 h-7" strokeWidth={2.4} />
+              )}
+            </button>
           </div>
 
           {/* 버전 picker — 재생성 이력이 있는 페이지에서만 표시. */}
@@ -931,63 +968,80 @@ function PageCard(props: {
             onChange={version => onSelectVersion(page.pageNumber, version)}
           />
 
-          {/* 재생성 UI — 사진 바로 밑. 입력 + 버튼. 동화 단위 카운터는 헤더에 있음. */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[#3F6B2E] font-bold text-xs flex items-center gap-1.5">
-                <Wand2 className="w-3.5 h-3.5" /> 그림 다시 그리기
-              </label>
-              <span
-                className={`text-[11px] font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${
-                  refineExhausted
-                    ? 'text-[#9A7548]/70 border-[#9A7548]/30 bg-[#E9DBBE]/50'
-                    : 'text-[#3F6B2E] border-[#3F6B2E]/30 bg-[#B9D38F]/25'
-                }`}
-                title="동화 단위 재생성 한도예요. 모든 페이지가 합산해 사용해요."
-              >
-                <RefreshCw className="w-2.5 h-2.5" />
-                동화 전체 {regenRemaining} / {regenLimit} 남음
-              </span>
+          {/* 재생성 패널 — 이미지 위 아이콘 클릭 시 토글. 평소엔 숨김. */}
+          {regenOpen && (
+            <div className="cr-regen-panel">
+              <div className="cr-regen-panel-head">
+                <label>
+                  <Wand2 className="w-3.5 h-3.5" /> 그림 다시 그리기
+                </label>
+                <span
+                  className={`cr-regen-counter${refineExhausted ? ' exhausted' : ''}`}
+                  title="동화 단위 재생성 한도예요. 모든 페이지가 합산해 사용해요."
+                >
+                  <RefreshCw className="w-2.5 h-2.5" />
+                  {regenRemaining} / {regenLimit} 남음
+                </span>
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={regeneratePrompt}
+                  onChange={e => onRegeneratePromptChange(e.target.value)}
+                  placeholder={
+                    refineExhausted ? '재생성 횟수를 모두 사용했어요' : '예: 따뜻한 색감으로'
+                  }
+                  disabled={inputDisabled}
+                  autoFocus
+                  className="cr-input"
+                  style={{ padding: '8px 12px', fontSize: 14 }}
+                />
+                <button
+                  type="button"
+                  onClick={onRegenerateImage}
+                  disabled={buttonDisabled}
+                  title={refineExhausted ? '재생성 횟수를 모두 사용했어요' : '그림 다시 그리기'}
+                  aria-label="그림 다시 그리기"
+                  className="cr-regen-send"
+                >
+                  {isRegeneratingThis ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
+              {isRegeneratingThis && (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--cr-sage-deep)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 4,
+                  }}
+                >
+                  <Loader2 className="w-3 h-3 animate-spin" /> 그림을 다시 그리는 중이에요…
+                </p>
+              )}
+              {regenerateError && !isRegeneratingThis && (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--cr-rust)',
+                    display: 'inline-flex',
+                    alignItems: 'flex-start',
+                    gap: 6,
+                    marginTop: 4,
+                  }}
+                >
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>{regenerateError}</span>
+                </p>
+              )}
             </div>
-            <div className="flex gap-1.5">
-              <input
-                type="text"
-                value={regeneratePrompt}
-                onChange={e => onRegeneratePromptChange(e.target.value)}
-                placeholder={
-                  refineExhausted ? '재생성 횟수를 모두 사용했어요' : '예: 따뜻한 색감으로'
-                }
-                disabled={inputDisabled}
-                className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none text-xs text-[#3E2A18] placeholder-[#9A7548]/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              />
-              <button
-                type="button"
-                onClick={onRegenerateImage}
-                disabled={buttonDisabled}
-                title={refineExhausted ? '재생성 횟수를 모두 사용했어요' : '그림 다시 그리기'}
-                aria-label="그림 다시 그리기"
-                className="bg-[#3F6B2E] text-[#FFFEF8] px-3 py-1.5 rounded-lg font-bold hover:bg-[#4F7B3E] transition-colors flex items-center gap-1 text-xs shadow-[0_2px_0_#1F3318] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-              >
-                {isRegeneratingThis ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-            {/* 진행 중 안내 / 에러 메시지 — 페이지별 즉시 피드백. */}
-            {isRegeneratingThis && (
-              <p className="text-[11px] text-[#3F6B2E] inline-flex items-center gap-1.5 mt-0.5">
-                <Loader2 className="w-3 h-3 animate-spin" /> 그림을 다시 그리는 중이에요…
-              </p>
-            )}
-            {regenerateError && !isRegeneratingThis && (
-              <p className="text-[11px] text-[#a3413f] inline-flex items-start gap-1.5 mt-0.5">
-                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                <span>{regenerateError}</span>
-              </p>
-            )}
-          </div>
+          )}
         </div>
 
         {/* ── 우측: 큰 따옴표 + 영어 본문 + 한글 해석 (읽기/편집 토글) ── */}
@@ -1182,9 +1236,10 @@ function FailedRetryCard(props: {
   const remaining = Math.max(0, limit - failedCount)
 
   return (
-    <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#2a1b12] p-10 text-center">
-      <AlertTriangle className="w-10 h-10 text-[#a3413f] mx-auto mb-3" />
-      <p className="text-[#a3413f] font-bold text-lg mb-2">본문 생성에 실패했어요</p>
+    <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
+      <span className="cr-tape" aria-hidden="true" />
+      <AlertTriangle className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--cr-rust)' }} />
+      <p className="font-bold text-lg mb-2" style={{ color: 'var(--cr-rust)', fontFamily: 'var(--cr-font-serif)' }}>본문 생성에 실패했어요</p>
       <p className="text-[#8b7a52] mb-1">잠시 후 다시 시도해 주세요.</p>
       <p className="text-[#8b7a52] text-sm mb-6">
         남은 시도 횟수: <span className="font-bold text-[#2d5a27]">{remaining}</span>회
@@ -1245,8 +1300,17 @@ function LimitExceededCard(props: {
   }, [])
 
   return (
-    <div className="bg-[#f0e6c0] rounded-2xl border-2 border-[#a3413f] p-10 text-center">
-      <AlertTriangle className="w-12 h-12 text-[#a3413f] mx-auto mb-4" />
+    <div
+      className="cr-card"
+      style={{
+        textAlign: 'center',
+        padding: 40,
+        borderColor: 'var(--cr-rust)',
+        boxShadow: '0 2px 0 var(--cr-rust), 0 8px 22px rgba(140, 100, 60, 0.16)',
+      }}
+    >
+      <span className="cr-tape" aria-hidden="true" style={{ background: 'rgba(216, 133, 124, 0.7)' }} />
+      <AlertTriangle className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--cr-rust)' }} />
       <p className="text-[#a3413f] font-bold text-xl mb-3">죄송합니다</p>
       <p className="text-[#2d5a27] font-bold mb-2">
         본문 생성이 {failedCount}회 연속 실패했어요 (한도 {limit}회).

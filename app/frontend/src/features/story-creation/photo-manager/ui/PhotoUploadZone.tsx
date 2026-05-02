@@ -1,23 +1,26 @@
 import { useCallback, useRef, useState, type DragEvent, type ChangeEvent } from 'react'
 import { UploadCloud } from 'lucide-react'
-import { MAX_PHOTOS } from '../lib/constants'
 
 interface PhotoUploadZoneProps {
   onFiles: (files: FileList | File[]) => void
+  /** 업로드 영역 바닥의 메타 텍스트 (예: "최대 30장 · JPG, PNG · 한 장당 10MB 이하"). */
+  metaText?: string
 }
 
 /**
- * 드래그앤드롭 + 파일 선택 업로드 영역.
- * 원본 story-forest 와 동일한 border-4 dashed + 중앙 UploadCloud 아이콘 스타일.
+ * paper-craft 톤 드래그앤드롭 + 파일 선택 업로드 영역.
+ * `.cr-upload` 클래스로 dashed caramel border + cream background.
  */
-export function PhotoUploadZone({ onFiles }: PhotoUploadZoneProps) {
+export function PhotoUploadZone({
+  onFiles,
+  metaText = '최대 30장 · JPG, PNG · 한 장당 10MB 이하',
+}: PhotoUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) onFiles(e.target.files)
-      // 같은 파일 재업로드 가능하도록 리셋 (원본 동작)
       if (inputRef.current) inputRef.current.value = ''
     },
     [onFiles],
@@ -46,11 +49,7 @@ export function PhotoUploadZone({ onFiles }: PhotoUploadZoneProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`block w-full rounded-[2rem] p-8 text-center cursor-pointer mb-10 transition-colors border-4 border-dashed ${
-        isDragOver
-          ? 'bg-[#e8ddb4] border-[#2d5a27] shadow-[0_0_20px_rgba(180,220,140,0.4)]'
-          : 'bg-[#f0e6c0] border-[#b4dc8c] hover:bg-[#e8ddb4]'
-      }`}
+      className={`cr-upload${isDragOver ? ' is-dragover' : ''}`}
     >
       <input
         ref={inputRef}
@@ -58,15 +57,13 @@ export function PhotoUploadZone({ onFiles }: PhotoUploadZoneProps) {
         accept="image/*"
         multiple
         onChange={handleFileChange}
-        className="hidden"
+        style={{ display: 'none' }}
       />
-      <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c]">
-        <UploadCloud className="w-8 h-8 text-[#f0e6c0]" />
+      <div className="cr-upload-icon">
+        <UploadCloud className="w-7 h-7" />
       </div>
-      <p className="text-xl text-[#2d5a27] mb-1 font-bold">
-        이곳에 사진을 끌어다 놓거나 클릭해서 찾기
-      </p>
-      <p className="text-[#8b7a52] text-sm">최대 {MAX_PHOTOS}장 (JPG, PNG)</p>
+      <div className="cr-upload-text">이곳에 사진을 올려놓거나 클릭해서 찾기</div>
+      <div className="cr-upload-meta">{metaText}</div>
     </label>
   )
 }
