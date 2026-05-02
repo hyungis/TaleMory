@@ -124,10 +124,6 @@ export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
         </div>
       </div>
 
-      {/* 산책하는 엄마+아이 — /walk.png 스프라이트 시트 (6프레임 walk cycle).
-          화면 가로를 천천히 가로지르며 무한 반복. pointer-events: none. */}
-      <div className="forest-walker" aria-hidden="true" />
-
       {/* 빛줄기 */}
       <div className="light-rays" />
 
