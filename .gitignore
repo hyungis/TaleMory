@@ -44,6 +44,7 @@ Thumbs.db
 **/__pycache__/
 *.pyc
 *.pyo
+**/tools
 
 .omc
 **/.omc
