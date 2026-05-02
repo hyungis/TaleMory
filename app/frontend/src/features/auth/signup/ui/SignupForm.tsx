@@ -1,8 +1,9 @@
-import { useCallback, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { TermsCheckboxes } from '../../terms'
 import { useSignupPost } from '../model/useSignupPost'
+import '../../styles/auth.css'
 
 interface SignupFormValues {
   id: string
@@ -57,31 +58,8 @@ interface SignupFormProps {
   onSwitchToLogin: () => void
 }
 
-const labelStyle: CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-display)',
-  fontSize: 16,
-  fontWeight: 700,
-  color: '#6b5638',
-  marginBottom: 6,
-}
-
-const inputStyle: CSSProperties = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: 12,
-  background: '#f7eccd',
-  border: '2px solid #a37548',
-  color: '#4a3b2a',
-  fontFamily: 'var(--font-display)',
-  fontSize: 17,
-  outline: 'none',
-  transition: 'border-color 0.15s, box-shadow 0.15s',
-  boxShadow: 'inset 0 1px 2px rgba(140, 100, 60, 0.08)',
-}
-
 /**
- * 회원가입 폼 — paper-craft 톤.
+ * 회원가입 폼 — paper-craft 톤. 스타일은 `auth.css` 의 `auth-*` 클래스 사용.
  */
 export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
   const [values, setValues] = useState<SignupFormValues>(INITIAL_VALUES)
@@ -129,89 +107,91 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
     [isPending, onSignedUp, signup, values],
   )
 
-  const required = (
-    <span style={{ color: '#c47254', fontWeight: 700, marginLeft: 2 }}>*</span>
-  )
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      aria-busy={isPending}
-      style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}
-    >
+    <form className="auth-form" onSubmit={handleSubmit} aria-busy={isPending}>
       <div>
-        <label style={labelStyle}>아이디 {required}</label>
+        <label className="auth-label">
+          아이디 <span className="required">*</span>
+        </label>
         <input
           type="text"
+          className="auth-input"
           value={values.id}
           disabled={isPending}
           onChange={e => handleChange('id', e.target.value)}
           autoComplete="username"
           placeholder="4자 이상"
-          style={inputStyle}
         />
       </div>
       <div>
-        <label style={labelStyle}>비밀번호 {required}</label>
+        <label className="auth-label">
+          비밀번호 <span className="required">*</span>
+        </label>
         <input
           type="password"
+          className="auth-input"
           value={values.password}
           disabled={isPending}
           onChange={e => handleChange('password', e.target.value)}
           autoComplete="new-password"
           placeholder="6자 이상"
-          style={inputStyle}
         />
       </div>
       <div>
-        <label style={labelStyle}>이메일 {required}</label>
+        <label className="auth-label">
+          이메일 <span className="required">*</span>
+        </label>
         <input
           type="email"
+          className="auth-input"
           value={values.email}
           disabled={isPending}
           onChange={e => handleChange('email', e.target.value)}
           autoComplete="email"
           placeholder="example@email.com"
-          style={inputStyle}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="auth-grid-2">
         <div>
-          <label style={labelStyle}>실명 {required}</label>
+          <label className="auth-label">
+            실명 <span className="required">*</span>
+          </label>
           <input
             type="text"
+            className="auth-input"
             value={values.name}
             disabled={isPending}
             onChange={e => handleChange('name', e.target.value)}
             autoComplete="name"
             placeholder="홍길동"
-            style={inputStyle}
           />
         </div>
         <div>
-          <label style={labelStyle}>닉네임 {required}</label>
+          <label className="auth-label">
+            닉네임 <span className="required">*</span>
+          </label>
           <input
             type="text"
+            className="auth-input"
             value={values.nickname}
             disabled={isPending}
             onChange={e => handleChange('nickname', e.target.value)}
             placeholder="해솔맘"
-            style={inputStyle}
           />
         </div>
       </div>
       <div>
-        <label style={labelStyle}>
-          휴대폰 <span style={{ fontSize: 13, color: '#a37548', fontWeight: 400, marginLeft: 4 }}>(선택)</span>
+        <label className="auth-label">
+          휴대폰 <span className="optional">(선택)</span>
         </label>
         <input
           type="tel"
+          className="auth-input"
           value={values.phone}
           disabled={isPending}
           onChange={e => handleChange('phone', e.target.value)}
           autoComplete="tel"
           placeholder="010-1234-5678"
-          style={inputStyle}
         />
       </div>
 
@@ -222,73 +202,19 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
       />
 
       {error && (
-        <div
-          style={{
-            background: 'rgba(196, 114, 84, 0.12)',
-            border: '1.5px solid rgba(196, 114, 84, 0.45)',
-            color: '#8c3a1f',
-            fontFamily: 'var(--font-display)',
-            fontSize: 15,
-            padding: '8px 12px',
-            borderRadius: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
+        <div className="auth-error">
           <AlertCircle className="w-4 h-4" />
           <span>{error}</span>
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        style={{
-          width: '100%',
-          background: '#7a9968',
-          color: '#fdfaf0',
-          border: '2px solid #5f7d50',
-          padding: '14px 20px',
-          borderRadius: 999,
-          fontFamily: 'var(--font-display)',
-          fontSize: 20,
-          fontWeight: 700,
-          cursor: isPending ? 'not-allowed' : 'pointer',
-          opacity: isPending ? 0.6 : 1,
-          boxShadow: '0 3px 0 #5f7d50, 0 6px 14px rgba(95, 125, 80, 0.25)',
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          marginTop: 6,
-        }}
-      >
+      <button type="submit" className="auth-btn-primary" disabled={isPending}>
         {isPending ? '가입 처리 중...' : '가입하기'}
       </button>
 
-      <p
-        className="text-center"
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 16,
-          color: '#8a7558',
-          paddingTop: 4,
-        }}
-      >
+      <p className="auth-footer-text">
         이미 계정이 있으신가요?{' '}
-        <button
-          type="button"
-          onClick={onSwitchToLogin}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#5f7d50',
-            fontFamily: 'var(--font-display)',
-            fontSize: 16,
-            fontWeight: 700,
-            cursor: 'pointer',
-            textDecoration: 'underline',
-            textUnderlineOffset: 3,
-          }}
-        >
+        <button type="button" className="auth-link" onClick={onSwitchToLogin}>
           로그인
         </button>
       </p>
