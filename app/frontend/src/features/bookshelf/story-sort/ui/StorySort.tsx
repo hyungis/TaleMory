@@ -7,29 +7,39 @@ interface StorySortProps {
 }
 
 /**
- * 정렬 드롭다운 (최신순/오래된순/가나다순).
- *
- * 브라우저 기본 `<select>` 화살표가 OS 별로 위치 / 거리가 다르고 스타일링 불가능해
- * `appearance: none` 으로 끄고 lucide `ChevronDown` 을 absolute 로 배치.
+ * 정렬 드롭다운 — Claude 디자인 .sort pill.
+ * `#f7eccd` bg + caramel-deep `#a37548` border + 손그림 입체 shadow.
  */
 export function StorySort({ value, onChange }: StorySortProps) {
   return (
-    <div className="flex gap-2 w-full md:w-auto justify-end">
-      <div className="relative">
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value as SortKey)}
-          className="appearance-none bg-[#E9DBBE] border border-[#9A7548]/40 text-[#3E2A18] text-base font-bold rounded-xl py-2.5 pl-3 pr-9 outline-none cursor-pointer shadow-sm hover:border-[#3F6B2E] transition-colors"
-        >
-          <option value="newest">최신순</option>
-          <option value="oldest">오래된순</option>
-          <option value="name">가나다순</option>
-        </select>
-        <ChevronDown
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B4A28] pointer-events-none"
-          aria-hidden="true"
-        />
-      </div>
+    <div className="relative inline-flex">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as SortKey)}
+        style={{
+          appearance: 'none',
+          fontFamily: 'var(--font-display)',
+          fontSize: 17,
+          fontWeight: 700,
+          padding: '6px 32px 6px 16px',
+          borderRadius: 999,
+          border: '2px solid #a37548',
+          background: '#f7eccd',
+          color: '#4a3b2a',
+          boxShadow: '0 2px 0 #a37548',
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+      >
+        <option value="newest">최신순</option>
+        <option value="oldest">오래된순</option>
+        <option value="name">가나다순</option>
+      </select>
+      <ChevronDown
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+        style={{ color: '#4a3b2a' }}
+        aria-hidden="true"
+      />
     </div>
   )
 }
