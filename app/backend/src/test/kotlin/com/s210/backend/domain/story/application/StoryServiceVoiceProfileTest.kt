@@ -17,6 +17,7 @@ import com.s210.backend.domain.story.model.Difficulty
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.voice.entity.VoiceProfile
 import com.s210.backend.domain.voice.exception.VoiceErrorCode
+import com.s210.backend.domain.storyboard.application.FinalIllustrationGenerationService
 import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -56,6 +57,8 @@ class StoryServiceVoiceProfileTest {
         mock(StoryboardPageImageVersionRedisRepository::class.java)
     private val applicationEventPublisher: ApplicationEventPublisher = mock(ApplicationEventPublisher::class.java)
     private val objectMapper: ObjectMapper = mock(ObjectMapper::class.java)
+    private val finalIllustrationGenerationService: FinalIllustrationGenerationService =
+        mock(FinalIllustrationGenerationService::class.java)
     private val jobRepository: StoryGenerationJobRepository = mock(StoryGenerationJobRepository::class.java)
     private val voiceProfileRepository: VoiceProfileRepository = mock(VoiceProfileRepository::class.java)
 
@@ -70,6 +73,7 @@ class StoryServiceVoiceProfileTest {
         storyboardPageImageVersionRepository = storyboardPageImageVersionRepository,
         applicationEventPublisher = applicationEventPublisher,
         objectMapper = objectMapper,
+        finalIllustrationGenerationService = finalIllustrationGenerationService,
         jobRepository = jobRepository,
         voiceProfileRepository = voiceProfileRepository,
     )
