@@ -1,13 +1,18 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { Trash2, Image as ImageIcon, Loader2, AlertCircle, ChevronUp, ChevronDown, GripVertical, Star } from 'lucide-react'
+import {
+  Trash2,
+  Image as ImageIcon,
+  Loader2,
+  AlertCircle,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  Star,
+} from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { PhotoPurposeApi } from '../api/types'
 
-/**
- * tagsJson (DB 의 JSON 컬럼) ↔ UI 의 plain 텍스트 변환.
- * BE 는 `JSON.stringify("#제주 #여행")` 같은 JSON string 을 저장하고, FE 는 파싱해서 입력창에 표시.
- */
 function parseTagsJson(json: string | null | undefined): string {
   if (!json) return ''
   try {
@@ -20,10 +25,6 @@ function parseTagsJson(json: string | null | undefined): string {
 
 interface PhotoItemCommittedProps {
   mode: 'committed'
-  /**
-   * 드래그-정렬용 안정 식별자 (photoId). DndContext 의 SortableContext items 와 1:1 매칭.
-   * uploading/error 모드는 reorder 대상이 아니라 id 가 없다.
-   */
   id: number
   imageUrl: string
   description: string | null
@@ -36,29 +37,10 @@ interface PhotoItemCommittedProps {
   isLast: boolean
   isRemoving?: boolean
   isReordering?: boolean
-  /**
-   * 사진의 현재 purpose. 별 토글 채움/비움 판단 + 입력 영역 노출 여부 결정.
-   *  - `STORYBOARD` : 일반 추억 사진 (별 비움)
-   *  - `BOTH`       : 추억 + reference (별 채움)
-   *  - `CHARACTER_REF`: reference 전용 (별도 업로드) — 본 카드 자체가 reference zone 에 있어 별 토글 X
-   */
   purpose?: PhotoPurposeApi
-  /**
-   * 별 토글 핸들러 — provided 면 footer 에 별 버튼 노출. 추억 zone 의 카드만 전달.
-   * 호출자는 next state(`true` = ON, `false` = OFF) 를 받아 mutation 호출.
-   */
   onCharacterRefToggle?: (next: boolean) => void
-  /** 토글 mutation 진행 중. 별 버튼 spinner. */
   isCharacterRefToggling?: boolean
-  /** 토글 비활성 (배치 generate 시작 후 lock). 별 버튼 disabled + 안내 tooltip. */
   isCharacterRefLocked?: boolean
-  /**
-   * Step 2 전체 mutation 잠금 (SUMMARY 잡 시작 후, BE STORY_022 와 1:1 매칭).
-   *
-   * true 면 카드의 모든 인터랙션 — 이동/삭제/별토글/설명·태그 input — 을 비활성화한다.
-   * `isCharacterRefLocked` 와 별개 가드: 후자는 별 토글만 막는데, 이 가드는 전체 mutation 을 막는
-   * 더 큰 gate. UX 상 보통 이 lock 이 활성이면 Step 2 전체가 read-only 배너로 안내된다.
-   */
   isMutationLocked?: boolean
 }
 
@@ -79,9 +61,8 @@ interface PhotoItemErrorProps {
 type PhotoItemProps = PhotoItemCommittedProps | PhotoItemUploadingProps | PhotoItemErrorProps
 
 /**
- * PhotoItem 의 외부 진입점 — mode 별 분기.
- * committed 모드만 dnd-kit 의 useSortable 훅을 쓰는 별도 컴포넌트로 위임.
- * (훅은 조건부 호출 불가이므로 분기 자체는 분리된 컴포넌트로 처리.)
+ * paper-craft 톤 PhotoItem — Claude offline.html 의 `.photo-card` 1:1.
+ * 3-column grid: drag grip / photo-thumb 140x140 / photo-meta (description + tags + ★ 토글).
  */
 export function PhotoItem(props: PhotoItemProps) {
   if (props.mode === 'committed') {
@@ -90,18 +71,7 @@ export function PhotoItem(props: PhotoItemProps) {
   return <StaticPhotoItem {...props} />
 }
 
-/**
- * committed (서버 커밋된) 사진 카드. 드래그-정렬 활성화.
- *
- * 동작:
- *  - 카드 전체가 drag handle (별도 grip 아이콘 X — 카드 어디든 잡고 끌면 됨).
- *  - DndContext 의 PointerSensor activationConstraint(distance:8) 으로 짧은 클릭은 통과.
- *    → input/button 클릭이 drag 로 가로채지지 않음.
- *  - isDragging 상태일 때 그림자/투명도로 시각 피드백.
- *  - isReordering(서버 mutation 진행 중) 때는 추가 변경 막기 위해 disabled.
- */
 function SortablePhotoItem(props: PhotoItemCommittedProps) {
-  // SUMMARY lock 활성 시 dnd-kit 의 sortable 자체를 비활성 — 카드 잡고 끌어도 reorder 안 됨.
   const sortableDisabled = props.isReordering || !!props.isMutationLocked
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.id,
@@ -122,132 +92,147 @@ function SortablePhotoItem(props: PhotoItemCommittedProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`bg-[#f0e6c0] p-4 md:p-6 rounded-2xl border-2 border-[#8b7a52]/60 hover:border-[#2d5a27] flex flex-col md:flex-row gap-6 relative group ${
-        isDragging
-          ? 'shadow-[0_12px_32px_rgba(0,0,0,0.45)] ring-2 ring-[#b4dc8c]/70'
-          : 'shadow-sm transition-colors'
-      }`}
+      className={`cr-photo-card${isDragging ? ' dragging' : ''}`}
     >
-      {/* 좌측 grip 인디케이터 — 드래그 가능 affordance. 항상 약하게 보이고 hover 시 진해짐. */}
-      <div
-        className="absolute left-2 top-1/2 -translate-y-1/2 text-[#8b7a52]/40 group-hover:text-[#2d5a27] transition-colors pointer-events-none"
-        aria-hidden="true"
-      >
+      <span className="cr-drag-grip" aria-hidden="true">
         <GripVertical className="w-4 h-4" />
+      </span>
+
+      <div className="cr-photo-thumb">
+        <Thumbnail props={props} />
       </div>
 
-      {/* 우상단 액션 버튼 세트. dnd-kit listener 가 root 에 붙어있어 button 클릭도 drag 로 갈 수 있는데
-          PointerSensor distance:8 제약으로 짧은 클릭은 통과 → 정상 동작. 추가로 onPointerDown stopPropagation
-          은 의도적으로 안 함 (텍스트 선택 등 다른 native 동작도 막혀버림).
-          isMutationLocked (SUMMARY lock) 시 카드 자체를 read-only 로 두기 위해 액션 버튼 그룹 미렌더 —
-          group-hover 로도 안 보이게 해서 사용자가 잠긴 카드를 변경 가능한 것으로 오해하지 않게 함. */}
+      <PhotoMeta
+        description={props.description}
+        tagsJson={props.tagsJson}
+        onUpdate={props.onUpdate}
+        purpose={props.purpose}
+        onCharacterRefToggle={props.onCharacterRefToggle}
+        isCharacterRefToggling={props.isCharacterRefToggling}
+        isCharacterRefLocked={props.isCharacterRefLocked}
+        isMutationLocked={props.isMutationLocked}
+      />
+
       {!props.isMutationLocked && (
-        <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="cr-photo-actions">
           <button
             type="button"
-            onClick={props.onMoveUp}
+            onClick={e => {
+              e.stopPropagation()
+              props.onMoveUp()
+            }}
+            onPointerDown={e => e.stopPropagation()}
             disabled={props.isFirst || props.isReordering}
             title="위로 이동"
             aria-label="위로 이동"
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="cr-photo-action"
           >
             <ChevronUp className="w-4 h-4" />
           </button>
           <button
             type="button"
-            onClick={props.onMoveDown}
+            onClick={e => {
+              e.stopPropagation()
+              props.onMoveDown()
+            }}
+            onPointerDown={e => e.stopPropagation()}
             disabled={props.isLast || props.isReordering}
             title="아래로 이동"
             aria-label="아래로 이동"
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5a27] text-[#f0e6c0] border-2 border-[#b4dc8c] hover:bg-[#3d6f34] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="cr-photo-action"
           >
             <ChevronDown className="w-4 h-4" />
           </button>
           <button
             type="button"
-            onClick={props.onRemove}
+            onClick={e => {
+              e.stopPropagation()
+              props.onRemove()
+            }}
+            onPointerDown={e => e.stopPropagation()}
             disabled={props.isRemoving}
             title="사진 삭제"
             aria-label="사진 삭제"
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] hover:bg-[#a84a35] transition-colors disabled:opacity-50"
+            className="cr-photo-action danger"
           >
-            {props.isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {props.isRemoving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
           </button>
         </div>
       )}
-
-      {/* 썸네일 — left grip 공간 만큼 살짝 이격 (ml-3). */}
-      <div className="ml-3">
-        <Thumbnail props={props} />
-      </div>
-
-      {/* 우측 상세 영역 */}
-      <div className="flex-1 min-w-0">
-        <CommittedFields
-          description={props.description}
-          tagsJson={props.tagsJson}
-          onUpdate={props.onUpdate}
-          purpose={props.purpose}
-          onCharacterRefToggle={props.onCharacterRefToggle}
-          isCharacterRefToggling={props.isCharacterRefToggling}
-          isCharacterRefLocked={props.isCharacterRefLocked}
-          isMutationLocked={props.isMutationLocked}
-        />
-      </div>
     </div>
   )
 }
 
-/** uploading / error 모드 — 정적 카드, 드래그 X. */
 function StaticPhotoItem(props: PhotoItemUploadingProps | PhotoItemErrorProps) {
   return (
     <div
-      className={`bg-[#f0e6c0] p-4 md:p-6 rounded-2xl shadow-sm border-2 transition-colors flex flex-col md:flex-row gap-6 relative ${
-        props.mode === 'error' ? 'border-[#8b3a2a]' : 'border-[#8b7a52]/60'
-      }`}
+      className="cr-photo-card"
+      style={{
+        borderColor: props.mode === 'error' ? 'var(--cr-rust)' : undefined,
+      }}
     >
-      {props.mode === 'error' && (
-        <button
-          type="button"
-          onClick={props.onDismiss}
-          title="에러 무시"
-          aria-label="에러 무시"
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center bg-[#8b3a2a] text-[#f0e6c0] border-2 border-[#c97b4a] hover:bg-[#a84a35] z-10"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      )}
+      <span className="cr-drag-grip" aria-hidden="true" style={{ opacity: 0.4 }}>
+        <GripVertical className="w-4 h-4" />
+      </span>
 
-      <Thumbnail props={props} />
+      <div className="cr-photo-thumb">
+        <Thumbnail props={props} />
+      </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="cr-photo-meta">
         <StatusText {...props} />
       </div>
-    </div>
-  )
-}
 
-/** 썸네일 영역 + uploading 오버레이. */
-function Thumbnail({ props }: { props: PhotoItemProps }) {
-  const previewSrc = props.mode === 'committed' ? props.imageUrl : props.previewUrl
-  return (
-    <div className="w-full md:w-48 aspect-video md:aspect-square rounded-xl overflow-hidden shrink-0 bg-gradient-to-br from-[#b4dc8c]/40 to-[#e8ddb4] flex items-center justify-center border border-[#8b7a52]/30 relative">
-      {previewSrc ? (
-        <img src={previewSrc} alt="사진" className="w-full h-full object-cover" draggable={false} />
-      ) : (
-        <ImageIcon className="w-12 h-12 text-[#8b7a52] opacity-50" />
-      )}
-      {props.mode === 'uploading' && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-[#f0e6c0] animate-spin" />
+      {props.mode === 'error' && (
+        <div className="cr-photo-actions" style={{ opacity: 1 }}>
+          <button
+            type="button"
+            onClick={props.onDismiss}
+            title="에러 무시"
+            aria-label="에러 무시"
+            className="cr-photo-action danger"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
   )
 }
 
-/** committed 사진의 설명/태그 입력 + 로컬 상태 + onBlur 시 PATCH. */
-function CommittedFields({
+function Thumbnail({ props }: { props: PhotoItemProps }) {
+  const previewSrc = props.mode === 'committed' ? props.imageUrl : props.previewUrl
+  return (
+    <>
+      {previewSrc ? (
+        <img src={previewSrc} alt="사진" draggable={false} />
+      ) : (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'rgba(255,255,255,0.5)',
+          }}
+        >
+          <ImageIcon className="w-10 h-10" />
+        </div>
+      )}
+      {props.mode === 'uploading' && (
+        <div className="cr-uploading-overlay">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
+      )}
+    </>
+  )
+}
+
+function PhotoMeta({
   description,
   tagsJson,
   onUpdate,
@@ -269,7 +254,6 @@ function CommittedFields({
   const [descLocal, setDescLocal] = useState(description ?? '')
   const [tagsLocal, setTagsLocal] = useState(parseTagsJson(tagsJson))
 
-  // 서버값이 변경되면 (다른 세션/탭에서 수정 등) 로컬 state 재동기화.
   useEffect(() => {
     setDescLocal(description ?? '')
   }, [description])
@@ -291,16 +275,16 @@ function CommittedFields({
     }
   }
 
-  // input 안에서 친 mousedown 이 root 카드까지 버블링되면 dnd-kit PointerSensor 의 8px distance 가
-  // 통과되며 카드가 reorder drag 로 들어가 텍스트 드래그-선택이 깨진다.
-  // → input 위에서만 stopPropagation 으로 끊어 텍스트 선택은 살리고, 카드의 다른 영역은 그대로 drag 가능.
-  // (root 전체 stopPropagation 은 카드 정렬 드래그 자체를 죽이므로 input 한정이 핵심)
   const stopDragPointer = (e: React.PointerEvent) => e.stopPropagation()
 
+  const isOn = purpose === 'BOTH'
+
   return (
-    <div className="space-y-4">
+    <div className="cr-photo-meta">
       <div>
-        <label className="block text-black text-sm mb-1 font-bold">사진 설명 (선택)</label>
+        <div className="mini-label">
+          사진 설명 <span className="req">*</span>
+        </div>
         <input
           type="text"
           placeholder="예: OO이가 처음으로 바다에 발을 담근 날"
@@ -310,119 +294,100 @@ function CommittedFields({
           onPointerDown={stopDragPointer}
           readOnly={!!isMutationLocked}
           disabled={!!isMutationLocked}
-          className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="cr-input"
         />
       </div>
       <div>
-        <label className="block text-black text-sm mb-1 font-bold">태그 (선택)</label>
+        <div className="mini-label">태그</div>
         <input
           type="text"
-          placeholder="예: #제주도 #여름휴가 #OO이첫바다"
+          placeholder="예: 모래성 쌓기, 첫 바다, #OO이첫바다"
           value={tagsLocal}
           onChange={e => setTagsLocal(e.target.value)}
           onBlur={handleTagsBlur}
           onPointerDown={stopDragPointer}
           readOnly={!!isMutationLocked}
           disabled={!!isMutationLocked}
-          className="w-full p-3 bg-[#e8ddb4] border-2 border-[#8b7a52]/60 rounded-xl focus:border-[#2d5a27] focus:outline-none text-black placeholder-black/60 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+          className="cr-input"
         />
       </div>
 
       {onCharacterRefToggle && (
-        <CharacterRefToggleRow
-          isOn={purpose === 'BOTH'}
-          isPending={!!isCharacterRefToggling}
-          // SUMMARY lock 활성 시 별 토글도 잠금 — 둘 중 하나라도 true 면 disabled.
-          isLocked={!!isCharacterRefLocked || !!isMutationLocked}
-          onToggle={onCharacterRefToggle}
-        />
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation()
+            onCharacterRefToggle(!isOn)
+          }}
+          onPointerDown={stopDragPointer}
+          disabled={isCharacterRefToggling || isCharacterRefLocked || isMutationLocked}
+          className={`cr-star-btn${isOn ? ' on' : ''}`}
+          title={
+            isCharacterRefLocked
+              ? '스토리보드 생성이 시작되어 변경할 수 없어요'
+              : isOn
+                ? '대표 해제'
+                : '이 사진을 대표 사진으로 지정'
+          }
+        >
+          {isCharacterRefToggling ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Star
+              className="w-3.5 h-3.5"
+              fill={isOn ? '#fff' : 'none'}
+              stroke="currentColor"
+            />
+          )}
+          <span>{isOn ? '대표 ★' : '대표로 지정'}</span>
+        </button>
       )}
     </div>
   )
 }
 
-/**
- * 추억 사진 카드의 별 토글 footer.
- *
- *  - `isOn=false` : 회색 빈 별 + "대표로 지정" — 클릭 시 BOTH 로 변경
- *  - `isOn=true`  : 앰버 채운 별 + "대표 ★" — 클릭 시 STORYBOARD 로 되돌림
- *  - `isLocked`   : 비활성 + 안내 text — 첫 STORYBOARD_IMAGE 배치 시작 후 잠김
- *
- * 카드 root 의 dnd-kit listener 가 button 클릭도 drag 로 가로챌 수 있는데,
- * PointerSensor distance:8 제약으로 짧은 클릭은 통과 → 정상 토글 동작.
- */
-function CharacterRefToggleRow({
-  isOn,
-  isPending,
-  isLocked,
-  onToggle,
-}: {
-  isOn: boolean
-  isPending: boolean
-  isLocked: boolean
-  onToggle: (next: boolean) => void
-}) {
-  const stopDragPointer = (e: React.PointerEvent) => e.stopPropagation()
-  const disabled = isPending || isLocked
-  return (
-    <div className="pt-3 border-t border-[#8b7a52]/30">
-      <button
-        type="button"
-        onClick={() => onToggle(!isOn)}
-        onPointerDown={stopDragPointer}
-        disabled={disabled}
-        title={
-          isLocked
-            ? '스토리보드 생성이 시작되어 변경할 수 없어요'
-            : isOn
-              ? '대표 해제'
-              : '이 사진을 캐릭터 reference 로도 사용 (대표로 지정)'
-        }
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 font-bold text-sm transition-colors ${
-          isOn
-            ? 'bg-[#fff7d6] text-[#8b6a14] border-[#E8A832]'
-            : 'bg-[#e8ddb4] text-[#3E2A18] border-[#9A7548]/40 hover:bg-[#d9be82]'
-        } disabled:opacity-50 disabled:cursor-not-allowed`}
-      >
-        {isPending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Star
-            className="w-4 h-4"
-            fill={isOn ? '#E8A832' : 'none'}
-            stroke={isOn ? '#E8A832' : 'currentColor'}
-          />
-        )}
-        <span>{isOn ? '대표 ★' : '대표로 지정'}</span>
-      </button>
-      {isLocked && (
-        <p className="mt-2 text-xs text-[#8b7a52]">
-          스토리보드 생성이 시작되어 대표 사진을 변경할 수 없어요.
-        </p>
-      )}
-    </div>
-  )
-}
-
-/** uploading / error 상태용 간단 텍스트. */
 function StatusText(props: PhotoItemUploadingProps | PhotoItemErrorProps) {
   if (props.mode === 'uploading') {
     return (
-      <div className="flex flex-col justify-center h-full">
-        <div className="text-sm text-[#2d5a27] font-bold flex items-center gap-2">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+        <div
+          style={{
+            fontSize: 15,
+            color: 'var(--cr-sage-deep)',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontFamily: 'var(--cr-font-gaegu)',
+          }}
+        >
           <Loader2 className="w-4 h-4 animate-spin" /> 업로드 중…
         </div>
-        <div className="text-xs text-black/60 mt-1 truncate">{props.fileName}</div>
+        <div style={{ fontSize: 13, color: 'var(--cr-ink-soft)', opacity: 0.7 }}>
+          {props.fileName}
+        </div>
       </div>
     )
   }
   return (
-    <div className="flex flex-col justify-center h-full">
-      <div className="text-sm text-[#8b3a2a] font-bold flex items-center gap-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+      <div
+        style={{
+          fontSize: 15,
+          color: 'var(--cr-rust)',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontFamily: 'var(--cr-font-gaegu)',
+        }}
+      >
         <AlertCircle className="w-4 h-4" /> 업로드 실패
       </div>
-      <div className="text-xs text-black/60 mt-1 truncate">{props.fileName}</div>
-      <div className="text-xs text-[#8b3a2a] mt-1 line-clamp-2">{props.error}</div>
+      <div style={{ fontSize: 13, color: 'var(--cr-ink-soft)', opacity: 0.7 }}>
+        {props.fileName}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--cr-rust)' }}>{props.error}</div>
     </div>
   )
 }

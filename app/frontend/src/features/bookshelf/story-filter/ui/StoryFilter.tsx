@@ -10,17 +10,41 @@ interface StoryFilterProps {
 }
 
 /**
- * 난이도(초급/중급/고급) 다중 선택 칩.
- * - 빈 선택 = 전체 표시
- * - 총 권수 표시는 필터 바 좌측에 붙여 레이아웃을 묶음
+ * 책장 필터 — Claude 디자인 .chip / .chip-group 1:1.
+ * 색상: chip bg `#f7eccd`, count bg `#efe1b6`, border `#a37548` (caramel-deep).
+ * 활성 seg: caramel `#c89968` bg + white text + inset shadow.
+ * 손그림 입체 box-shadow: `0 2px 0 #a37548` 으로 종이 위에 떠있는 느낌.
  */
 export function StoryFilter({ activeFilters, onToggle, totalCount }: StoryFilterProps) {
+  const chipBase: React.CSSProperties = {
+    fontFamily: 'var(--font-display)',
+    fontSize: 18,
+    fontWeight: 700,
+    padding: '8px 18px',
+    borderRadius: 999,
+    border: '2px solid #a37548',
+    color: '#4a3b2a',
+    boxShadow: '0 2px 0 #a37548',
+  }
+
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
-      <div className="text-[#3E2A18] text-lg font-bold whitespace-nowrap bg-[#E9DBBE] px-4 py-2 rounded-xl shadow-sm border border-[#9A7548]/40">
-        총 <span className="text-[#3F6B2E]">{totalCount}</span>권
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* count chip */}
+      <div style={{ ...chipBase, background: '#efe1b6' }}>
+        총 {totalCount}권
       </div>
-      <div className="flex gap-2 bg-[#E9DBBE] rounded-xl p-1.5 border border-[#9A7548]/40 shadow-sm">
+
+      {/* chip group — segmented */}
+      <div
+        className="flex items-center gap-0"
+        style={{
+          background: '#f7eccd',
+          border: '2px solid #a37548',
+          borderRadius: 999,
+          padding: 4,
+          boxShadow: '0 2px 0 #a37548',
+        }}
+      >
         {LEVELS.map(level => {
           const isActive = activeFilters.includes(level)
           return (
@@ -28,7 +52,19 @@ export function StoryFilter({ activeFilters, onToggle, totalCount }: StoryFilter
               key={level}
               type="button"
               onClick={() => onToggle(level)}
-              className={`filter-btn px-4 py-1.5 rounded-lg text-sm font-bold transition-all bg-transparent text-[#6B4A28] border border-transparent hover:bg-[#3F6B2E]/15 hover:text-[#3F6B2E] ${isActive ? 'active' : ''}`}
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 17,
+                fontWeight: 700,
+                padding: '4px 16px',
+                borderRadius: 999,
+                border: 'none',
+                background: isActive ? '#c89968' : 'transparent',
+                color: isActive ? '#fff' : '#6b5638',
+                boxShadow: isActive ? 'inset 0 -2px 0 rgba(0,0,0,0.1)' : 'none',
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
             >
               {level}
             </button>

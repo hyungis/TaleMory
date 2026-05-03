@@ -8,14 +8,14 @@ interface CreationHeaderProps {
 }
 
 /**
- * 동화 제작 플로우 공통 상단 헤더.
+ * 동화 제작 플로우 공통 상단 헤더 — paper-craft 톤 (Claude offline.html 1:1).
  *
  * 구성:
- *  - 좌측: Talemory 로고 (T 박스 + Gaegu script 로고타입)
- *  - 가운데: step 진행 dots (완료/현재/미완 3가지 상태)
- *  - 우측: "0N / 0M" 페이지 카운터
+ *  - 좌측: TaleMory 워드마크 + verticalDivider
+ *  - 가운데: 9-dot progress (idle / done / active 3-state) + 점선 connector
+ *  - 우측: "01 / 09" Nanum Myeongjo pill counter
  *
- * 각 step 컴포넌트의 `.bookshelf-modal.step-forest-modal` flex column 최상단에 위치.
+ * `.cr-shell` 하위에서만 활성화되며, 각 step 의 sticky topbar 로 동작.
  */
 export function CreationHeader({ currentStep }: CreationHeaderProps) {
   const total = MAX_STEP
@@ -23,51 +23,40 @@ export function CreationHeader({ currentStep }: CreationHeaderProps) {
   const paddedTotal = String(total).padStart(2, '0')
 
   return (
-    <div className="flex items-center justify-between py-3 px-6 border-b-2 border-[#9A7548]/30 bg-[#F4E4BC] shrink-0 gap-4">
-      {/* 로고 — Talemory 손글씨 워드마크 (아이콘 박스 제거). */}
-      <span
-        className="text-[#3F6B2E] font-bold text-2xl md:text-3xl tracking-wide shrink-0"
-        style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}
-      >
-        Talemory
-      </span>
+    <div className="cr-topbar">
+      <div className="cr-brand-wrap">
+        <span className="cr-brand">
+          Tale<span className="accent">Mory</span>
+        </span>
+        <span className="cr-brand-divider" aria-hidden="true" />
+      </div>
 
-      {/* 진행 단계 dots — connector 가 flex-grow 로 늘어나 가로 가득 채움. */}
-      <div className="flex items-center flex-1 min-w-0 px-2">
+      <div className="cr-progress" role="list" aria-label="진행 단계">
         {Array.from({ length: total }, (_, i) => i + 1).map(step => {
           const isCompleted = step < currentStep
           const isCurrent = step === currentStep
-          const isLast = step === total
+          const stateClass = isCompleted ? 'done' : isCurrent ? 'active' : ''
           return (
             <Fragment key={step}>
               <div
-                className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-[11px] font-bold transition-colors ${
-                  isCurrent
-                    ? 'bg-[#B9D38F] border-[#3F6B2E] text-[#1F3318]'
-                    : isCompleted
-                      ? 'bg-[#3F6B2E] border-[#3F6B2E] text-[#FFFFE5]'
-                      : 'bg-[#E9DBBE] border-[#9A7548]/40 text-[#76695A]'
-                }`}
+                className={`cr-pstep ${stateClass}`}
+                role="listitem"
                 aria-current={isCurrent ? 'step' : undefined}
-                aria-label={`단계 ${step}${isCurrent ? ' (현재)' : isCompleted ? ' (완료)' : ''}`}
               >
-                {isCompleted ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : step}
-              </div>
-              {!isLast && (
                 <div
-                  className={`flex-1 min-w-[8px] h-0.5 ${
-                    isCompleted ? 'bg-[#3F6B2E]' : 'bg-[#9A7548]/30'
-                  }`}
-                  aria-hidden="true"
-                />
-              )}
+                  className="cr-pdot"
+                  aria-label={`단계 ${step}${isCurrent ? ' (현재)' : isCompleted ? ' (완료)' : ''}`}
+                >
+                  {isCompleted ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : step}
+                </div>
+                <div className="cr-pline" aria-hidden="true" />
+              </div>
             </Fragment>
           )
         })}
       </div>
 
-      {/* 카운터 */}
-      <div className="text-[#3E2A18] font-bold text-sm tracking-wider tabular-nums shrink-0">
+      <div className="cr-pcounter" aria-hidden="true">
         {paddedCurrent} / {paddedTotal}
       </div>
     </div>

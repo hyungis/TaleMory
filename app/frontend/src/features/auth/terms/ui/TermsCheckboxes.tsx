@@ -7,32 +7,74 @@ interface TermsCheckboxesProps {
 }
 
 /**
- * 회원가입 시 선택 동의 체크박스 영역 (SMS 수신 / 마케팅 정보 수신).
- * TODO(S14P31S210-75): 백엔드 `/api/terms` 조회 응답에 따라 동적 렌더링하도록 확장.
+ * 회원가입 시 선택 동의 체크박스 — paper-craft 톤.
  */
 export function TermsCheckboxes({ smsAgree, marketingAgree, onChange }: TermsCheckboxesProps) {
   return (
-    <div className="bg-[#e8ddb4] border-2 border-[#8b7a52]/40 rounded-xl p-4 space-y-2.5">
-      <label className="flex items-center gap-2.5 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={smsAgree}
-          onChange={e => onChange('smsAgree', e.target.checked)}
-          className="w-4 h-4 accent-[#2d5a27] cursor-pointer"
-        />
-        <span className="text-sm text-[#2d5a27] font-bold">SMS 수신에 동의합니다</span>
-        <span className="text-xs text-[#8b7a52] ml-auto">(선택)</span>
-      </label>
-      <label className="flex items-center gap-2.5 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={marketingAgree}
-          onChange={e => onChange('marketingAgree', e.target.checked)}
-          className="w-4 h-4 accent-[#2d5a27] cursor-pointer"
-        />
-        <span className="text-sm text-[#2d5a27] font-bold">마케팅 정보 수신에 동의합니다</span>
-        <span className="text-xs text-[#8b7a52] ml-auto">(선택)</span>
-      </label>
+    <div
+      style={{
+        background: '#f7eccd',
+        border: '2px solid rgba(163, 117, 72, 0.45)',
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      <CheckboxRow
+        checked={smsAgree}
+        onChange={v => onChange('smsAgree', v)}
+        label="SMS 수신에 동의합니다"
+      />
+      <CheckboxRow
+        checked={marketingAgree}
+        onChange={v => onChange('marketingAgree', v)}
+        label="마케팅 정보 수신에 동의합니다"
+      />
     </div>
+  )
+}
+
+function CheckboxRow({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+}) {
+  return (
+    <label
+      className="flex items-center cursor-pointer select-none"
+      style={{ gap: 10 }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        style={{
+          width: 18,
+          height: 18,
+          accentColor: '#7a9968',
+          cursor: 'pointer',
+        }}
+      />
+      <span
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 16,
+          color: '#4a3b2a',
+          fontWeight: 700,
+          flex: 1,
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: '#a37548' }}>
+        (선택)
+      </span>
+    </label>
   )
 }

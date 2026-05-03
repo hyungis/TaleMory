@@ -1,8 +1,9 @@
 import type { Story } from './types'
 
 /**
- * 책장 더미 데이터 (빈티지 가죽 장정 톤).
- * S14P31S210-76 Task 3a 기준 — 실제 API 연동 전 시각 테스트용.
+ * 책장 더미 데이터 (디자인 검증용 — 20권).
+ * 실제 API 연동되면 책 목록을 받아 fallback 으로만 동작.
+ * 다양한 스타일/레벨/뱃지 조합으로 그리드 + 필터 + 정렬을 시각 테스트.
  */
 export const DUMMY_STORIES: Story[] = [
   { id: 1,  title: '해솔이의 특별한 제주도 모험', date: '2026-04-08', style: '수채화 스타일',    pages: 12, level: '초급', badgeType: 'mic',   badgeText: '엄마아빠 목소리', bgClass: 'from-[#2d4a25] to-[#1a3014]' },
@@ -17,4 +18,12 @@ export const DUMMY_STORIES: Story[] = [
   { id: 10, title: '꿈나라 기차',               date: '2026-04-01', style: '수채화 스타일',    pages: 16, level: '초급', badgeType: 'music', badgeText: '자장가 BGM',       bgClass: 'from-[#3a1f3a] to-[#1e0f20]' },
   { id: 11, title: '장난감 병정의 모험',        date: '2025-10-05', style: '3D 렌더링',        pages: 22, level: '고급', badgeType: 'mic',   badgeText: '할머니 목소리',   bgClass: 'from-[#44332a] to-[#221810]' },
   { id: 12, title: '숨바꼭질 대장',             date: '2026-02-28', style: '색연필 만화',       pages: 10, level: '중급', badgeType: 'music', badgeText: '통통 튀는 BGM',    bgClass: 'from-[#2a4a4a] to-[#122424]' },
+  { id: 13, title: '눈사람과 친구가 됐어요',    date: '2025-12-08', style: '수채화 스타일',    pages: 14, level: '초급', badgeType: 'music', badgeText: '겨울왕국 BGM',     bgClass: 'from-[#2a3850] to-[#0e1428]' },
+  { id: 14, title: '강아지 또또의 첫 산책',     date: '2026-03-22', style: '동화책 일러스트', pages: 11, level: '초급', badgeType: 'mic',   badgeText: '아이 목소리',      bgClass: 'from-[#4a3a26] to-[#241a10]' },
+  { id: 15, title: '비 오는 날의 우산 친구',    date: '2026-02-05', style: '파스텔 톤',         pages: 9,  level: '중급', badgeType: 'music', badgeText: '빗소리 ASMR',      bgClass: 'from-[#2a3e4a] to-[#101c24]' },
+  { id: 16, title: '하늘을 나는 풍선 여행',     date: '2026-04-15', style: '수채화 스타일',    pages: 17, level: '고급', badgeType: 'mic',   badgeText: '온 가족 합창',     bgClass: 'from-[#5a3a4a] to-[#2a1828]' },
+  { id: 17, title: '도서관에서 만난 마법사',    date: '2025-11-28', style: '라인 드로잉',       pages: 19, level: '고급', badgeType: 'music', badgeText: '신비로운 BGM',     bgClass: 'from-[#332a4a] to-[#181024]' },
+  { id: 18, title: '꼬마 화가의 색깔 모험',     date: '2026-03-08', style: '크레파스 질감',    pages: 13, level: '초급', badgeType: 'mic',   badgeText: '아빠 목소리',      bgClass: 'from-[#5a4a2a] to-[#2e2410]' },
+  { id: 19, title: '바람을 타고 떠난 여행',     date: '2026-01-30', style: '동화책 일러스트', pages: 16, level: '중급', badgeType: 'music', badgeText: '여행 BGM',         bgClass: 'from-[#2a4a3e] to-[#102420]' },
+  { id: 20, title: '별을 따러 간 밤',           date: '2026-04-20', style: '3D 렌더링',        pages: 21, level: '고급', badgeType: 'mic',   badgeText: '엄마 자장가',      bgClass: 'from-[#1a1a3a] to-[#0a0a1c]' },
 ]

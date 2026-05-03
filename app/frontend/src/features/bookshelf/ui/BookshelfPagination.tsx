@@ -7,22 +7,28 @@ interface BookshelfPaginationProps {
 }
 
 /**
- * 책장 페이지네이션 컨트롤 (이전 / 페이지 숫자 / 다음).
+ * 책장 페이지네이션 (이전 / 페이지 숫자 / 다음) — 손그림 paper-cream pill 톤.
  * totalPages <= 1 인 경우 렌더되지 않음 (BookshelfModal 에서 가드).
  */
 export function BookshelfPagination({ currentPage, totalPages, onPageChange }: BookshelfPaginationProps) {
   const canPrev = currentPage > 1
   const canNext = currentPage < totalPages
 
+  const baseBtn =
+    'w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors shadow-[0_2px_0_rgba(163,117,72,0.25)]'
+
   return (
-    <div className="flex justify-center items-center gap-2 mt-20 relative z-20">
+    <div
+      className="flex justify-center items-center gap-2 mt-16 relative z-20"
+      style={{ fontFamily: 'var(--font-display)' }}
+    >
       <button
         type="button"
         onClick={() => canPrev && onPageChange(currentPage - 1)}
         disabled={!canPrev}
         aria-label="이전 페이지"
-        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#9A7548]/40 text-[#3E2A18] bg-[#E9DBBE] transition-colors shadow-sm ${
-          canPrev ? 'hover:bg-[#B9D38F] hover:border-[#8DBA64] cursor-pointer' : 'opacity-40 cursor-not-allowed'
+        className={`${baseBtn} bg-[#F0DBA8] border-[#a37548]/55 text-[#6B4A28] ${
+          canPrev ? 'hover:bg-[#E8D08F] cursor-pointer' : 'opacity-40 cursor-not-allowed'
         }`}
       >
         <ChevronLeft className="w-5 h-5" />
@@ -37,8 +43,8 @@ export function BookshelfPagination({ currentPage, totalPages, onPageChange }: B
             onClick={() => onPageChange(page)}
             className={
               isCurrent
-                ? 'w-10 h-10 rounded-full flex items-center justify-center bg-[#8DBA64] text-[#1F3318] font-bold shadow-[0_0_10px_rgba(141,186,100,0.35)] border border-[#B9D38F]'
-                : 'w-10 h-10 rounded-full flex items-center justify-center border border-[#9A7548]/40 bg-[#E9DBBE] text-[#3E2A18] hover:bg-[#B9D38F] hover:border-[#8DBA64] transition-colors cursor-pointer shadow-sm'
+                ? `${baseBtn} bg-[#7a9968] border-[#5e7a4f] text-[#FFFEF8] font-bold`
+                : `${baseBtn} bg-[#F0DBA8] border-[#a37548]/55 text-[#6B4A28] hover:bg-[#E8D08F] cursor-pointer`
             }
           >
             {page}
@@ -51,8 +57,8 @@ export function BookshelfPagination({ currentPage, totalPages, onPageChange }: B
         onClick={() => canNext && onPageChange(currentPage + 1)}
         disabled={!canNext}
         aria-label="다음 페이지"
-        className={`w-10 h-10 rounded-full flex items-center justify-center border border-[#9A7548]/40 text-[#3E2A18] bg-[#E9DBBE] transition-colors shadow-sm ${
-          canNext ? 'hover:bg-[#B9D38F] hover:border-[#8DBA64] cursor-pointer' : 'opacity-40 cursor-not-allowed'
+        className={`${baseBtn} bg-[#F0DBA8] border-[#a37548]/55 text-[#6B4A28] ${
+          canNext ? 'hover:bg-[#E8D08F] cursor-pointer' : 'opacity-40 cursor-not-allowed'
         }`}
       >
         <ChevronRight className="w-5 h-5" />

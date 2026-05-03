@@ -1,329 +1,829 @@
-import {
-  ArrowLeft,
-  CheckCircle2,
-  FolderOpen,
-  Mic,
-  Pause,
-  Play,
-  Radio,
-  RotateCcw,
-  Save,
-  ScrollText,
-  Sparkles,
-  Square,
-  Volume2,
-  Wand2,
-} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../shared/constants'
+import { BookshelfDoodles } from '../../features/bookshelf'
 import {
   VOICE_SAMPLE_SCRIPT,
   useVoiceClone,
   formatAudioTime,
 } from '../../features/mypage'
-// bookshelf.css 의 `bookshelf-modal / step-forest-modal / bookshelf-scroll` 스타일 재사용.
-// 동화 생성 플로우와 같은 CSS 를 참조하지만, 이 페이지 자체 로직은 story-creation 과 완전히 분리.
-import '../../features/bookshelf/styles/bookshelf.css'
+import './styles/mypage.css'
 
 /**
  * 마이페이지 → "+ 목소리 추가" 전용 페이지 (`/mypage/voice-clone`).
  *
- * 동화 생성 플로우의 `VoiceCloneStep` UI 를 기반으로 하되, 문맥에 맞춰 포팅:
- *  - "STEP 06" 스텝 카운터 헤더 → "마이페이지로" back 버튼 + "목소리 추가" 타이틀
- *  - "동화책 만들기" CTA → 서버 저장 후 자동으로 /mypage 복귀
- *  - POST /api/voice-profiles/presigned-url → S3 PUT → POST /api/voice-profiles 저장
+ * Claude HTML voice clone page (rebuilt) 디자인을 1:1 적용:
+ *  - 페이지 상단 sticky vc-page-bar (gradient cream)
+ *  - vc-hero — sage 78x78 mic + Nanum Pen Script 52px 타이틀
+ *  - 3-step Stepper (녹음 → 음성 변환 → 저장) — active/done 상태 + 점선 connector
+ *  - Step 1: vc-sample-block 손그림 인용구 카드 + recorder (3-state: idle/recording/recorded)
+ *      pulse-ring + waveform (28 bar) + Nanum Myeongjo 시간
+ *  - Step 2: TTS textarea + 변환 결과 audio bar
+ *  - Step 3: 보이스 이름 + 저장 + save-stats info pill
+ *  - vc-foot-mark — Nanum Pen Script 손글씨 푸터
+ *
+ * 백엔드 로직(useVoiceClone)은 그대로 유지하며 UI 만 reskin.
  */
 export function VoiceCloneAddPage() {
   const navigate = useNavigate()
   const vc = useVoiceClone()
 
-  const StatusIcon =
-    vc.status === 'recording' ? Mic : vc.status === 'ready' ? CheckCircle2 : Radio
+  // Claude 디자인의 sentenceIdx — 여러 샘플 문장 로테이션 대신 기본 한 문장만
+  // (백엔드는 VOICE_SAMPLE_SCRIPT 한 줄 기준이라 유지). 다른 문장 보기 버튼은 데코.
+  const sample = useMemo(() => buildSample(VOICE_SAMPLE_SCRIPT), [])
 
-  const statusBadgeClass =
+  // 녹음 단계 phase 계산 — useVoiceClone 의 status 를 Claude 의 idle/recording/recorded 로 매핑.
+  const phase: Phase =
     vc.status === 'recording'
-      ? 'bg-[#8b3a2a] text-[#f0e6c0] border-[#c97b4a]'
+      ? 'recording'
       : vc.status === 'ready'
-        ? 'bg-[#2d5a27] text-[#b4dc8c] border-[#b4dc8c]/50'
-        : 'bg-[#e8ddb4] text-[#8b7a52] border-[#8b7a52]/40'
+        ? 'recorded'
+        : 'idle'
 
-  const progressPercent = vc.audioDuration > 0 ? (vc.audioCurrentTime / vc.audioDuration) * 100 : 0
+  // 녹음 경과 시간 — vc.audioCurrentTime 은 "재생" 시간이라 녹음 중에는 0 유지.
+  // 녹음 시작 시 1초 간격으로 증가, 종료 시 리셋(다음 녹음 위해).
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  useEffect(() => {
+    if (phase !== 'recording') {
+      // 녹음 종료 (recorded) 시점에는 마지막 값을 유지하고, idle 로 돌아가면 0 으로 리셋.
+      if (phase === 'idle') setRecordingSeconds(0)
+      return
+    }
+    setRecordingSeconds(0)
+    const interval = window.setInterval(() => {
+      setRecordingSeconds(prev => prev + 1)
+    }, 1000)
+    return () => window.clearInterval(interval)
+  }, [phase])
+
+  // 변환된 TTS 가 한 번이라도 들렸는지 (= step 3 활성 여부)
+  const ttsPlayed = !!vc.ttsAudioUrl
+
+  // Stepper step index — 0: 녹음, 1: 음성 변환, 2: 저장
+  const stepIdx = phase !== 'recorded' ? 0 : ttsPlayed ? 2 : 1
 
   const goBack = () => navigate(ROUTES.mypage)
 
   const handleSave = async () => {
     const name = await vc.saveVoiceRecording()
-    if (name) goBack() // 저장 성공 시 마이페이지 복귀
+    if (name) goBack()
   }
 
+  const handleRecordButton = () => {
+    if (vc.status === 'recording') {
+      vc.stopRecording()
+    } else {
+      void vc.startRecording()
+    }
+  }
+
+  const progressPercent =
+    vc.audioDuration > 0 ? (vc.audioCurrentTime / vc.audioDuration) * 100 : 0
+
   return (
-    <div className="bookshelf-modal step-forest-modal">
-      {/* ── 헤더 (마이페이지 문맥 전용) ─────────────────────── */}
-      <div className="flex items-center gap-4 py-4 px-8 border-b border-[#4a3a24] bg-[#2a1b12]/60 shrink-0">
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label="마이페이지로 돌아가기"
-          className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-[#4a3a24] text-[#d6c78e] bg-[#2a1b12]/70 hover:bg-[#2d5a27]/40 hover:text-[#f0e6c0] transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">
-          목소리 추가
-        </span>
+    <div className="mypage-shell">
+      <div className="mp-doodles-bg" aria-hidden="true">
+        <BookshelfDoodles />
       </div>
 
-      <div className="bookshelf-scroll">
-        <main className="py-10 px-6 bookshelf-fade-in">
-          <div className="max-w-4xl mx-auto pb-12">
-            {/* 타이틀 */}
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-[#2d5a27] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#b4dc8c] shadow-[0_0_20px_rgba(180,220,140,0.4)]">
-                <Mic className="w-8 h-8 text-[#f0e6c0]" />
-              </div>
-              <h2 className="text-3xl text-[#f0e6c0] font-bold">
-                새 목소리를 녹음하거나 불러와 주세요
-              </h2>
-              <p className="text-[#b4c4a4] mt-2">
-                샘플 문장을 읽어 녹음한 뒤, 보이스 클론으로 바뀐 TTS를 들어보고 제목과 함께
-                저장합니다.
-              </p>
+      {/* ── 상단 바 — back 버튼 + 컴팩트 Stepper ─────────── */}
+      <div className="vc-page-bar">
+        <button type="button" onClick={goBack} className="vc-back-btn" aria-label="마이페이지로">
+          <svg width="12" height="10" viewBox="0 0 14 10" aria-hidden="true">
+            <path
+              d="M5,2 L1,5 L5,8 M1,5 L13,5"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          마이페이지
+        </button>
+        <Stepper step={stepIdx} variant="header" />
+        <div style={{ width: 100 }} aria-hidden="true" />
+      </div>
+
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          padding: '0 24px 60px',
+          position: 'relative',
+          zIndex: 2,
+        }}
+      >
+        {/* ── Hero ───────────────────────────────────────── */}
+        <div className="vc-hero">
+          <div className="vc-hero-mic" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="3" width="6" height="12" rx="3" stroke="#fdf6dc" strokeWidth="2" />
+              <path
+                d="M5,11 C5,15 8,18 12,18 C16,18 19,15 19,11 M12,18 L12,21 M9,21 L15,21"
+                stroke="#fdf6dc"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <h1>새 목소리를 들려주세요</h1>
+          <p>
+            아래 샘플 문장을 또박또박 따라 읽어주시면,
+            <br />
+            아이가 사랑하는 그 목소리로 동화를 들려드릴게요.
+          </p>
+        </div>
+
+        {/* Stepper 는 vc-page-bar 안으로 이동 */}
+
+        {/* ── Step 1: Sample + Record ─────────────────── */}
+        <div className="mp-card" style={{ marginTop: 18 }}>
+          <span className="mp-tape" aria-hidden="true" />
+          <div className="vc-step-badge">
+            <span className="pip">1</span> 샘플 문장 따라 읽기
+          </div>
+          <div
+            className="mp-card-header"
+            style={{ marginBottom: 6, alignItems: 'center', flexWrap: 'wrap', gap: 10 }}
+          >
+            <h2 className="mp-card-title" style={{ margin: 0, minWidth: 0 }}>
+              오늘의 문장
+            </h2>
+            <button
+              type="button"
+              className="mp-btn mp-btn-cream"
+              style={{ fontSize: 14, padding: '6px 14px' }}
+              onClick={vc.loadExistingVoice}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M2,8 Q2,3 8,3 Q12,3 14,5 M14,3 L14,6 L11,6 M14,8 Q14,13 8,13 Q4,13 2,11 M2,13 L2,10 L5,10"
+                  stroke="#5b3a18"
+                  strokeWidth="1.8"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+              기존 음성 불러오기
+            </button>
+          </div>
+
+          <div className="vc-sample-block">
+            <div className="quote-mark" aria-hidden="true">
+              "
             </div>
-
-            <div className="flex flex-col gap-6">
-              {/* Section 1: 녹음 스크립트 + 녹음 컨트롤 */}
-              <section className="bg-[#f0e6c0] p-6 md:p-8 rounded-[2rem] border-2 border-[#2a1b12] shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-[#2d5a27] flex items-center justify-center text-[#b4dc8c] border border-[#b4dc8c]/40">
-                      <ScrollText className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-[#8b7a52] text-sm">녹음 스크립트</p>
-                      <h3 className="text-2xl text-[#2d5a27] font-bold">
-                        보이스 클론용 샘플 문장
-                      </h3>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={vc.loadExistingVoice}
-                    className="px-5 py-3 rounded-full bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] hover:bg-[#b4dc8c] transition-colors flex items-center gap-2 self-start font-bold"
-                  >
-                    <FolderOpen className="w-4 h-4" /> 기존 음성 불러오기
-                  </button>
-                </div>
-
-                <div className="rounded-[1.5rem] bg-[#e8ddb4] border-2 border-[#8b7a52]/40 p-6">
-                  <p className="text-[#8b7a52] mb-3">읽기 가이드</p>
-                  <p className="text-2xl md:text-3xl text-[#2d5a27] leading-relaxed font-bold text-center">
-                    {VOICE_SAMPLE_SCRIPT}
-                  </p>
-
-                  <div className="mt-8 text-center">
-                    {/* Status indicator */}
-                    <div className="flex justify-center mb-6">
-                      <div
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border font-bold ${statusBadgeClass}`}
-                      >
-                        <StatusIcon className="w-5 h-5" />
-                        <span>{vc.statusLabel}</span>
-                      </div>
-                    </div>
-
-                    {/* 녹음 시작 버튼 */}
-                    <div className="flex flex-col items-center justify-center gap-4 mb-6">
-                      <button
-                        type="button"
-                        onClick={() => void vc.startRecording()}
-                        disabled={vc.status === 'recording'}
-                        className={`w-24 h-24 rounded-full flex items-center justify-center border-4 border-[#f0e6c0] shadow-lg transition-colors ${
-                          vc.status === 'recording'
-                            ? 'bg-[#8b3a2a]/50 text-[#f0e6c0] cursor-not-allowed'
-                            : 'bg-[#8b3a2a] text-[#f0e6c0] hover:bg-[#a84a35]'
-                        }`}
-                      >
-                        <Mic className="w-10 h-10" />
-                      </button>
-                      <p className="text-[#8b3a2a] text-xl font-bold">
-                        {vc.status === 'recording'
-                          ? '녹음 중...'
-                          : '눌러서 새 음성 녹음을 시작하세요'}
-                      </p>
-                    </div>
-
-                    {/* 녹음 종료/다시 */}
-                    <div className="flex flex-wrap justify-center gap-3 mb-6">
-                      <button
-                        type="button"
-                        onClick={vc.stopRecording}
-                        disabled={vc.status !== 'recording'}
-                        className="px-6 py-3 rounded-full bg-[#c97b4a] text-[#f0e6c0] hover:bg-[#d88a58] transition-colors flex items-center gap-2 font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Square className="w-4 h-4" /> 녹음 종료
-                      </button>
-                      <button
-                        type="button"
-                        onClick={vc.rerecord}
-                        className="px-6 py-3 rounded-full bg-[#f0e6c0] border-2 border-[#8b7a52]/60 text-[#2d5a27] hover:bg-[#b4dc8c] transition-colors flex items-center gap-2 font-bold"
-                      >
-                        <RotateCcw className="w-4 h-4" /> 다시 녹음하기
-                      </button>
-                    </div>
-
-                    {/* 녹음 오디오 엘리먼트(숨김) + 커스텀 플레이어 */}
-                    <audio
-                      ref={vc.audioRef}
-                      src={vc.recordedAudioUrl ?? undefined}
-                      className="hidden"
-                      onLoadedMetadata={(e) =>
-                        vc.setAudioDuration(
-                          (e.currentTarget.duration as number | undefined) ?? 0,
-                        )
-                      }
-                      onTimeUpdate={(e) =>
-                        vc.setAudioCurrentTime(e.currentTarget.currentTime ?? 0)
-                      }
-                      onPlay={() => vc.setIsAudioPlaying(true)}
-                      onPause={() => vc.setIsAudioPlaying(false)}
-                      onEnded={() => vc.setIsAudioPlaying(false)}
-                    />
-                    <div className="flex items-center gap-3 bg-[#f0e6c0] border-2 border-[#8b7a52]/40 rounded-full px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={vc.toggleAudioPlayback}
-                        disabled={!vc.recordedAudioUrl}
-                        aria-label={vc.isAudioPlaying ? '일시정지' : '재생'}
-                        className="w-11 h-11 rounded-full bg-[#2d5a27] text-[#f0e6c0] flex items-center justify-center flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#3d6f34] transition-colors"
-                      >
-                        {vc.isAudioPlaying ? (
-                          <Pause className="w-5 h-5" />
-                        ) : (
-                          <Play className="w-5 h-5" />
-                        )}
-                      </button>
-                      <div className="flex-1 grid gap-2">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={progressPercent}
-                          onChange={(e) => vc.seekAudio(Number(e.target.value))}
-                          disabled={!vc.recordedAudioUrl}
-                          className="w-full accent-[#2d5a27] cursor-pointer disabled:cursor-not-allowed"
-                        />
-                        <div className="flex justify-between text-[#8b7a52] text-sm">
-                          <span>{formatAudioTime(vc.audioCurrentTime)}</span>
-                          <span>{formatAudioTime(vc.audioDuration)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Section 2: TTS 미리듣기 */}
-              <section className="bg-[#f0e6c0] p-6 md:p-8 rounded-[2rem] border-2 border-[#2a1b12] shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#c97b4a] flex items-center justify-center text-[#f0e6c0]">
-                    <Volume2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[#8b7a52] text-sm">TTS 미리듣기</p>
-                    <h3 className="text-2xl text-[#2d5a27] font-bold">
-                      보이스 클론으로 변환된 음성 듣기
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.5rem] border-2 border-[#8b7a52]/40 bg-[#e8ddb4] p-6 grid gap-4">
-                  <div>
-                    <label className="block text-[#8b7a52] text-sm mb-2 font-bold">
-                      TTS로 들어볼 문장
-                    </label>
-                    <textarea
-                      value={vc.ttsText}
-                      onChange={(e) => vc.setTtsText(e.target.value)}
-                      rows={3}
-                      placeholder="동화 속 문장을 입력해 주세요."
-                      className="w-full p-4 rounded-2xl border-2 border-[#8b7a52]/60 bg-[#f0e6c0] text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/40 resize-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-3 md:items-center">
-                    <button
-                      type="button"
-                      onClick={() => void vc.previewTts()}
-                      disabled={!vc.recordedAudioUrl || vc.isTtsLoading}
-                      className="bg-[#c97b4a] text-[#f0e6c0] px-7 py-3 rounded-full shadow-[0_4px_0_#8b3a2a] hover:translate-y-1 hover:shadow-[0_2px_0_#8b3a2a] hover:bg-[#d88a58] transition-all flex items-center justify-center gap-2 font-bold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#8b3a2a]"
-                    >
-                      <Wand2 className="w-4 h-4" />
-                      {vc.isTtsLoading ? 'TTS 생성 중...' : 'TTS 들어보기'}
-                    </button>
-                    <p className="text-[#8b7a52] text-sm flex-1">{vc.ttsStatusText}</p>
-                  </div>
-
-                  {vc.ttsAudioUrl && (
-                    <audio src={vc.ttsAudioUrl} controls className="w-full mt-2" />
-                  )}
-                </div>
-              </section>
-
-              {/* Section 3: 저장 */}
-              <section className="bg-[#f0e6c0] p-6 md:p-8 rounded-[2rem] border-2 border-[#2a1b12] shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#c97b4a] flex items-center justify-center text-[#f0e6c0]">
-                    <Save className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[#8b7a52] text-sm">음성 녹음 저장</p>
-                    <h3 className="text-2xl text-[#2d5a27] font-bold">제목 입력 후 저장</h3>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.5rem] border-2 border-[#8b7a52]/40 bg-[#e8ddb4] p-6">
-                  <label className="block text-[#8b7a52] text-sm mb-2 font-bold">
-                    저장할 보이스 제목
-                  </label>
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <input
-                      type="text"
-                      value={vc.voiceTitle}
-                      onChange={(e) => vc.setVoiceTitle(e.target.value)}
-                      placeholder="예: 엄마 제주 동화 목소리"
-                      className="flex-1 p-4 rounded-2xl border-2 border-[#8b7a52]/60 bg-[#f0e6c0] text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/40 placeholder-[#8b7a52]/60"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void handleSave()}
-                      disabled={!vc.recordedAudioUrl || vc.isSaving}
-                      className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all flex items-center justify-center gap-2 font-bold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_0_#1a3a14]"
-                    >
-                      <Save className="w-4 h-4" /> {vc.isSaving ? '저장 중...' : '저장하고 돌아가기'}
-                    </button>
-                  </div>
-
-                  <div className="mt-5 rounded-[1.25rem] bg-[#f0e6c0] border-2 border-[#8b7a52]/40 p-4">
-                    <p className="text-[#8b7a52] text-sm mb-1 font-bold">저장 상태</p>
-                    <p className="text-[#2d5a27] text-lg">{vc.savedVoiceSummary}</p>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            {/* 하단 — 마이페이지 복귀 CTA (저장 없이 나가기) */}
-            <div className="mt-10 flex justify-center w-full">
-              <button
-                type="button"
-                onClick={goBack}
-                className="text-[#b4c4a4] hover:text-[#f0e6c0] px-8 py-3 text-lg font-bold transition-colors inline-flex items-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" /> 저장하지 않고 마이페이지로
-              </button>
+            <div className="quote">{sample.en}</div>
+            {sample.ko && <div className="ko-hint">{sample.ko}</div>}
+            <div className="vc-sample-meta">
+              <span className="vc-lang">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" stroke="#5b3a18" strokeWidth="1.6" fill="none" />
+                  <path
+                    d="M2,8 L14,8 M8,2 Q11,8 8,14 Q5,8 8,2"
+                    stroke="#5b3a18"
+                    strokeWidth="1.4"
+                    fill="none"
+                  />
+                </svg>
+                영어 (US)
+              </span>
+              <span className="vc-tip">조용한 곳에서 약 10초 정도 읽어주세요</span>
             </div>
           </div>
-        </main>
+
+          <Recorder
+            phase={phase}
+            statusLabel={vc.statusLabel}
+            recordingSeconds={recordingSeconds}
+            duration={vc.audioDuration}
+            onMicClick={handleRecordButton}
+            onStop={() => vc.stopRecording()}
+            onPlay={vc.toggleAudioPlayback}
+            onRerecord={vc.rerecord}
+            isPlaying={vc.isAudioPlaying}
+            hasAudio={!!vc.recordedAudioUrl}
+          />
+
+          {/* 숨김 audio 태그 — useVoiceClone 의 audioRef 와 연결 */}
+          <audio
+            ref={vc.audioRef}
+            src={vc.recordedAudioUrl ?? undefined}
+            preload="metadata"
+            style={{ display: 'none' }}
+            onLoadedMetadata={e =>
+              vc.setAudioDuration((e.currentTarget.duration as number | undefined) ?? 0)
+            }
+            onTimeUpdate={e => vc.setAudioCurrentTime(e.currentTarget.currentTime ?? 0)}
+            onPlay={() => vc.setIsAudioPlaying(true)}
+            onPause={() => vc.setIsAudioPlaying(false)}
+            onEnded={() => vc.setIsAudioPlaying(false)}
+          />
+
+          {/* 녹음 완료 후 미리듣기 */}
+          {phase === 'recorded' && vc.recordedAudioUrl && (
+            <div className="vc-preview-audio">
+              <div className="vc-preview-audio-head">
+                <span>녹음 미리듣기</span>
+                <span className="vc-tip">{formatAudioTime(vc.audioDuration)}</span>
+              </div>
+              <PaperAudioStrip
+                isPlaying={vc.isAudioPlaying}
+                onToggle={vc.toggleAudioPlayback}
+                onSeek={vc.seekAudio}
+                progressPercent={progressPercent}
+                currentLabel={formatAudioTime(vc.audioCurrentTime)}
+                durationLabel={formatAudioTime(vc.audioDuration)}
+                audioRef={vc.audioRef}
+                src={vc.recordedAudioUrl}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ── Step 2: TTS Preview ─────────────────────── */}
+        <div className={`mp-card${phase !== 'recorded' ? ' vc-card-dim has-actions' : ''}`}>
+          <span className="mp-tape mp-tape--alt" aria-hidden="true" />
+          <div className="vc-step-badge">
+            <span className="pip">2</span> 변환된 목소리 미리듣기
+          </div>
+          <h2 className="mp-card-title" style={{ marginTop: 2, marginBottom: 12 }}>
+            이 목소리로 어떤 동화를 들려줄까요?
+          </h2>
+
+          <div style={ttsHelperLabelStyle}>들어볼 문장 (한 문장)</div>
+          <textarea
+            className="vc-tts-input"
+            value={vc.ttsText}
+            onChange={e => vc.setTtsText(e.target.value)}
+            disabled={phase !== 'recorded'}
+            placeholder="여기에 문장을 입력하면, 방금 녹음한 목소리로 읽어드려요"
+            rows={3}
+          />
+          <div className="vc-tts-helper">
+            <span>💡 짧은 문장일수록 더 자연스럽게 들려요</span>
+            <span>{vc.ttsText.length} / 120</span>
+          </div>
+
+          <div className="vc-tts-bottom">
+            <button
+              type="button"
+              className="mp-btn mp-btn-sage"
+              disabled={phase !== 'recorded' || vc.isTtsLoading}
+              onClick={() => void vc.previewTts()}
+            >
+              <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M3,2 L3,10 L10,6 Z" fill="#fdf6dc" />
+              </svg>
+              {vc.isTtsLoading ? '변환 중...' : '내 목소리로 들어보기'}
+            </button>
+            {phase !== 'recorded' && (
+              <span style={{ fontFamily: 'Gaegu, cursive', fontSize: 14, color: '#8a7558' }}>
+                먼저 1단계에서 녹음을 완료해 주세요
+              </span>
+            )}
+            {phase === 'recorded' && !ttsPlayed && (
+              <span style={{ fontFamily: 'Gaegu, cursive', fontSize: 14, color: '#8a7558' }}>
+                {vc.ttsStatusText}
+              </span>
+            )}
+          </div>
+
+          {ttsPlayed && vc.ttsAudioUrl && (
+            <div className="vc-tts-result">
+              <audio
+                src={vc.ttsAudioUrl}
+                controls
+                style={{ width: '100%', borderRadius: 999 }}
+              />
+              <div
+                style={{
+                  fontFamily: 'Gaegu, cursive',
+                  fontSize: 13,
+                  color: 'var(--mp-sage-deep)',
+                  marginTop: 8,
+                  fontWeight: 700,
+                }}
+              >
+                ✓ 변환 완료 · 마음에 들면 아래에서 저장해 주세요
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Step 3: Save ─────────────────────────────── */}
+        <div className={`mp-card${!ttsPlayed ? ' vc-card-dim has-actions' : ''}`}>
+          <span className="mp-tape mp-tape--alt2" aria-hidden="true" />
+          <div className="vc-step-badge">
+            <span className="pip">3</span> 이 목소리에 이름 지어주기
+          </div>
+          <h2 className="mp-card-title" style={{ marginTop: 2, marginBottom: 14 }}>
+            이 목소리를 뭐라고 부를까요?
+          </h2>
+
+          <div style={ttsHelperLabelStyle}>보이스 이름</div>
+          <div className="vc-save-row">
+            <input
+              type="text"
+              className="vc-save-input"
+              placeholder="예) 엄마 따뜻한 목소리, 아빠 잠자리 보이스"
+              value={vc.voiceTitle}
+              onChange={e => vc.setVoiceTitle(e.target.value)}
+              disabled={!ttsPlayed}
+            />
+            <button
+              type="button"
+              className="mp-btn mp-btn-sage"
+              disabled={!ttsPlayed || !vc.voiceTitle.trim() || vc.isSaving}
+              onClick={() => void handleSave()}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M3,3 L11,3 L13,5 L13,13 L3,13 Z M5,3 L5,7 L11,7 L11,3 M5,10 L11,10"
+                  stroke="#fdf6dc"
+                  strokeWidth="1.8"
+                  fill="none"
+                />
+              </svg>
+              {vc.isSaving ? '저장 중...' : '저장하고 돌아가기'}
+            </button>
+          </div>
+
+          <div className="vc-save-stats">
+            <div className="vc-save-stat-icon">♪</div>
+            <div className="vc-save-stat-text">{vc.savedVoiceSummary}</div>
+          </div>
+        </div>
+
+        <div className="vc-foot-mark">
+          — 저장하지 않은 녹음은 페이지를 떠나면 사라져요 <span className="heart">♥</span> —
+        </div>
       </div>
     </div>
   )
+}
+
+/* ============================================================================
+ * Stepper — 3 단계 (녹음 → 음성 변환 → 저장)
+ * variant="header" 면 vc-page-bar 안에 들어가는 컴팩트 버전.
+ * ========================================================================= */
+function Stepper({ step, variant }: { step: number; variant?: 'header' }) {
+  const steps = ['녹음하기', '음성 변환', '저장']
+  const cls = `vc-stepper${variant === 'header' ? ' vc-stepper--header' : ''}`
+  return (
+    <div className={cls} role="list" aria-label="진행 단계">
+      {steps.map((label, i) => (
+        <StepperFragment key={i} index={i} label={label} step={step} isLast={i === steps.length - 1} />
+      ))}
+    </div>
+  )
+}
+
+function StepperFragment({
+  index,
+  label,
+  step,
+  isLast,
+}: {
+  index: number
+  label: string
+  step: number
+  isLast: boolean
+}) {
+  const stateClass =
+    step === index ? ' active' : step > index ? ' done' : ''
+  return (
+    <>
+      <div className={`vc-step${stateClass}`} role="listitem" aria-current={step === index}>
+        <div className="num">
+          <span>{index + 1}</span>
+        </div>
+        <div className="lbl">{label}</div>
+      </div>
+      {!isLast && <div className={`vc-step-line${step > index ? ' done' : ''}`} aria-hidden="true" />}
+    </>
+  )
+}
+
+/* ============================================================================
+ * Recorder — 3-state (idle/recording/recorded) + pulse-ring + waveform + time
+ * ========================================================================= */
+type Phase = 'idle' | 'recording' | 'recorded'
+
+interface RecorderProps {
+  phase: Phase
+  statusLabel: string
+  /** 녹음 중 경과 초 — 1초 간격 카운트업. */
+  recordingSeconds: number
+  /** 녹음 완료 후 audio.duration. */
+  duration: number
+  hasAudio: boolean
+  isPlaying: boolean
+  onMicClick: () => void
+  onStop: () => void
+  onPlay: () => void
+  onRerecord: () => void
+}
+
+function Recorder({
+  phase,
+  statusLabel,
+  recordingSeconds,
+  duration,
+  hasAudio,
+  isPlaying,
+  onMicClick,
+  onStop,
+  onPlay,
+  onRerecord,
+}: RecorderProps) {
+  const stateClass =
+    phase === 'recording'
+      ? 'is-recording'
+      : phase === 'recorded'
+        ? 'is-recorded'
+        : ''
+
+  // recording 중에는 vc.audioCurrentTime 이 0 유지되므로 별도 카운터 사용.
+  // recorded 시 duration 이 알 수 없으면 (Blob 직후엔 NaN/Infinity 일 수 있음)
+  // 마지막 카운터 값을 fallback 으로 사용.
+  const recordedTime =
+    duration > 0 && Number.isFinite(duration) ? duration : recordingSeconds
+  const timeText =
+    phase === 'recording'
+      ? formatAudioTime(recordingSeconds)
+      : phase === 'recorded'
+        ? formatAudioTime(recordedTime)
+        : '00:00'
+
+  return (
+    <div className={`vc-recorder ${stateClass}`}>
+      <div className="vc-rec-status-tag">
+        {phase === 'recording' && (
+          <>
+            <span className="live-dot" /> REC · 녹음 중
+          </>
+        )}
+        {phase === 'idle' && (statusLabel || '대기 중')}
+        {phase === 'recorded' && '✓ 녹음 완료'}
+      </div>
+
+      <div className="vc-rec-mic-shell">
+        {phase === 'recording' && (
+          <>
+            <span className="pulse-ring" aria-hidden="true" />
+            <span className="pulse-ring delay" aria-hidden="true" />
+          </>
+        )}
+        <button
+          type="button"
+          className="vc-btn-record"
+          onClick={onMicClick}
+          aria-label={phase === 'recording' ? '녹음 종료' : '녹음 시작'}
+        >
+          {phase === 'recording' ? (
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+              <rect x="6" y="6" width="10" height="10" rx="2" fill="#fff" />
+            </svg>
+          ) : (
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="12" rx="3" fill="#fff" />
+              <path
+                d="M5,11 C5,15 8,18 12,18 C16,18 19,15 19,11 M12,18 L12,21"
+                stroke="#fff"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      <div className="vc-rec-time">{timeText}</div>
+      <Waveform active={phase === 'recording'} recorded={phase === 'recorded'} />
+
+      <div className="vc-rec-hint">
+        {phase === 'idle' && '버튼을 눌러 녹음을 시작하세요'}
+        {phase === 'recording' && '또박또박 천천히 읽어주세요'}
+        {phase === 'recorded' && '잘 들리는지 한 번 들어볼까요?'}
+      </div>
+
+      {phase === 'recording' && (
+        <div className="vc-rec-actions">
+          <button type="button" className="mp-btn mp-btn-sage" onClick={onStop}>
+            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="3" y="3" width="10" height="10" rx="1.5" fill="#fdf6dc" />
+            </svg>
+            녹음 종료
+          </button>
+        </div>
+      )}
+      {phase === 'recorded' && (
+        <div className="vc-rec-actions">
+          <button
+            type="button"
+            className="mp-btn mp-btn-cream"
+            onClick={onPlay}
+            disabled={!hasAudio}
+          >
+            {isPlaying ? (
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <rect x="2" y="2" width="3" height="8" fill="#5b3a18" />
+                <rect x="7" y="2" width="3" height="8" fill="#5b3a18" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M3,2 L3,10 L10,6 Z" fill="#5b3a18" />
+              </svg>
+            )}
+            {isPlaying ? '일시정지' : '들어보기'}
+          </button>
+          <button type="button" className="mp-btn mp-btn-cream" onClick={onRerecord}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M2,8 Q2,3 8,3 Q12,3 14,5 M14,3 L14,6 L11,6"
+                stroke="#5b3a18"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinecap="round"
+              />
+            </svg>
+            다시 녹음
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================================
+ * Waveform — Claude HTML 의 28 bar 모션 placeholder
+ * ========================================================================= */
+const WAVEFORM_HEIGHTS = [
+  14, 22, 32, 18, 28, 40, 22, 36, 44, 28, 18, 30, 40, 24, 36, 28, 42, 20, 30, 38, 22, 34, 28, 44, 18, 26, 32, 20,
+]
+
+function Waveform({ active, recorded }: { active: boolean; recorded: boolean }) {
+  return (
+    <div className="vc-waveform" aria-hidden="true">
+      {WAVEFORM_HEIGHTS.map((h, i) => {
+        const style: CSSProperties & Record<string, string | number> = {
+          '--h': `${h}px`,
+          height: active ? `${h}px` : recorded ? `${h * 0.65}px` : '8px',
+          animationDelay: `${i * 50}ms`,
+        }
+        return <div key={i} className="bar" style={style} />
+      })}
+    </div>
+  )
+}
+
+/* ============================================================================
+ * PaperAudioStrip — 녹음 미리듣기용 작은 audio bar.
+ * audioRef 를 받아 volume / muted 를 직접 조작.
+ * ========================================================================= */
+function PaperAudioStrip({
+  isPlaying,
+  onToggle,
+  onSeek,
+  progressPercent,
+  currentLabel,
+  durationLabel,
+  audioRef,
+  src,
+}: {
+  isPlaying: boolean
+  onToggle: () => void
+  onSeek: (percent: number) => void
+  progressPercent: number
+  currentLabel: string
+  durationLabel: string
+  audioRef?: RefObject<HTMLAudioElement | null>
+  src?: string | null
+}) {
+  const volumeWrapRef = useRef<HTMLSpanElement | null>(null)
+  const [volume, setVolume] = useState(1)
+  const [muted, setMuted] = useState(false)
+  const [volumeOpen, setVolumeOpen] = useState(false)
+
+  // src 가 바뀌면 reset
+  useEffect(() => {
+    setVolume(1)
+    setMuted(false)
+    setVolumeOpen(false)
+  }, [src])
+
+  // 외부 클릭 시 popover 닫기
+  useEffect(() => {
+    if (!volumeOpen) return
+    const onDown = (event: MouseEvent) => {
+      if (!volumeWrapRef.current?.contains(event.target as Node)) {
+        setVolumeOpen(false)
+      }
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [volumeOpen])
+
+  // audio 엘리먼트에 volume / muted 반영
+  useEffect(() => {
+    const audio = audioRef?.current
+    if (audio) audio.volume = volume
+  }, [audioRef, volume])
+
+  useEffect(() => {
+    const audio = audioRef?.current
+    if (audio) audio.muted = muted
+  }, [audioRef, muted])
+
+  return (
+    <div className="mp-audio-bar" role="group" aria-label="녹음 재생">
+      <button type="button" className="mp-audio-play" onClick={onToggle} aria-label={isPlaying ? '일시정지' : '재생'}>
+        {isPlaying ? (
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <rect x="2" y="1" width="2.5" height="8" fill="#fdf6dc" />
+            <rect x="5.5" y="1" width="2.5" height="8" fill="#fdf6dc" />
+          </svg>
+        ) : (
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <path d="M2,1 L2,9 L9,5 Z" fill="#fdf6dc" />
+          </svg>
+        )}
+      </button>
+      <span className="mp-audio-time">{currentLabel}</span>
+      <div
+        className="mp-audio-track"
+        onClick={event => {
+          const rect = event.currentTarget.getBoundingClientRect()
+          const percent = ((event.clientX - rect.left) / rect.width) * 100
+          onSeek(Math.max(0, Math.min(100, percent)))
+        }}
+        role="slider"
+        aria-label="재생 위치"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progressPercent)}
+      >
+        <div className="mp-audio-track-fill" style={{ width: `${progressPercent}%` }} />
+        <div className="mp-audio-track-knob" style={{ left: `${progressPercent}%` }} />
+      </div>
+      <span className="mp-audio-time">{durationLabel}</span>
+      <span ref={volumeWrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
+        <VolumeButton
+          volume={volume}
+          muted={muted}
+          isOpen={volumeOpen}
+          onToggle={() => setVolumeOpen(prev => !prev)}
+        />
+        {volumeOpen && (
+          <VolumePopover
+            volume={volume}
+            muted={muted}
+            onVolumeChange={next => {
+              setVolume(next)
+              if (next > 0 && muted) setMuted(false)
+            }}
+            onToggleMute={() => setMuted(prev => !prev)}
+          />
+        )}
+      </span>
+    </div>
+  )
+}
+
+/* ============================================================================
+ * VolumeButton & VolumePopover — 재사용을 위해 inline 정의.
+ * VoiceProfilesSection 의 PaperAudioPlayer 와 동일한 구현.
+ * ========================================================================= */
+function VolumeButton({
+  volume,
+  muted,
+  isOpen,
+  onToggle,
+}: {
+  volume: number
+  muted: boolean
+  isOpen: boolean
+  onToggle: () => void
+}) {
+  const isMute = muted || volume <= 0.001
+  const isLow = !isMute && volume < 0.45
+  return (
+    <button
+      type="button"
+      className={`mp-audio-volume${isMute ? ' muted' : ''}`}
+      onClick={onToggle}
+      aria-label="볼륨 조절"
+      aria-haspopup="dialog"
+      aria-expanded={isOpen}
+    >
+      {isMute ? (
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+          <path
+            d="M2,5 L2,9 L6,9 L10,12 L10,2 L6,5 Z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <line x1="12" y1="3" x2="17" y2="11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <line x1="17" y1="3" x2="12" y2="11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ) : isLow ? (
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+          <path
+            d="M2,5 L2,9 L6,9 L10,12 L10,2 L6,5 Z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <path d="M13,4 Q15,7 13,10" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+          <path
+            d="M2,5 L2,9 L6,9 L10,12 L10,2 L6,5 Z M13,4 Q15,7 13,10 M15,2 Q18,7 15,12"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+    </button>
+  )
+}
+
+function VolumePopover({
+  volume,
+  muted,
+  onVolumeChange,
+  onToggleMute,
+}: {
+  volume: number
+  muted: boolean
+  onVolumeChange: (next: number) => void
+  onToggleMute: () => void
+}) {
+  const displayed = muted ? 0 : Math.round(volume * 100)
+  const sliderStyle = { '--mp-vol': `${displayed}%` } as Record<string, string>
+  return (
+    <div
+      className="mp-volume-popover"
+      role="dialog"
+      aria-label="볼륨 조절"
+      onClick={event => event.stopPropagation()}
+    >
+      <div className="mp-volume-popover-header">
+        <span>볼륨</span>
+        <strong>{displayed}</strong>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={displayed}
+        onChange={event => onVolumeChange(Number(event.target.value) / 100)}
+        className="mp-volume-slider"
+        style={sliderStyle}
+        aria-label="볼륨 슬라이더"
+      />
+      <button
+        type="button"
+        className={`mp-volume-mute-toggle${muted ? ' muted' : ''}`}
+        onClick={onToggleMute}
+      >
+        {muted ? '음소거 해제' : '음소거'}
+      </button>
+    </div>
+  )
+}
+
+/* ============================================================================
+ * Helpers
+ * ========================================================================= */
+
+const ttsHelperLabelStyle: CSSProperties = {
+  fontFamily: 'Gaegu, cursive',
+  fontSize: 14,
+  color: 'var(--mp-ink-soft)',
+  marginBottom: 6,
+  fontWeight: 700,
+}
+
+/** VOICE_SAMPLE_SCRIPT 가 한국어/영문 한 줄이라 그대로 영문 자리에 노출.
+ *  KO hint 가 있으면 보여주고, 없으면 생략. */
+function buildSample(script: string): { en: string; ko?: string } {
+  const trimmed = script.trim()
+  if (!trimmed) return { en: '"안녕, 우리 함께 이야기를 시작해 볼까?"' }
+  // 따옴표가 없으면 자동으로 감싼다
+  if (!trimmed.startsWith('"') && !trimmed.startsWith('"')) {
+    return { en: `"${trimmed}"` }
+  }
+  return { en: trimmed }
 }

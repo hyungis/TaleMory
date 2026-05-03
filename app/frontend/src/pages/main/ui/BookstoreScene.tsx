@@ -224,7 +224,7 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
         onDeleteStory={handleDeleteStory}
         stories={stories}
         isLoading={storiesLoading}
-        topRightMenu={<TopRightMenu />}
+        topRightMenu={<TopRightMenu mypageFrom="bookshelf" />}
         topBanner={
           draft ? (
             <DraftResumeBanner draft={draft} onResume={handleResumeDraft} />

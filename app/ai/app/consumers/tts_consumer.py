@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 def consume_tts_jobs() -> None:
-    from app.mq.client import create_channel, create_connection, declare_storyboard_topology
+    from app.mq.client import create_channel, create_connection, declare_ai_topology
 
     connection = create_connection()
     channel = create_channel(connection)
-    declare_storyboard_topology(channel)
+    declare_ai_topology(channel)
     register_tts_consumers(channel)
     try:
         channel.start_consuming()
