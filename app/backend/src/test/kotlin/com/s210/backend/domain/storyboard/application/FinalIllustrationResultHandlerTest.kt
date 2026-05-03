@@ -23,7 +23,6 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 import tools.jackson.module.kotlin.jacksonObjectMapper
-import java.util.Optional
 
 /**
  * Unit tests for FinalIllustrationResultHandler — covers:
@@ -102,7 +101,7 @@ class FinalIllustrationResultHandlerTest {
     @Test
     fun `페이지 N장 누적되어 마지막 도착 시 SUCCESS`() {
         val job = pendingJob(jobId = 100L, storyId = 1L, pageCount = 3)
-        `when`(jobRepository.findById(100L)).thenReturn(Optional.of(job))
+        `when`(jobRepository.findByIdForUpdate(100L)).thenReturn(job)
 
         sut.handleSuccess(successEnvelope(100L, 1, "https://s3/p1.png"))
         assertEquals(JobStatus.RUNNING, job.status)
@@ -126,7 +125,7 @@ class FinalIllustrationResultHandlerTest {
         val job = pendingJob(jobId = 101L, storyId = 1L, pageCount = 1).apply {
             status = JobStatus.SUCCESS
         }
-        `when`(jobRepository.findById(101L)).thenReturn(Optional.of(job))
+        `when`(jobRepository.findByIdForUpdate(101L)).thenReturn(job)
 
         sut.handleSuccess(successEnvelope(101L, 1, "https://s3/x.png"))
 
@@ -142,7 +141,7 @@ class FinalIllustrationResultHandlerTest {
         val job = pendingJob(jobId = 104L, storyId = 1L, pageCount = 1).apply {
             status = JobStatus.FAILED
         }
-        `when`(jobRepository.findById(104L)).thenReturn(Optional.of(job))
+        `when`(jobRepository.findByIdForUpdate(104L)).thenReturn(job)
 
         sut.handleSuccess(successEnvelope(104L, 1, "https://s3/x.png"))
 
@@ -159,7 +158,7 @@ class FinalIllustrationResultHandlerTest {
     @Test
     fun `Scene 이 이미 있으면 illustrationUrl 즉시 update`() {
         val job = pendingJob(jobId = 102L, storyId = 5L, pageCount = 2)
-        `when`(jobRepository.findById(102L)).thenReturn(Optional.of(job))
+        `when`(jobRepository.findByIdForUpdate(102L)).thenReturn(job)
 
         val scene = Scene(id = 1L, storyId = 5L, pageNumber = 1, illustrationUrl = null)
         `when`(sceneRepository.findByStoryIdAndPageNumber(5L, 1)).thenReturn(scene)
@@ -176,7 +175,7 @@ class FinalIllustrationResultHandlerTest {
     @Test
     fun `handleFailure 가 status FAILED 와 errorMessage 와 finishedAt 설정`() {
         val job = pendingJob(jobId = 103L, storyId = 1L, pageCount = 2)
-        `when`(jobRepository.findById(103L)).thenReturn(Optional.of(job))
+        `when`(jobRepository.findByIdForUpdate(103L)).thenReturn(job)
 
         sut.handleFailure(failureEnvelope(103L, "AI_TIMEOUT", "model timeout"))
 
@@ -191,7 +190,7 @@ class FinalIllustrationResultHandlerTest {
 
     @Test
     fun `존재하지 않는 jobId 면 silent log warn 후 noop`() {
-        `when`(jobRepository.findById(999L)).thenReturn(Optional.empty())
+        `when`(jobRepository.findByIdForUpdate(999L)).thenReturn(null)
 
         assertDoesNotThrow {
             sut.handleSuccess(successEnvelope(999L, 1, "https://s3/x.png"))
