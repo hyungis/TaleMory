@@ -40,14 +40,8 @@ data class FinalIllustrationItem(
     val companions: List<String>,
     /**
      * Step 4 에서 생성된 storyboard rough 의 URL.
-     * AI 측 model_validator 가 (roughStoryboardImageUrl | roughStoryboardImageS3Key |
-     * currentIllustrationImageS3Key) 중 하나는 필수.
      */
     val roughStoryboardImageUrl: String? = null,
-    /** Step 4 rough 이미지 S3 key (URL 대신 사용 가능). */
-    val roughStoryboardImageS3Key: String? = null,
-    /** 기존 최종 일러스트 S3 key (수정/재생성 시 사용). */
-    val currentIllustrationImageS3Key: String? = null,
     val stylePrompt: String,
     val additionalInstruction: String? = null,
 )
