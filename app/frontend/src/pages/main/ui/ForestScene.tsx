@@ -1,12 +1,9 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from 'react'
-import { generateForestParticles } from '../lib/generateForestParticles'
 import { TopRightMenu } from './TopRightMenu'
 
 interface ForestSceneProps {
@@ -26,7 +23,7 @@ type ForestPhase = 'idle' | 'opening' | 'zooming'
 
 /**
  * 로그인 직후 진입하는 숲 씬.
- * 배경 / 나무 / 집 / 빛줄기 / 비네팅 / 부유 파티클 레이어 조합.
+ * 배경 / 나무 / 집 / 빛줄기 / 비네팅 레이어 조합.
  *
  * 클릭 인터랙션은 phase 머신으로 두 단계로 분리:
  *   1) opening — 문이 열린 모습을 사용자에게 충분히 보여줌 (openMs)
@@ -34,7 +31,6 @@ type ForestPhase = 'idle' | 'opening' | 'zooming'
  * cleanupMs 뒤 phase 를 idle 로 reset 해서 BookstoreScene 의 ← 로 돌아왔을 때 다시 닫힌 집이 보이게 한다.
  */
 export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
-  const particles = useMemo(() => generateForestParticles(), [])
   const [phase, setPhase] = useState<ForestPhase>('idle')
   const timersRef = useRef<number[]>([])
 
@@ -78,7 +74,11 @@ export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
   const isZooming = phase === 'zooming'
 
   return (
-    <div className={`scene${isZooming ? ' is-entering' : ''}`}>
+    <div
+      className={`scene${isInteracting ? ' is-opening' : ''}${
+        isZooming ? ' is-entering' : ''
+      }`}
+    >
       {/* 우상단 햄버거 메뉴 — 마이페이지 / 로그아웃 진입.
           standalone=true 로 자체 absolute 위치를 잡는다 (BookstoreScene 과 달리
           여기엔 우상단 액션 버튼 그룹이 없으므로). */}
@@ -89,12 +89,7 @@ export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
         <img src="/background.png" alt="숲 배경" draggable={false} />
       </div>
 
-      {/* 레이어 2: 나무 프레임 (sway 애니메이션) */}
-      <div className="layer layer--tree">
-        <img src="/tree.png" alt="나무 프레임" draggable={false} />
-      </div>
-
-      {/* 레이어 3: 집 (bobbing + 클릭 시 openhouse 로 교체 후 씬 전환).
+      {/* 레이어 2: 집 (클릭 시 openhouse 로 교체 후 씬 전환).
           PNG 투명 여백까지 클릭되지 않도록, 이미지 자체는 pointer-events: none 이고
           위에 덮인 .house-hitbox 가 실제 silhouette 크기로 클릭을 받는다. */}
       <div className="layer layer--house">
@@ -138,26 +133,6 @@ export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
       {/* 문 안에서 새어나오는 빛 — zooming phase 일 때 fade-in + scale 확장 으로
           "빨려들어가는" 인상을 강화. pointer-events: none. */}
       <div className="door-light" aria-hidden="true" />
-
-      {/* 부유 파티클 */}
-      <div className="particles">
-        {particles.map(p => (
-          <div
-            key={p.id}
-            className="particle"
-            style={
-              {
-                left: p.left,
-                width: p.size,
-                height: p.size,
-                '--duration': p.duration,
-                '--delay': p.delay,
-                '--drift': p.drift,
-              } as unknown as CSSProperties
-            }
-          />
-        ))}
-      </div>
     </div>
   )
 }
