@@ -37,7 +37,9 @@ class FinalIllustrationResultHandler(
                 log.warn("[FINAL_ILLUST:RES] invalid jobId={}", envelope.jobId)
                 return
             }
-        val job = jobRepository.findById(jobId).orElse(null)
+        // PESSIMISTIC_WRITE 락 — 멀티 pod 에서 같은 잡의 다른 페이지 결과가 동시에 도착해도
+        // read-modify-write of resultPayload 가 직렬화되어 누락 page 가 안 생기도록 보장.
+        val job = jobRepository.findByIdForUpdate(jobId)
         if (job == null) {
             log.warn("[FINAL_ILLUST:RES] job not found id={}", jobId)
             return
@@ -53,7 +55,7 @@ class FinalIllustrationResultHandler(
         val imageUrl = envelope.payload?.result?.imageUrl
             ?: throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
-        // 1) resultPayload 누적.
+        // 1) resultPayload 누적 (lock 보호 하에 read-modify-write 안전).
         val accumulator = readAccumulator(job)
         accumulator[pageNumber] = imageUrl
         job.resultPayload = objectMapper.writeValueAsString(accumulator)
@@ -83,7 +85,8 @@ class FinalIllustrationResultHandler(
                 log.warn("[FINAL_ILLUST:RES] invalid jobId={}", envelope.jobId)
                 return
             }
-        val job = jobRepository.findById(jobId).orElse(null) ?: return
+        // 동일 잡의 success 콜백과 race 가능 — handleSuccess 와 같은 lock 사용.
+        val job = jobRepository.findByIdForUpdate(jobId) ?: return
         if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) return
 
         job.status = JobStatus.FAILED
