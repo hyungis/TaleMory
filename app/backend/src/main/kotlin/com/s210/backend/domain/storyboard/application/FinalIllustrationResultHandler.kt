@@ -87,7 +87,9 @@ class FinalIllustrationResultHandler(
         if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) return
 
         job.status = JobStatus.FAILED
-        job.errorMessage = (envelope.error?.message ?: "FINAL_ILLUSTRATION_FAILED").take(65_000)
+        val code = envelope.error?.code
+        val msg = envelope.error?.message
+        job.errorMessage = listOfNotNull(code, msg).joinToString(": ").ifBlank { "FINAL_ILLUSTRATION_FAILED" }.take(65_535)
         job.finishedAt = LocalDateTime.now()
 
         log.warn("[FINAL_ILLUST:RES] failed — jobId={}, code={}, message={}",
@@ -122,6 +124,7 @@ class FinalIllustrationResultHandler(
             val req = objectMapper.readTree(job.requestPayload)
             req.path("payload").path("items").size()
         } catch (e: Exception) {
+            log.warn("[FINAL_ILLUST:RES] cannot parse expectedPageCount for jobId={}", job.id, e)
             Int.MAX_VALUE
         }
     }

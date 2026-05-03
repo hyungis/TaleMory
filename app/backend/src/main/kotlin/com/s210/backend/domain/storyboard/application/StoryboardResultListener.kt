@@ -153,8 +153,11 @@ class StoryboardResultListener(
                     "[FINAL_ILLUST:RES] received — type={}, jobId={}, page={}, status={}",
                     type, envelope.jobId, envelope.pageNumber, envelope.status,
                 )
-                if (envelope.status == "COMPLETED") finalIllustrationResultHandler.handleSuccess(envelope)
-                else finalIllustrationResultHandler.handleFailure(envelope)
+                when (envelope.status.uppercase()) {
+                    "COMPLETED" -> finalIllustrationResultHandler.handleSuccess(envelope)
+                    "FAILED" -> finalIllustrationResultHandler.handleFailure(envelope)
+                    else -> log.warn("[FINAL_ILLUST:RES] unknown status='{}' jobId={}", envelope.status, envelope.jobId)
+                }
             }
             else -> log.warn("Unknown envelope type='{}', body={}", type, body)
         }
