@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  Library,
   Loader2,
-  Maximize,
-  Share2,
 } from 'lucide-react'
 import { BookSpread } from './BookSpread'
 import {
@@ -31,22 +28,20 @@ interface FinalPreviewStepProps {
    */
   finalIllustrationJobId: number | null
   onBack: () => void
-  onSaveToBookshelf: () => void
-  onOpenViewer: () => void
-  onShare?: () => void
+  /** Step 9 (PublishStoryStep) 로 이동 — 실제 발행/공유/책장보관/뷰어는 거기서. */
+  onNext: () => void
 }
 
 /**
- * STEP 08 — paper-craft 톤 (Claude offline.html 1:1).
+ * STEP 08 — paper-craft 톤. 완성된 동화책 미리보기 전용.
+ * 발행/책장보관/뷰어/공유 같은 실제 액션은 Step 9 (PublishStoryStep) 로 위임.
  */
 export function FinalPreviewStep({
   storyId,
   storyGenerationJobId,
   finalIllustrationJobId,
   onBack,
-  onSaveToBookshelf,
-  onOpenViewer,
-  onShare,
+  onNext,
 }: FinalPreviewStepProps) {
   const ttsJobQuery = useGenerationJobQuery(storyGenerationJobId)
   const finalJobQuery = useGenerationJobQuery(finalIllustrationJobId)
@@ -101,24 +96,6 @@ export function FinalPreviewStep({
   const nextPage = useCallback(() => {
     setResultPageIndex(i => Math.min(totalPages - 1, i + 1))
   }, [totalPages])
-
-  const handleShareFallback = useCallback(() => {
-    if (onShare) {
-      onShare()
-      return
-    }
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      navigator
-        .share({
-          title: '우리 가족 동화책',
-          text: 'TaleMory 로 만든 동화책을 확인해보세요!',
-          url: window.location.origin,
-        })
-        .catch(() => {})
-    } else {
-      alert('공유 링크 생성은 발행(publish) 후 사용 가능합니다.')
-    }
-  }, [onShare])
 
   // 두 잡 중 하나라도 PENDING/RUNNING 이거나 scenes fetch 중이면 blocking.
   const ttsInProgress =
@@ -342,48 +319,15 @@ export function FinalPreviewStep({
             </div>
           )}
 
-          {/* 하단 액션 */}
-          <div
-            style={{
-              marginTop: 40,
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: 14,
-            }}
-          >
-            <button type="button" onClick={onSaveToBookshelf} className="cr-btn-back" style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 17 }}>
-              <Library className="w-5 h-5" /> 내 책장 보관하기
-            </button>
-            <button type="button" onClick={onOpenViewer} className="cr-btn-next" style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 17 }}>
-              <Maximize className="w-5 h-5" /> 뷰어로 열기
-            </button>
-            <button
-              type="button"
-              onClick={handleShareFallback}
-              style={{
-                background: 'var(--cr-rust)',
-                color: '#fdf6dc',
-                border: '2px solid #8a4a32',
-                borderRadius: 999,
-                padding: '14px 24px',
-                fontFamily: 'var(--cr-font-serif)',
-                fontWeight: 700,
-                fontSize: 17,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                boxShadow: '0 3px 0 #8a4a32, 0 6px 14px rgba(140,60,40,0.25)',
-              }}
-            >
-              <Share2 className="w-5 h-5" /> 링크 공유하기
-            </button>
-          </div>
         </main>
       </div>
 
-      <CreationFooter currentStep={8} onBack={onBack} />
+      <CreationFooter
+        currentStep={8}
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="발행하러 가기"
+      />
     </div>
   )
 }
