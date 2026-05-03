@@ -23,6 +23,12 @@ interface FinalPreviewStepProps {
   storyId: number | null
   /** TTS 잡 jobId (HighlightOutroStep confirm 응답). null 이면 폴링 없이 즉시 scenes fetch. */
   storyGenerationJobId: number | null
+  /**
+   * Step 5 PATCH /style 시점에 enqueue 된 FINAL_ILLUSTRATION 잡 id.
+   * null 이면 폴링 없이 (구버전 흐름 호환).
+   * non-null 이면 TTS 와 함께 둘 다 SUCCESS 일 때까지 대기.
+   */
+  finalIllustrationJobId: number | null
   onBack: () => void
   /** "내 책장 보관하기" — 제작 플로우 종료 후 메인(서점) 으로 복귀. */
   onSaveToBookshelf: () => void
@@ -42,17 +48,24 @@ interface FinalPreviewStepProps {
 export function FinalPreviewStep({
   storyId,
   storyGenerationJobId,
+  finalIllustrationJobId,
   onBack,
   onSaveToBookshelf,
   onOpenViewer,
   onShare,
 }: FinalPreviewStepProps) {
-  const jobQuery = useGenerationJobQuery(storyGenerationJobId)
+  const ttsJobQuery = useGenerationJobQuery(storyGenerationJobId)
+  const finalJobQuery = useGenerationJobQuery(finalIllustrationJobId)
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [outro, setOutro] = useState<OutroDto | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
+
+  // 두 잡 모두 (있다면) SUCCESS 여야 fetch.
+  const ttsReady = !storyGenerationJobId || ttsJobQuery.data?.status === 'SUCCESS'
+  const finalReady = !finalIllustrationJobId || finalJobQuery.data?.status === 'SUCCESS'
+  const shouldFetch = ttsReady && finalReady
 
   useEffect(() => {
     if (!storyId) {
@@ -61,8 +74,6 @@ export function FinalPreviewStep({
       return
     }
 
-    // jobId 가 없거나 SUCCESS 도달 시점에만 scenes/outro fetch
-    const shouldFetch = !storyGenerationJobId || jobQuery.data?.status === 'SUCCESS'
     if (!shouldFetch) return
 
     let cancelled = false
@@ -84,7 +95,7 @@ export function FinalPreviewStep({
     return () => {
       cancelled = true
     }
-  }, [storyId, jobQuery.data?.status, storyGenerationJobId])
+  }, [storyId, shouldFetch])
 
   const totalPages = scenes.length
   const currentScene = scenes[resultPageIndex] ?? null
@@ -115,14 +126,23 @@ export function FinalPreviewStep({
     }
   }, [onShare])
 
-  // TTS 잡이 PENDING/RUNNING 인 경우 또는 scenes fetch 중인 경우 blocking
-  const isJobInProgress =
+  // 두 잡 중 하나라도 PENDING/RUNNING 이거나 scenes fetch 중이면 blocking.
+  const ttsInProgress =
     !!storyGenerationJobId &&
-    (jobQuery.data?.status === 'PENDING' || jobQuery.data?.status === 'RUNNING')
-  const blocking = isJobInProgress || loadingScenes
+    (ttsJobQuery.data?.status === 'PENDING' || ttsJobQuery.data?.status === 'RUNNING')
+  const finalInProgress =
+    !!finalIllustrationJobId &&
+    (finalJobQuery.data?.status === 'PENDING' || finalJobQuery.data?.status === 'RUNNING')
+  const blocking = ttsInProgress || finalInProgress || loadingScenes
 
   if (blocking) {
-    const message = jobQuery.data?.currentStep ?? '동화책 만드는 중...'
+    // 두 잡 진행 중일 땐 "어떤 단계가 미완" 인지 사용자에게 표시.
+    const message = (() => {
+      if (finalInProgress && ttsInProgress) return '동화책 만드는 중... (삽화 + 음성)'
+      if (finalInProgress) return '컬러 삽화 마무리 중...'
+      if (ttsInProgress) return ttsJobQuery.data?.currentStep ?? '음성 생성 중...'
+      return '동화 데이터 불러오는 중...'
+    })()
     return (
       <div className="bookshelf-modal step-forest-modal flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-[#b4dc8c] animate-spin" />
@@ -131,12 +151,18 @@ export function FinalPreviewStep({
     )
   }
 
-  if (jobQuery.data?.status === 'FAILED') {
+  // 둘 중 하나라도 FAILED 면 에러 화면.
+  const failedJob = ttsJobQuery.data?.status === 'FAILED'
+    ? ttsJobQuery.data
+    : finalJobQuery.data?.status === 'FAILED'
+      ? finalJobQuery.data
+      : null
+  if (failedJob) {
     return (
       <div className="bookshelf-modal step-forest-modal flex items-center justify-center flex-col gap-4">
-        <p className="text-red-400 text-lg">동화 음성 생성에 실패했습니다.</p>
-        {jobQuery.data.errorMessage && (
-          <p className="text-[#f0e6c0] text-sm">{jobQuery.data.errorMessage}</p>
+        <p className="text-red-400 text-lg">동화 생성에 실패했습니다.</p>
+        {failedJob.errorMessage && (
+          <p className="text-[#f0e6c0] text-sm">{failedJob.errorMessage}</p>
         )}
         <button
           type="button"
