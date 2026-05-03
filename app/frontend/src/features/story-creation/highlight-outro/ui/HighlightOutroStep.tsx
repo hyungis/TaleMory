@@ -31,6 +31,12 @@ interface HighlightOutroStepProps {
   onBack: () => void
   onNext: () => void
   setStoryGenerationJobId: (jobId: number | null) => void
+  /**
+   * confirm 응답에 finalIllustrationJobId 가 들어 있으면 store 동기화.
+   * Step 5 에서 이미 set 된 값과 보통 같지만, 새로고침 등으로 store 가 비어있을
+   * 때를 위한 보정 경로.
+   */
+  setFinalIllustrationJobId: (jobId: number | null) => void
 }
 
 interface HighlightSentence {
@@ -73,6 +79,7 @@ export function HighlightOutroStep({
   onBack,
   onNext,
   setStoryGenerationJobId,
+  setFinalIllustrationJobId,
 }: HighlightOutroStepProps) {
   const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
   const [confirmError, setConfirmError] = useState<string | null>(null)
@@ -317,6 +324,10 @@ export function HighlightOutroStep({
       const job = await confirmStoryboard(storyId)
       // 3) jobId 부모로 전달
       setStoryGenerationJobId(job.jobId)
+      // 3-1) FINAL_ILLUSTRATION jobId 도 받아 store 동기화 (보정 경로).
+      if (job.finalIllustrationJobId !== null) {
+        setFinalIllustrationJobId(job.finalIllustrationJobId)
+      }
       // 4) Step 8 진입
       onNext()
     } catch (err: unknown) {
@@ -327,7 +338,7 @@ export function HighlightOutroStep({
         setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했습니다.')
       }
     }
-  }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, onNext])
+  }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, setFinalIllustrationJobId, onNext])
 
   const playAudio = useCallback((url: string) => {
     if (audioRef.current) {
