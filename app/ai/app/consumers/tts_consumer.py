@@ -39,6 +39,11 @@ def consume_tts_jobs() -> None:
 
 
 def register_tts_consumers(channel: Any) -> None:
+    register_story_tts_consumer(channel)
+    register_preview_tts_consumer(channel)
+
+
+def register_story_tts_consumer(channel: Any) -> None:
     publisher = TtsResultPublisher(channel)
     channel.basic_consume(
         queue=settings.RABBITMQ_TTS_GENERATE_QUEUE,
@@ -46,6 +51,10 @@ def register_tts_consumers(channel: Any) -> None:
             ch, method.delivery_tag, body, publisher
         ),
     )
+
+
+def register_preview_tts_consumer(channel: Any) -> None:
+    publisher = TtsResultPublisher(channel)
     channel.basic_consume(
         queue=settings.RABBITMQ_TTS_PREVIEW_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_preview_message(
