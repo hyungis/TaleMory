@@ -17,6 +17,7 @@ import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationConte
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationGenerateMessage
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationGeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationItem
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationJobMeta
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationPagePayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.springframework.amqp.rabbit.core.RabbitTemplate
@@ -65,6 +66,7 @@ class FinalIllustrationGenerationService(
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         val pages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
         if (pages.isEmpty()) throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        if (pages.size > MAX_ITEMS) throw BusinessException(CommonErrorCode.INVALID_INPUT)
         if (pages.any { it.imageUrl.isNullOrBlank() }) {
             throw BusinessException(StoryErrorCode.STORYBOARD_IMAGES_NOT_READY)
         }
@@ -87,6 +89,8 @@ class FinalIllustrationGenerationService(
                 ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
             val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
                 ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+            val nonBlankImageUrl = page.imageUrl?.takeIf { it.isNotBlank() }
+                ?: throw BusinessException(StoryErrorCode.STORYBOARD_IMAGES_NOT_READY)
 
             FinalIllustrationItem(
                 pageNumber = page.pageNumber,
@@ -103,15 +107,10 @@ class FinalIllustrationGenerationService(
                 ),
                 children = children,
                 companions = companions,
-                roughStoryboardImageUrl = page.imageUrl,
+                roughStoryboardImageUrl = nonBlankImageUrl,
                 stylePrompt = stylePreset.code,
                 additionalInstruction = null,
             )
-        }
-
-        // 6) max_items 가드.
-        if (items.size > MAX_ITEMS) {
-            throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
 
         val seed = deterministicSeed(storyId)
@@ -128,10 +127,7 @@ class FinalIllustrationGenerationService(
                 jobType = JobType.FINAL_ILLUSTRATION,
                 status = JobStatus.PENDING,
                 requestPayload = objectMapper.writeValueAsString(
-                    mapOf(
-                        "stylePresetId" to stylePresetId,
-                        "payload" to payload,
-                    ),
+                    FinalIllustrationJobMeta(stylePresetId, payload),
                 ),
             ),
         )
@@ -161,8 +157,7 @@ class FinalIllustrationGenerationService(
         ) ?: return null
         if (recent.status !in REUSABLE_STATUSES) return null
         val savedStylePresetId = try {
-            val node = objectMapper.readTree(recent.requestPayload)
-            node.get("stylePresetId")?.asLong() ?: return null
+            objectMapper.readValue(recent.requestPayload, FinalIllustrationJobMeta::class.java).stylePresetId
         } catch (e: Exception) {
             return null
         }
@@ -189,6 +184,10 @@ class FinalIllustrationGenerationService(
 
     companion object {
         private const val MAX_ITEMS = 20
+        /**
+         * SUCCESS 도 포함하는 이유: 같은 stylePresetId 재선택 시 이미 끝난 결과를 그대로 사용한다
+         * (재생성 비용 0). 다른 stylePresetId 면 가드를 통과해 새 잡이 만들어진다.
+         */
         private val REUSABLE_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS)
     }
 }
