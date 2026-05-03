@@ -46,6 +46,7 @@ class TtsResultHandler(
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun handle(envelope: StoryTtsResultEnvelope) {
+        val started = System.nanoTime()
         val jobIdLong = envelope.jobId.toLongOrNull()
         if (jobIdLong == null) {
             log.warn("Invalid TTS jobId: {}", envelope.jobId)
@@ -60,10 +61,18 @@ class TtsResultHandler(
             log.info("TTS job {} already finalized ({}), skip", job.id, job.status)
             return
         }
+        log.info(
+            "[TTS:RES:CONSUME] jobId={}, storyId={}, status={}",
+            envelope.jobId, envelope.storyId ?: job.storyId, envelope.status,
+        )
 
         when (envelope.status.uppercase()) {
             "COMPLETED" -> {
                 handleCompleted(job, envelope)
+                log.info(
+                    "[TTS:RES:HANDLE:DONE] jobId={}, storyId={}, status={}, elapsedMs={}",
+                    envelope.jobId, job.storyId, envelope.status, elapsedMs(started),
+                )
             }
             "FAILED" -> {
                 val code = envelope.error?.code ?: "UNKNOWN"
@@ -72,12 +81,17 @@ class TtsResultHandler(
                 job.errorMessage = "$code: $msg".take(65_535)
                 job.finishedAt = LocalDateTime.now()
                 tryUpdateRedisStatus(job.storyId, "failed", null, "$code: $msg")
+                log.info(
+                    "[TTS:RES:HANDLE:DONE] jobId={}, storyId={}, status={}, elapsedMs={}",
+                    envelope.jobId, job.storyId, envelope.status, elapsedMs(started),
+                )
             }
             else -> log.warn("Unknown TTS envelope status: {}", envelope.status)
         }
     }
 
     fun handle(envelope: PreviewTtsResultEnvelope) {
+        val started = System.nanoTime()
         val previewId = envelope.jobId
         val snapshot = previewRedis.get(previewId)
         if (snapshot == null) {
@@ -88,6 +102,10 @@ class TtsResultHandler(
             log.info("TTS_PREVIEW {} already finalized ({}), skip", previewId, snapshot.status)
             return
         }
+        log.info(
+            "[TTS_PREVIEW:RES:CONSUME] previewId={}, status={}",
+            previewId, envelope.status,
+        )
 
         when (envelope.status.uppercase()) {
             "COMPLETED" -> {
@@ -98,12 +116,19 @@ class TtsResultHandler(
                     return
                 }
                 previewRedis.markSuccess(previewId, payload.audioUrl)
-                log.info("TTS_PREVIEW {} SUCCESS", previewId)
+                log.info(
+                    "[TTS_PREVIEW:RES:HANDLE:DONE] previewId={}, status={}, elapsedMs={}",
+                    previewId, envelope.status, elapsedMs(started),
+                )
             }
             "FAILED" -> {
                 val code = envelope.error?.code ?: "UNKNOWN"
                 val msg = envelope.error?.message ?: "(unknown)"
                 previewRedis.markFailed(previewId, code, msg)
+                log.info(
+                    "[TTS_PREVIEW:RES:HANDLE:DONE] previewId={}, status={}, elapsedMs={}",
+                    previewId, envelope.status, elapsedMs(started),
+                )
             }
             else -> log.warn("Unknown TTS_PREVIEW envelope status: {}", envelope.status)
         }
@@ -183,4 +208,7 @@ class TtsResultHandler(
             log.warn("Redis job status HSET failed (non-fatal): {}", e.message)
         }
     }
+
+    private fun elapsedMs(started: Long): Long =
+        (System.nanoTime() - started) / 1_000_000
 }

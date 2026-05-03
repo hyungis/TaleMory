@@ -78,13 +78,6 @@ def declare_ai_topology(channel: Any) -> None:
         routing_key=settings.RABBITMQ_TTS_PREVIEW_ROUTING_KEY,
     )
 
-    channel.queue_declare(queue=settings.RABBITMQ_TTS_RESULT_QUEUE, durable=True)
-    channel.queue_bind(
-        queue=settings.RABBITMQ_TTS_RESULT_QUEUE,
-        exchange=settings.RABBITMQ_RESULT_EXCHANGE,
-        routing_key=settings.RABBITMQ_TTS_RESULT_BINDING_KEY,
-    )
-
     channel.queue_declare(queue=settings.RABBITMQ_IMAGE_GENERATE_QUEUE, durable=True)
     channel.queue_bind(
         queue=settings.RABBITMQ_IMAGE_GENERATE_QUEUE,

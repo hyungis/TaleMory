@@ -1,132 +1,483 @@
-# TTS Notes
+# TTS 정리 메모
 
-## 1. Current Architecture
+## 1. 현재 전체 흐름
 
-현재 TTS는 CosyVoice `inference_cross_lingual` 기준으로 동작한다.
+### Preview
 
-- preview endpoint: `POST /api/voices/{voiceId}/preview`
-- story TTS endpoint: `POST /api/tts/story`
-- MQ request routing key: `ai.gpu.tts.generate`
-- MQ result routing keys:
-  - `ai.result.tts.generate.completed`
-  - `ai.result.tts.generate.failed`
-
-생성 방식은 문장별 순차 호출이다.
-
-- sentence 1개당 CosyVoice 1회 호출
-- `generateFullBookAudio=true`면 sentence wav 생성 후 full-book wav를 추가로 합친다
-
-## 2. Reference Audio Resolution
-
-이제 AI는 로컬 `voices/{voiceId}/reference.wav`만 보지 않는다.
-
-우선순위:
-
-1. 로컬 캐시 파일 존재 시 재사용
-   - `app/ai/.runtime/storage/voices/{voiceId}/reference.wav`
-2. `referenceAudioS3Key`가 있으면 S3에서 다운로드
-3. `referenceAudioUrl`이 있으면 다운로드
-4. `referenceAudioUrl` 값이 실제 URL이 아니라 `stories/...` 형태의 raw S3 key면 S3 key로 간주
-
-즉 현재는 아래 두 방식 모두 허용한다.
-
-```json
-{
-  "referenceAudioS3Key": "stories/voice/42/reference.wav"
-}
-```
-
-```json
-{
-  "referenceAudioUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/stories/voice/42/reference.wav"
-}
-```
-
-또는 backward compatibility:
-
-```json
-{
-  "referenceAudioUrl": "stories/voice/42/reference.wav"
-}
-```
-
-주의:
-
-- 현재 AI는 **다운로드된 파일이 wav라고 가정**한다.
-- 즉 장기적으로는 DB에서 원본 업로드와 TTS용 reference를 분리하는 것이 맞다.
-- 권장 구조:
-  - `audio_url`: 원본 녹음
-  - `reference_audio_s3_key`: TTS용 trim/정제 reference
-  - `tts_voice_url`: 마지막 preview/sample 음성
-
-## 3. Runtime Paths
-
-```text
-app/ai/.runtime/storage/voices/{voiceId}/reference.wav
-app/ai/.runtime/storage/voices/{voiceId}/metadata.json
-app/ai/.runtime/storage/generated/voice-preview/{voiceId}/...
-app/ai/.runtime/storage/generated/story-tts/{storyId}/sentences/...
-app/ai/.runtime/storage/generated/story-tts/{storyId}/full-book/full-book.wav
-app/ai/.runtime/manifests/jobs/{jobId}.json
-```
-
-설명:
-
-- `voices/...`
-  - reference voice local cache
-- `generated/voice-preview/...`
-  - preview 결과
-- `generated/story-tts/...`
-  - sentence별 TTS 및 full-book 산출물
-- `manifests/jobs/...`
-  - 로컬 job 상태 기록
-
-## 4. Backend Integration Status
-
-백엔드 기준으로 현재 구현된 것은 아래와 같다.
-
-### Voice / Preview
-
-- voice profile CRUD 구현됨
-- preview endpoint 구현됨
-- backend는 voice profile의 저장 값을 보고
-  - `stories/...`면 `referenceAudioS3Key`
-  - 그 외면 `referenceAudioUrl`
-  로 AI preview API를 호출한다
-
-현재 backend preview 호출 경로:
-
-```text
-POST /api/voices/{voiceId}/preview
-```
+1. 프론트가 `POST /api/voices/{voiceId}/preview`를 호출한다.
+2. 백엔드 [VoicePreviewService.kt](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/backend/src/main/kotlin/com/s210/backend/domain/tts/application/VoicePreviewService.kt)가 권한을 확인하고 Redis에 preview job을 만든다.
+3. 백엔드 [TtsService.kt](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/backend/src/main/kotlin/com/s210/backend/domain/tts/application/TtsService.kt)가 RabbitMQ `ai.gpu.tts.preview`로 `TtsPreviewJobMessage`를 publish한다.
+4. AI worker가 [tts_consumer.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/app/consumers/tts_consumer.py)에서 preview 큐를 consume한다.
+5. AI가 reference 음성을 찾고 CosyVoice를 호출한 뒤 결과를 저장하고 `GENERATE_TTS_PREVIEW_COMPLETED` 또는 `GENERATE_TTS_PREVIEW_FAILED`를 publish한다.
+6. 백엔드는 Redis의 preview 상태를 갱신하고 프론트는 polling으로 결과를 확인한다.
 
 ### Story TTS
 
-- confirm 시 `StoryGenerationJob(jobType=TTS)` 생성
-- 문장 캐시 lookup 수행
-- cache miss sentence만 MQ로 publish
-- AI 결과 consume 후
-  - `scene_sentences.tts_audio_url` 반영
-  - `story_generation_jobs` 상태 업데이트
-  - Redis TTS cache 저장
+1. 프론트가 storyboard confirm을 호출한다.
+2. 백엔드 [StoryConfirmService.kt](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/backend/src/main/kotlin/com/s210/backend/domain/story/application/StoryConfirmService.kt)가 `Scene`, `SceneSentence`를 생성한다.
+3. 백엔드는 문장별로 TTS 캐시를 조회한다.
+4. 캐시 miss 문장만 모아서 `StoryTtsJobMessage` 한 건으로 `ai.gpu.tts.generate`에 publish한다.
+5. AI worker가 [tts_consumer.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/app/consumers/tts_consumer.py)에서 story TTS 큐를 consume한다.
+6. AI는 문장마다 CosyVoice를 한 번씩 호출하고, 문장 오디오를 저장하고, 필요하면 full-book wav도 만든 뒤 결과 envelope를 publish한다.
+7. 백엔드 [TtsResultHandler.kt](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/backend/src/main/kotlin/com/s210/backend/domain/tts/application/TtsResultHandler.kt)가 `scene_sentences.tts_audio_url`을 문장별로 채우고 job 결과를 저장한다.
 
-즉 backend는 이미 AI worker 결과를 소비할 수 있는 상태다.
+중요: 현재 RabbitMQ는 이미 story 단위로 묶여 있다. 느린 부분은 백엔드 publish 횟수가 아니라 AI worker 내부에서 문장마다 CosyVoice를 반복 호출하는 부분이다.
 
-## 5. MQ Request Message Shape
+## 2. 현재 reference 음성 처리
 
-공통 envelope:
+AI는 [dev_tts_service.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/app/services/dev_tts_service.py)에서 reference 음성을 이렇게 찾는다.
+
+1. `app/ai/.runtime/storage/voices/{voiceId}/reference.wav`가 있으면 재사용
+2. 없고 `referenceAudioS3Key`가 있으면 S3 다운로드
+3. 없고 `referenceAudioUrl`이 있으면 URL 다운로드
+4. 로컬 runtime 경로에 `reference.wav`로 저장
+
+현재 입력 현실:
+
+- 프론트 voice 녹음 업로드 기본 포맷은 `audio/webm`
+- 백엔드는 `voice_profiles.audio_url`에 raw S3 key를 저장
+- 따라서 prompt 입력이 이미 wav가 아니라면 AI 또는 CosyVoice 쪽에서 포맷 정규화를 흡수해야 한다
+
+## 3. 현재 worker 구조
+
+### 지금 실제로 도는 구조
+
+- dev/local compose는 아직 `python worker.py`만 띄운다
+- [worker.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/worker.py)는 아래 consumer를 한 번에 등록한다
+  - storyboard
+  - storyboard image
+  - final illustration
+  - TTS
+
+### 이 구조가 의미하는 것
+
+- preview TTS, story TTS, storyboard generation, storyboard image generation, final illustration이 같은 worker 프로세스에서 경쟁한다
+- RabbitMQ channel QoS는 [client.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/app/mq/client.py) 기준 `prefetch_count=1`이다
+- 오래 걸리는 작업 하나가 같은 worker의 다음 작업을 지연시킬 수 있다
+
+### 분리 worker 코드 상태
+
+역할별 엔트리포인트 파일은 이미 있다.
+
+- [worker_story.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/worker_story.py)
+- [worker_image_storyboard.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/worker_image_storyboard.py)
+- [worker_image_final.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/worker_image_final.py)
+- [worker_tts.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/worker_tts.py)
+
+하지만 compose에서 아직 이 파일들을 사용하지 않고 있으므로, 런타임은 여전히 통합 worker 구조다.
+
+## 4. 주요 성능 병목
+
+### 4-1. 통합 worker 경쟁
+
+현재 증상:
+
+- TTS가 이미지/최종삽화 작업과 같은 프로세스와 채널을 공유한다
+- preview가 이미지나 final illustration 작업 때문에 밀릴 수 있다
+- story TTS도 다른 큐 작업 때문에 대기 시간이 길어질 수 있다
+
+영향:
+
+- 큐 대기 시간 증가
+- preview 응답성 불안정
+
+### 4-2. prompt 음성 반복 처리
+
+현재 증상:
+
+- 같은 목소리 reference를 여러 번 다운로드할 수 있다
+- 같은 prompt 음성을 CosyVoice에 여러 번 다시 전송할 수 있다
+- 같은 speaker conditioning을 여러 번 다시 계산할 수 있다
+
+영향:
+
+- 반복 I/O
+- 반복 전처리
+- preview와 story 둘 다 불필요한 지연 발생
+
+### 4-3. 문장마다 CosyVoice 호출
+
+현재 증상:
+
+- RabbitMQ는 story 단위로 한 번만 publish하지만, AI는 문장마다 CosyVoice를 한 번씩 호출한다
+- story에 문장이 20개면 CosyVoice 호출도 20번이다
+
+영향:
+
+- HTTP 오버헤드 반복
+- speaker conditioning 비용 반복
+- 긴 story에서 처리량 저하
+
+### 4-4. TTS 서버의 full-buffer 응답
+
+현재 `server1.py` 패턴은 다음과 같다.
+
+1. 업로드를 temp 파일로 저장
+2. 필요하면 wav로 변환
+3. `cosyvoice.inference_*` 호출
+4. `_collect_wav_audio()`에서 결과를 전부 모음
+5. 최종 wav 한 번에 응답
+
+영향:
+
+- 스트리밍 이점이 없다
+- preview가 전체 음성 생성이 끝날 때까지 기다린다
+- 모델의 first-byte latency 개선이 호출자에게 드러나지 않는다
+
+### 4-5. timing 로그 부재
+
+지금은 아래 시간을 분리해서 볼 수 없다.
+
+- MQ 대기 시간
+- S3 다운로드 시간
+- prompt 포맷 변환 시간
+- CosyVoice 추론 시간
+- 결과 저장/업로드 시간
+
+즉 최적화가 측정 기반이 아니라 추측 기반이 되기 쉽다.
+
+## 5. 지금 해볼 만한 성능 개선
+
+### 우선순위 A. worker를 도메인별로 분리
+
+첫 단계 추천:
+
+- TTS를 storyboard/image/final illustration과 분리
+
+이유:
+
+- 구현 리스크가 낮다
+- 큐 경쟁이 바로 줄어든다
+- preview latency가 더 안정적이다
+
+추천 topology:
+
+- `worker_story.py`
+- `worker_image_storyboard.py`
+- `worker_image_final.py`
+- `worker_tts.py`
+
+그 다음 단계:
+
+- preview TTS와 story TTS를 추가로 분리
+
+이유:
+
+- preview는 짧고 지연에 민감하다
+- story TTS는 길고 처리량 중심이다
+
+### 우선순위 B. timing 로그와 baseline부터 확보
+
+최소 측정해야 할 지점:
+
+- backend publish 시각
+- worker consume 시작 시각
+- reference resolve 시작/끝
+- prompt 변환 시작/끝
+- CosyVoice 요청 시작/끝
+- 출력 저장/업로드 시작/끝
+- 결과 publish 시각
+
+필요한 baseline:
+
+- preview cold-start 전체 시간
+- preview warm-start 전체 시간
+- story 문장당 평균 시간
+- story 전체 작업 시간
+- queue wait time과 실제 inference time의 비율
+
+### 우선순위 C. speaker conditioning 재사용
+
+장기적으로 가장 의미 있는 개선:
+
+- reference 음성을 한 번 정규화하고 등록
+- preview와 story에서 speaker cache 또는 `speaker_id`를 재사용
+
+이유:
+
+- prompt 업로드 반복 제거
+- speaker 추출 반복 제거
+- preview와 story 둘 다 지연 감소
+
+### 우선순위 D. 여러 문장을 한 요청으로 묶는 batch endpoint
+
+story 쪽에서는 speaker 재사용 다음으로 의미가 큰 개선이다.
+
+중요한 구분:
+
+- 현재 backend는 이미 story당 MQ 요청 1건으로 묶고 있다
+- 하지만 현재 AI 서버는 문장 여러 개를 한 번에 추론하지 않는다
+
+더 좋은 목표:
+
+- story MQ job은 그대로 유지
+- AI 내부에서 같은 reference를 공유하는 여러 문장을 TTS 서버 batch endpoint 한 번으로 보냄
+
+그러면 줄어드는 것:
+
+- HTTP round-trip 반복
+- prompt 전처리 반복
+- endpoint 오버헤드 반복
+
+## 6. 페이지 단위 묶음은 가능한가
+
+아이디어:
+
+- 문장마다 CosyVoice 요청을 보내지 않고
+- 페이지별 문장들을 묶어서
+- 페이지 단위로 한 번에 합성
+
+결론부터 말하면 가능은 하지만, **출력 형태를 어떻게 잡을지**가 핵심이다.
+
+### 6-1. 페이지 요청 1건 = 페이지 오디오 1개만 반환
+
+이건 구현은 단순하지만 현재 문장 클릭 UX와는 맞지 않는다.
+
+현재 백엔드 모델은:
+
+- 각 `SceneSentence` row가 자기 `ttsAudioUrl`을 가짐
+- 프론트가 특정 문장을 클릭하면 그 문장만 직접 재생할 수 있어야 함
+
+그런데 페이지 묶음 결과가 단순히:
+
+- `page1.wav`
+
+하나만 나오면 현재 sentence-click 흐름은 깨진다. 유지하려면 최소한 아래 중 하나가 필요하다.
+
+1. 페이지 오디오 안의 문장별 timestamp metadata
+2. 생성 후 forced alignment 또는 silence-based segmentation
+3. 프론트가 문장별 파일 대신 공용 페이지 오디오를 seek 재생
+
+즉 **페이지 오디오 1개만 저장하는 방식은 지금 스키마와 UX에 바로 맞지 않는다.**
+
+### 6-2. 페이지 요청 1건 = 문장별 결과 여러 개 반환
+
+이게 더 현실적인 “페이지 batching” 해석이다.
+
+의미:
+
+- 한 페이지의 모든 문장을 한 요청으로 보냄
+- reference는 한 번만 공유
+- 응답은
+  - 여러 sentence wav를 한 번에 돌려주거나
+  - 페이지 wav 1개와 문장 경계를 같이 돌려주고 나중에 분리
+
+이러면 백엔드는 결국 여전히 아래를 가질 수 있다.
+
+- sentence 1 오디오
+- sentence 2 오디오
+- sentence 3 오디오
+
+즉 **요청은 페이지 단위로 묶되, 저장 결과는 문장 단위로 유지**하는 방식이다.
+
+이 방식은 현재 문장 클릭 재생과 호환된다.
+
+### 6-3. 가장 안전한 권장안
+
+처음부터 저장 단위를 바꾸지 않는다.
+
+추천:
+
+1. `scene_sentences.tts_audio_url`를 계속 최종 출력 계약으로 유지
+2. batching은 inference transport 레벨에서만 수행
+3. 그래도 최종 산출물은 sentence-level 파일로 저장
+
+이렇게 하면:
+
+- 프론트 문장 클릭 UX 유지
+- 백엔드 result handler 개념 거의 유지
+- story 처리량 개선 가능
+
+## 7. story와 preview를 같이 볼 때 추천 구조
+
+### 선택지 1. 저장은 문장 단위 유지, 전송만 최적화
+
+추천.
+
+흐름:
+
+1. reference 음성 1회 정규화
+2. speaker 등록 또는 cache 재사용
+3. preview는 `voiceId + text`
+4. story는 `voiceId + pageSentences[]` 또는 `voiceId + storySentences[]`
+5. TTS 서버는 batch 처리
+6. backend는 문장 단위 URL 저장 유지
+
+장점:
+
+- 현재 스키마와 잘 맞음
+- sentence click UX 유지
+- 반복 오버헤드 감소
+
+### 선택지 2. 페이지 오디오 + 문장 offset 저장
+
+가능하지만 backend/frontend 계약 수정이 필요하다.
+
+추가로 필요한 것:
+
+- page-level audio URL
+- sentence-level `startMs`, `endMs`
+- 프론트 audio seek 재생 로직
+- offset 저장용 스키마 또는 별도 테이블
+
+장점:
+
+- 저장 파일 수 감소
+- 생성 흐름 단순화 가능성
+
+단점:
+
+- 리팩터링 범위 큼
+- 현재 문장 클릭 직접 재생 구조와 안 맞음
+
+### 추천 결론
+
+먼저 선택지 1로 간다.
+
+성능 개선을 얻으면서도 현재 동작을 덜 깨뜨린다.
+
+## 8. 무엇부터 개선할지
+
+추천 순서:
+
+1. backend, AI worker, TTS 서버에 timing 로그 추가
+2. preview warm/cold와 story 전체 latency baseline 측정
+3. compose에서 split worker 실제 배포
+4. TTS worker를 non-TTS worker와 분리
+5. 필요하면 preview TTS와 story TTS도 분리
+6. prompt/reference 음성을 한 번 정규화하고 캐시
+7. speaker registration 또는 speaker cache reuse 추가
+8. sentence-batch 또는 page-batch TTS endpoint 추가
+9. 저장은 sentence-level 유지
+10. 그 다음에야 Qwen을 동일 벤치마크로 비교
+
+## 9. 실무 결론
+
+### 이미 사실인 것
+
+- backend는 문장마다 MQ publish 하지 않는다
+- story는 이미 MQ 기준으로 story 단위 batch다
+- 진짜 반복 비용은 AI sentence loop와 TTS 서버 호출 안에 있다
+
+### 처음부터 하지 말아야 할 것
+
+- 바로 page-only audio 저장으로 뛰지 말 것
+- sentence-level 저장을 바로 없애지 말 것
+
+### 먼저 해야 할 것
+
+- worker 분리
+- timing 측정
+- prompt 처리 반복 감소
+- sentence-level 저장은 유지하면서 inference transport를 batch화
+
+## 10. 페이지 batching 질문에 대한 짧은 답
+
+페이지 단위 묶음 가능하냐
+
+- 가능하다. 단, “한 요청에 여러 페이지/문장을 묶는다”는 뜻으로는 충분히 가능하다.
+
+문장 클릭 재생 유지 가능하냐
+
+- 가능하다. 단, batch 요청 결과를 다시 sentence-level 오디오로 저장해야 한다.
+
+페이지 단위 오디오만 저장하고 끝낼 수 있냐
+
+- 지금 구조에서는 어렵다.
+
+그렇게 하려면 문장별 offset metadata와 프론트 seek 재생 모델까지 같이 바뀌어야 한다.
+
+## 11. 내일 바로 쓸 MQ 테스트 JSON
+
+아래 예시는 현재 구조 기준으로 바로 RabbitMQ에 publish해서 확인할 수 있는 테스트 메시지다.
+
+### 11-1. Preview 테스트용 JSON
+
+용도:
+
+- preview latency 확인
+- CosyVoice 연결 확인
+- reference 음성 접근 확인
+
+exchange:
+
+```text
+ai.request
+```
+
+routing key:
+
+```text
+ai.gpu.tts.preview
+```
+
+body:
 
 ```json
 {
-  "jobId": "story_tts_1234abcd",
-  "jobType": "TTS",
-  "storyId": 1201,
+  "jobId": "preview_tts_test_short_001",
+  "jobType": "TTS_PREVIEW",
+  "voiceId": "42",
   "payload": {
-    "storyId": 1201,
+    "text": "안녕, 해솔아.",
+    "language": "ko-KR",
+    "format": "wav",
+    "referenceAudioUrl": null,
+    "referenceAudioS3Key": "stories/voice/42/reference.wav",
+    "options": {
+      "emotion": "NEUTRAL",
+      "stylePrompt": null,
+      "speakingRate": null,
+      "pitch": null,
+      "volumeGain": null,
+      "useSsml": false
+    }
+  }
+}
+```
+
+짧은 preview라서:
+
+- queue 대기 시간
+- reference resolve 시간
+- CosyVoice 실제 추론 시간
+
+을 보기 좋다.
+
+### 11-2. Story 테스트용 JSON
+
+용도:
+
+- 문장 여러 개일 때 총 처리 시간 확인
+- 문장당 CosyVoice 호출 반복 비용 확인
+- page batching 필요성 체감 확인
+
+exchange:
+
+```text
+ai.request
+```
+
+routing key:
+
+```text
+ai.gpu.tts.generate
+```
+
+body:
+
+```json
+{
+  "jobId": "story_tts_perf_test_001",
+  "jobType": "TTS",
+  "action": "GENERATE",
+  "storyId": 101,
+  "payload": {
+    "storyId": 101,
     "voiceId": "42",
     "referenceAudioUrl": null,
     "referenceAudioS3Key": "stories/voice/42/reference.wav",
-    "language": "en-US",
+    "language": "ko-KR",
     "format": "wav",
     "options": {
       "defaultEmotion": "NEUTRAL",
@@ -139,260 +490,82 @@ POST /api/voices/{voiceId}/preview
     },
     "sentences": [
       {
-        "sentenceId": 5001,
-        "pageNumber": 1,
-        "sentenceOrder": 1,
-        "text": "Mina looked at the sea and smiled quietly.",
-        "speakerKey": "narrator",
-        "emotion": "NEUTRAL",
-        "stylePrompt": null,
-        "ssml": null
-      }
-    ]
-  }
-}
-```
-
-허용 emotion:
-
-- `NEUTRAL`
-- `WARM`
-- `HAPPY`
-- `EXCITED`
-- `CALM`
-- `SAD`
-- `SOFT`
-- `SERIOUS`
-- `ANGRY`
-- `NARRATION`
-
-주의:
-
-- `emotion`, `stylePrompt`, `speakingRate`, `pitch`, `volumeGain`은 현재 실제 CosyVoice 생성 파라미터로는 반영되지 않는다
-- metadata 성격으로만 남는다
-
-## 6. MQ Result Message Shape
-
-성공:
-
-```json
-{
-  "jobId": "story_tts_1234abcd",
-  "type": "GENERATE_TTS_COMPLETED",
-  "storyId": 1201,
-  "status": "COMPLETED",
-  "payload": {
-    "storyId": 1201,
-    "voiceId": "42",
-    "items": [
-      {
-        "sentenceId": 5001,
-        "appliedStyle": {
-          "emotion": "NEUTRAL",
-          "stylePrompt": null
-        },
-        "audio": {
-          "audioUrl": "https://...",
-          "s3Key": "stories/tts/generated/story-tts/1201/sentences/5001.wav",
-          "durationMs": 2100,
-          "format": "wav"
-        }
-      }
-    ],
-    "sceneSentenceUpdates": [
-      {
-        "sentenceId": 5001,
-        "ttsAudioUrl": "https://...",
-        "ttsAudioS3Key": "stories/tts/generated/story-tts/1201/sentences/5001.wav"
-      }
-    ],
-    "summary": {
-      "sentenceCount": 1
-    },
-    "fullBookAudio": {
-      "audioUrl": "https://...",
-      "s3Key": "stories/tts/generated/story-tts/1201/full-book/full-book.wav",
-      "format": "wav"
-    }
-  }
-}
-```
-
-실패:
-
-```json
-{
-  "jobId": "story_tts_1234abcd",
-  "type": "GENERATE_TTS_FAILED",
-  "storyId": 1201,
-  "status": "FAILED",
-  "error": {
-    "code": "GENERATE_TTS_ENGINE_ERROR",
-    "message": "..."
-  }
-}
-```
-
-## 7. Files Changed for S3 Reference Support
-
-이번 변경으로 수정된 핵심 파일:
-
-- `app/ai/app/schemas/tts.py`
-  - `PreviewRequest.referenceAudioUrl`
-  - `PreviewRequest.referenceAudioS3Key`
-  - `StoryTtsRequest.referenceAudioS3Key`
-- `app/ai/app/services/storage_service.py`
-  - `download_s3_bytes()` 추가
-- `app/ai/app/services/dev_tts_service.py`
-  - `resolve_reference_voice()` 추가
-  - preview/story TTS에서 공통 resolver 사용
-- `app/ai/app/api/routes/tts.py`
-  - preview API가 `referenceAudioUrl`, `referenceAudioS3Key`를 전달
-- `app/ai/app/consumers/tts_consumer.py`
-  - worker 사전 다운로드 로직 제거
-  - service 공통 resolver에 위임
-
-backend 쪽 같이 맞춘 파일:
-
-- `app/backend/.../VoicePreviewRequest.kt`
-  - `referenceAudioS3Key` 추가
-- `app/backend/.../StoryTtsPayload.kt`
-  - `referenceAudioS3Key` 추가
-- `app/backend/.../VoicePreviewService.kt`
-  - 저장 값이 S3 key면 `referenceAudioS3Key`로 전송
-  - preview URI를 `/api/voices/{voiceId}/preview`로 수정
-- `app/backend/.../StoryConfirmService.kt`
-  - TTS MQ payload 생성 시 S3 key / URL 분기
-
-## 8. Local Test Guide
-
-### 8-1. Infra
-
-RabbitMQ / Redis / MySQL:
-
-```powershell
-cd infra\compose
-docker compose -f docker-compose.infra-local.yml up -d
-```
-
-확인:
-
-```powershell
-docker ps
-```
-
-RabbitMQ 관리 페이지:
-
-```text
-http://localhost:15673
-```
-
-### 8-2. CosyVoice
-
-CosyVoice 서버는 별도 포트에서 먼저 띄운다.
-
-예:
-
-```bash
-cd ~/work/CosyVoice/runtime/python/fastapi
-python server.py --port 8001 --model_dir ~/work/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B
-```
-
-AI `.env`:
-
-```env
-COSYVOICE_BASE_URL=http://localhost:8001
-COSYVOICE_CROSS_LINGUAL_PATH=/inference_cross_lingual
-COSYVOICE_TIMEOUT_SEC=180
-```
-
-### 8-3. AI API / Worker
-
-같은 가상환경에서 실행하는 것이 중요하다.
-
-```powershell
-cd app\ai
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-worker:
-
-```powershell
-cd app\ai
-python .\worker_tts.py
-```
-
-### 8-4. Preview API Test
-
-body 예시:
-
-```json
-{
-  "text": "Hello, Lina.",
-  "language": "en-US",
-  "format": "wav",
-  "referenceAudioS3Key": "stories/voice/42/reference.wav",
-  "options": {
-    "emotion": "NEUTRAL",
-    "stylePrompt": null,
-    "speakingRate": null,
-    "pitch": null,
-    "volumeGain": null,
-    "useSsml": false
-  }
-}
-```
-
-호출:
-
-```bash
-curl -X POST http://localhost:8000/api/voices/42/preview ^
-  -H "Content-Type: application/json" ^
-  -d @preview.json
-```
-
-예상:
-
-- `app/ai/.runtime/storage/voices/42/reference.wav` 생성
-- preview audio 생성
-- `audioUrl`, `s3Key`, `durationMs` 반환
-
-### 8-5. Story MQ Test
-
-1. 요청 큐 purge
-   - `ai.gpu.request.queue`
-2. 필요하면 결과 큐 purge
-   - `ai.result.tts.queue`
-3. 아래 메시지 publish
-
-```json
-{
-  "jobId": "story_tts_test_s3_001",
-  "jobType": "TTS",
-  "storyId": 1,
-  "payload": {
-    "storyId": 1,
-    "voiceId": "42",
-    "referenceAudioS3Key": "stories/voice/42/reference.wav",
-    "language": "en-US",
-    "format": "wav",
-    "options": {
-      "defaultEmotion": "NEUTRAL",
-      "defaultStylePrompt": null,
-      "generateFullBookAudio": false,
-      "speakingRate": null,
-      "pitch": null,
-      "volumeGain": null,
-      "useSsml": false
-    },
-    "sentences": [
-      {
         "sentenceId": 1001,
         "pageNumber": 1,
         "sentenceOrder": 1,
-        "text": "Lina looked at the sea and smiled quietly.",
+        "text": "해솔이는 아침 햇살이 비치는 창가에 앉아 파란 스케치북을 천천히 펼쳤다.",
         "speakerKey": "narrator",
         "emotion": "NEUTRAL",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1002,
+        "pageNumber": 1,
+        "sentenceOrder": 2,
+        "text": "오늘은 바다를 주제로 그림책을 만들기로 한 날이라서 마음이 유난히 두근거렸다.",
+        "speakerKey": "narrator",
+        "emotion": "WARM",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1003,
+        "pageNumber": 2,
+        "sentenceOrder": 1,
+        "text": "연필 끝이 종이 위를 사각사각 지나가자 잔잔한 파도와 둥근 조약돌, 그리고 작은 갈매기 한 마리가 차례로 모습을 드러냈다.",
+        "speakerKey": "narrator",
+        "emotion": "CALM",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1004,
+        "pageNumber": 2,
+        "sentenceOrder": 2,
+        "text": "해솔이는 그림 속 바닷가에 서 있는 아이의 표정이 너무 외로워 보인다고 생각해, 곁에서 함께 웃어 줄 친구를 한 명 더 그려 넣었다.",
+        "speakerKey": "narrator",
+        "emotion": "SOFT",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1005,
+        "pageNumber": 3,
+        "sentenceOrder": 1,
+        "text": "그 순간 창문 밖에서 불어온 바람이 스케치북의 페이지를 훌쩍 넘겼고, 해솔이는 마치 이야기의 다음 장면이 먼저 말을 걸어오는 것 같은 기분을 느꼈다.",
+        "speakerKey": "narrator",
+        "emotion": "NARRATION",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1006,
+        "pageNumber": 3,
+        "sentenceOrder": 2,
+        "text": "새로운 페이지에는 노을빛 바다가 펼쳐져 있었고, 낮게 물든 하늘 아래에서 두 아이가 주운 조개껍데기를 귀에 대고 바다의 소리를 듣고 있었다.",
+        "speakerKey": "narrator",
+        "emotion": "WARM",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1007,
+        "pageNumber": 4,
+        "sentenceOrder": 1,
+        "text": "해솔이는 마지막 장면만큼은 독자가 오래 기억했으면 좋겠다고 생각하며, 고요한 파도 위로 반짝이는 별빛과 두 아이의 작은 뒷모습을 정성스럽게 덧칠했다.",
+        "speakerKey": "narrator",
+        "emotion": "CALM",
+        "stylePrompt": null,
+        "ssml": null
+      },
+      {
+        "sentenceId": 1008,
+        "pageNumber": 4,
+        "sentenceOrder": 2,
+        "text": "그리고 페이지 아래쪽에 조심스럽게 이렇게 적었다. 함께 바라본 풍경은 오래도록 마음속에서 반짝인다고.",
+        "speakerKey": "narrator",
+        "emotion": "SOFT",
         "stylePrompt": null,
         "ssml": null
       }
@@ -401,49 +574,168 @@ curl -X POST http://localhost:8000/api/voices/42/preview ^
 }
 ```
 
-exchange / routing:
+이 story 예시는:
+
+- 페이지 4개
+- 문장 8개
+- full-book 생성 포함
+
+조건이라서 지금 구조에서 충분히 병목을 확인하기 좋다.
+
+### 11-3. 테스트할 때 같이 볼 것
+
+preview는 아래를 확인한다.
+
+- AI worker consume 시작 시각
+- reference resolve 시간
+- CosyVoice 응답 시간
+- preview 결과 publish 시각
+
+story는 아래를 확인한다.
+
+- 문장 1개당 평균 처리 시간
+- 문장 수 증가에 따른 총 시간 증가폭
+- full-book concat 시간
+- preview와 같은 worker에 있을 때 queue 지연 발생 여부
+
+### 11-4. 다음 단계 실험 포인트
+
+내일 바로 실험할 수 있는 비교는 이 정도다.
+
+1. preview 짧은 텍스트 1문장
+2. story 8문장
+3. 같은 reference로 다시 한 번 story 8문장
+4. worker 분리 전/후 같은 JSON 반복
+
+이렇게 보면:
+
+- 첫 실행과 재실행 차이
+- reference 캐시 효과
+- worker 분리 효과
+- 문장 반복 비용
+
+을 바로 체감할 수 있다.
+
+## 12. 내일 진행 순서
+
+내일은 아래 순서대로 진행하는 것이 가장 효율적이다.
+
+### 12-1. 먼저 확인할 것
+
+1. 로컬 인프라와 앱 컨테이너가 정상 기동하는지 확인
+2. CosyVoice 서버가 실제로 응답하는지 확인
+3. `worker.py` 기준인지, 분리 worker 기준인지 확인
+4. preview/story용 MQ 테스트 JSON을 각각 한 번씩 실행
+
+### 12-2. 첫 번째 목표
+
+목표는 "지금 느린 이유가 어디인지 숫자로 확인"하는 것이다.
+
+우선 해야 할 일:
+
+1. preview JSON 1회 실행
+2. story JSON 1회 실행
+3. preview JSON 재실행
+4. story JSON 재실행
+
+이렇게 최소 4번 돌려서 아래를 비교한다.
+
+- 첫 실행 vs 재실행 차이
+- preview 총 소요 시간
+- story 총 소요 시간
+- 문장 수 대비 story 처리 시간
+
+### 12-3. 내일 바로 추가할 로그
+
+다음 지점에 timing 로그를 넣는 것이 1순위다.
+
+#### AI worker
+
+- preview/story consume 시작 시각
+- reference resolve 시작/끝
+- CosyVoice 호출 시작/끝
+- 결과 저장 시작/끝
+- MQ 결과 publish 시각
+
+#### CosyVoice 서버
+
+- 업로드 파일 저장 시작/끝
+- 필요 시 wav 변환 시작/끝
+- `cosyvoice.inference_*` 호출 시작/끝
+- `_collect_wav_audio()` 시작/끝
+
+#### backend
+
+- preview publish 시각
+- story publish 시각
+- 결과 consume 시각
+
+### 12-4. 내일 판단할 것
+
+로그를 본 뒤 아래 질문에 답하면 된다.
+
+1. 병목이 queue wait 인가
+2. 병목이 reference 다운로드/변환인가
+3. 병목이 CosyVoice inference 자체인가
+4. 병목이 결과 저장인가
+5. preview가 story나 이미지 작업 때문에 같이 밀리는가
+
+### 12-5. 그 다음 우선순위
+
+로그를 본 뒤 보통 다음 순서로 결정하면 된다.
+
+1. worker 분리부터 적용할지
+2. TTS를 preview/story로 추가 분리할지
+3. reference 재사용 구조를 먼저 넣을지
+4. batch endpoint를 먼저 만들지
+5. `cross_lingual` 외 다른 CosyVoice API를 비교할지
+
+### 12-6. 페이지 단위 batching 관련 결론
+
+내일 논의가 다시 나와도 기준은 이걸 유지하면 된다.
+
+- 요청 단위를 페이지/문장 묶음으로 키우는 것은 가능
+- 하지만 저장 결과는 우선 sentence-level 유지가 맞음
+- 즉 "batch request + sentence-level output" 방향으로 판단
+
+### 12-7. 내일 나한테 바로 던질 내용
+
+내일 작업을 바로 이어가려면 아래 4개를 같이 주면 된다.
+
+1. preview 테스트 로그
+2. story 테스트 로그
+3. 현재 worker 실행 방식
+   - `worker.py` 하나인지
+   - `worker_story.py`, `worker_tts.py` 등 분리 실행인지
+4. CosyVoice 서버 로그
+
+### 12-8. 내일 나한테 이렇게 요청하면 됨
+
+아래처럼 말하면 바로 이어서 작업할 수 있다.
 
 ```text
-exchange: ai.request
-routing key: ai.gpu.tts.generate
+tts.md 기준으로 진행하자.
+preview/story 테스트 로그는 이거고,
+현재 worker는 이 방식으로 돌고 있다.
+병목 분석해서 1순위 수정부터 해줘.
 ```
 
-예상:
+또는
 
-- local cache:
-  - `app/ai/.runtime/storage/voices/42/reference.wav`
-- sentence output:
-  - `app/ai/.runtime/storage/generated/story-tts/1/sentences/1001.wav`
-- result event:
-  - `ai.result.tts.generate.completed`
+```text
+tts.md 12번 순서대로 하자.
+지금 preview/story 실행 결과가 이렇고,
+다음으로 timing 로그부터 넣어줘.
+```
 
-### 8-6. Troubleshooting
+### 12-9. 내일 최종 목표
 
-`voice not found`
+내일 한 번에 다 끝내는 목표는 아니다.
 
-- 로컬 cache 없음
-- `referenceAudioS3Key` / `referenceAudioUrl` 둘 다 없음
+내일의 현실적인 목표는:
 
-`StorageDownloadError`
+1. 병목 구간 확정
+2. worker 분리 효과 확인
+3. batch 또는 speaker reuse 중 무엇이 먼저인지 결정
 
-- S3 key 오타
-- AWS credential / bucket / region 설정 문제
-
-`CosyVoiceInvocationError`
-
-- CosyVoice 서버 미기동
-- `COSYVOICE_BASE_URL` / path mismatch
-
-`Ready > 0` on `ai.result.tts.queue`
-
-- AI가 결과를 publish 했지만 backend consumer가 안 먹고 있는 상태
-
-## 9. Remaining Boundaries
-
-현재 아직 남아 있는 구조적 과제:
-
-- `voice_profiles.audio_url`와 TTS용 reference 분리
-- `reference_audio_s3_key` 컬럼 정식 도입
-- 원본이 wav가 아닐 때의 변환/정제 파이프라인
-- 긴 story TTS의 job 분할 또는 병렬화
-- worker reconnect / publish reconnect 강화
+여기까지 정하면 이후 구현 방향이 거의 확정된다.
