@@ -156,7 +156,7 @@ AWS_S3_ENV_PREFIX=dev
 - [x] `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` — `s210-backend-s3` IAM user Secret Access Key
 - [x] `ENV_DEV_APP_OPENAI_API_KEY` — OpenAI API 키
 - [x] `ENV_DEV_APP_GEMINI_API_KEY` — Gemini API 키 (storyboard 이미지 생성)
-- [ ] `ENV_DEV_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
+- [x] `ENV_DEV_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
 
 ## ③ Infra — File Variable
 
@@ -307,7 +307,7 @@ AWS_S3_ENV_PREFIX=prod
 - [x] `ENV_MASTER_APP_AWS_SECRET_ACCESS_KEY`
 - [x] `ENV_MASTER_APP_OPENAI_API_KEY` — OpenAI API 키
 - [x] `ENV_MASTER_APP_GEMINI_API_KEY` — prod Gemini API 키
-- [ ] `ENV_MASTER_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
+- [x] `ENV_MASTER_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
 
 ## ③ Infra — File Variable
 
