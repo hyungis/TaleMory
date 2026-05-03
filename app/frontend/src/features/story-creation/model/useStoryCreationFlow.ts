@@ -110,6 +110,12 @@ export interface UseStoryCreationFlowResult {
    */
   storyGenerationJobId: number | null
   /**
+   * Step 5 PATCH /style 응답으로 받은 FINAL_ILLUSTRATION 잡 id (멱등 가드 시 기존 id 재사용).
+   * Step 8 FinalPreviewStep 에서 TTS jobId 와 함께 동시 폴링.
+   * 메모리 한정 — 새로고침 시 sessionStorage 미영속.
+   */
+  finalIllustrationJobId: number | null
+  /**
    * 마지막으로 사용자가 "스토리 확정하고 다음" 으로 본문 발행에 사용한 SUMMARY 잡의 id (string).
    * Step 3 으로 돌아와서 confirm 다시 누를 때 이 값과 현재 summary jobId 를 비교해
    * 같으면 본문 재발행을 skip (불필요한 OpenAI 호출 + 페이지 통째 교체 방지).
@@ -121,6 +127,7 @@ export interface UseStoryCreationFlowResult {
   handlePrev: () => void
   setStoryId: (id: number | null) => void
   setStoryGenerationJobId: (jobId: number | null) => void
+  setFinalIllustrationJobId: (jobId: number | null) => void
   setLastConfirmedSummaryJobId: (jobId: string | null) => void
   updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   updateStep2: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
@@ -194,6 +201,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
    * Step 4 가 storyboard-pages 캐시 기반으로 동작 (pages.length > 0 이면 정상 표시).
    */
   const [storyGenerationJobId, setStoryGenerationJobIdState] = useState<number | null>(null)
+  const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<number | null>(null)
   /**
    * 마지막으로 본문 발행에 사용된 SUMMARY 잡 id. PromptStep 에서 confirm 시 비교 → 재발행 skip 판단.
    *
@@ -321,6 +329,10 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     setStoryGenerationJobIdState(jobId)
   }, [])
 
+  const setFinalIllustrationJobId = useCallback((jobId: number | null) => {
+    setFinalIllustrationJobIdState(jobId)
+  }, [])
+
   const setLastConfirmedSummaryJobId = useCallback((jobId: string | null) => {
     setLastConfirmedSummaryJobIdState(jobId)
   }, [])
@@ -347,12 +359,14 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     projectData,
     storyId,
     storyGenerationJobId,
+    finalIllustrationJobId,
     lastConfirmedSummaryJobId,
     setCurrentStep,
     handleNext,
     handlePrev,
     setStoryId,
     setStoryGenerationJobId,
+    setFinalIllustrationJobId,
     setLastConfirmedSummaryJobId,
     updateStep1,
     updateStep2,

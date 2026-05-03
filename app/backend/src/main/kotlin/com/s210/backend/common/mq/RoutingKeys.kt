@@ -25,6 +25,11 @@ object RoutingKeys {
     const val IMAGE_GENERATE = "ai.image.generate"
     const val IMAGE_REGENERATE = "ai.image.regenerate"
 
+    // ---------- 최종(컬러) 일러스트 생성 ----------
+    // AI 팀 큐 prefix 와 일치 (RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY).
+    // 워커가 자체적으로 큐(`ai.final-illustration.generate.request.queue`)를 declare/bind.
+    const val FINAL_ILLUSTRATION_GENERATE = "ai.image.final-illustration.generate"
+
     // ---------- 스토리(동화) 줄거리(요약) 생성 ----------
     const val STORY_SUMMARY_GENERATE = "ai.cpu.story.summary.generate"
     const val STORY_SUMMARY_REGENERATE = "ai.cpu.story.summary.regenerate"

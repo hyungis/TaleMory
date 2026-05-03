@@ -5,9 +5,18 @@ import {
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
 } from '../lib/defaults'
-import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript, postVoicePreview, getVoicePreview } from '../api/voiceProfileApi'
+import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript, postVoicePreview, getVoicePreview, attachVoiceProfileToStory } from '../api/voiceProfileApi'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
+
+/**
+ * voice profile ↔ story 연결(attach) 진행 상태.
+ * - 'idle'      : 아직 시도 안 함 (savedProfileId === null)
+ * - 'attaching' : 시도 중 (retry 포함)
+ * - 'attached'  : 성공
+ * - 'failed'    : 모든 retry 소진 후 실패 — UI 가 inline 에러 + 재시도 버튼 노출
+ */
+export type AttachStatus = 'idle' | 'attaching' | 'attached' | 'failed'
 
 interface SavedVoiceRecord {
   name: string
@@ -36,6 +45,11 @@ export interface UseVoiceCloneResult {
   // 서버 저장 결과
   savedProfileId: number | null
   isSaving: boolean
+
+  // story attach 상태
+  attachStatus: AttachStatus
+  attachError: string | null
+  retryAttach: () => Promise<void>
 
   // TTS 입력
   ttsText: string
@@ -114,6 +128,8 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 음성이 없습니다.')
   const [savedProfileId, setSavedProfileId] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [attachStatus, setAttachStatus] = useState<AttachStatus>('idle')
+  const [attachError, setAttachError] = useState<string | null>(null)
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
@@ -162,6 +178,48 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
   }, [])
+
+  /**
+   * voice profile 을 현재 story 에 묶는다 — transient 실패 흡수용 retry 포함.
+   *
+   * Step 6 의 commit / load 직후 호출되어 stories.voice_profile_id 를 채워야
+   * Step 7 → 8 confirm 가드(409 INVALID_STORY_STATE)를 통과한다.
+   *
+   * 실패 처리:
+   *  - 1차 시도 + 2회 retry (총 3회), 200ms / 600ms 지수 백오프
+   *  - 최종 실패 시 attachStatus='failed' + attachError 세팅 → UI 가 다음 버튼을
+   *    막고 inline 에러 + 재시도 버튼 노출 (10분 녹음 후 confirm 에서 발견되는 것 방지).
+   */
+  const tryAttachToStory = useCallback(async (voiceProfileId: number) => {
+    if (!storyId) return
+    setAttachStatus('attaching')
+    setAttachError(null)
+    const delays = [0, 200, 600]
+    let lastError: unknown = null
+    for (const delay of delays) {
+      if (delay > 0) await new Promise(r => setTimeout(r, delay))
+      try {
+        await attachVoiceProfileToStory(storyId, voiceProfileId)
+        setAttachStatus('attached')
+        setAttachError(null)
+        return
+      } catch (err) {
+        lastError = err
+      }
+    }
+    const message = lastError instanceof Error
+      ? lastError.message
+      : '음성을 동화에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.'
+    console.warn('attachVoiceProfileToStory failed after retries:', lastError)
+    setAttachStatus('failed')
+    setAttachError(message)
+  }, [storyId])
+
+  /** "다시 연결" 버튼이 호출 — 가장 최근 savedProfileId 로 재시도. */
+  const retryAttach = useCallback(async () => {
+    if (savedProfileId === null) return
+    await tryAttachToStory(savedProfileId)
+  }, [savedProfileId, tryAttachToStory])
 
   const startRecording = useCallback(async () => {
     try {
@@ -221,6 +279,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         }
         setVoiceTitle(latest.title || '')
         setSavedProfileId(latest.voiceProfileId)
+        await tryAttachToStory(latest.voiceProfileId)
         setStatus('ready')
         setStatusLabel('기존 음성 불러옴')
         setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
@@ -233,7 +292,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } catch {
       alert('저장된 음성을 불러오지 못했습니다.')
     }
-  }, [])
+  }, [tryAttachToStory])
 
   const previewTts = useCallback(async () => {
     if (!recordedAudioUrl) {
@@ -260,6 +319,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
         profileId = profile.voiceProfileId
         setSavedProfileId(profileId)
+        await tryAttachToStory(profileId)
       }
 
       // BE에 TTS 미리듣기 비동기 작업 요청
@@ -312,7 +372,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } finally {
       setIsTtsLoading(false)
     }
-  }, [recordedAudioUrl, ttsText, savedProfileId])
+  }, [recordedAudioUrl, ttsText, savedProfileId, tryAttachToStory])
 
   /**
    * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).
@@ -339,6 +399,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
       const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
 
       setSavedProfileId(profile.voiceProfileId)
+      await tryAttachToStory(profile.voiceProfileId)
       setStatus('ready')
       setStatusLabel('서버에 저장 완료')
       setSavedVoiceSummary(`녹음이 저장되었습니다. (ID: ${profile.voiceProfileId})`)
@@ -350,7 +411,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } finally {
       setIsSaving(false)
     }
-  }, [recordedAudioUrl])
+  }, [recordedAudioUrl, tryAttachToStory])
 
   const toggleAudioPlayback = useCallback(() => {
     const el = audioRef.current
@@ -384,6 +445,9 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     savedVoiceSummary,
     savedProfileId,
     isSaving,
+    attachStatus,
+    attachError,
+    retryAttach,
     audioRef,
     isAudioPlaying,
     audioCurrentTime,

@@ -164,7 +164,7 @@ class TtsResultHandler(
         // 2) Job 마무리
         job.status = JobStatus.SUCCESS
         job.resultPayload = objectMapper.writeValueAsString(payload)
-        job.costUsd = payload.usage.costUsd?.let { BigDecimal.valueOf(it) }
+        job.costUsd = payload.usage?.costUsd?.let { BigDecimal.valueOf(it) }
         job.finishedAt = LocalDateTime.now()
         log.info(
             "TTS job {} SUCCESS — storyId={}, applied={}/{}",

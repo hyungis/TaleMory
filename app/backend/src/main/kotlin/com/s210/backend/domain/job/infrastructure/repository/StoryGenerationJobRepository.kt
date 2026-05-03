@@ -3,9 +3,27 @@ package com.s210.backend.domain.job.infrastructure.repository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.model.JobType
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 interface StoryGenerationJobRepository : JpaRepository<StoryGenerationJob, Long> {
+
+    /**
+     * pessimistic write lock 을 걸고 잡을 조회 — `SELECT ... FOR UPDATE`.
+     *
+     * 사용처: `FinalIllustrationResultHandler` 가 페이지별 콜백을 받아 같은 잡 row 의
+     * `result_payload` (Map<pageNumber, imageUrl>) 를 read-modify-write 로 누적할 때.
+     * 단일 BE pod 에서는 `concurrentConsumers=1` 이라 race 가 없지만, 멀티 pod 으로
+     * 수평 스케일하면 두 pod 이 동시에 같은 잡의 다른 페이지 결과를 처리할 수 있어
+     * 한쪽의 누적 write 가 덮여 page 가 누락될 수 있다. 이 lock 으로 해당 잡 row 를
+     * 트랜잭션 종료까지 직렬화한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT j FROM StoryGenerationJob j WHERE j.id = :id")
+    fun findByIdForUpdate(@Param("id") id: Long): StoryGenerationJob?
 
     /**
      * 한 storyId 의 특정 jobType + status 작업 중 가장 최근 것을 조회.

@@ -147,6 +147,7 @@ class StoryController(
             sentenceCount = result.sentenceCount,
             cacheHits = result.cacheHits,
             cacheMisses = result.cacheMisses,
+            finalIllustrationJobId = result.finalIllustrationJobId,
         )))
     }
 

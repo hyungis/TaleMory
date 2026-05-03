@@ -193,4 +193,5 @@ data class ConfirmStoryboardResponse(
     val sentenceCount: Int,
     val cacheHits: Int,
     val cacheMisses: Int,
+    val finalIllustrationJobId: Long? = null,
 )

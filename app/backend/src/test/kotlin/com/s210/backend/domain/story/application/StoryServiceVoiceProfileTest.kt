@@ -1,15 +1,12 @@
 package com.s210.backend.domain.story.application
 
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
-import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
-import com.s210.backend.domain.job.model.JobStatus
-import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.preset.infrastructure.repository.BgmPresetRepository
 import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
-import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
@@ -17,14 +14,15 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.story.model.Difficulty
+import com.s210.backend.domain.story.model.StoryStatus
+import com.s210.backend.domain.voice.entity.VoiceProfile
+import com.s210.backend.domain.voice.exception.VoiceErrorCode
 import com.s210.backend.domain.storyboard.application.FinalIllustrationGenerationService
 import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
@@ -35,17 +33,17 @@ import tools.jackson.databind.ObjectMapper
 import java.util.Optional
 
 /**
- * Unit tests for StoryService — Step 1 Lock 거동.
+ * Unit tests for StoryService.modifyVoiceProfile (Step 5 보이스 클론 → Story 연결).
  *
- * 가드: `STORYBOARD_STORY_SUMMARY` 잡이 PENDING/RUNNING/SUCCESS 중 하나로 존재하면
- *       `modifyStory` (PATCH /api/stories/{id}) 가 STEP_LOCKED_BY_SUMMARY 로 거부된다.
- *       FAILED 만 있는 상태 또는 잡 자체가 없는 상태에선 통과.
- *
- * Step 2 Lock (PhotoServiceLockTest) 와 동일 패턴.
+ * 가드:
+ *  - story 소유권 + soft-delete 미반영 (ownedStory 헬퍼)
+ *  - story.status == DRAFT
+ *  - voice profile 존재 + soft-delete 미반영
+ *  - voice profile 소유권
  */
 @ExtendWith(MockitoExtension::class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class StoryServiceLockTest {
+class StoryServiceVoiceProfileTest {
 
     private val storyRepository: StoryRepository = mock(StoryRepository::class.java)
     private val sceneRepository: SceneRepository = mock(SceneRepository::class.java)
@@ -82,80 +80,112 @@ class StoryServiceLockTest {
 
     private val userId = 1L
     private val storyId = 10L
+    private val voiceProfileId = 100L
 
     // ---------------------------------------------------------------------------
-    // modifyStory — SUMMARY active(PENDING/RUNNING/SUCCESS) → STEP_LOCKED_BY_SUMMARY
+    // Happy path
     // ---------------------------------------------------------------------------
 
-    @ParameterizedTest
-    @EnumSource(value = JobStatus::class, names = ["PENDING", "RUNNING", "SUCCESS"])
-    fun `modifyStory throws STEP_LOCKED_BY_SUMMARY when SUMMARY job exists in active state`(status: JobStatus) {
-        stubOwnedStory()
-        stubSummaryJob(status)
+    @Test
+    fun `modifyVoiceProfile sets story voiceProfileId on success`() {
+        val story = stubOwnedStory(status = StoryStatus.DRAFT)
+        stubOwnedVoiceProfile()
+
+        service.modifyVoiceProfile(userId, storyId, voiceProfileId)
+
+        assertEquals(voiceProfileId, story.voiceProfileId)
+    }
+
+    // ---------------------------------------------------------------------------
+    // Story 가드
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun `modifyVoiceProfile throws STORY_NOT_FOUND when story missing`() {
+        `when`(storyRepository.findById(storyId)).thenReturn(Optional.empty())
 
         val ex = assertThrows<BusinessException> {
-            service.modifyStory(userId, storyId, buildModifyCommand())
+            service.modifyVoiceProfile(userId, storyId, voiceProfileId)
         }
-        assertEquals(StoryErrorCode.STEP_LOCKED_BY_SUMMARY, ex.errorCode)
+        assertEquals(StoryErrorCode.STORY_NOT_FOUND, ex.errorCode)
     }
 
     @Test
-    fun `modifyStory allows mutation when only FAILED SUMMARY exists`() {
-        stubOwnedStory()
-        stubSummaryJob(JobStatus.FAILED)
+    fun `modifyVoiceProfile throws FORBIDDEN when story owned by other user`() {
+        stubOwnedStory(status = StoryStatus.DRAFT, ownerUserId = userId + 99)
 
-        // throw 하지 않으면 통과 — story dirty checking 으로 변경 적용.
-        service.modifyStory(userId, storyId, buildModifyCommand())
+        val ex = assertThrows<BusinessException> {
+            service.modifyVoiceProfile(userId, storyId, voiceProfileId)
+        }
+        assertEquals(CommonErrorCode.FORBIDDEN, ex.errorCode)
     }
 
     @Test
-    fun `modifyStory allows mutation when no SUMMARY job exists`() {
-        stubOwnedStory()
-        // stub 없이도 Mockito 가 null 반환 — lenient 모드라 안전.
+    fun `modifyVoiceProfile throws INVALID_STORY_STATE when story not DRAFT`() {
+        stubOwnedStory(status = StoryStatus.PUBLISHED)
 
-        service.modifyStory(userId, storyId, buildModifyCommand())
+        val ex = assertThrows<BusinessException> {
+            service.modifyVoiceProfile(userId, storyId, voiceProfileId)
+        }
+        assertEquals(StoryErrorCode.INVALID_STORY_STATE, ex.errorCode)
+    }
+
+    // ---------------------------------------------------------------------------
+    // VoiceProfile 가드
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun `modifyVoiceProfile throws VOICE_NOT_FOUND when voice profile missing`() {
+        stubOwnedStory(status = StoryStatus.DRAFT)
+        `when`(voiceProfileRepository.findByIdAndDeletedAtIsNull(voiceProfileId)).thenReturn(null)
+
+        val ex = assertThrows<BusinessException> {
+            service.modifyVoiceProfile(userId, storyId, voiceProfileId)
+        }
+        assertEquals(VoiceErrorCode.NOT_FOUND, ex.errorCode)
+    }
+
+    @Test
+    fun `modifyVoiceProfile throws VOICE_FORBIDDEN when voice profile owned by other user`() {
+        stubOwnedStory(status = StoryStatus.DRAFT)
+        val foreignProfile = VoiceProfile(
+            id = voiceProfileId,
+            userId = userId + 99,
+            title = "타인 보이스",
+            audioUrl = "dev/stories/voice/x/abc.webm",
+        )
+        `when`(voiceProfileRepository.findByIdAndDeletedAtIsNull(voiceProfileId)).thenReturn(foreignProfile)
+
+        val ex = assertThrows<BusinessException> {
+            service.modifyVoiceProfile(userId, storyId, voiceProfileId)
+        }
+        assertEquals(VoiceErrorCode.FORBIDDEN, ex.errorCode)
     }
 
     // ---------------------------------------------------------------------------
     // Fixture builders
     // ---------------------------------------------------------------------------
 
-    private fun stubOwnedStory() {
+    private fun stubOwnedStory(status: StoryStatus, ownerUserId: Long = userId): Story {
         val story = Story(
             id = storyId,
-            userId = userId,
-            travelPlace = "제주도",
+            userId = ownerUserId,
+            status = status,
             difficulty = Difficulty.BEGINNER,
-            mainCharacterJson = """[{"name":"아이","age":5,"gender":"MALE"}]""",
+            mainCharacterJson = """{"name":"아이","age":5,"gender":"MALE"}""",
             companionsJson = "[]",
         )
         `when`(storyRepository.findById(storyId)).thenReturn(Optional.of(story))
+        return story
     }
 
-    private fun stubSummaryJob(status: JobStatus) {
-        val job = StoryGenerationJob(
-            id = 1L,
-            storyId = storyId,
-            jobType = JobType.STORYBOARD_STORY_SUMMARY,
-            status = status,
+    private fun stubOwnedVoiceProfile() {
+        val profile = VoiceProfile(
+            id = voiceProfileId,
+            userId = userId,
+            title = "내 보이스",
+            audioUrl = "dev/stories/voice/$userId/abc.webm",
         )
-        val activeStatuses = listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS)
-        `when`(
-            jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
-                storyId,
-                JobType.STORYBOARD_STORY_SUMMARY,
-                activeStatuses,
-            )
-        ).thenReturn(if (status in activeStatuses) job else null)
+        `when`(voiceProfileRepository.findByIdAndDeletedAtIsNull(voiceProfileId)).thenReturn(profile)
     }
-
-    private fun buildModifyCommand() = ModifyStoryCommand(
-        title = "수정된 제목",
-        difficulty = null,
-        mainCharacterJson = null,
-        companionsJson = null,
-        travelPlace = null,
-        travelStartDate = null,
-        travelEndDate = null,
-    )
 }
