@@ -26,4 +26,7 @@ enum class JobType {
      * Step 4 의 페이지별 [재생성하기] 버튼 흐름에서만 사용.
      */
     STORYBOARD_IMAGE_REGENERATE,
+
+    /** Step 5 스타일 선택 직후 백그라운드로 시작되는 최종(컬러) 일러스트 잡. */
+    FINAL_ILLUSTRATION,
 }
