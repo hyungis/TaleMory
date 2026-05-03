@@ -151,10 +151,11 @@ export function FinalPreviewStep({
     )
   }
 
-  // 둘 중 하나라도 FAILED 면 에러 화면.
-  const failedJob = ttsJobQuery.data?.status === 'FAILED'
+  // 둘 중 하나라도 terminal-error(FAILED/CANCELLED) 면 에러 화면.
+  const isTerminalError = (status?: string) => status === 'FAILED' || status === 'CANCELLED'
+  const failedJob = isTerminalError(ttsJobQuery.data?.status)
     ? ttsJobQuery.data
-    : finalJobQuery.data?.status === 'FAILED'
+    : isTerminalError(finalJobQuery.data?.status)
       ? finalJobQuery.data
       : null
   if (failedJob) {

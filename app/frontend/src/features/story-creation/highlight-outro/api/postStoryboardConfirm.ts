@@ -10,8 +10,9 @@ export interface ConfirmStoryboardResponse {
   cacheMisses: number
   /**
    * Step 5 PATCH /style 시점에 enqueue 된 FINAL_ILLUSTRATION 잡 id.
-   * SUCCESS/RUNNING 상태의 잡이 있으면 그 id, 그 외(없음/FAILED/CANCELLED)면 null.
-   * Step 8 가 TTS jobId 와 함께 동시 폴링하는 데 사용한다.
+   * 잡이 한 번도 enqueue 되지 않았으면 null. FAILED/CANCELLED 잡 id 도 반환 —
+   * FE 가 폴링해서 실패 화면을 보여줄 수 있도록 의도된 동작.
+   * Step 8 가 TTS jobId 와 함께 동시 폴링한다.
    */
   finalIllustrationJobId: number | null
 }
