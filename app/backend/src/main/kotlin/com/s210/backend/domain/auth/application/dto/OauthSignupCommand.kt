@@ -8,4 +8,5 @@ data class OauthSignupCommand(
     val phone: String?,
     val agreeSms: Boolean,
     val agreeMarketing: Boolean,
+    val restoreConfirmed: Boolean = false,
 )

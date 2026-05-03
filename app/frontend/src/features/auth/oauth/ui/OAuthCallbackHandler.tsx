@@ -6,6 +6,7 @@ import { ROUTES } from '../../../../shared/constants'
 import { mapLoginResponse, type LoginResponse } from '../../login'
 import { clearAuthSession, setAuthSession } from '../../model/authSession'
 import { postKakaoCallback } from '../api/postKakaoCallback'
+import { postKakaoSignup } from '../api/postKakaoSignup'
 import { parseOauthCallbackPayload } from '../lib/parseOauthCallbackPayload'
 import type { KakaoSignupProfile } from '../types'
 import { KakaoSignupForm } from './KakaoSignupForm'
@@ -15,12 +16,19 @@ interface KakaoSignupDraft {
   profile: KakaoSignupProfile
 }
 
+interface KakaoRestoreDraft {
+  signupToken: string
+  profile: KakaoSignupProfile
+}
+
 export function OAuthCallbackHandler() {
   const location = useLocation()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [signupDraft, setSignupDraft] = useState<KakaoSignupDraft | null>(null)
+  const [restoreDraft, setRestoreDraft] = useState<KakaoRestoreDraft | null>(null)
   const [isSignupNoticeOpen, setIsSignupNoticeOpen] = useState(false)
+  const [isRestorePending, setIsRestorePending] = useState(false)
 
   useEffect(() => {
     let isActive = true
@@ -48,11 +56,23 @@ export function OAuthCallbackHandler() {
 
           if (payload.status === 'SIGNUP_REQUIRED') {
             clearAuthSession()
+            setRestoreDraft(null)
             setSignupDraft({
               signupToken: payload.signupToken,
               profile: payload.profile,
             })
             setIsSignupNoticeOpen(true)
+            return
+          }
+
+          if (payload.status === 'RESTORE_REQUIRED') {
+            clearAuthSession()
+            setSignupDraft(null)
+            setIsSignupNoticeOpen(false)
+            setRestoreDraft({
+              signupToken: payload.signupToken,
+              profile: payload.profile,
+            })
             return
           }
 
@@ -119,6 +139,69 @@ export function OAuthCallbackHandler() {
     clearAuthSession()
     setIsSignupNoticeOpen(false)
     navigate(ROUTES.home, { replace: true })
+  }
+
+  const handleKakaoRestoreCancel = () => {
+    if (isRestorePending) return
+
+    clearAuthSession()
+    setRestoreDraft(null)
+    navigate(ROUTES.home, { replace: true })
+  }
+
+  const handleKakaoRestoreConfirm = async () => {
+    if (restoreDraft === null || isRestorePending) return
+
+    setIsRestorePending(true)
+
+    try {
+      const result = await postKakaoSignup({
+        signupToken: restoreDraft.signupToken,
+        email: restoreDraft.profile.email,
+        name: restoreDraft.profile.name,
+        nickname: restoreDraft.profile.nickname,
+        phone: restoreDraft.profile.phone ?? undefined,
+        agreeSms: false,
+        agreeMarketing: false,
+        restoreConfirmed: true,
+      })
+
+      setAuthSession(result)
+      setRestoreDraft(null)
+      navigate(ROUTES.home, {
+        replace: true,
+        state: {
+          skipLanding: true,
+        },
+      })
+    } catch (restoreError) {
+      clearAuthSession()
+      setRestoreDraft(null)
+      setError(isApiError(restoreError) ? restoreError.message : '카카오 계정을 복구하지 못했어요. 다시 시도해주세요.')
+    } finally {
+      setIsRestorePending(false)
+    }
+  }
+
+  if (restoreDraft) {
+    return (
+      <div className="min-h-screen bg-[#f6f0da] flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] shadow-[0_20px_60px_rgba(0,0,0,0.28)] p-8 text-center space-y-4">
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#2d5a27]/10 text-[#2d5a27] flex items-center justify-center">
+            <LoaderCircle className="w-7 h-7 animate-spin" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-[#2a1b12]">카카오 로그인 확인 중</h1>
+            <p className="text-sm text-[#6a5632]">계정 상태를 확인하고 있어요.</p>
+          </div>
+        </div>
+        <KakaoRestoreConfirmDialog
+          isPending={isRestorePending}
+          onCancel={handleKakaoRestoreCancel}
+          onConfirm={handleKakaoRestoreConfirm}
+        />
+      </div>
+    )
   }
 
   if (signupDraft) {
@@ -195,6 +278,58 @@ export function OAuthCallbackHandler() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-[#2a1b12]">카카오 로그인 처리 중</h1>
           <p className="text-sm text-[#6a5632]">인증 정보를 확인하고 있어요. 잠시만 기다려주세요.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function KakaoRestoreConfirmDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[10001] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="kakao-callback-restore-title"
+      onClick={() => {
+        if (!isPending) onCancel()
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] shadow-[0_20px_60px_rgba(0,0,0,0.45)] p-6"
+        onClick={event => event.stopPropagation()}
+      >
+        <h2 id="kakao-callback-restore-title" className="text-xl text-[#2a1b12] font-bold mb-3">
+          계정 복구
+        </h2>
+        <p className="text-sm leading-6 text-[#6a5632] mb-5">
+          기존에 가입한 이력이 있습니다. 복구를 진행할까요?
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="flex-1 bg-[#e8ddb4] text-[#2a1b12] py-3 rounded-xl border border-[#8b7a52]/60 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            아니오
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 bg-[#2d5a27] text-[#f0e6c0] py-3 rounded-xl border border-[#b4dc8c]/40 font-bold shadow-[0_4px_0_#1a3a14] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isPending ? '복구 중...' : '예'}
+          </button>
         </div>
       </div>
     </div>

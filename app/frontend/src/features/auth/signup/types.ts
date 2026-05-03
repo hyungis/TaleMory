@@ -7,4 +7,9 @@ export interface SignupRequest {
   phone?: string
   agreeSms: boolean
   agreeMarketing: boolean
+  restoreConfirmed?: boolean
+}
+
+export interface SignupResponse {
+  userId: number
 }

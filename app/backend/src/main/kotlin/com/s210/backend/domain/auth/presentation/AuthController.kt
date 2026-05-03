@@ -13,6 +13,7 @@ import com.s210.backend.domain.auth.presentation.request.SignupRequest
 import com.s210.backend.domain.auth.presentation.response.AuthResponse
 import com.s210.backend.domain.auth.presentation.response.KakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.response.RefreshTokenResponse
+import com.s210.backend.domain.auth.presentation.response.SignupResponse
 import com.s210.backend.domain.auth.presentation.response.toAuthResponse
 import com.s210.backend.domain.auth.presentation.response.toKakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.support.RefreshTokenCookieManager
@@ -33,9 +34,10 @@ class AuthController(
 ) {
 
     @PostMapping("/signup")
-    fun authSignup(@RequestBody request: SignupRequest): ResponseEntity<ApiResponse<Unit>> {
-        return ResponseEntity.ok(memberService.signUp(request.toCommand()))
-    }
+    fun authSignup(@RequestBody request: SignupRequest): ResponseEntity<ApiResponse<SignupResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(data = SignupResponse(userId = memberService.signUp(request.toCommand()))),
+        )
 
     @PostMapping("/login")
     fun authLogin(
