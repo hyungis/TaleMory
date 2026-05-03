@@ -426,11 +426,73 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
         </main>
       </div>
 
+      {vc.attachStatus === 'failed' && (
+        <div
+          role="alert"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 92,
+            margin: '0 auto',
+            maxWidth: 640,
+            background: '#fcefe7',
+            border: '2px solid var(--cr-rust)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            fontFamily: 'var(--cr-font-gaegu)',
+            color: 'var(--cr-rust)',
+            boxShadow: '0 3px 0 var(--cr-rust), 0 6px 14px rgba(180,90,50,0.2)',
+            zIndex: 20,
+          }}
+        >
+          <span>
+            음성을 동화에 연결하지 못했어요. 잠시 후 "다시 연결" 을 눌러주세요.
+            {vc.attachError && <span style={{ display: 'block', fontSize: 12, marginTop: 4, opacity: 0.8 }}>{vc.attachError}</span>}
+          </span>
+          <button
+            type="button"
+            onClick={() => void vc.retryAttach()}
+            disabled={vc.attachStatus !== 'failed'}
+            style={{
+              flexShrink: 0,
+              background: 'var(--cr-rust)',
+              color: '#fdf6dc',
+              border: '2px solid #8a4a32',
+              borderRadius: 999,
+              padding: '6px 16px',
+              fontFamily: 'var(--cr-font-gaegu)',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            다시 연결
+          </button>
+        </div>
+      )}
+
       <CreationFooter
         currentStep={6}
         onBack={onBack}
         rightSlot={
-          <button type="button" onClick={onNext} className="cr-btn-next">
+          <button
+            type="button"
+            onClick={onNext}
+            className="cr-btn-next"
+            disabled={vc.savedProfileId !== null && vc.attachStatus !== 'attached'}
+            title={
+              vc.savedProfileId !== null && vc.attachStatus === 'attaching'
+                ? '음성 연결 중...'
+                : vc.savedProfileId !== null && vc.attachStatus === 'failed'
+                  ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
+                  : undefined
+            }
+          >
             <span>동화책 만들기</span>
             <Sparkles className="w-4 h-4" />
           </button>
