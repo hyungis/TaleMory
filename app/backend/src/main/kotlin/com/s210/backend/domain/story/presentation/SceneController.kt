@@ -22,6 +22,7 @@ import com.s210.backend.domain.story.presentation.response.OutroResponse
 import com.s210.backend.domain.story.presentation.response.PresignedUrlResponse
 import com.s210.backend.domain.story.presentation.response.ProgressResponse
 import com.s210.backend.domain.story.presentation.response.SceneResponse
+import com.s210.backend.domain.story.presentation.response.StyleModifyResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -140,9 +141,9 @@ class SceneController(
         @PathVariable storyId: Long,
         @RequestBody request: StyleModifyRequest,
         @AuthenticationPrincipal user: CustomUser,
-    ): ResponseEntity<ApiResponse<Unit>> {
-        storyService.modifyStyle(user.userId, storyId, request.stylePresetId)
-        return ResponseEntity.ok(ApiResponse(data = null))
+    ): ResponseEntity<ApiResponse<StyleModifyResponse>> {
+        val jobId = storyService.modifyStyle(user.userId, storyId, request.stylePresetId)
+        return ResponseEntity.ok(ApiResponse(data = StyleModifyResponse(finalIllustrationJobId = jobId)))
     }
 
     // 보이스 프로필 선택 — Step 5 보이스 클론 commit/load 직후 FE 가 호출.
