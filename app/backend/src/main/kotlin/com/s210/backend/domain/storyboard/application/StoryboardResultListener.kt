@@ -12,6 +12,7 @@ import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryResultEnvelope
@@ -57,6 +58,7 @@ class StoryboardResultListener(
     private val sceneRepository: SceneRepository,
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
+    private val finalIllustrationResultHandler: FinalIllustrationResultHandler,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -79,6 +81,9 @@ class StoryboardResultListener(
             val STORY = setOf("GENERATE_STORY_COMPLETED", "GENERATE_STORY_FAILED")
             val TTS = setOf("GENERATE_TTS_COMPLETED", "GENERATE_TTS_FAILED")
             val TTS_PREVIEW = setOf("GENERATE_TTS_PREVIEW_COMPLETED", "GENERATE_TTS_PREVIEW_FAILED")
+            val FINAL_ILLUSTRATION = setOf(
+                "GENERATE_FINAL_ILLUSTRATION_COMPLETED", "GENERATE_FINAL_ILLUSTRATION_FAILED",
+            )
         }
     }
 
@@ -141,6 +146,15 @@ class StoryboardResultListener(
                     type, envelope.jobId, envelope.status,
                 )
                 ttsResultHandler.handle(envelope)
+            }
+            in EnvelopeTypes.FINAL_ILLUSTRATION -> {
+                val envelope = objectMapper.treeToValue(tree, FinalIllustrationResultEnvelope::class.java)
+                log.info(
+                    "[FINAL_ILLUST:RES] received — type={}, jobId={}, page={}, status={}",
+                    type, envelope.jobId, envelope.pageNumber, envelope.status,
+                )
+                if (envelope.status == "COMPLETED") finalIllustrationResultHandler.handleSuccess(envelope)
+                else finalIllustrationResultHandler.handleFailure(envelope)
             }
             else -> log.warn("Unknown envelope type='{}', body={}", type, body)
         }

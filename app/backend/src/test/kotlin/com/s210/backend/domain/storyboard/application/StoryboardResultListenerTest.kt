@@ -46,6 +46,8 @@ class StoryboardResultListenerTest {
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository = mock(IllustrationVersionRedisRepository::class.java)
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository =
         mock(StoryboardPageImageVersionRedisRepository::class.java)
+    private val finalIllustrationResultHandler: FinalIllustrationResultHandler =
+        mock(FinalIllustrationResultHandler::class.java)
     private val objectMapper = jacksonObjectMapper()
 
     private val listener = StoryboardResultListener(
@@ -58,6 +60,7 @@ class StoryboardResultListenerTest {
         sceneRepository = sceneRepository,
         illustrationVersionRedisRepository = illustrationVersionRedisRepository,
         storyboardPageImageVersionRepository = storyboardPageImageVersionRepository,
+        finalIllustrationResultHandler = finalIllustrationResultHandler,
     )
 
     // -----------------------------------------------------------------------
