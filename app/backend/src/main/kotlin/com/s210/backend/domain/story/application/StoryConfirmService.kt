@@ -126,14 +126,24 @@ class StoryConfirmService(
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
-        // 6) Scene + SceneSentence INSERT
+        // 6) 최신 FINAL_ILLUSTRATION 잡의 페이지별 결과 (있으면 우선 사용).
+        val latestFinalJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
+            storyId, JobType.FINAL_ILLUSTRATION,
+        )
+        val finalUrlsByPage: Map<Int, String> = latestFinalJob
+            ?.takeIf { it.status == JobStatus.SUCCESS || it.status == JobStatus.RUNNING }
+            ?.resultPayload
+            ?.let { runCatching { parseFinalUrlMap(it) }.getOrNull() }
+            ?: emptyMap()
+
+        // 7) Scene + SceneSentence INSERT
         var totalSentences = 0
         val createdScenes = pages.map { page ->
             val scene = sceneRepository.save(
                 Scene(
                     storyId = storyId,
                     pageNumber = page.pageNumber,
-                    illustrationUrl = page.imageUrl,
+                    illustrationUrl = finalUrlsByPage[page.pageNumber] ?: page.imageUrl,
                     characterAnchors = null,
                 )
             )
@@ -156,14 +166,14 @@ class StoryConfirmService(
             scene
         }
 
-        // 7) StoryOutro 보장
+        // 8) StoryOutro 보장
         if (storyOutroRepository.findByStoryIdAndDeletedAtIsNull(storyId) == null) {
             storyOutroRepository.save(
                 StoryOutro(storyId = storyId, outroText = "", audioUrl = null, signature = null)
             )
         }
 
-        // 8) TTS 잡 row 생성 (PENDING)
+        // 9) TTS 잡 row 생성 (PENDING)
         val ttsJob = jobRepository.save(
             StoryGenerationJob(
                 storyId = storyId,
@@ -172,7 +182,7 @@ class StoryConfirmService(
             )
         )
 
-        // 9) Redis versions 초기화 — best-effort, 실패해도 응답은 정상
+        // 10) Redis versions 초기화 — best-effort, 실패해도 응답은 정상
         createdScenes.forEach { scene ->
             try {
                 illustrationVersionRedisRepository.pushVersion(
@@ -187,7 +197,7 @@ class StoryConfirmService(
             }
         }
 
-        // 10) TTS 사전 캐시 조회 — 모든 SceneSentence 에 대해
+        // 11) TTS 사전 캐시 조회 — 모든 SceneSentence 에 대해
         val voiceProfileId = story.voiceProfileId!!
         val voiceProfile = voiceProfileRepository.findById(voiceProfileId).orElseThrow {
             BusinessException(StoryErrorCode.INVALID_STORY_STATE)
@@ -224,7 +234,7 @@ class StoryConfirmService(
         val sentenceCount = allSentences.size
         val cacheMisses = missSentences.size
 
-        // 11) Job status Redis HSET (best-effort)
+        // 12) Job status Redis HSET (best-effort)
         try {
             jobStatusRedisRepo.setStatus(
                 storyId = storyId,
@@ -236,7 +246,7 @@ class StoryConfirmService(
             log.warn("Redis status init failed for story {}: {}", storyId, e.message)
         }
 
-        // 12) MQ publish (cache miss 있을 때만) 또는 즉시 SUCCESS
+        // 13) MQ publish (cache miss 있을 때만) 또는 즉시 SUCCESS
         val finalStatus = if (cacheMisses > 0) {
             ttsService.publish(
                     StoryTtsJobMessage(
@@ -270,7 +280,7 @@ class StoryConfirmService(
             JobStatus.SUCCESS
         }
 
-        // 13) 결과 반환
+        // 14) 결과 반환
         return ConfirmStoryboardResult(
             jobId = ttsJob.id,
             jobType = "TTS",
@@ -279,7 +289,21 @@ class StoryConfirmService(
             sentenceCount = sentenceCount,
             cacheHits = cacheHits,
             cacheMisses = cacheMisses,
+            finalIllustrationJobId = latestFinalJob?.id,
         )
+    }
+
+    /**
+     * FINAL_ILLUSTRATION 잡 resultPayload 의 JSON `{"1":"url1","2":"url2",...}` 를
+     * Map<pageNumber, imageUrl> 로 파싱. 실패 시 null 리턴 (caller 가 emptyMap 으로 폴백).
+     */
+    private fun parseFinalUrlMap(json: String): Map<Int, String> {
+        val map = objectMapper.readValue(json, Map::class.java) as Map<*, *>
+        return map.entries.mapNotNull { (k, v) ->
+            val page = k?.toString()?.toIntOrNull() ?: return@mapNotNull null
+            val url = v?.toString() ?: return@mapNotNull null
+            page to url
+        }.toMap()
     }
 
     /**

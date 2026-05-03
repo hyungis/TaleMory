@@ -5,7 +5,7 @@ import {
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
 } from '../lib/defaults'
-import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript, postVoicePreview, getVoicePreview } from '../api/voiceProfileApi'
+import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript, postVoicePreview, getVoicePreview, attachVoiceProfileToStory } from '../api/voiceProfileApi'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -163,6 +163,23 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     streamRef.current = null
   }, [])
 
+  /**
+   * voice profile 을 현재 story 에 묶는다 — best-effort.
+   *
+   * Step 5 의 commit / load 직후 호출되어 stories.voice_profile_id 를 채워야
+   * Step 7 → 8 confirm 가드(409 INVALID_STORY_STATE)를 통과한다.
+   * 실패해도 사용자 흐름은 막지 않는다 — confirm 시점에서 가드에 의해 명시적으로 거부되므로
+   * 사용자에게 별도 에러 토스트를 띄우지 않는다.
+   */
+  const tryAttachToStory = useCallback(async (voiceProfileId: number) => {
+    if (!storyId) return
+    try {
+      await attachVoiceProfileToStory(storyId, voiceProfileId)
+    } catch (err) {
+      console.warn('attachVoiceProfileToStory failed:', err)
+    }
+  }, [storyId])
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -221,6 +238,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         }
         setVoiceTitle(latest.title || '')
         setSavedProfileId(latest.voiceProfileId)
+        await tryAttachToStory(latest.voiceProfileId)
         setStatus('ready')
         setStatusLabel('기존 음성 불러옴')
         setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
@@ -233,7 +251,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } catch {
       alert('저장된 음성을 불러오지 못했습니다.')
     }
-  }, [])
+  }, [tryAttachToStory])
 
   const previewTts = useCallback(async () => {
     if (!recordedAudioUrl) {
@@ -260,6 +278,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
         profileId = profile.voiceProfileId
         setSavedProfileId(profileId)
+        await tryAttachToStory(profileId)
       }
 
       // BE에 TTS 미리듣기 비동기 작업 요청
@@ -312,7 +331,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } finally {
       setIsTtsLoading(false)
     }
-  }, [recordedAudioUrl, ttsText, savedProfileId])
+  }, [recordedAudioUrl, ttsText, savedProfileId, tryAttachToStory])
 
   /**
    * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).
@@ -339,6 +358,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
       const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
 
       setSavedProfileId(profile.voiceProfileId)
+      await tryAttachToStory(profile.voiceProfileId)
       setStatus('ready')
       setStatusLabel('서버에 저장 완료')
       setSavedVoiceSummary(`녹음이 저장되었습니다. (ID: ${profile.voiceProfileId})`)
@@ -350,7 +370,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } finally {
       setIsSaving(false)
     }
-  }, [recordedAudioUrl])
+  }, [recordedAudioUrl, tryAttachToStory])
 
   const toggleAudioPlayback = useCallback(() => {
     const el = audioRef.current

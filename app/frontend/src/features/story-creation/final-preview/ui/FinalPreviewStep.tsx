@@ -24,6 +24,12 @@ import '../../styles/creation-paper.css'
 interface FinalPreviewStepProps {
   storyId: number | null
   storyGenerationJobId: number | null
+  /**
+   * Step 5 PATCH /style 시점에 enqueue 된 FINAL_ILLUSTRATION 잡 id.
+   * null 이면 폴링 없이 (구버전 흐름 호환).
+   * non-null 이면 TTS 와 함께 둘 다 SUCCESS 일 때까지 대기.
+   */
+  finalIllustrationJobId: number | null
   onBack: () => void
   onSaveToBookshelf: () => void
   onOpenViewer: () => void
@@ -36,17 +42,24 @@ interface FinalPreviewStepProps {
 export function FinalPreviewStep({
   storyId,
   storyGenerationJobId,
+  finalIllustrationJobId,
   onBack,
   onSaveToBookshelf,
   onOpenViewer,
   onShare,
 }: FinalPreviewStepProps) {
-  const jobQuery = useGenerationJobQuery(storyGenerationJobId)
+  const ttsJobQuery = useGenerationJobQuery(storyGenerationJobId)
+  const finalJobQuery = useGenerationJobQuery(finalIllustrationJobId)
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [outro, setOutro] = useState<OutroDto | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
+
+  // 두 잡 모두 (있다면) SUCCESS 여야 fetch.
+  const ttsReady = !storyGenerationJobId || ttsJobQuery.data?.status === 'SUCCESS'
+  const finalReady = !finalIllustrationJobId || finalJobQuery.data?.status === 'SUCCESS'
+  const shouldFetch = ttsReady && finalReady
 
   useEffect(() => {
     if (!storyId) {
@@ -55,7 +68,6 @@ export function FinalPreviewStep({
       return
     }
 
-    const shouldFetch = !storyGenerationJobId || jobQuery.data?.status === 'SUCCESS'
     if (!shouldFetch) return
 
     let cancelled = false
@@ -77,7 +89,7 @@ export function FinalPreviewStep({
     return () => {
       cancelled = true
     }
-  }, [storyId, jobQuery.data?.status, storyGenerationJobId])
+  }, [storyId, shouldFetch])
 
   const totalPages = scenes.length
   const currentScene = scenes[resultPageIndex] ?? null
@@ -108,13 +120,23 @@ export function FinalPreviewStep({
     }
   }, [onShare])
 
-  const isJobInProgress =
+  // 두 잡 중 하나라도 PENDING/RUNNING 이거나 scenes fetch 중이면 blocking.
+  const ttsInProgress =
     !!storyGenerationJobId &&
-    (jobQuery.data?.status === 'PENDING' || jobQuery.data?.status === 'RUNNING')
-  const blocking = isJobInProgress || loadingScenes
+    (ttsJobQuery.data?.status === 'PENDING' || ttsJobQuery.data?.status === 'RUNNING')
+  const finalInProgress =
+    !!finalIllustrationJobId &&
+    (finalJobQuery.data?.status === 'PENDING' || finalJobQuery.data?.status === 'RUNNING')
+  const blocking = ttsInProgress || finalInProgress || loadingScenes
 
   if (blocking) {
-    const message = jobQuery.data?.currentStep ?? '동화책 만드는 중...'
+    // 두 잡 진행 중일 땐 "어떤 단계가 미완" 인지 사용자에게 표시.
+    const message = (() => {
+      if (finalInProgress && ttsInProgress) return '동화책 만드는 중... (삽화 + 음성)'
+      if (finalInProgress) return '컬러 삽화 마무리 중...'
+      if (ttsInProgress) return ttsJobQuery.data?.currentStep ?? '음성 생성 중...'
+      return '동화 데이터 불러오는 중...'
+    })()
     return (
       <div className="cr-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -127,18 +149,25 @@ export function FinalPreviewStep({
     )
   }
 
-  if (jobQuery.data?.status === 'FAILED') {
+  // 둘 중 하나라도 terminal-error(FAILED/CANCELLED) 면 에러 화면.
+  const isTerminalError = (status?: string) => status === 'FAILED' || status === 'CANCELLED'
+  const failedJob = isTerminalError(ttsJobQuery.data?.status)
+    ? ttsJobQuery.data
+    : isTerminalError(finalJobQuery.data?.status)
+      ? finalJobQuery.data
+      : null
+  if (failedJob) {
     return (
       <div
         className="cr-shell"
         style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}
       >
         <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-rust)' }}>
-          동화 음성 생성에 실패했어요.
+          동화 생성에 실패했어요.
         </p>
-        {jobQuery.data.errorMessage && (
+        {failedJob.errorMessage && (
           <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-ink-soft)' }}>
-            {jobQuery.data.errorMessage}
+            {failedJob.errorMessage}
           </p>
         )}
         <button type="button" onClick={onBack} className="cr-btn-back">

@@ -22,6 +22,9 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRep
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.story.presentation.response.ShareLinkResponse
 import com.s210.backend.domain.story.presentation.response.StoryResponse
+import com.s210.backend.domain.storyboard.application.FinalIllustrationGenerationService
+import com.s210.backend.domain.voice.exception.VoiceErrorCode
+import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
@@ -51,7 +54,9 @@ class StoryService(
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val finalIllustrationGenerationService: FinalIllustrationGenerationService,
     private val jobRepository: StoryGenerationJobRepository,
+    private val voiceProfileRepository: VoiceProfileRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     /**
@@ -345,12 +350,42 @@ class StoryService(
         story.bgmPresetId = bgmPresetId
     }
 
-    fun modifyStyle(userId: Long, storyId: Long, stylePresetId: Long) {
+    /**
+     * @return Step 5 직후 백그라운드 enqueue 된 FINAL_ILLUSTRATION 잡 id
+     *         (같은 stylePresetId 재선택 시 멱등 가드로 기존 jobId 반환).
+     */
+    fun modifyStyle(userId: Long, storyId: Long, stylePresetId: Long): Long {
         val story = ownedStory(userId, storyId)
         if (!stylePresetRepository.existsById(stylePresetId)) {
             throw BusinessException(StoryErrorCode.STYLE_PRESET_NOT_FOUND)
         }
         story.stylePresetId = stylePresetId
+        return finalIllustrationGenerationService.enqueue(storyId, stylePresetId)
+    }
+
+    /**
+     * 보이스 프로필을 동화에 연결한다 — Step 5 보이스 클론 commit/load 직후 호출.
+     *
+     * Story.voiceProfileId 는 StoryConfirmService 가 Step 7 → 8 진입 시 필수로 검증한다
+     * (없으면 INVALID_STORY_STATE/409). 즉 confirm 전까지 반드시 한 번 채워져야 한다.
+     *
+     * 가드:
+     *  - 동화 소유권: 다른 유저면 403 FORBIDDEN
+     *  - 동화 상태: DRAFT 가 아니면 409 INVALID_STORY_STATE — PUBLISHED 동화의 보이스 교체 차단
+     *  - 보이스 프로필 존재 + soft-delete 미반영: 404 VOICE_010
+     *  - 보이스 프로필 소유권: 다른 유저 소유면 403 VOICE_011
+     */
+    fun modifyVoiceProfile(userId: Long, storyId: Long, voiceProfileId: Long) {
+        val story = ownedStory(userId, storyId)
+        if (story.status != StoryStatus.DRAFT) {
+            throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        }
+        val voiceProfile = voiceProfileRepository.findByIdAndDeletedAtIsNull(voiceProfileId)
+            ?: throw BusinessException(VoiceErrorCode.NOT_FOUND)
+        if (voiceProfile.userId != userId) {
+            throw BusinessException(VoiceErrorCode.FORBIDDEN)
+        }
+        story.voiceProfileId = voiceProfileId
     }
 
     /**

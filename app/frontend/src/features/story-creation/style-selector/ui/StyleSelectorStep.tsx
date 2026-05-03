@@ -14,13 +14,18 @@ interface StyleSelectorStepProps {
   onStyleChange: (style: StylePresetCode) => void
   onBack: () => void
   onNext: () => void
+  /**
+   * Step 5 PATCH /style 응답으로 받은 FINAL_ILLUSTRATION 잡 id 를 store 에 저장한다.
+   * Step 8 FinalPreviewStep 가 이 jobId 로 폴링.
+   */
+  setFinalIllustrationJobId: (jobId: number) => void
 }
 
 /**
  * STEP 05 — paper-craft 톤 (Claude offline.html 1:1).
  * 서버에서 프리셋 목록을 조회하고, 선택 시 PATCH 로 저장한 뒤 다음 단계로 이동.
  */
-export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext }: StyleSelectorStepProps) {
+export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext, setFinalIllustrationJobId }: StyleSelectorStepProps) {
   const presetsQuery = useStylePresetsQuery()
   const stylePatch = useStoryStylePatch(storyId)
 
@@ -31,7 +36,12 @@ export function StyleSelectorStep({ data, storyId, onStyleChange, onBack, onNext
       onNext()
       return
     }
-    stylePatch.mutate(selected.id, { onSuccess: () => onNext() })
+    stylePatch.mutate(selected.id, {
+      onSuccess: (response) => {
+        setFinalIllustrationJobId(response.finalIllustrationJobId)
+        onNext()
+      },
+    })
   }
 
   return (

@@ -30,4 +30,5 @@ enum class StoryErrorCode(
     MAX_CHARACTER_PHOTOS_EXCEEDED(HttpStatus.BAD_REQUEST, "STORY_020", "대표 사진은 최대 3장까지 선택할 수 있습니다."),
     CHARACTER_PHOTOS_LOCKED(HttpStatus.CONFLICT, "STORY_021", "스토리보드 생성이 시작되어 대표 사진을 변경할 수 없습니다."),
     STEP_LOCKED_BY_SUMMARY(HttpStatus.CONFLICT, "STORY_022", "본문(줄거리)이 이미 생성되어 변경할 수 없습니다."),
+    STORYBOARD_IMAGES_NOT_READY(HttpStatus.CONFLICT, "STORY_023", "스토리보드 이미지가 아직 모두 준비되지 않았습니다."),
 }
