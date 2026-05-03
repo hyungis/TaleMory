@@ -47,27 +47,31 @@ class MemberService(
             throw BusinessException(CommonErrorCode.DUPLICATE_LOGIN_ID)
         }
 
+        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(command.email)
+        if (existingEmailUser != null) {
+            throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+        }
+
         val withdrawnLoginUser = memberRepository
             .findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.loginId)
+        val withdrawnEmailUser = memberRepository
+            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.email)
+
         if (withdrawnLoginUser != null) {
             if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
-            return restoreUser(withdrawnLoginUser)
+            if (withdrawnEmailUser != null && withdrawnEmailUser.id != withdrawnLoginUser.id) {
+                throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+            }
+            return restoreUser(withdrawnLoginUser, command)
         }
 
-        val withdrawnEmailUser = memberRepository
-            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.email)
         if (withdrawnEmailUser != null) {
             if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
-            return restoreUser(withdrawnEmailUser)
-        }
-
-        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(command.email)
-        if (existingEmailUser != null) {
-            throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+            return restoreUser(withdrawnEmailUser, command)
         }
 
         return memberRepository.save(
@@ -278,6 +282,19 @@ class MemberService(
             .forEach { oauthAccount -> oauthAccount.deletedAt = null }
 
         return user.id
+    }
+
+    private fun restoreUser(user: User, command: SignupCommand): Long {
+        user.loginId = command.loginId
+        user.passwordHash = passwordEncoder.encode(command.password)
+        user.email = command.email
+        user.name = command.name
+        user.nickname = command.nickname
+        user.phone = command.phone
+        user.agreeSms = command.agreeSms
+        user.agreeMarketing = command.agreeMarketing
+
+        return restoreUser(user)
     }
 
     fun logoutWithOauthCallback(provider: String, refreshToken: String?) {

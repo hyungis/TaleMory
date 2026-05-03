@@ -82,14 +82,19 @@ class MemberServiceSignupRestoreTest {
             memberRepository.findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc("old-login"),
         ).thenReturn(user)
         `when`(oauthAccountRepository.findAllByUser_Id(user.id)).thenReturn(listOf(oauthAccount))
+        `when`(passwordEncoder.encode("new-password")).thenReturn("encoded-new-password")
 
         val userId = service.signUp(signupCommand(restoreConfirmed = true))
 
         assertEquals(user.id, userId)
-        assertEquals("old-password", user.passwordHash)
-        assertEquals("old@example.com", user.email)
-        assertEquals("기존 이름", user.name)
-        assertEquals("기존 닉네임", user.nickname)
+        assertEquals("old-login", user.loginId)
+        assertEquals("encoded-new-password", user.passwordHash)
+        assertEquals("new@example.com", user.email)
+        assertEquals("새 이름", user.name)
+        assertEquals("새 닉네임", user.nickname)
+        assertEquals("010-1234-5678", user.phone)
+        assertTrue(user.agreeSms)
+        assertTrue(user.agreeMarketing)
         assertNull(user.deletedAt)
         assertNull(oauthAccount.deletedAt)
     }
@@ -102,12 +107,16 @@ class MemberServiceSignupRestoreTest {
             memberRepository.findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc("new@example.com"),
         ).thenReturn(user)
         `when`(oauthAccountRepository.findAllByUser_Id(user.id)).thenReturn(emptyList())
+        `when`(passwordEncoder.encode("new-password")).thenReturn("encoded-new-password")
 
         val userId = service.signUp(signupCommand(restoreConfirmed = true))
 
         assertEquals(user.id, userId)
         assertEquals("old-login", user.loginId)
-        assertEquals("old@example.com", user.email)
+        assertEquals("encoded-new-password", user.passwordHash)
+        assertEquals("new@example.com", user.email)
+        assertEquals("새 이름", user.name)
+        assertEquals("새 닉네임", user.nickname)
         assertNull(user.deletedAt)
     }
 
