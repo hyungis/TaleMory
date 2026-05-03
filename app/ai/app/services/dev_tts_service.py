@@ -539,6 +539,14 @@ def generate_story_tts_result(
         "summary": {
             "sentenceCount": len(items),
         },
+        "usage": {
+            "model": "cosyvoice",
+            "inputTokens": None,
+            "outputTokens": None,
+            "totalTokens": None,
+            "costUsd": None,
+            "promptTemplateVersion": "tts_v1",
+        },
     }
 
     if request["options"].get("generateFullBookAudio") and sentence_paths and all(

@@ -52,6 +52,15 @@ class TtsSummary(BaseModel):
     sentenceCount: int
 
 
+class TtsUsage(BaseModel):
+    model: str
+    inputTokens: int | None = None
+    outputTokens: int | None = None
+    totalTokens: int | None = None
+    costUsd: float | None = None
+    promptTemplateVersion: str
+
+
 class StoryTtsResultPayload(BaseModel):
     storyId: int
     voiceId: str
@@ -59,6 +68,7 @@ class StoryTtsResultPayload(BaseModel):
     sceneSentenceUpdates: list[TtsSentenceUpdate]
     summary: TtsSummary
     fullBookAudio: TtsAudioAsset | None = None
+    usage: TtsUsage
 
 
 class TtsSuccessEnvelope(BaseModel):
