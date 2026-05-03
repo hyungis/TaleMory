@@ -169,10 +169,7 @@ export function CreationPage() {
           storyGenerationJobId={flow.storyGenerationJobId}
           finalIllustrationJobId={flow.finalIllustrationJobId}
           onBack={handleBack}
-          onSaveToBookshelf={goToBookshelf}
-          onOpenViewer={() => {
-            if (flow.storyId) navigate(buildViewerPath(flow.storyId))
-          }}
+          onNext={flow.handleNext}
         />
       )}
 
@@ -180,7 +177,10 @@ export function CreationPage() {
         <PublishStoryStep
           storyId={flow.storyId}
           onBack={handleBack}
-          onExit={goToBookshelf}
+          onSaveToBookshelf={goToBookshelf}
+          onOpenViewer={() => {
+            if (flow.storyId) navigate(buildViewerPath(flow.storyId))
+          }}
         />
       )}
     </div>
