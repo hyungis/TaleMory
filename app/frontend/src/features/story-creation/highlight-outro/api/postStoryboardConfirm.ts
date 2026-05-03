@@ -8,6 +8,12 @@ export interface ConfirmStoryboardResponse {
   sentenceCount: number
   cacheHits: number
   cacheMisses: number
+  /**
+   * Step 5 PATCH /style 시점에 enqueue 된 FINAL_ILLUSTRATION 잡 id.
+   * SUCCESS/RUNNING 상태의 잡이 있으면 그 id, 그 외(없음/FAILED/CANCELLED)면 null.
+   * Step 8 가 TTS jobId 와 함께 동시 폴링하는 데 사용한다.
+   */
+  finalIllustrationJobId: number | null
 }
 
 /**
