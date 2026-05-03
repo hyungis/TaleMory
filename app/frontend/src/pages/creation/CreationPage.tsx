@@ -139,6 +139,7 @@ export function CreationPage() {
           onStyleChange={flow.updateStyle}
           onBack={handleBack}
           onNext={flow.handleNext}
+          setFinalIllustrationJobId={flow.setFinalIllustrationJobId}
         />
       )}
 
@@ -158,6 +159,7 @@ export function CreationPage() {
           onBack={handleBack}
           onNext={flow.handleNext}
           setStoryGenerationJobId={flow.setStoryGenerationJobId}
+          setFinalIllustrationJobId={flow.setFinalIllustrationJobId}
         />
       )}
 
@@ -165,6 +167,7 @@ export function CreationPage() {
         <FinalPreviewStep
           storyId={flow.storyId}
           storyGenerationJobId={flow.storyGenerationJobId}
+          finalIllustrationJobId={flow.finalIllustrationJobId}
           onBack={handleBack}
           onSaveToBookshelf={goToBookshelf}
           onOpenViewer={() => {
