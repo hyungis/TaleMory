@@ -110,6 +110,10 @@ class Settings(BaseModel):
         "RABBITMQ_SUMMARY_REGENERATE_QUEUE",
         "ai.cpu.story.summary.regenerate.request.queue",
     )
+    RABBITMQ_SENTENCE_TRANSLATE_QUEUE: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_QUEUE",
+        "ai.cpu.story.sentences.translate.request.queue",
+    )
     RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.story.regenerate.request.queue")
     RABBITMQ_TTS_GENERATE_QUEUE: str = getenv("RABBITMQ_TTS_GENERATE_QUEUE", "ai.gpu.request.queue")
     RABBITMQ_TTS_RESULT_QUEUE: str = getenv("RABBITMQ_TTS_RESULT_QUEUE", "ai.result.tts.queue")
@@ -122,6 +126,10 @@ class Settings(BaseModel):
     RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY",
         "ai.cpu.story.summary.regenerate",
+    )
+    RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY",
+        "ai.cpu.story.sentences.translate",
     )
     RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
     RABBITMQ_TTS_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_TTS_GENERATE_ROUTING_KEY", "ai.gpu.tts.generate")
@@ -187,6 +195,10 @@ class Settings(BaseModel):
         "RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY",
         "ai.result.story.summary.regenerate.completed",
     )
+    RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY",
+        "ai.result.story.sentences.translate.completed",
+    )
     RABBITMQ_GENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.generate.failed",
@@ -198,6 +210,10 @@ class Settings(BaseModel):
     RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.summary.regenerate.failed",
+    )
+    RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY",
+        "ai.result.story.sentences.translate.failed",
     )
     RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY",
