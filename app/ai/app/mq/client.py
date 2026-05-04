@@ -20,7 +20,7 @@ def create_connection() -> Any:
 
 def create_channel(connection: Any) -> Any:
     channel = connection.channel()
-    channel.basic_qos(prefetch_count=1)
+    channel.basic_qos(prefetch_count=settings.RABBITMQ_PREFETCH_COUNT)
     return channel
 
 

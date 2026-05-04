@@ -59,6 +59,12 @@ class Settings(BaseModel):
         "high",
     )
     STORYBOARD_IMAGE_MODEL: str = getenv("STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
+    STORYBOARD_IMAGE_INPUT_COST_PER_1M: float = float(
+        getenv("STORYBOARD_IMAGE_INPUT_COST_PER_1M", "0.30")
+    )
+    STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE: float = float(
+        getenv("STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE", "0.039")
+    )
     FINAL_ILLUSTRATION_MODEL: str = getenv("FINAL_ILLUSTRATION_MODEL", "black-forest-labs/flux-2-klein-9b")
     STORYBOARD_IMAGE_S3_BUCKET: str | None = getenv("STORYBOARD_IMAGE_S3_BUCKET", getenv("AWS_S3_BUCKET"))
     STORYBOARD_IMAGE_S3_REGION: str | None = getenv("STORYBOARD_IMAGE_S3_REGION", getenv("AWS_REGION"))
@@ -89,6 +95,22 @@ class Settings(BaseModel):
     RABBITMQ_USER: str = getenv("RABBITMQ_USERNAME", getenv("RABBITMQ_USER", "guest"))
     RABBITMQ_PASSWORD: str = getenv("RABBITMQ_PASSWORD", "guest")
     RABBITMQ_VHOST: str = getenv("RABBITMQ_VHOST", "/")
+    AI_WORKER_CONCURRENCY: int = int(getenv("AI_WORKER_CONCURRENCY", "2"))
+    AI_STORY_API_CONCURRENCY: int = int(
+        getenv(
+            "AI_STORY_API_CONCURRENCY",
+            getenv("AI_API_CONCURRENCY", getenv("AI_WORKER_CONCURRENCY", "2")),
+        )
+    )
+    AI_IMAGE_API_CONCURRENCY: int = int(
+        getenv(
+            "AI_IMAGE_API_CONCURRENCY",
+            getenv("AI_API_CONCURRENCY", getenv("RABBITMQ_PREFETCH_COUNT", "10")),
+        )
+    )
+    RABBITMQ_PREFETCH_COUNT: int = int(
+        getenv("RABBITMQ_PREFETCH_COUNT", getenv("AI_WORKER_CONCURRENCY", "2"))
+    )
     RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "ai.request")
     RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
     RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.story.generate.request.queue")
