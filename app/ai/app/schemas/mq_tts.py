@@ -67,7 +67,6 @@ class StoryTtsResultPayload(BaseModel):
     items: list[TtsSentenceItem]
     sceneSentenceUpdates: list[TtsSentenceUpdate]
     summary: TtsSummary
-    fullBookAudio: TtsAudioAsset | None = None
     usage: TtsUsage
 
 

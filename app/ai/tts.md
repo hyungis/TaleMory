@@ -18,7 +18,7 @@
 3. 백엔드는 문장별로 TTS 캐시를 조회한다.
 4. 캐시 miss 문장만 모아서 `StoryTtsJobMessage` 한 건으로 `ai.gpu.tts.generate`에 publish한다.
 5. AI worker가 [tts_consumer.py](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/ai/app/consumers/tts_consumer.py)에서 story TTS 큐를 consume한다.
-6. AI는 문장마다 CosyVoice를 한 번씩 호출하고, 문장 오디오를 저장하고, 필요하면 full-book wav도 만든 뒤 결과 envelope를 publish한다.
+6. AI worker generates and stores sentence-level TTS audio, then publishes the result envelope.
 7. 백엔드 [TtsResultHandler.kt](/c:/Users/SSAFY/Desktop/talemory/S14P31S210/app/backend/src/main/kotlin/com/s210/backend/domain/tts/application/TtsResultHandler.kt)가 `scene_sentences.tts_audio_url`을 문장별로 채우고 job 결과를 저장한다.
 
 중요: 현재 RabbitMQ는 이미 story 단위로 묶여 있다. 느린 부분은 백엔드 publish 횟수가 아니라 AI worker 내부에서 문장마다 CosyVoice를 반복 호출하는 부분이다.
@@ -482,7 +482,6 @@ body:
     "options": {
       "defaultEmotion": "NEUTRAL",
       "defaultStylePrompt": null,
-      "generateFullBookAudio": true,
       "speakingRate": null,
       "pitch": null,
       "volumeGain": null,
@@ -578,7 +577,6 @@ body:
 
 - 페이지 4개
 - 문장 8개
-- full-book 생성 포함
 
 조건이라서 지금 구조에서 충분히 병목을 확인하기 좋다.
 
@@ -595,7 +593,6 @@ story는 아래를 확인한다.
 
 - 문장 1개당 평균 처리 시간
 - 문장 수 증가에 따른 총 시간 증가폭
-- full-book concat 시간
 - preview와 같은 worker에 있을 때 queue 지연 발생 여부
 
 ### 11-4. 다음 단계 실험 포인트

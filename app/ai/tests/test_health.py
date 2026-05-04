@@ -114,9 +114,8 @@ def test_voice_register_preview_and_story_flow() -> None:
                 "language": "ko-KR",
                 "format": "wav",
                 "options": {
-                    "defaultEmotion": "NARRATION",
+                    "defaultEmotion": "NEUTRAL",
                     "defaultStylePrompt": "Read clearly like a story narrator.",
-                    "generateFullBookAudio": True,
                     "speakingRate": 0.94,
                     "pitch": 0.0,
                     "volumeGain": 1.0,
@@ -155,7 +154,6 @@ def test_voice_register_preview_and_story_flow() -> None:
         assert story_data["status"] == "SUCCESS"
         assert len(story_data["result"]["items"]) == 2
         assert story_data["result"]["items"][0]["audio"]["audioUrl"].startswith("/static/")
-        assert story_data["result"]["fullBookAudio"]["audioUrl"].startswith("/static/")
     finally:
         dev_tts_service.synthesize_instruct_tts = original_synthesizer
         settings.COSYVOICE_BASE_URL = original_base_url

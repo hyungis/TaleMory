@@ -224,37 +224,6 @@ def _voice_metadata(voice_id: str) -> dict[str, Any]:
     return _read_json(metadata_path)
 
 
-def _concat_wavs(paths: list[Path], output_path: Path, pause_ms: int = 900) -> None:
-    if not paths:
-        raise ValueError("No wav files to concatenate")
-
-    _ensure_parent(output_path)
-    with wave.open(str(paths[0]), "rb") as first_file:
-        nchannels = first_file.getnchannels()
-        sampwidth = first_file.getsampwidth()
-        framerate = first_file.getframerate()
-
-    with wave.open(str(output_path), "wb") as out_file:
-        out_file.setnchannels(nchannels)
-        out_file.setsampwidth(sampwidth)
-        out_file.setframerate(framerate)
-
-        silence_frame_count = int(framerate * max(0, pause_ms) / 1000)
-        silence = b"\x00" * silence_frame_count * nchannels * sampwidth
-
-        for index, path in enumerate(paths):
-            with wave.open(str(path), "rb") as in_file:
-                if (
-                    in_file.getnchannels() != nchannels
-                    or in_file.getsampwidth() != sampwidth
-                    or in_file.getframerate() != framerate
-                ):
-                    raise ValueError("All story sentence wav files must share the same audio parameters")
-                out_file.writeframes(in_file.readframes(in_file.getnframes()))
-                if index < len(paths) - 1 and silence:
-                    out_file.writeframes(silence)
-
-
 def create_pending_manifest(job_id: str | int, job_type: str, extra: dict[str, Any]) -> None:
     payload = {
         "success": True,
@@ -461,7 +430,6 @@ def generate_story_tts_result(
     )
 
     story_id = request["storyId"]
-    sentence_paths: list[Path] = []
     items: list[dict[str, Any]] = []
 
     default_emotion = request["options"]["defaultEmotion"]
@@ -504,8 +472,6 @@ def generate_story_tts_result(
             store_elapsed,
             _elapsed_ms(sentence_started),
         )
-        if resolved_format == "wav":
-            sentence_paths.append(sentence_path)
         items.append(
             {
                 "sentenceId": sentence_id,
@@ -548,32 +514,6 @@ def generate_story_tts_result(
             "promptTemplateVersion": "tts_v1",
         },
     }
-
-    if request["options"].get("generateFullBookAudio") and sentence_paths and all(
-        item["audio"]["format"] == "wav" for item in items
-    ):
-        full_book_path = (
-            settings.TTS_STORAGE_ROOT / "generated" / "story-tts" / str(story_id) / "full-book" / "full-book.wav"
-        )
-        concat_started = perf_counter()
-        _concat_wavs(sentence_paths, full_book_path)
-        concat_elapsed = _elapsed_ms(concat_started)
-        store_started = perf_counter()
-        stored_full_book = store_file(full_book_path, "audio/wav")
-        logger.info(
-            "[TTS:STORY:FULL_BOOK] storyId=%s sentenceCount=%d concatMs=%d storeMs=%d",
-            story_id,
-            len(sentence_paths),
-            concat_elapsed,
-            _elapsed_ms(store_started),
-        )
-        result["fullBookAudio"] = {
-            "audioUrl": stored_full_book.url,
-            "s3Key": stored_full_book.key,
-            "format": "wav",
-        }
-    elif request["options"].get("generateFullBookAudio"):
-        result["fullBookAudio"] = None
 
     logger.info(
         "[TTS:STORY:GENERATE:DONE] storyId=%s voiceId=%s sentenceCount=%d elapsedMs=%d",

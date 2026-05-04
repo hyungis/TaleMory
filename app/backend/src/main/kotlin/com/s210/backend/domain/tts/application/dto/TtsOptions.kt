@@ -7,6 +7,5 @@ package com.s210.backend.domain.tts.application.dto
  *   기본 "NEUTRAL" — story/TTS 공통 emotion enum의 안전한 기본값.
  */
 data class TtsOptions(
-    val defaultEmotion: String = "NEUTRAL",
-    val generateFullBookAudio: Boolean = false,
+    val defaultEmotion: String = "NEUTRAL"
 )
