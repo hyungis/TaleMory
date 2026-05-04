@@ -1,4 +1,5 @@
 import type { LoginResponsePayload } from '../login'
+import type { TermAgreement } from '../terms'
 
 export interface KakaoCallbackRequest {
   code: string
@@ -18,8 +19,7 @@ export interface KakaoSignupRequest {
   name: string
   nickname: string
   phone?: string
-  agreeSms: boolean
-  agreeMarketing: boolean
+  termAgreements?: TermAgreement[]
   restoreConfirmed?: boolean
 }
 

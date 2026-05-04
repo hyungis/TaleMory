@@ -37,12 +37,6 @@ export function ProfileSection({ user, onEditClick }: Props) {
             </>
           )}
           <div className="mp-profile-tags">
-            <span className={`mp-tag-chip${user.agreeSms ? '' : ' mp-tag-chip--off'}`}>
-              {user.agreeSms ? '✓' : '✕'} SMS {user.agreeSms ? '수신' : '차단'}
-            </span>
-            <span className={`mp-tag-chip${user.agreeMarketing ? '' : ' mp-tag-chip--off'}`}>
-              {user.agreeMarketing ? '✓' : '✕'} 마케팅 {user.agreeMarketing ? '수신' : '차단'}
-            </span>
             {user.provider && (
               <span className="mp-tag-chip mp-tag-chip--provider">{user.provider}</span>
             )}

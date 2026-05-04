@@ -3,7 +3,7 @@ import { AlertCircle, UserPlus } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { formatPhoneNumber } from '../../../../shared/lib'
 import { getNicknameAvailability } from '../../api/getAuthAvailability'
-import { TermsCheckboxes } from '../../terms'
+import { buildRequiredTermAgreements, TermsCheckboxes } from '../../terms'
 import { useKakaoSignupPost } from '../model/useKakaoSignupPost'
 import type { KakaoSignupProfile, KakaoSignupRequest } from '../types'
 import type { LoginResponse } from '../../login'
@@ -13,8 +13,8 @@ interface KakaoSignupFormValues {
   name: string
   nickname: string
   phone: string
-  smsAgree: boolean
-  marketingAgree: boolean
+  serviceTermsAgree: boolean
+  privacyAgree: boolean
 }
 
 interface KakaoSignupFormProps {
@@ -64,8 +64,8 @@ function createInitialValues(profile: KakaoSignupProfile): KakaoSignupFormValues
     name: profile.name ?? '',
     nickname: profile.nickname ?? '',
     phone: formatPhoneNumber(profile.phone ?? ''),
-    smsAgree: false,
-    marketingAgree: false,
+    serviceTermsAgree: false,
+    privacyAgree: false,
   }
 }
 
@@ -78,6 +78,8 @@ function validate(values: KakaoSignupFormValues): string | null {
   if (!values.name.trim()) return '이름을 입력해주세요.'
   if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
   if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
+  if (!values.serviceTermsAgree) return '서비스 이용약관에 동의해주세요.'
+  if (!values.privacyAgree) return '개인정보 수집 및 이용에 동의해주세요.'
   return null
 }
 
@@ -170,8 +172,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
         name: values.name.trim(),
         nickname: values.nickname.trim(),
         phone: values.phone.trim() || undefined,
-        agreeSms: values.smsAgree,
-        agreeMarketing: values.marketingAgree,
+        termAgreements: buildRequiredTermAgreements(values),
       }
 
       try {
@@ -312,8 +313,8 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
           </div>
 
           <TermsCheckboxes
-            smsAgree={values.smsAgree}
-            marketingAgree={values.marketingAgree}
+            serviceTermsAgree={values.serviceTermsAgree}
+            privacyAgree={values.privacyAgree}
             onChange={(key, value) => handleChange(key, value)}
           />
 

@@ -1,3 +1,5 @@
+import type { TermAgreement } from '../terms'
+
 export interface SignupRequest {
   loginId: string
   password: string
@@ -6,8 +8,7 @@ export interface SignupRequest {
   name: string
   nickname: string
   phone?: string
-  agreeSms: boolean
-  agreeMarketing: boolean
+  termAgreements: TermAgreement[]
   restoreConfirmed?: boolean
 }
 

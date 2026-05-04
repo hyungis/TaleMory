@@ -8,6 +8,7 @@ import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
 import com.s210.backend.domain.auth.application.dto.OauthUserProfile
 import com.s210.backend.domain.auth.application.dto.SignupCommand
+import com.s210.backend.domain.auth.application.dto.TermAgreementCommand
 import com.s210.backend.domain.auth.exception.AuthErrorCode
 import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
@@ -19,6 +20,7 @@ import com.s210.backend.domain.user.entity.User
 import com.s210.backend.domain.user.exception.UserErrorCode
 import com.s210.backend.domain.user.infrastructure.repository.OauthAccountRepository
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -97,8 +99,8 @@ class MemberServiceSignupRestoreTest {
         assertEquals("새 이름", user.name)
         assertEquals("새 닉네임", user.nickname)
         assertEquals("010-1234-5678", user.phone)
-        assertTrue(user.agreeSms)
-        assertTrue(user.agreeMarketing)
+        assertFalse(user.agreeSms)
+        assertFalse(user.agreeMarketing)
         assertNull(user.deletedAt)
         assertNull(oauthAccount.deletedAt)
     }
@@ -128,6 +130,23 @@ class MemberServiceSignupRestoreTest {
     fun `signUp throws INVALID_INPUT when password check differs`() {
         val ex = assertThrows<BusinessException> {
             service.signUp(signupCommand(restoreConfirmed = false, passwordCheck = "different-password"))
+        }
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
+    }
+
+    @Test
+    fun `signUp throws INVALID_INPUT when required terms are not agreed`() {
+        val ex = assertThrows<BusinessException> {
+            service.signUp(
+                signupCommand(
+                    restoreConfirmed = false,
+                    termAgreements = listOf(
+                        TermAgreementCommand(termId = 1L, agreed = true),
+                        TermAgreementCommand(termId = 2L, agreed = false),
+                    ),
+                )
+            )
         }
 
         assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
@@ -221,8 +240,7 @@ class MemberServiceSignupRestoreTest {
                     name = "카카오 이름",
                     nickname = "카카오 닉네임",
                     phone = null,
-                    agreeSms = false,
-                    agreeMarketing = false,
+                    termAgreements = requiredTermAgreements(),
                 )
             )
         }
@@ -245,6 +263,7 @@ class MemberServiceSignupRestoreTest {
     private fun signupCommand(
         restoreConfirmed: Boolean,
         passwordCheck: String? = null,
+        termAgreements: List<TermAgreementCommand> = requiredTermAgreements(),
     ): SignupCommand =
         SignupCommand(
             loginId = "old-login",
@@ -254,9 +273,14 @@ class MemberServiceSignupRestoreTest {
             name = "새 이름",
             nickname = "새 닉네임",
             phone = "010-1234-5678",
-            agreeSms = true,
-            agreeMarketing = true,
+            termAgreements = termAgreements,
             restoreConfirmed = restoreConfirmed,
+        )
+
+    private fun requiredTermAgreements(): List<TermAgreementCommand> =
+        listOf(
+            TermAgreementCommand(termId = 1L, agreed = true),
+            TermAgreementCommand(termId = 2L, agreed = true),
         )
 
     private fun oauthProfile(): OauthUserProfile =

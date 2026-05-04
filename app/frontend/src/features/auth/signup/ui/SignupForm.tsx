@@ -3,7 +3,7 @@ import { AlertCircle } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { formatPhoneNumber } from '../../../../shared/lib'
 import { getLoginIdAvailability, getNicknameAvailability } from '../../api/getAuthAvailability'
-import { TermsCheckboxes } from '../../terms'
+import { buildRequiredTermAgreements, TermsCheckboxes } from '../../terms'
 import { useSignupPost } from '../model/useSignupPost'
 import type { SignupRequest } from '../types'
 
@@ -15,8 +15,8 @@ interface SignupFormValues {
   name: string
   nickname: string
   phone: string
-  smsAgree: boolean
-  marketingAgree: boolean
+  serviceTermsAgree: boolean
+  privacyAgree: boolean
 }
 
 const INITIAL_VALUES: SignupFormValues = {
@@ -27,8 +27,8 @@ const INITIAL_VALUES: SignupFormValues = {
   name: '',
   nickname: '',
   phone: '',
-  smsAgree: false,
-  marketingAgree: false,
+  serviceTermsAgree: false,
+  privacyAgree: false,
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -80,6 +80,8 @@ function validate(values: SignupFormValues): string | null {
   if (!values.name.trim()) return '실명을 입력해주세요.'
   if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
   if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
+  if (!values.serviceTermsAgree) return '서비스 이용약관에 동의해주세요.'
+  if (!values.privacyAgree) return '개인정보 수집 및 이용에 동의해주세요.'
   return null
 }
 
@@ -242,8 +244,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         name: values.name.trim(),
         nickname: values.nickname.trim(),
         phone: values.phone.trim() || undefined,
-        agreeSms: values.smsAgree,
-        agreeMarketing: values.marketingAgree,
+        termAgreements: buildRequiredTermAgreements(values),
       }
 
       try {
@@ -451,8 +452,8 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         </div>
 
         <TermsCheckboxes
-          smsAgree={values.smsAgree}
-          marketingAgree={values.marketingAgree}
+          serviceTermsAgree={values.serviceTermsAgree}
+          privacyAgree={values.privacyAgree}
           onChange={(key, value) => handleChange(key, value)}
         />
 

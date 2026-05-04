@@ -13,6 +13,7 @@ import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
 import com.s210.backend.domain.auth.application.dto.OauthSignupProfile
 import com.s210.backend.domain.auth.application.dto.OauthUserProfile
 import com.s210.backend.domain.auth.application.dto.SignupCommand
+import com.s210.backend.domain.auth.application.dto.TermAgreementCommand
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.auth.exception.AuthErrorCode
 import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
@@ -90,8 +91,6 @@ class MemberService(
                 name = command.name,
                 nickname = command.nickname,
                 phone = command.phone,
-                agreeSms = command.agreeSms,
-                agreeMarketing = command.agreeMarketing,
             )
         ).id
     }
@@ -218,8 +217,6 @@ class MemberService(
                 name = command.name,
                 nickname = command.nickname,
                 phone = command.phone,
-                agreeSms = command.agreeSms,
-                agreeMarketing = command.agreeMarketing,
             )
         )
 
@@ -307,6 +304,10 @@ class MemberService(
         if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+
+        if (!command.restoreConfirmed) {
+            requireRequiredTermsAgreed(command.termAgreements)
+        }
     }
 
     private fun validateSignupCommand(command: SignupCommand) {
@@ -333,6 +334,22 @@ class MemberService(
         }
 
         if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!command.restoreConfirmed) {
+            requireRequiredTermsAgreed(command.termAgreements)
+        }
+    }
+
+    private fun requireRequiredTermsAgreed(termAgreements: List<TermAgreementCommand>) {
+        val agreedTermIds = termAgreements
+            .asSequence()
+            .filter { it.agreed }
+            .map { it.termId }
+            .toSet()
+
+        if (!agreedTermIds.containsAll(REQUIRED_TERM_IDS)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
     }
@@ -376,9 +393,6 @@ class MemberService(
         user.name = command.name
         user.nickname = command.nickname
         user.phone = command.phone
-        user.agreeSms = command.agreeSms
-        user.agreeMarketing = command.agreeMarketing
-
         return restoreUser(user)
     }
 
@@ -387,9 +401,6 @@ class MemberService(
         user.name = command.name
         user.nickname = command.nickname
         user.phone = command.phone
-        user.agreeSms = command.agreeSms
-        user.agreeMarketing = command.agreeMarketing
-
         return restoreUser(user)
     }
 
@@ -457,6 +468,7 @@ class MemberService(
         private const val SUPPORTED_PROVIDER = "kakao"
         private const val MIN_LOGIN_ID_LENGTH = 4
         private const val MIN_PASSWORD_LENGTH = 6
+        private val REQUIRED_TERM_IDS = setOf(1L, 2L)
         private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
         private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
     }

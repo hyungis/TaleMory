@@ -8,7 +8,6 @@ data class SignupCommand(
     val name: String,
     val nickname: String,
     val phone: String?,
-    val agreeSms: Boolean,
-    val agreeMarketing: Boolean,
+    val termAgreements: List<TermAgreementCommand> = emptyList(),
     val restoreConfirmed: Boolean = false,
 )

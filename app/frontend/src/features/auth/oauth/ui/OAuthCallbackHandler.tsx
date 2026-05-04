@@ -161,8 +161,6 @@ export function OAuthCallbackHandler() {
         name: restoreDraft.profile.name,
         nickname: restoreDraft.profile.nickname,
         phone: restoreDraft.profile.phone ?? undefined,
-        agreeSms: false,
-        agreeMarketing: false,
         restoreConfirmed: true,
       })
 

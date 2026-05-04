@@ -3,6 +3,7 @@ package com.s210.backend.domain.auth.presentation.request
 import com.s210.backend.domain.auth.application.dto.LoginCommand
 import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
 import com.s210.backend.domain.auth.application.dto.SignupCommand
+import com.s210.backend.domain.auth.application.dto.TermAgreementCommand
 
 data class SignupRequest(
     val loginId: String,
@@ -12,8 +13,7 @@ data class SignupRequest(
     val name: String,
     val nickname: String,
     val phone: String? = null,
-    val agreeSms: Boolean = false,
-    val agreeMarketing: Boolean = false,
+    val termAgreements: List<TermAgreementRequest> = emptyList(),
     val restoreConfirmed: Boolean = false,
 ) {
     fun toCommand(): SignupCommand =
@@ -25,8 +25,7 @@ data class SignupRequest(
             name = name.trim(),
             nickname = nickname.trim(),
             phone = phone?.trim()?.takeIf { it.isNotEmpty() },
-            agreeSms = agreeSms,
-            agreeMarketing = agreeMarketing,
+            termAgreements = termAgreements.map { it.toCommand() },
             restoreConfirmed = restoreConfirmed,
         )
 }
@@ -47,14 +46,24 @@ data class KakaoCallbackRequest(
     val redirectUri: String,
 )
 
+data class TermAgreementRequest(
+    val termId: Long,
+    val agreed: Boolean,
+) {
+    fun toCommand(): TermAgreementCommand =
+        TermAgreementCommand(
+            termId = termId,
+            agreed = agreed,
+        )
+}
+
 data class KakaoSignupRequest(
     val signupToken: String,
     val email: String,
     val name: String,
     val nickname: String,
     val phone: String? = null,
-    val agreeSms: Boolean = false,
-    val agreeMarketing: Boolean = false,
+    val termAgreements: List<TermAgreementRequest> = emptyList(),
     val restoreConfirmed: Boolean = false,
 ) {
     fun toCommand(): OauthSignupCommand =
@@ -64,8 +73,7 @@ data class KakaoSignupRequest(
             name = name.trim(),
             nickname = nickname.trim(),
             phone = phone?.trim()?.takeIf { it.isNotEmpty() },
-            agreeSms = agreeSms,
-            agreeMarketing = agreeMarketing,
+            termAgreements = termAgreements.map { it.toCommand() },
             restoreConfirmed = restoreConfirmed,
         )
 }
