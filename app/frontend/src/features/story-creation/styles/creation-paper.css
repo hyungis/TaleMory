@@ -662,6 +662,14 @@
 .cr-hero-banner .body .gold {
   color: var(--cr-gold);
 }
+.cr-hero-banner .body strong {
+  color: var(--cr-sage-deep);
+  font-weight: 800;
+  background: rgba(122, 153, 104, 0.14);
+  padding: 1px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
 
 /* prompt card (Step 3) */
 .cr-prompt-card .field-head {

@@ -210,6 +210,15 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
             subtitle="10장 이상 올려주시면 풍성한 동화가 돼요"
           />
 
+          <div className="cr-hero-banner">
+            <div className="body">
+              가족이 모두 잘 나온 사진을 골라주세요. AI 가 일관성 있게 동화 속 주인공의 모습을 그려줍니다.
+              <br />
+              아래 <strong>'추억의 사진'</strong> 카드에 사진을 올린 뒤 <span className="gold">★</span> 대표로
+              지정 버튼을 누르거나, 페이지 아래쪽 <strong>'대표 사진'</strong> 영역에 직접 올릴 수도 있어요.
+            </div>
+          </div>
+
           {storyId === null && (
             <div className="cr-banner error" role="alert">
               <span>⚠ Step 1 저장이 완료되지 않았어요. 이전 단계로 돌아가 다시 시도해주세요.</span>
@@ -355,15 +364,6 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
             </div>
             <div className={`cr-pill-counter ${refCount === 0 ? 'alert' : 'gold'}`}>
               대표 {refCount} / {MAX_CHARACTER_REFS}
-            </div>
-          </div>
-
-          <div className="cr-hero-banner">
-            <div className="body">
-              가족이 모두 잘 나온 사진을 골라주세요. AI가 일관성 있게 동화 속 주인공의 모습을 그려줍니다.
-              <br />
-              위쪽 사진에서 <span className="gold">★</span> 대표로 지정 버튼을 누르거나, 아래
-              영역에 직접 올릴 수도 있어요.
             </div>
           </div>
 
