@@ -1,2 +1,6 @@
-export { buildRequiredTermAgreements, REQUIRED_TERM_IDS, TermsCheckboxes } from './ui/TermsCheckboxes'
-export type { TermAgreement, TermsKey } from './ui/TermsCheckboxes'
+export { buildRequiredTermAgreements, REQUIRED_TERM_IDS } from './model/termAgreements'
+export { TermsDetailModal } from './ui/TermsDetailModal'
+export { TermsCheckboxes } from './ui/TermsCheckboxes'
+export { TERM_DETAILS } from './model/termDetails'
+export type { TermAgreement, TermsKey } from './model/termAgreements'
+export type { TermDetail, TermDetailSection, TermDetailSlug } from './model/termDetails'
