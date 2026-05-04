@@ -1,11 +1,10 @@
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { PlusCircle } from 'lucide-react'
 import { type Story } from '../../../entities/story'
 import { StoryGrid } from '../story-list'
 import { StoryFilter } from '../story-filter'
 import { StorySort } from '../story-sort'
 import { useBookshelf } from '../model/useBookshelf'
-import { generateBookshelfParticles } from '../lib/generateBookshelfParticles'
 import { BookshelfPagination } from './BookshelfPagination'
 import { BookshelfDoodles } from './BookshelfDoodles'
 import { EmptyBookshelfState } from './EmptyBookshelfState'
@@ -63,37 +62,11 @@ export function BookshelfModal({
   const { paged, filtered, activeFilters, toggleFilter, sort, updateSort, page, setPage, totalPages } =
     useBookshelf(stories)
 
-  /**
-   * 책장 배경 위로 부유하는 amber/gold 입자. 매 마운트마다 random 으로 한 번 생성하면
-   * 충분 (CSS 키프레임만으로 무한 반복). 모달이 닫혔다 다시 열리면 새 좌표가 생성된다.
-   */
-  const particles = useMemo(() => generateBookshelfParticles(), [])
-
   if (!isOpen) return null
 
   return (
     <div className="library-modal-overlay" onClick={onClose}>
       <div className="bookshelf-modal" onClick={e => e.stopPropagation()}>
-        {/* 배경 부유 입자 — amber/gold 톤 햇살 먼지. pointer-events: none 으로 모든 인터랙션 통과. */}
-        <div className="bookshelf-particles" aria-hidden="true">
-          {particles.map(p => (
-            <span
-              key={p.id}
-              className="bookshelf-particle"
-              style={
-                {
-                  left: p.left,
-                  width: p.size,
-                  height: p.size,
-                  '--duration': p.duration,
-                  '--delay': p.delay,
-                  '--drift': p.drift,
-                } as unknown as CSSProperties
-              }
-            />
-          ))}
-        </div>
-
         {/* 햄버거 / 닫기 버튼은 .top-actions 안 인라인 으로 이동 — Claude .topbar 와 동일 배치.
             (이전 absolute 슬롯 / 우상단 close 버튼 모두 제거.) */}
 
