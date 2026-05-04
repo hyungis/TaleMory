@@ -4,8 +4,6 @@ import {
   Image as ImageIcon,
   Loader2,
   AlertCircle,
-  ChevronUp,
-  ChevronDown,
   GripVertical,
   Star,
 } from 'lucide-react'
@@ -31,10 +29,6 @@ interface PhotoItemCommittedProps {
   tagsJson: string | null
   onRemove: () => void
   onUpdate: (patch: { description?: string; tagsJson?: string }) => void
-  onMoveUp: () => void
-  onMoveDown: () => void
-  isFirst: boolean
-  isLast: boolean
   isRemoving?: boolean
   isReordering?: boolean
   purpose?: PhotoPurposeApi
@@ -92,7 +86,9 @@ function SortablePhotoItem(props: PhotoItemCommittedProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`cr-photo-card${isDragging ? ' dragging' : ''}`}
+      className={`cr-photo-card${isDragging ? ' dragging' : ''}${
+        props.purpose === 'BOTH' ? ' is-character-ref' : ''
+      }`}
     >
       <span className="cr-drag-grip" aria-hidden="true">
         <GripVertical className="w-4 h-4" />
@@ -115,34 +111,6 @@ function SortablePhotoItem(props: PhotoItemCommittedProps) {
 
       {!props.isMutationLocked && (
         <div className="cr-photo-actions">
-          <button
-            type="button"
-            onClick={e => {
-              e.stopPropagation()
-              props.onMoveUp()
-            }}
-            onPointerDown={e => e.stopPropagation()}
-            disabled={props.isFirst || props.isReordering}
-            title="위로 이동"
-            aria-label="위로 이동"
-            className="cr-photo-action"
-          >
-            <ChevronUp className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={e => {
-              e.stopPropagation()
-              props.onMoveDown()
-            }}
-            onPointerDown={e => e.stopPropagation()}
-            disabled={props.isLast || props.isReordering}
-            title="아래로 이동"
-            aria-label="아래로 이동"
-            className="cr-photo-action"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
           <button
             type="button"
             onClick={e => {
@@ -282,9 +250,7 @@ function PhotoMeta({
   return (
     <div className="cr-photo-meta">
       <div>
-        <div className="mini-label">
-          사진 설명 <span className="req">*</span>
-        </div>
+        <div className="mini-label">사진 설명</div>
         <input
           type="text"
           placeholder="예: OO이가 처음으로 바다에 발을 담근 날"

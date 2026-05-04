@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Lock, Star, Wand2 } from 'lucide-react'
+import { Camera, Loader2, Lock, Star, Wand2 } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -123,18 +123,6 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
     [deleteMutation, showToast, summaryQuery],
   )
 
-  const handleMemoryMove = useCallback(
-    (photoId: number, direction: -1 | 1) => {
-      const ids = memoryPhotos.map(p => p.photoId)
-      const idx = ids.indexOf(photoId)
-      const target = idx + direction
-      if (idx < 0 || target < 0 || target >= ids.length) return
-      ;[ids[idx], ids[target]] = [ids[target], ids[idx]]
-      reorderMutation.mutate(ids)
-    },
-    [memoryPhotos, reorderMutation],
-  )
-
   const handleMemoryDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
@@ -239,6 +227,19 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
           )}
 
           {/* ─── 추억 사진 zone ─────────────────────────── */}
+          <div className="cr-section-head">
+            <div className="ttl">
+              <Camera
+                className="w-5 h-5"
+                style={{ color: 'var(--cr-caramel-deep)' }}
+              />
+              추억의 사진
+            </div>
+            <div className="cr-pill-counter">
+              {totalCount} / {MAX_PHOTOS} 장
+            </div>
+          </div>
+
           {!isSummaryLocked && (
             <div className="cr-card">
               <span className="cr-tape" aria-hidden="true" />
@@ -248,13 +249,6 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
               />
             </div>
           )}
-
-          <div className="cr-section-head">
-            <div className="ttl">업로드된 사진</div>
-            <div className="cr-pill-counter">
-              {totalCount} / {MAX_PHOTOS} 장
-            </div>
-          </div>
 
           <div className="cr-card" style={{ padding: 18 }}>
             <span className="cr-tape" aria-hidden="true" />
@@ -287,7 +281,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
                 items={memoryPhotos.map(p => p.photoId)}
                 strategy={verticalListSortingStrategy}
               >
-                {memoryPhotos.map((photo, idx) => (
+                {memoryPhotos.map(photo => (
                   <PhotoItem
                     key={`memory-${photo.photoId}`}
                     id={photo.photoId}
@@ -300,8 +294,6 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
                     onUpdate={patch =>
                       updateMutation.mutate({ photoId: photo.photoId, body: patch })
                     }
-                    onMoveUp={() => handleMemoryMove(photo.photoId, -1)}
-                    onMoveDown={() => handleMemoryMove(photo.photoId, 1)}
                     onCharacterRefToggle={() =>
                       handleToggleRef(photo.photoId, photo.purpose === 'BOTH')
                     }
@@ -309,8 +301,6 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
                       toggleMutation.isPending &&
                       toggleMutation.variables?.photoId === photo.photoId
                     }
-                    isFirst={idx === 0}
-                    isLast={idx === memoryPhotos.length - 1}
                     isRemoving={
                       deleteMutation.isPending && deleteMutation.variables === photo.photoId
                     }
@@ -397,10 +387,6 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
                   onUpdate={patch =>
                     updateMutation.mutate({ photoId: photo.photoId, body: patch })
                   }
-                  onMoveUp={() => {}}
-                  onMoveDown={() => {}}
-                  isFirst
-                  isLast
                   isRemoving={
                     deleteMutation.isPending && deleteMutation.variables === photo.photoId
                   }
@@ -437,7 +423,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
         onBack={onBack}
         rightSlot={
           <button type="button" onClick={handleNextClick} className="cr-btn-next">
-            <span>이런 스토리 만들기</span>
+            <span>줄거리 만들기</span>
             <Wand2 className="w-4 h-4" />
           </button>
         }
