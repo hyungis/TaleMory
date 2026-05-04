@@ -12,8 +12,9 @@ data class SignupRequest(
     val nickname: String,
     val phone: String? = null,
     val agreeSms: Boolean = false,
-    val agreeMarketing: Boolean = false
-){
+    val agreeMarketing: Boolean = false,
+    val restoreConfirmed: Boolean = false,
+) {
     fun toCommand(): SignupCommand =
         SignupCommand(
             loginId = loginId,
@@ -24,13 +25,14 @@ data class SignupRequest(
             phone = phone,
             agreeSms = agreeSms,
             agreeMarketing = agreeMarketing,
+            restoreConfirmed = restoreConfirmed,
         )
 }
 
 data class LoginRequest(
     val loginId: String,
-    val password: String
-){
+    val password: String,
+) {
     fun toCommand(): LoginCommand =
         LoginCommand(
             loginId = loginId,
@@ -51,6 +53,7 @@ data class KakaoSignupRequest(
     val phone: String? = null,
     val agreeSms: Boolean = false,
     val agreeMarketing: Boolean = false,
+    val restoreConfirmed: Boolean = false,
 ) {
     fun toCommand(): OauthSignupCommand =
         OauthSignupCommand(
@@ -61,5 +64,6 @@ data class KakaoSignupRequest(
             phone = phone?.trim()?.takeIf { it.isNotEmpty() },
             agreeSms = agreeSms,
             agreeMarketing = agreeMarketing,
+            restoreConfirmed = restoreConfirmed,
         )
 }

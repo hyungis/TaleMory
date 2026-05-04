@@ -3,7 +3,7 @@ import { AlertCircle, UserPlus } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { TermsCheckboxes } from '../../terms'
 import { useKakaoSignupPost } from '../model/useKakaoSignupPost'
-import type { KakaoSignupProfile } from '../types'
+import type { KakaoSignupProfile, KakaoSignupRequest } from '../types'
 import type { LoginResponse } from '../../login'
 
 interface KakaoSignupFormValues {
@@ -24,6 +24,7 @@ interface KakaoSignupFormProps {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
+const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 
 function createInitialValues(profile: KakaoSignupProfile): KakaoSignupFormValues {
   return {
@@ -71,6 +72,7 @@ function getKakaoSignupErrorMessage(error: unknown): string {
 export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: KakaoSignupFormProps) {
   const [values, setValues] = useState<KakaoSignupFormValues>(() => createInitialValues(profile))
   const [error, setError] = useState('')
+  const [restoreRequest, setRestoreRequest] = useState<KakaoSignupRequest | null>(null)
   const { isPending, signup } = useKakaoSignupPost()
 
   const handleChange = useCallback(
@@ -92,25 +94,56 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
         return
       }
 
+      const request: KakaoSignupRequest = {
+        signupToken,
+        email: values.email.trim(),
+        name: values.name.trim(),
+        nickname: values.nickname.trim(),
+        phone: values.phone.trim() || undefined,
+        agreeSms: values.smsAgree,
+        agreeMarketing: values.marketingAgree,
+      }
+
       try {
-        const result = await signup({
-          signupToken,
-          email: values.email.trim(),
-          name: values.name.trim(),
-          nickname: values.nickname.trim(),
-          phone: values.phone.trim() || undefined,
-          agreeSms: values.smsAgree,
-          agreeMarketing: values.marketingAgree,
-        })
+        const result = await signup(request)
 
         setError('')
         onSuccess(result)
       } catch (submitError) {
+        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE) {
+          setError('')
+          setRestoreRequest(request)
+          return
+        }
+
         setError(getKakaoSignupErrorMessage(submitError))
       }
     },
     [isPending, onSuccess, signup, signupToken, values],
   )
+
+  const handleRestoreCancel = useCallback(() => {
+    if (!isPending) {
+      setRestoreRequest(null)
+    }
+  }, [isPending])
+
+  const handleRestoreConfirm = useCallback(async () => {
+    if (restoreRequest === null || isPending) return
+
+    try {
+      const result = await signup({
+        ...restoreRequest,
+        restoreConfirmed: true,
+      })
+      setError('')
+      setRestoreRequest(null)
+      onSuccess(result)
+    } catch (restoreError) {
+      setRestoreRequest(null)
+      setError(getKakaoSignupErrorMessage(restoreError))
+    }
+  }, [isPending, onSuccess, restoreRequest, signup])
 
   return (
     <div className="min-h-screen bg-[#f6f0da] flex items-center justify-center px-4 py-10">
@@ -216,6 +249,65 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
             다음에 할게요
           </button>
         </form>
+      </div>
+      {restoreRequest && (
+        <KakaoRestoreConfirmDialog
+          isPending={isPending}
+          onCancel={handleRestoreCancel}
+          onConfirm={handleRestoreConfirm}
+        />
+      )}
+    </div>
+  )
+}
+
+function KakaoRestoreConfirmDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[10001] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="kakao-restore-title"
+      onClick={() => {
+        if (!isPending) onCancel()
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] shadow-[0_20px_60px_rgba(0,0,0,0.45)] p-6"
+        onClick={event => event.stopPropagation()}
+      >
+        <h2 id="kakao-restore-title" className="text-xl text-[#2a1b12] font-bold mb-3">
+          계정 복구
+        </h2>
+        <p className="text-sm leading-6 text-[#6a5632] mb-5">
+          기존에 가입한 이력이 있습니다. 복구를 진행할까요?
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="flex-1 bg-[#e8ddb4] text-[#2a1b12] py-3 rounded-xl border border-[#8b7a52]/60 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            아니오
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 bg-[#2d5a27] text-[#f0e6c0] py-3 rounded-xl border border-[#b4dc8c]/40 font-bold shadow-[0_4px_0_#1a3a14] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isPending ? '복구 중...' : '예'}
+          </button>
+        </div>
       </div>
     </div>
   )

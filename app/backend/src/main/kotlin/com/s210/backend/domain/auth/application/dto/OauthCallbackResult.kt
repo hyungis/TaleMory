@@ -9,6 +9,11 @@ sealed interface OauthCallbackResult {
         val signupToken: String,
         val profile: OauthSignupProfile,
     ) : OauthCallbackResult
+
+    data class RestoreRequired(
+        val signupToken: String,
+        val profile: OauthSignupProfile,
+    ) : OauthCallbackResult
 }
 
 data class OauthSignupProfile(

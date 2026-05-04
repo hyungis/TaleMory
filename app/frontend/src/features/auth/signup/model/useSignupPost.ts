@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react'
 import { postSignup } from '../api/postSignup'
-import type { SignupRequest } from '../types'
+import type { SignupRequest, SignupResponse } from '../types'
 
 interface UseSignupPostResult {
   isPending: boolean
-  signup: (request: SignupRequest) => Promise<void>
+  signup: (request: SignupRequest) => Promise<SignupResponse>
 }
 
 export function useSignupPost(): UseSignupPostResult {
@@ -15,7 +15,7 @@ export function useSignupPost(): UseSignupPostResult {
     setIsPending(true)
 
     try {
-      await postSignup(request)
+      return await postSignup(request)
     } finally {
       setIsPending(false)
     }

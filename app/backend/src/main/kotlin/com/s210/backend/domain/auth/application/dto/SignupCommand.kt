@@ -8,5 +8,6 @@ data class SignupCommand(
     val nickname: String,
     val phone: String?,
     val agreeSms: Boolean,
-    val agreeMarketing: Boolean
+    val agreeMarketing: Boolean,
+    val restoreConfirmed: Boolean = false,
 )

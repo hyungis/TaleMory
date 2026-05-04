@@ -1,8 +1,8 @@
 import { post } from '../../../../shared/api'
-import type { SignupRequest } from '../types'
+import type { SignupRequest, SignupResponse } from '../types'
 
-export async function postSignup(body: SignupRequest): Promise<void> {
-  await post<void>(
+export async function postSignup(body: SignupRequest): Promise<SignupResponse> {
+  return post<SignupResponse>(
     '/auth/signup',
     {
       loginId: body.loginId,
@@ -13,6 +13,7 @@ export async function postSignup(body: SignupRequest): Promise<void> {
       phone: body.phone,
       agreeSms: body.agreeSms,
       agreeMarketing: body.agreeMarketing,
+      restoreConfirmed: body.restoreConfirmed ?? false,
     },
     {
       // 회원가입 전 요청이므로 기존 Authorization 주입을 건너뛴다.

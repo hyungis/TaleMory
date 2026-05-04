@@ -10,6 +10,10 @@ data class AuthResponse(
     val user: AuthUserResponse
 )
 
+data class SignupResponse(
+    val userId: Long,
+)
+
 data class RefreshTokenResponse(
     val accessToken: String
 )
@@ -69,6 +73,11 @@ fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
             signupToken = signupToken,
             profile = profile.toResponse(),
         )
+        is OauthCallbackResult.RestoreRequired -> KakaoCallbackResponse(
+            status = CALLBACK_STATUS_RESTORE_REQUIRED,
+            signupToken = signupToken,
+            profile = profile.toResponse(),
+        )
     }
 
 private fun AuthResult.toKakaoCallbackResponse(): KakaoCallbackResponse {
@@ -91,3 +100,4 @@ private fun OauthSignupProfile.toResponse(): OauthSignupProfileResponse =
 
 private const val CALLBACK_STATUS_LOGIN = "LOGIN"
 private const val CALLBACK_STATUS_SIGNUP_REQUIRED = "SIGNUP_REQUIRED"
+private const val CALLBACK_STATUS_RESTORE_REQUIRED = "RESTORE_REQUIRED"

@@ -5,7 +5,6 @@ import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.jwt.JwtTokenProvider
 import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
-import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.application.dto.AuthResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
@@ -19,8 +18,8 @@ import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
-import com.s210.backend.domain.user.entity.User
 import com.s210.backend.domain.user.entity.OauthAccount
+import com.s210.backend.domain.user.entity.User
 import com.s210.backend.domain.user.infrastructure.repository.OauthAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.security.authentication.AuthenticationManager
@@ -42,15 +41,40 @@ class MemberService(
     private val oauthRedirectUriResolver: OauthRedirectUriResolver,
     private val oauthSignupTokenProvider: OauthSignupTokenProvider,
 ) {
-    fun signUp(command: SignupCommand): ApiResponse<Unit> {
-        if (memberRepository.existsByLoginIdAndDeletedAtIsNull(command.loginId)) {
+    fun signUp(command: SignupCommand): Long {
+        val activeLoginUser = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
+        if (activeLoginUser != null) {
             throw BusinessException(CommonErrorCode.DUPLICATE_LOGIN_ID)
         }
-        if (memberRepository.existsByEmailAndDeletedAtIsNull(command.email)) {
+
+        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(command.email)
+        if (existingEmailUser != null) {
             throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
 
-        val id = memberRepository.save(
+        val withdrawnLoginUser = memberRepository
+            .findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.loginId)
+        val withdrawnEmailUser = memberRepository
+            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.email)
+
+        if (withdrawnLoginUser != null) {
+            if (!command.restoreConfirmed) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
+            if (withdrawnEmailUser != null && withdrawnEmailUser.id != withdrawnLoginUser.id) {
+                throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+            }
+            return restoreUser(withdrawnLoginUser, command)
+        }
+
+        if (withdrawnEmailUser != null) {
+            if (!command.restoreConfirmed) {
+                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            }
+            return restoreUser(withdrawnEmailUser, command)
+        }
+
+        return memberRepository.save(
             User(
                 loginId = command.loginId,
                 passwordHash = passwordEncoder.encode(command.password),
@@ -62,12 +86,6 @@ class MemberService(
                 agreeMarketing = command.agreeMarketing,
             )
         ).id
-
-        return ApiResponse(
-            success = true,
-            data = null,
-            message = id.toString(),
-        )
     }
 
     fun login(command: LoginCommand): AuthResult {
@@ -112,6 +130,7 @@ class MemberService(
         return when (val result = createOauthCallbackResult(oauthUserProfile)) {
             is OauthCallbackResult.Login -> result.authResult
             is OauthCallbackResult.SignupRequired -> throw BusinessException(AuthErrorCode.OAUTH_FAILED)
+            is OauthCallbackResult.RestoreRequired -> throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
         }
     }
 
@@ -127,16 +146,33 @@ class MemberService(
         )
         if (existingOauthAccount != null) {
             if (existingOauthAccount.deletedAt != null || existingOauthAccount.user.deletedAt != null) {
-                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+                if (!command.restoreConfirmed) {
+                    throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+                }
+                restoreUser(existingOauthAccount.user)
             }
             return createOauthLoginResult(existingOauthAccount.user, oauthSignupToken.provider)
         }
 
-        val existingEmailUser = memberRepository.findByEmail(command.email)
-        if (existingEmailUser != null) {
-            if (existingEmailUser.deletedAt != null) {
+        val withdrawnEmailUser = memberRepository
+            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.email)
+        if (withdrawnEmailUser != null) {
+            if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
+            restoreUser(withdrawnEmailUser)
+            oauthAccountRepository.save(
+                OauthAccount(
+                    user = withdrawnEmailUser,
+                    provider = oauthSignupToken.provider,
+                    providerUserId = oauthSignupToken.providerUserId,
+                )
+            )
+            return createOauthLoginResult(withdrawnEmailUser, oauthSignupToken.provider)
+        }
+
+        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(command.email)
+        if (existingEmailUser != null) {
             throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
 
@@ -171,21 +207,36 @@ class MemberService(
         )
         if (oauthAccount != null) {
             if (oauthAccount.deletedAt != null || oauthAccount.user.deletedAt != null) {
-                throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+                return OauthCallbackResult.RestoreRequired(
+                    signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
+                    profile = oauthUserProfile.toSignupProfile(),
+                )
             }
             return OauthCallbackResult.Login(createOauthLoginResult(oauthAccount.user, oauthUserProfile.provider))
         }
 
+        val withdrawnEmailUser = memberRepository
+            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(oauthUserProfile.email)
+        if (withdrawnEmailUser != null) {
+            return OauthCallbackResult.RestoreRequired(
+                signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
+                profile = oauthUserProfile.toSignupProfile(),
+            )
+        }
+
         return OauthCallbackResult.SignupRequired(
             signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
-            profile = OauthSignupProfile(
-                email = oauthUserProfile.email,
-                name = oauthUserProfile.name,
-                nickname = oauthUserProfile.nickname,
-                phone = oauthUserProfile.phone,
-            ),
+            profile = oauthUserProfile.toSignupProfile(),
         )
     }
+
+    private fun OauthUserProfile.toSignupProfile(): OauthSignupProfile =
+        OauthSignupProfile(
+            email = email,
+            name = name,
+            nickname = nickname,
+            phone = phone,
+        )
 
     private fun createOauthLoginResult(user: User, provider: String): AuthResult {
         val principal = createOauthPrincipal(user, provider)
@@ -222,6 +273,28 @@ class MemberService(
         if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+    }
+
+    private fun restoreUser(user: User): Long {
+        user.deletedAt = null
+
+        oauthAccountRepository.findAllByUser_Id(user.id)
+            .forEach { oauthAccount -> oauthAccount.deletedAt = null }
+
+        return user.id
+    }
+
+    private fun restoreUser(user: User, command: SignupCommand): Long {
+        user.loginId = command.loginId
+        user.passwordHash = passwordEncoder.encode(command.password)
+        user.email = command.email
+        user.name = command.name
+        user.nickname = command.nickname
+        user.phone = command.phone
+        user.agreeSms = command.agreeSms
+        user.agreeMarketing = command.agreeMarketing
+
+        return restoreUser(user)
     }
 
     fun logoutWithOauthCallback(provider: String, refreshToken: String?) {
