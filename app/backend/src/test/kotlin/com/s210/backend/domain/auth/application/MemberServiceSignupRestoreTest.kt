@@ -1,5 +1,6 @@
 package com.s210.backend.domain.auth.application
 
+import com.s210.backend.common.entity.TokenInfo
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.jwt.JwtTokenProvider
@@ -26,7 +27,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.security.authentication.AuthenticationManager
@@ -220,6 +224,91 @@ class MemberServiceSignupRestoreTest {
     }
 
     @Test
+    fun `kakao callback returns link required when active email user exists`() {
+        val user = activeUser()
+        val profile = oauthProfile()
+        `when`(
+            oauthRedirectUriResolver.requireAllowedRedirectUri("http://localhost/callback"),
+        ).thenReturn("http://localhost/callback")
+        `when`(kakaoOAuthClient.fetchUserProfile("code", "http://localhost/callback")).thenReturn(profile)
+        `when`(memberRepository.findByEmailAndDeletedAtIsNull("old@example.com")).thenReturn(user)
+        `when`(oauthSignupTokenProvider.createToken(profile)).thenReturn("link-token")
+
+        val result = service.loginWithKakaoCallback("code", "http://localhost/callback")
+
+        assertTrue(result is OauthCallbackResult.LinkRequired)
+        val linkRequired = result as OauthCallbackResult.LinkRequired
+        assertEquals("link-token", linkRequired.signupToken)
+        assertEquals("old@example.com", linkRequired.profile.email)
+    }
+
+    @Test
+    fun `signUpWithKakao links active email user after confirmation`() {
+        val user = activeUser()
+        `when`(oauthSignupTokenProvider.parseToken("signup-token")).thenReturn(
+            OauthSignupToken(
+                provider = "kakao",
+                providerUserId = "kakao-user",
+                email = "old@example.com",
+                name = "Kakao Name",
+                nickname = "Kakao Nickname",
+                phone = null,
+            )
+        )
+        `when`(memberRepository.findByEmailAndDeletedAtIsNull("old@example.com")).thenReturn(user)
+        `when`(jwtTokenProvider.createToken(any(org.springframework.security.core.Authentication::class.java)))
+            .thenReturn(TokenInfo("old-login", "Bearer", "access-token", "refresh-token"))
+
+        val result = service.signUpWithKakao(
+            OauthSignupCommand(
+                signupToken = "signup-token",
+                email = "old@example.com",
+                name = "Kakao Name",
+                nickname = "Kakao Nickname",
+                phone = null,
+                linkConfirmed = true,
+            )
+        )
+
+        assertEquals(user.id, result.user.id)
+        assertEquals("kakao", result.provider)
+        val oauthAccountCaptor = ArgumentCaptor.forClass(OauthAccount::class.java)
+        verify(oauthAccountRepository).save(oauthAccountCaptor.capture())
+        assertEquals(user, oauthAccountCaptor.value.user)
+        assertEquals("kakao", oauthAccountCaptor.value.provider)
+        assertEquals("kakao-user", oauthAccountCaptor.value.providerUserId)
+    }
+
+    @Test
+    fun `signUpWithKakao still requires terms when link confirmation has no active email user`() {
+        `when`(oauthSignupTokenProvider.parseToken("signup-token")).thenReturn(
+            OauthSignupToken(
+                provider = "kakao",
+                providerUserId = "kakao-user",
+                email = "new@example.com",
+                name = "Kakao Name",
+                nickname = "Kakao Nickname",
+                phone = null,
+            )
+        )
+
+        val ex = assertThrows<BusinessException> {
+            service.signUpWithKakao(
+                OauthSignupCommand(
+                    signupToken = "signup-token",
+                    email = "new@example.com",
+                    name = "Kakao Name",
+                    nickname = "Kakao Nickname",
+                    phone = null,
+                    linkConfirmed = true,
+                )
+            )
+        }
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
+    }
+
+    @Test
     fun `signUpWithKakao rejects request email that differs from kakao signup token email`() {
         `when`(oauthSignupTokenProvider.parseToken("signup-token")).thenReturn(
             OauthSignupToken(
@@ -259,6 +348,16 @@ class MemberServiceSignupRestoreTest {
         ).also {
             it.deletedAt = LocalDateTime.now().minusDays(7)
         }
+
+    private fun activeUser(): User =
+        User(
+            id = 1L,
+            loginId = "old-login",
+            passwordHash = "old-password",
+            email = "old@example.com",
+            name = "Existing User",
+            nickname = "Existing Nickname",
+        )
 
     private fun signupCommand(
         restoreConfirmed: Boolean,

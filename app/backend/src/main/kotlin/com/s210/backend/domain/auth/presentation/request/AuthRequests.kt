@@ -65,6 +65,7 @@ data class KakaoSignupRequest(
     val phone: String? = null,
     val termAgreements: List<TermAgreementRequest> = emptyList(),
     val restoreConfirmed: Boolean = false,
+    val linkConfirmed: Boolean = false,
 ) {
     fun toCommand(): OauthSignupCommand =
         OauthSignupCommand(
@@ -75,5 +76,6 @@ data class KakaoSignupRequest(
             phone = phone?.trim()?.takeIf { it.isNotEmpty() },
             termAgreements = termAgreements.map { it.toCommand() },
             restoreConfirmed = restoreConfirmed,
+            linkConfirmed = linkConfirmed,
         )
 }

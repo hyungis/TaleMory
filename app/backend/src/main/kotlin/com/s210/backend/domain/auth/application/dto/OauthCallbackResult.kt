@@ -14,6 +14,11 @@ sealed interface OauthCallbackResult {
         val signupToken: String,
         val profile: OauthSignupProfile,
     ) : OauthCallbackResult
+
+    data class LinkRequired(
+        val signupToken: String,
+        val profile: OauthSignupProfile,
+    ) : OauthCallbackResult
 }
 
 data class OauthSignupProfile(

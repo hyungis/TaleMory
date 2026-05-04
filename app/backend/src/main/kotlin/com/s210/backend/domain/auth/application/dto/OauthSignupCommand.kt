@@ -8,4 +8,5 @@ data class OauthSignupCommand(
     val phone: String?,
     val termAgreements: List<TermAgreementCommand> = emptyList(),
     val restoreConfirmed: Boolean = false,
+    val linkConfirmed: Boolean = false,
 )

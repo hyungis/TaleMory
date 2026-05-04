@@ -86,6 +86,11 @@ fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
             signupToken = signupToken,
             profile = profile.toResponse(),
         )
+        is OauthCallbackResult.LinkRequired -> KakaoCallbackResponse(
+            status = CALLBACK_STATUS_LINK_REQUIRED,
+            signupToken = signupToken,
+            profile = profile.toResponse(),
+        )
     }
 
 private fun AuthResult.toKakaoCallbackResponse(): KakaoCallbackResponse {
@@ -109,3 +114,4 @@ private fun OauthSignupProfile.toResponse(): OauthSignupProfileResponse =
 private const val CALLBACK_STATUS_LOGIN = "LOGIN"
 private const val CALLBACK_STATUS_SIGNUP_REQUIRED = "SIGNUP_REQUIRED"
 private const val CALLBACK_STATUS_RESTORE_REQUIRED = "RESTORE_REQUIRED"
+private const val CALLBACK_STATUS_LINK_REQUIRED = "LINK_REQUIRED"

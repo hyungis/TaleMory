@@ -160,6 +160,7 @@ class MemberService(
             is OauthCallbackResult.Login -> result.authResult
             is OauthCallbackResult.SignupRequired -> throw BusinessException(AuthErrorCode.OAUTH_FAILED)
             is OauthCallbackResult.RestoreRequired -> throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+            is OauthCallbackResult.LinkRequired -> throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
     }
 
@@ -204,9 +205,14 @@ class MemberService(
 
         val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(kakaoEmail)
         if (existingEmailUser != null) {
-            throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+            if (!command.linkConfirmed) {
+                throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
+            }
+            linkOauthAccount(existingEmailUser, oauthSignupToken.provider, oauthSignupToken.providerUserId)
+            return createOauthLoginResult(existingEmailUser, oauthSignupToken.provider)
         }
 
+        requireRequiredTermsAgreed(command.termAgreements)
         requireAvailableNickname(command.nickname)
 
         val createdUser = memberRepository.save(
@@ -231,6 +237,16 @@ class MemberService(
         return createOauthLoginResult(createdUser, oauthSignupToken.provider)
     }
 
+    private fun linkOauthAccount(user: User, provider: String, providerUserId: String) {
+        oauthAccountRepository.save(
+            OauthAccount(
+                user = user,
+                provider = provider,
+                providerUserId = providerUserId,
+            )
+        )
+    }
+
     private fun createOauthCallbackResult(oauthUserProfile: OauthUserProfile): OauthCallbackResult {
         val oauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(
             oauthUserProfile.provider,
@@ -244,6 +260,14 @@ class MemberService(
                 )
             }
             return OauthCallbackResult.Login(createOauthLoginResult(oauthAccount.user, oauthUserProfile.provider))
+        }
+
+        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(oauthUserProfile.email)
+        if (existingEmailUser != null) {
+            return OauthCallbackResult.LinkRequired(
+                signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
+                profile = oauthUserProfile.toSignupProfile(),
+            )
         }
 
         val withdrawnEmailUser = memberRepository
@@ -305,9 +329,6 @@ class MemberService(
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
 
-        if (!command.restoreConfirmed) {
-            requireRequiredTermsAgreed(command.termAgreements)
-        }
     }
 
     private fun validateSignupCommand(command: SignupCommand) {

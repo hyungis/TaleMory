@@ -21,6 +21,7 @@ export interface KakaoSignupRequest {
   phone?: string
   termAgreements?: TermAgreement[]
   restoreConfirmed?: boolean
+  linkConfirmed?: boolean
 }
 
 export interface KakaoLoginCallbackPayload extends LoginResponsePayload {
@@ -39,7 +40,14 @@ export interface KakaoRestoreRequiredCallbackPayload {
   profile: KakaoSignupProfile
 }
 
+export interface KakaoLinkRequiredCallbackPayload {
+  status: 'LINK_REQUIRED'
+  signupToken: string
+  profile: KakaoSignupProfile
+}
+
 export type KakaoCallbackResponsePayload =
   | KakaoLoginCallbackPayload
   | KakaoSignupRequiredCallbackPayload
   | KakaoRestoreRequiredCallbackPayload
+  | KakaoLinkRequiredCallbackPayload
