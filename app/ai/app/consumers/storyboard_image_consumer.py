@@ -184,10 +184,14 @@ def _publish_image_failure(
 ) -> bool:
     if isinstance(exc, ValueError):
         code = f"{action}_STORYBOARD_IMAGE_ERROR"
+        message = str(exc)
     elif isinstance(exc, RuntimeError):
         code = f"{action}_STORYBOARD_IMAGE_RUNTIME_ERROR"
+        message = str(exc)
     else:
-        raise exc
+        logger.exception("Unexpected storyboard image api error", exc_info=exc)
+        code = f"{action}_STORYBOARD_IMAGE_UNEXPECTED_ERROR"
+        message = "Unexpected worker error"
 
     with publisher_channel() as channel:
         publisher = StoryboardImageJobPublisher(channel)
@@ -195,7 +199,7 @@ def _publish_image_failure(
             job_id=job_id,
             story_id=story_id,
             page_number=page_number,
-            error=StoryboardImageError(code=code, message=str(exc)),
+            error=StoryboardImageError(code=code, message=message),
             action=action,
         )
     return True

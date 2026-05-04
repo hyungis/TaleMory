@@ -95,22 +95,10 @@ class Settings(BaseModel):
     RABBITMQ_USER: str = getenv("RABBITMQ_USERNAME", getenv("RABBITMQ_USER", "guest"))
     RABBITMQ_PASSWORD: str = getenv("RABBITMQ_PASSWORD", "guest")
     RABBITMQ_VHOST: str = getenv("RABBITMQ_VHOST", "/")
-    AI_WORKER_CONCURRENCY: int = int(getenv("AI_WORKER_CONCURRENCY", "2"))
-    AI_STORY_API_CONCURRENCY: int = int(
-        getenv(
-            "AI_STORY_API_CONCURRENCY",
-            getenv("AI_API_CONCURRENCY", getenv("AI_WORKER_CONCURRENCY", "2")),
-        )
-    )
-    AI_IMAGE_API_CONCURRENCY: int = int(
-        getenv(
-            "AI_IMAGE_API_CONCURRENCY",
-            getenv("AI_API_CONCURRENCY", getenv("RABBITMQ_PREFETCH_COUNT", "10")),
-        )
-    )
-    RABBITMQ_PREFETCH_COUNT: int = int(
-        getenv("RABBITMQ_PREFETCH_COUNT", getenv("AI_WORKER_CONCURRENCY", "2"))
-    )
+    AI_WORKER_CONCURRENCY: int = int(getenv("AI_WORKER_CONCURRENCY", "3"))
+    AI_STORY_API_CONCURRENCY: int = int(getenv("AI_STORY_API_CONCURRENCY", "3"))
+    AI_IMAGE_API_CONCURRENCY: int = int(getenv("AI_IMAGE_API_CONCURRENCY", "10"))
+    RABBITMQ_PREFETCH_COUNT: int = int(getenv("RABBITMQ_PREFETCH_COUNT", "13"))
     RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "ai.request")
     RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
     RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.story.generate.request.queue")

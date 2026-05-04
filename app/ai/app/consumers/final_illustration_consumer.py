@@ -172,10 +172,14 @@ def _publish_final_illustration_failure(
 ) -> bool:
     if isinstance(exc, ValueError):
         code = f"{action}_FINAL_ILLUSTRATION_ERROR"
+        message = str(exc)
     elif isinstance(exc, RuntimeError):
         code = f"{action}_FINAL_ILLUSTRATION_RUNTIME_ERROR"
+        message = str(exc)
     else:
-        raise exc
+        logger.exception("Unexpected final illustration api error", exc_info=exc)
+        code = f"{action}_FINAL_ILLUSTRATION_UNEXPECTED_ERROR"
+        message = "Unexpected worker error"
 
     with publisher_channel() as channel:
         publisher = FinalIllustrationJobPublisher(channel)
@@ -183,7 +187,7 @@ def _publish_final_illustration_failure(
             job_id=job_id,
             story_id=story_id,
             page_number=page_number,
-            error=FinalIllustrationError(code=code, message=str(exc)),
+            error=FinalIllustrationError(code=code, message=message),
             action=action,
         )
     return True
