@@ -28,7 +28,7 @@ export function IllustrationModal({ scene, onClose }: IllustrationModalProps) {
 
   if (!scene) return null
 
-  const illustStyle = { '--illust-a': '#c4e3b4', '--illust-b': '#f7c59f' } as React.CSSProperties
+  const illustStyle = { '--illust-a': '#c9d8b2', '--illust-b': '#e8c79b' } as React.CSSProperties
 
   return (
     <div
@@ -54,7 +54,7 @@ export function IllustrationModal({ scene, onClose }: IllustrationModalProps) {
           {scene.illustrationUrl ? (
             <img src={scene.illustrationUrl} alt={`Page ${scene.pageNumber} 확대 삽화`} />
           ) : (
-            <ImageIcon className="w-32 h-32 md:w-48 md:h-48 text-white/95" strokeWidth={1.5} />
+            <ImageIcon className="sb-illust-modal-empty-icon" strokeWidth={1.5} />
           )}
         </div>
 

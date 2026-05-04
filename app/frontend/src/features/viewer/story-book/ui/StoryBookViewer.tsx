@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bookmark, ChevronLeft, ChevronRight, Maximize, X } from 'lucide-react'
+import { Bookmark, ChevronLeft, ChevronRight, Maximize } from 'lucide-react'
 import type { StoryView, SceneView, WordEntry } from '../../model/types'
 import { BookCover } from './BookCover'
 import { BookSpread } from './BookSpread'
 import { BookBackCover } from './BookBackCover'
 import { TurnSheet } from './TurnSheet'
-import { ViewerToolbar, type ViewerTheme } from './ViewerToolbar'
+import { ViewerToolbar } from './ViewerToolbar'
 import { IllustrationModal } from './IllustrationModal'
 import { WordLookupCard } from './WordLookupCard'
 import { useStoryTts } from '../model/useStoryTts'
@@ -30,14 +30,21 @@ interface FlipState {
   toPageIndex: number
 }
 
+/**
+ * 표지(앞표지/뒷표지) ↔ 본문 전환 시의 3D 책표지 열기/닫기 애니메이션 상태.
+ * - kind: 어느 표지를 보여줄지 (cover = 앞표지 hinge 왼쪽 / backCover = 뒷표지 hinge 오른쪽)
+ * - phase: open = 표지가 열려서 사라짐 / close = 표지가 다시 닫힘
+ */
+interface CoverFlipState {
+  kind: 'cover' | 'backCover'
+  phase: 'open' | 'close'
+}
+
 const FLIP_DURATION_MS = 850
 const FADE_DURATION_MS = 600
 const TOOLBAR_CLOSE_DELAY_MS = 350
 
-const STORAGE_KEY_THEME = 'viewer-theme'
 const storageKeyBookmark = (storyId: number) => `viewer-bookmark-${storyId}`
-
-const VALID_THEMES: ViewerTheme[] = ['forest', 'sunset', 'night']
 
 /**
  * 동화책 모드 메인 뷰어.
@@ -62,8 +69,35 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     [story.scenes],
   )
 
-  const [pageIndex, setPageIndex] = useState(0)
+  /* 책갈피 — 한 동화당 1개 (pageIndex 단일값).
+     useState lazy initializer 로 마운트 시점에 localStorage 에서 읽어 즉시 적용 →
+     viewer 를 껐다 다시 들어올 때 책갈피 페이지부터 시작 (cover 깜빡임 없이). */
+  const [bookmark, setBookmark] = useState<number | null>(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKeyBookmark(story.storyId))
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (typeof parsed === 'number' && Number.isFinite(parsed)) {
+          return parsed
+        }
+      }
+    } catch {
+      /* noop */
+    }
+    return null
+  })
+
+  /* pageIndex 도 책갈피 위치에서 시작. 책갈피 없으면 표지(0)부터.
+     pages 길이 범위 체크 — 동화 내용이 변경돼 page 수가 줄었을 경우 안전. */
+  const [pageIndex, setPageIndex] = useState(() => {
+    if (bookmark !== null && bookmark >= 0 && bookmark < pages.length) {
+      return bookmark
+    }
+    return 0
+  })
+
   const [flip, setFlip] = useState<FlipState | null>(null)
+  const [coverFlip, setCoverFlip] = useState<CoverFlipState | null>(null)
   const [isFading, setIsFading] = useState(false)
   const swapTimerRef = useRef<number | null>(null)
 
@@ -79,49 +113,8 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   // 단어 번역 팝업
   const [wordLookup, setWordLookup] = useState<{ word: string; entries: WordEntry[]; isLoading: boolean } | null>(null)
 
-  // 책갈피 — 한 동화당 1개 (pageIndex 단일값)
-  const [bookmark, setBookmark] = useState<number | null>(null)
-
-  // 테마
-  const [theme, setTheme] = useState<ViewerTheme>('forest')
-
   // TTS
   const tts = useStoryTts()
-
-  // ===== localStorage 초기 로드 =====
-  useEffect(() => {
-    try {
-      const rawTheme = window.localStorage.getItem(STORAGE_KEY_THEME)
-      if (rawTheme && VALID_THEMES.includes(rawTheme as ViewerTheme)) {
-        setTheme(rawTheme as ViewerTheme)
-      }
-    } catch {
-      /* noop */
-    }
-  }, [])
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKeyBookmark(story.storyId))
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (typeof parsed === 'number' && Number.isFinite(parsed)) {
-          setBookmark(parsed)
-        }
-      }
-    } catch {
-      /* noop */
-    }
-  }, [story.storyId])
-
-  // ===== localStorage 저장 =====
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY_THEME, theme)
-    } catch {
-      /* noop */
-    }
-  }, [theme])
 
   useEffect(() => {
     try {
@@ -136,7 +129,15 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     }
   }, [bookmark, story.storyId])
 
-  const isBusy = flip !== null || isFading
+  /* 책을 다 읽으면(= 뒷표지 도달) 책갈피 자동 해제.
+     storeBookmark 저장 effect 가 함께 발동해 localStorage 에서도 삭제. */
+  useEffect(() => {
+    if (pages[pageIndex]?.kind === 'backCover' && bookmark !== null) {
+      setBookmark(null)
+    }
+  }, [pageIndex, pages, bookmark])
+
+  const isBusy = flip !== null || coverFlip !== null || isFading
 
   const goTo = (target: number) => {
     if (isBusy) return
@@ -149,7 +150,31 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     const direction: 'next' | 'prev' = target > pageIndex ? 'next' : 'prev'
     const sceneToScene = from.kind === 'scene' && to.kind === 'scene'
 
+    /* === 표지 ↔ 본문 전환 — 책표지 열기/닫기 3D 플립 ===
+       cover ↔ scene  : 앞표지가 왼쪽 hinge 로 열림/닫힘
+       backCover ↔ scene : 뒷표지가 오른쪽 hinge 로 열림/닫힘
+       cover ↔ backCover (Restart 등 드물게) 는 기존 fade 로 처리. */
+    const isCoverScene =
+      (from.kind === 'cover' && to.kind === 'scene') ||
+      (from.kind === 'scene' && to.kind === 'cover')
+    const isBackCoverScene =
+      (from.kind === 'backCover' && to.kind === 'scene') ||
+      (from.kind === 'scene' && to.kind === 'backCover')
+
+    if (isCoverScene || isBackCoverScene) {
+      const kind: CoverFlipState['kind'] = isCoverScene ? 'cover' : 'backCover'
+      const phase: CoverFlipState['phase'] =
+        from.kind === 'cover' || from.kind === 'backCover' ? 'open' : 'close'
+      setCoverFlip({ kind, phase })
+      // 표지가 edge-on 으로 보이지 않는 중간 시점에 underlying content 를 swap.
+      swapTimerRef.current = window.setTimeout(() => {
+        setPageIndex(target)
+      }, FLIP_DURATION_MS / 2)
+      return
+    }
+
     if (!sceneToScene) {
+      // 그 외 (cover ↔ backCover) — 기본 fade
       setIsFading(true)
       window.setTimeout(() => {
         setPageIndex(target)
@@ -213,7 +238,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const isCover = current.kind === 'cover'
   const isBackCover = current.kind === 'backCover'
   const shellClass = `sb-shell ${isCover ? 'is-cover' : ''} ${isBackCover ? 'is-back-cover' : ''}`.trim()
-  const roomClass = `sb-room sb-theme-${theme}`
+  const roomClass = 'sb-room'
 
   const flipFromScene = flip && pages[flip.fromPageIndex].kind === 'scene'
     ? story.scenes[pages[flip.fromPageIndex].sceneIndex!]
@@ -307,7 +332,6 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
         isBookmarked={isCurrentBookmarked}
         bookmarkLabel={bookmarkLabel}
         canJumpToBookmark={canJumpToBookmark}
-        theme={theme}
         onPlayFullBook={playFullBook}
         onPause={tts.pause}
         onResume={tts.resume}
@@ -316,7 +340,6 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
         onFontSizeChange={setFontSize}
         onToggleBookmark={toggleBookmark}
         onJumpToBookmark={jumpToBookmark}
-        onThemeChange={setTheme}
         onMouseEnter={openToolbar}
         onMouseLeave={scheduleToolbarClose}
       />
@@ -324,9 +347,6 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
       <div className="sb-float-top">
         <button onClick={toggleFullscreen} className="sb-float-btn" title="전체화면" aria-label="전체화면 토글">
           <Maximize className="w-5 h-5" />
-        </button>
-        <button onClick={onExit} className="sb-float-btn" title="닫기" aria-label="뷰어 닫기">
-          <X className="w-5 h-5" />
         </button>
       </div>
 
@@ -384,6 +404,25 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
             toIndex={pages[flip.toPageIndex].sceneIndex!}
             onEnd={handleFlipEnd}
           />
+        )}
+
+        {coverFlip && (
+          <div
+            className={`sb-cover-flip-sheet sb-cover-flip-${coverFlip.kind} sb-cover-flip-${coverFlip.phase}`}
+            onAnimationEnd={() => setCoverFlip(null)}
+            aria-hidden="true"
+          >
+            {coverFlip.kind === 'cover' ? (
+              <BookCover
+                title={story.title ?? '제목 없는 동화'}
+                subtitle="TaleMory"
+                authorLabel={story.mainCharacter?.name ? `${story.mainCharacter.name}의 가족 드림` : '우리 가족 드림'}
+                illustrationUrl={story.coverIllustrationUrl}
+              />
+            ) : (
+              <div className="sb-back-cover sb-back-cover-static" />
+            )}
+          </div>
         )}
 
         <button
