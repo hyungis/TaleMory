@@ -28,13 +28,17 @@ const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 
 function createInitialValues(profile: KakaoSignupProfile): KakaoSignupFormValues {
   return {
-    email: profile.email ?? '',
+    email: profile.email.trim(),
     name: profile.name ?? '',
     nickname: profile.nickname ?? '',
     phone: profile.phone ?? '',
     smsAgree: false,
     marketingAgree: false,
   }
+}
+
+function getKakaoEmail(profile: KakaoSignupProfile): string {
+  return profile.email.trim()
 }
 
 function validate(values: KakaoSignupFormValues): string | null {
@@ -74,6 +78,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
   const [error, setError] = useState('')
   const [restoreRequest, setRestoreRequest] = useState<KakaoSignupRequest | null>(null)
   const { isPending, signup } = useKakaoSignupPost()
+  const kakaoEmail = getKakaoEmail(profile)
 
   const handleChange = useCallback(
     <K extends keyof KakaoSignupFormValues>(key: K, value: KakaoSignupFormValues[K]) => {
@@ -96,7 +101,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
 
       const request: KakaoSignupRequest = {
         signupToken,
-        email: values.email.trim(),
+        email: kakaoEmail,
         name: values.name.trim(),
         nickname: values.nickname.trim(),
         phone: values.phone.trim() || undefined,
@@ -119,7 +124,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
         setError(getKakaoSignupErrorMessage(submitError))
       }
     },
-    [isPending, onSuccess, signup, signupToken, values],
+    [isPending, kakaoEmail, onSuccess, signup, signupToken, values],
   )
 
   const handleRestoreCancel = useCallback(() => {
@@ -165,13 +170,15 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
             </label>
             <input
               type="email"
-              value={values.email}
-              disabled={isPending}
-              onChange={e => handleChange('email', e.target.value)}
+              value={kakaoEmail}
+              readOnly
               autoComplete="email"
               placeholder="example@email.com"
-              className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60"
             />
+            <p className="mt-1.5 text-xs leading-5 text-[#6a5632]">
+              카카오 계정에서 인증된 이메일이라 수정할 수 없어요.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

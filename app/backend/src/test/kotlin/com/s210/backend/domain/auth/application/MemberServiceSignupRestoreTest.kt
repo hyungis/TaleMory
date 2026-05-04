@@ -1,14 +1,17 @@
 package com.s210.backend.domain.auth.application
 
 import com.s210.backend.common.exception.BusinessException
+import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.jwt.JwtTokenProvider
 import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
+import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
 import com.s210.backend.domain.auth.application.dto.OauthUserProfile
 import com.s210.backend.domain.auth.application.dto.SignupCommand
 import com.s210.backend.domain.auth.exception.AuthErrorCode
 import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
+import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupToken
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.user.entity.OauthAccount
@@ -148,6 +151,36 @@ class MemberServiceSignupRestoreTest {
         assertEquals("old@example.com", restoreRequired.profile.email)
         assertTrue(user.deletedAt != null)
         assertTrue(oauthAccount.deletedAt != null)
+    }
+
+    @Test
+    fun `signUpWithKakao rejects request email that differs from kakao signup token email`() {
+        `when`(oauthSignupTokenProvider.parseToken("signup-token")).thenReturn(
+            OauthSignupToken(
+                provider = "kakao",
+                providerUserId = "kakao-user",
+                email = "kakao@example.com",
+                name = "카카오 이름",
+                nickname = "카카오 닉네임",
+                phone = null,
+            )
+        )
+
+        val ex = assertThrows<BusinessException> {
+            service.signUpWithKakao(
+                OauthSignupCommand(
+                    signupToken = "signup-token",
+                    email = "other@example.com",
+                    name = "카카오 이름",
+                    nickname = "카카오 닉네임",
+                    phone = null,
+                    agreeSms = false,
+                    agreeMarketing = false,
+                )
+            )
+        }
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
     }
 
     private fun withdrawnUser(): User =

@@ -136,9 +136,9 @@ class MemberService(
 
     fun signUpWithKakao(command: OauthSignupCommand): AuthResult {
         validateOauthSignupCommand(command)
-
         val oauthSignupToken = oauthSignupTokenProvider.parseToken(command.signupToken)
         requireSupportedProvider(oauthSignupToken.provider)
+        val kakaoEmail = requireMatchingOauthEmail(command, oauthSignupToken.email)
 
         val existingOauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(
             oauthSignupToken.provider,
@@ -155,7 +155,7 @@ class MemberService(
         }
 
         val withdrawnEmailUser = memberRepository
-            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.email)
+            .findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc(kakaoEmail)
         if (withdrawnEmailUser != null) {
             if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
@@ -171,7 +171,7 @@ class MemberService(
             return createOauthLoginResult(withdrawnEmailUser, oauthSignupToken.provider)
         }
 
-        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(command.email)
+        val existingEmailUser = memberRepository.findByEmailAndDeletedAtIsNull(kakaoEmail)
         if (existingEmailUser != null) {
             throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
@@ -180,7 +180,7 @@ class MemberService(
             User(
                 loginId = null,
                 passwordHash = null,
-                email = command.email,
+                email = kakaoEmail,
                 name = command.name,
                 nickname = command.nickname,
                 phone = command.phone,
@@ -273,6 +273,17 @@ class MemberService(
         if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+    }
+
+    private fun requireMatchingOauthEmail(command: OauthSignupCommand, tokenEmail: String): String {
+        val requestEmail = command.email.trim()
+        val kakaoEmail = tokenEmail.trim()
+
+        if (!EMAIL_PATTERN.matches(kakaoEmail) || requestEmail != kakaoEmail) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        return kakaoEmail
     }
 
     private fun restoreUser(user: User): Long {
