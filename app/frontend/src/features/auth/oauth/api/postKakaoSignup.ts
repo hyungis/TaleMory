@@ -13,6 +13,7 @@ export async function postKakaoSignup(body: KakaoSignupRequest): Promise<LoginRe
       phone: body.phone,
       agreeSms: body.agreeSms,
       agreeMarketing: body.agreeMarketing,
+      restoreConfirmed: body.restoreConfirmed ?? false,
     },
     {
       skipAuth: true,

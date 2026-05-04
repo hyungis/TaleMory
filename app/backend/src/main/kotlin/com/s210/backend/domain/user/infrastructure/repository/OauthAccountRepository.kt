@@ -10,5 +10,7 @@ interface OauthAccountRepository : JpaRepository<OauthAccount, Long> {
 
     fun findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(userId: Long): OauthAccount?
 
+    fun findAllByUser_Id(userId: Long): List<OauthAccount>
+
     fun findAllByUser_IdAndDeletedAtIsNull(userId: Long): List<OauthAccount>
 }
