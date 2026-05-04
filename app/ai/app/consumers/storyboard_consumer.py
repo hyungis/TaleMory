@@ -20,6 +20,7 @@ from app.services.storyboard_summary_service import (
     regenerate_storyboard_summary,
 )
 from app.services.storyboard_service import generate_storyboard, regenerate_storyboard
+from app.worker_async import ApiJob, publisher_channel, submit_story_api_message
 
 logger = logging.getLogger(__name__)
 
@@ -37,30 +38,28 @@ def consume_storyboard_jobs() -> None:
 
 
 def register_storyboard_consumers(channel: Any) -> None:
-    publisher = StoryResultPublisher(channel)
-
     channel.basic_consume(
         queue=settings.RABBITMQ_GENERATE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_generate_message(
-            ch, method.delivery_tag, body, publisher
+            ch, method.delivery_tag, body
         ),
     )
     channel.basic_consume(
         queue=settings.RABBITMQ_SUMMARY_GENERATE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_summary_generate_message(
-            ch, method.delivery_tag, body, publisher
+            ch, method.delivery_tag, body
         ),
     )
     channel.basic_consume(
         queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_summary_regenerate_message(
-            ch, method.delivery_tag, body, publisher
+            ch, method.delivery_tag, body
         ),
     )
     channel.basic_consume(
         queue=settings.RABBITMQ_REGENERATE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_regenerate_message(
-            ch, method.delivery_tag, body, publisher
+            ch, method.delivery_tag, body
         ),
     )
 
@@ -69,82 +68,268 @@ def _dispatch_generate_message(
     channel: Any,
     delivery_tag: int,
     body: bytes,
-    publisher: StoryResultPublisher,
 ) -> None:
     logger.info(
         "[STORY:GEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_GENERATE_QUEUE, len(body),
     )
-    try:
-        handle_generate_message(body=body, publisher=publisher)
-    except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
-        logger.exception("Unexpected error while processing generate storyboard message")
-    else:
-        channel.basic_ack(delivery_tag=delivery_tag)
+    submit_story_api_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        job_factory=lambda: _create_generate_job(body),
+        task_name="generate storyboard message",
+    )
 
 
 def _dispatch_summary_generate_message(
     channel: Any,
     delivery_tag: int,
     body: bytes,
-    publisher: StoryResultPublisher,
 ) -> None:
     logger.info(
         "[SUMMARY:GEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_SUMMARY_GENERATE_QUEUE, len(body),
     )
-    try:
-        handle_summary_generate_message(body=body, publisher=publisher)
-    except Exception as exc:
-        logger.exception("Unexpected error while processing generate storyboard summary message")
-        if _publish_unexpected_summary_failure(body=body, publisher=publisher, action="GENERATE", exc=exc):
-            channel.basic_ack(delivery_tag=delivery_tag)
-            return
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
-    else:
-        channel.basic_ack(delivery_tag=delivery_tag)
+    submit_story_api_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        job_factory=lambda: _create_summary_generate_job(body),
+        task_name="generate storyboard summary message",
+    )
 
 
 def _dispatch_regenerate_message(
     channel: Any,
     delivery_tag: int,
     body: bytes,
-    publisher: StoryResultPublisher,
 ) -> None:
     logger.info(
         "[STORY:REGEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_REGENERATE_QUEUE, len(body),
     )
-    try:
-        handle_regenerate_message(body=body, publisher=publisher)
-    except Exception:
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
-        logger.exception("Unexpected error while processing regenerate storyboard message")
-    else:
-        channel.basic_ack(delivery_tag=delivery_tag)
+    submit_story_api_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        job_factory=lambda: _create_regenerate_job(body),
+        task_name="regenerate storyboard message",
+    )
 
 
 def _dispatch_summary_regenerate_message(
     channel: Any,
     delivery_tag: int,
     body: bytes,
-    publisher: StoryResultPublisher,
 ) -> None:
     logger.info(
         "[SUMMARY:REGEN] dispatch — deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE, len(body),
     )
-    try:
-        handle_summary_regenerate_message(body=body, publisher=publisher)
-    except Exception as exc:
-        logger.exception("Unexpected error while processing regenerate storyboard summary message")
-        if _publish_unexpected_summary_failure(body=body, publisher=publisher, action="REGENERATE", exc=exc):
-            channel.basic_ack(delivery_tag=delivery_tag)
-            return
-        channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
+    submit_story_api_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        job_factory=lambda: _create_summary_regenerate_job(body),
+        task_name="regenerate storyboard summary message",
+    )
+
+
+def _create_generate_job(body: bytes) -> ApiJob:
+    message = StoryGenerateJobMessage.model_validate_json(body)
+    request = _merge_story_id_generate(message.storyId, message.payload)
+    story_id = _story_id_from_generate(message.storyId, request)
+    logger.info(
+        "[STORY:GEN] received ??jobId=%s, storyId=%s, photos=%d, children=%d",
+        message.jobId, story_id, len(request.photos), len(request.children),
+    )
+    return ApiJob(
+        task=lambda: generate_storyboard(request),
+        on_success=lambda result: _publish_story_result(message, story_id, result, "GENERATE"),
+        on_error=lambda exc: _publish_story_failure(message, story_id, exc, "GENERATE"),
+    )
+
+
+def _create_summary_generate_job(body: bytes) -> ApiJob:
+    message = StorySummaryGenerateJobMessage.model_validate_json(body)
+    request = _merge_story_id_summary(message.storyId, message.payload)
+    story_id = _story_id_from_summary(message.storyId, request)
+    logger.info(
+        "[SUMMARY:GEN] received ??jobId=%s, storyId=%s, photos=%d, children=%d",
+        message.jobId, story_id, len(request.photos), len(request.children),
+    )
+    return ApiJob(
+        task=lambda: generate_storyboard_summary(request),
+        on_success=lambda result: _publish_summary_result(message, story_id, result, "GENERATE"),
+        on_error=lambda exc: _publish_summary_failure(message, story_id, exc, "GENERATE"),
+    )
+
+
+def _create_regenerate_job(body: bytes) -> ApiJob:
+    message = StoryRegenerateJobMessage.model_validate_json(body)
+    request = _merge_story_id_regenerate(message.storyId, message.payload)
+    story_id = _story_id_from_regenerate(message.storyId, request)
+    logger.info(
+        "[STORY:REGEN] received ??jobId=%s, storyId=%s",
+        message.jobId, story_id,
+    )
+    return ApiJob(
+        task=lambda: regenerate_storyboard(request),
+        on_success=lambda result: _publish_story_result(message, story_id, result, "REGENERATE"),
+        on_error=lambda exc: _publish_story_failure(message, story_id, exc, "REGENERATE"),
+    )
+
+
+def _create_summary_regenerate_job(body: bytes) -> ApiJob:
+    message = StorySummaryRegenerateJobMessage.model_validate_json(body)
+    request = _merge_story_id_summary_regenerate(message.storyId, message.payload)
+    story_id = _story_id_from_summary_regenerate(message.storyId, request)
+    logger.info(
+        "[SUMMARY:REGEN] received ??jobId=%s, storyId=%s, userPromptLen=%d",
+        message.jobId, story_id, len(request.userPrompt or ""),
+    )
+    return ApiJob(
+        task=lambda: regenerate_storyboard_summary(request),
+        on_success=lambda result: _publish_summary_result(message, story_id, result, "REGENERATE"),
+        on_error=lambda exc: _publish_summary_failure(message, story_id, exc, "REGENERATE"),
+    )
+
+
+def _process_generate_message(body: bytes) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        handle_generate_message(body=body, publisher=publisher)
+    return True
+
+
+def _process_summary_generate_message(body: bytes) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        try:
+            handle_summary_generate_message(body=body, publisher=publisher)
+        except Exception as exc:
+            logger.exception("Unexpected error while processing generate storyboard summary message")
+            return _publish_unexpected_summary_failure(body=body, publisher=publisher, action="GENERATE", exc=exc)
+    return True
+
+
+def _process_regenerate_message(body: bytes) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        handle_regenerate_message(body=body, publisher=publisher)
+    return True
+
+
+def _process_summary_regenerate_message(body: bytes) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        try:
+            handle_summary_regenerate_message(body=body, publisher=publisher)
+        except Exception as exc:
+            logger.exception("Unexpected error while processing regenerate storyboard summary message")
+            return _publish_unexpected_summary_failure(body=body, publisher=publisher, action="REGENERATE", exc=exc)
+    return True
+
+
+def _publish_story_result(
+    message: StoryGenerateJobMessage | StoryRegenerateJobMessage,
+    story_id: int | None,
+    result: Any,
+    action: str,
+) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        publisher.publish_result(
+            job_id=message.jobId,
+            story_id=story_id,
+            payload=result,
+            action=action,
+        )
+    if action == "GENERATE":
+        logger.info(
+            "[STORY:GEN] published result ??jobId=%s, pages=%d, totalWords=%s, costUsd=%s",
+            message.jobId, len(result.pages), result.totalWordCount, result.usage.costUsd,
+        )
     else:
-        channel.basic_ack(delivery_tag=delivery_tag)
+        logger.info(
+            "[STORY:REGEN] published result ??jobId=%s, pages=%d, costUsd=%s",
+            message.jobId, len(result.pages), result.usage.costUsd,
+        )
+    return True
+
+
+def _publish_story_failure(
+    message: StoryGenerateJobMessage | StoryRegenerateJobMessage,
+    story_id: int | None,
+    exc: BaseException,
+    action: str,
+) -> bool:
+    if isinstance(exc, ValueError):
+        code = f"{action}_STORY_ERROR"
+    elif isinstance(exc, RuntimeError):
+        code = f"{action}_STORY_RUNTIME_ERROR"
+    else:
+        raise exc
+
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        publisher.publish_failure(
+            job_id=message.jobId,
+            story_id=story_id,
+            error=StoryError(code=code, message=str(exc)),
+            action=action,
+        )
+    return True
+
+
+def _publish_summary_result(
+    message: StorySummaryGenerateJobMessage | StorySummaryRegenerateJobMessage,
+    story_id: int | None,
+    result: Any,
+    action: str,
+) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        publisher.publish_summary_result(
+            job_id=message.jobId,
+            story_id=story_id,
+            payload=result,
+            action=action,
+        )
+    logger.info(
+        "[SUMMARY:%s] published result ??jobId=%s, summaryKoLen=%d, costUsd=%s",
+        "GEN" if action == "GENERATE" else "REGEN",
+        message.jobId, len(result.summaryKo), result.usage.costUsd,
+    )
+    return True
+
+
+def _publish_summary_failure(
+    message: StorySummaryGenerateJobMessage | StorySummaryRegenerateJobMessage,
+    story_id: int | None,
+    exc: BaseException,
+    action: str,
+) -> bool:
+    if isinstance(exc, ValueError):
+        code = f"{action}_STORY_SUMMARY_ERROR"
+    elif isinstance(exc, RuntimeError):
+        code = f"{action}_STORY_SUMMARY_RUNTIME_ERROR"
+    else:
+        with publisher_channel() as channel:
+            publisher = StoryResultPublisher(channel)
+            return _publish_unexpected_summary_failure(
+                body=json.dumps({"jobId": message.jobId, "storyId": story_id}).encode("utf-8"),
+                publisher=publisher,
+                action=action,
+                exc=exc,
+            )
+
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        publisher.publish_summary_failure(
+            job_id=message.jobId,
+            story_id=story_id,
+            error=StoryError(code=code, message=str(exc)),
+            action=action,
+        )
+    return True
 
 
 def handle_generate_message(body: bytes, publisher: StoryResultPublisher) -> None:
