@@ -1,6 +1,8 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { AlertCircle, UserPlus } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
+import { formatPhoneNumber } from '../../../../shared/lib'
+import { getNicknameAvailability } from '../../api/getAuthAvailability'
 import { TermsCheckboxes } from '../../terms'
 import { useKakaoSignupPost } from '../model/useKakaoSignupPost'
 import type { KakaoSignupProfile, KakaoSignupRequest } from '../types'
@@ -26,12 +28,42 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
 const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 
+type NicknameCheckStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
+
+interface NicknameCheckState {
+  status: NicknameCheckStatus
+  value: string
+}
+
+const INITIAL_NICKNAME_CHECK: NicknameCheckState = {
+  status: 'idle',
+  value: '',
+}
+
+function isNicknameCheckConfirmed(state: NicknameCheckState, nickname: string): boolean {
+  return state.status === 'available' && state.value === nickname.trim()
+}
+
+function getNicknameCheckMessage(state: NicknameCheckState, nickname: string): string | null {
+  if (state.status === 'idle' || state.value !== nickname.trim()) return null
+  if (state.status === 'checking') return '닉네임 중복 여부를 확인하고 있어요.'
+  if (state.status === 'available') return '사용 가능한 닉네임입니다.'
+  if (state.status === 'unavailable') return '이미 사용 중인 닉네임입니다.'
+  return '닉네임 중복 확인에 실패했어요. 잠시 후 다시 시도해주세요.'
+}
+
+function getNicknameCheckMessageClassName(status: NicknameCheckStatus): string {
+  if (status === 'available') return 'text-[#2d5a27]'
+  if (status === 'unavailable' || status === 'error') return 'text-[#8b3a2a]'
+  return 'text-[#6a5632]'
+}
+
 function createInitialValues(profile: KakaoSignupProfile): KakaoSignupFormValues {
   return {
     email: profile.email.trim(),
     name: profile.name ?? '',
     nickname: profile.nickname ?? '',
-    phone: profile.phone ?? '',
+    phone: formatPhoneNumber(profile.phone ?? ''),
     smsAgree: false,
     marketingAgree: false,
   }
@@ -42,7 +74,7 @@ function getKakaoEmail(profile: KakaoSignupProfile): string {
 }
 
 function validate(values: KakaoSignupFormValues): string | null {
-  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email)) return '올바른 이메일 형식을 입력해주세요.'
+  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email.trim())) return '올바른 이메일 형식을 입력해주세요.'
   if (!values.name.trim()) return '이름을 입력해주세요.'
   if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
   if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
@@ -56,6 +88,10 @@ function getKakaoSignupErrorMessage(error: unknown): string {
 
   if (error.code === 'AUTH_002') {
     return '이미 사용 중인 이메일입니다.'
+  }
+
+  if (error.code === 'USER_002') {
+    return '이미 사용 중인 닉네임입니다.'
   }
 
   if (error.code === 'AUTH_008') {
@@ -76,6 +112,7 @@ function getKakaoSignupErrorMessage(error: unknown): string {
 export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: KakaoSignupFormProps) {
   const [values, setValues] = useState<KakaoSignupFormValues>(() => createInitialValues(profile))
   const [error, setError] = useState('')
+  const [nicknameCheck, setNicknameCheck] = useState<NicknameCheckState>(INITIAL_NICKNAME_CHECK)
   const [restoreRequest, setRestoreRequest] = useState<KakaoSignupRequest | null>(null)
   const { isPending, signup } = useKakaoSignupPost()
   const kakaoEmail = getKakaoEmail(profile)
@@ -88,6 +125,25 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
     [],
   )
 
+  const handleNicknameCheck = useCallback(async () => {
+    const nickname = values.nickname.trim()
+    if (!nickname) {
+      setError('닉네임을 입력해주세요.')
+      return
+    }
+
+    setError('')
+    setNicknameCheck({ status: 'checking', value: nickname })
+
+    try {
+      const result = await getNicknameAvailability(nickname)
+      setNicknameCheck({ status: result.available ? 'available' : 'unavailable', value: nickname })
+    } catch (checkError) {
+      setNicknameCheck({ status: 'error', value: nickname })
+      setError(getKakaoSignupErrorMessage(checkError))
+    }
+  }, [values.nickname])
+
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault()
@@ -96,6 +152,15 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
       const validationError = validate(values)
       if (validationError) {
         setError(validationError)
+        return
+      }
+
+      if (!isNicknameCheckConfirmed(nicknameCheck, values.nickname)) {
+        setError(
+          nicknameCheck.status === 'unavailable' && nicknameCheck.value === values.nickname.trim()
+            ? '이미 사용 중인 닉네임입니다.'
+            : '닉네임 중복 확인을 완료해주세요.',
+        )
         return
       }
 
@@ -124,7 +189,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
         setError(getKakaoSignupErrorMessage(submitError))
       }
     },
-    [isPending, kakaoEmail, onSuccess, signup, signupToken, values],
+    [isPending, kakaoEmail, nicknameCheck, onSuccess, signup, signupToken, values],
   )
 
   const handleRestoreCancel = useCallback(() => {
@@ -149,6 +214,8 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
       setError(getKakaoSignupErrorMessage(restoreError))
     }
   }, [isPending, onSuccess, restoreRequest, signup])
+
+  const nicknameCheckMessage = getNicknameCheckMessage(nicknameCheck, values.nickname)
 
   return (
     <div className="min-h-screen bg-[#f6f0da] flex items-center justify-center px-4 py-10">
@@ -181,7 +248,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
                 이름 <span className="text-[#8b3a2a]">*</span>
@@ -200,14 +267,32 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
               <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
                 닉네임 <span className="text-[#8b3a2a]">*</span>
               </label>
-              <input
-                type="text"
-                value={values.nickname}
-                disabled={isPending}
-                onChange={e => handleChange('nickname', e.target.value)}
-                placeholder="해솔맘"
-                className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={values.nickname}
+                  disabled={isPending}
+                  onChange={e => {
+                    setNicknameCheck(INITIAL_NICKNAME_CHECK)
+                    handleChange('nickname', e.target.value)
+                  }}
+                  placeholder="해솔맘"
+                  className="min-w-0 flex-1 p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  disabled={isPending || nicknameCheck.status === 'checking'}
+                  onClick={handleNicknameCheck}
+                  className="shrink-0 rounded-xl border-2 border-[#2d5a27] bg-[#e4efd1] px-3 text-sm font-bold text-[#2d5a27] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {nicknameCheck.status === 'checking' ? '확인 중' : '중복 확인'}
+                </button>
+              </div>
+              {nicknameCheckMessage && (
+                <p className={`mt-1.5 text-xs leading-5 ${getNicknameCheckMessageClassName(nicknameCheck.status)}`}>
+                  {nicknameCheckMessage}
+                </p>
+              )}
             </div>
           </div>
 
@@ -219,7 +304,7 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
               type="tel"
               value={values.phone}
               disabled={isPending}
-              onChange={e => handleChange('phone', e.target.value)}
+              onChange={e => handleChange('phone', formatPhoneNumber(e.target.value))}
               autoComplete="tel"
               placeholder="010-1234-5678"
               className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"

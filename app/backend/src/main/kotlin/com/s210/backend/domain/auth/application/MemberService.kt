@@ -6,6 +6,7 @@ import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.jwt.JwtTokenProvider
 import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
 import com.s210.backend.domain.auth.application.dto.AuthResult
+import com.s210.backend.domain.auth.application.dto.AvailabilityResult
 import com.s210.backend.domain.auth.application.dto.LoginCommand
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
@@ -20,6 +21,7 @@ import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvide
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.user.entity.OauthAccount
 import com.s210.backend.domain.user.entity.User
+import com.s210.backend.domain.user.exception.UserErrorCode
 import com.s210.backend.domain.user.infrastructure.repository.OauthAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.security.authentication.AuthenticationManager
@@ -42,6 +44,8 @@ class MemberService(
     private val oauthSignupTokenProvider: OauthSignupTokenProvider,
 ) {
     fun signUp(command: SignupCommand): Long {
+        validateSignupCommand(command)
+
         val activeLoginUser = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
         if (activeLoginUser != null) {
             throw BusinessException(CommonErrorCode.DUPLICATE_LOGIN_ID)
@@ -64,6 +68,7 @@ class MemberService(
             if (withdrawnEmailUser != null && withdrawnEmailUser.id != withdrawnLoginUser.id) {
                 throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
             }
+            requireAvailableNickname(command.nickname, withdrawnLoginUser.id)
             return restoreUser(withdrawnLoginUser, command)
         }
 
@@ -71,8 +76,11 @@ class MemberService(
             if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
+            requireAvailableNickname(command.nickname, withdrawnEmailUser.id)
             return restoreUser(withdrawnEmailUser, command)
         }
+
+        requireAvailableNickname(command.nickname)
 
         return memberRepository.save(
             User(
@@ -86,6 +94,28 @@ class MemberService(
                 agreeMarketing = command.agreeMarketing,
             )
         ).id
+    }
+
+    fun findLoginIdAvailability(loginId: String): AvailabilityResult {
+        val normalizedLoginId = loginId.trim()
+        if (normalizedLoginId.length < MIN_LOGIN_ID_LENGTH) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        return AvailabilityResult(
+            available = !memberRepository.existsByLoginIdAndDeletedAtIsNull(normalizedLoginId),
+        )
+    }
+
+    fun findNicknameAvailability(nickname: String): AvailabilityResult {
+        val normalizedNickname = nickname.trim()
+        if (normalizedNickname.isBlank()) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        return AvailabilityResult(
+            available = !memberRepository.existsByNicknameAndDeletedAtIsNull(normalizedNickname),
+        )
     }
 
     fun login(command: LoginCommand): AuthResult {
@@ -149,7 +179,8 @@ class MemberService(
                 if (!command.restoreConfirmed) {
                     throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
                 }
-                restoreUser(existingOauthAccount.user)
+                requireAvailableNickname(command.nickname, existingOauthAccount.user.id)
+                restoreUser(existingOauthAccount.user, command)
             }
             return createOauthLoginResult(existingOauthAccount.user, oauthSignupToken.provider)
         }
@@ -160,7 +191,8 @@ class MemberService(
             if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
-            restoreUser(withdrawnEmailUser)
+            requireAvailableNickname(command.nickname, withdrawnEmailUser.id)
+            restoreUser(withdrawnEmailUser, command)
             oauthAccountRepository.save(
                 OauthAccount(
                     user = withdrawnEmailUser,
@@ -175,6 +207,8 @@ class MemberService(
         if (existingEmailUser != null) {
             throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
+
+        requireAvailableNickname(command.nickname)
 
         val createdUser = memberRepository.save(
             User(
@@ -275,6 +309,46 @@ class MemberService(
         }
     }
 
+    private fun validateSignupCommand(command: SignupCommand) {
+        val phone = command.phone?.trim()
+
+        if (
+            command.loginId.isBlank() ||
+            command.loginId.length < MIN_LOGIN_ID_LENGTH ||
+            command.password.isBlank() ||
+            command.password.length < MIN_PASSWORD_LENGTH ||
+            command.email.isBlank() ||
+            command.name.isBlank() ||
+            command.nickname.isBlank()
+        ) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (command.passwordCheck != null && command.password != command.passwordCheck) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!EMAIL_PATTERN.matches(command.email.trim())) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
+            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+    }
+
+    private fun requireAvailableNickname(nickname: String, excludedUserId: Long? = null) {
+        val duplicated = if (excludedUserId == null) {
+            memberRepository.existsByNicknameAndDeletedAtIsNull(nickname)
+        } else {
+            memberRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(nickname, excludedUserId)
+        }
+
+        if (duplicated) {
+            throw BusinessException(UserErrorCode.NICKNAME_DUPLICATED)
+        }
+    }
+
     private fun requireMatchingOauthEmail(command: OauthSignupCommand, tokenEmail: String): String {
         val requestEmail = command.email.trim()
         val kakaoEmail = tokenEmail.trim()
@@ -298,6 +372,17 @@ class MemberService(
     private fun restoreUser(user: User, command: SignupCommand): Long {
         user.loginId = command.loginId
         user.passwordHash = passwordEncoder.encode(command.password)
+        user.email = command.email
+        user.name = command.name
+        user.nickname = command.nickname
+        user.phone = command.phone
+        user.agreeSms = command.agreeSms
+        user.agreeMarketing = command.agreeMarketing
+
+        return restoreUser(user)
+    }
+
+    private fun restoreUser(user: User, command: OauthSignupCommand): Long {
         user.email = command.email
         user.name = command.name
         user.nickname = command.nickname
@@ -370,6 +455,8 @@ class MemberService(
 
     companion object {
         private const val SUPPORTED_PROVIDER = "kakao"
+        private const val MIN_LOGIN_ID_LENGTH = 4
+        private const val MIN_PASSWORD_LENGTH = 6
         private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
         private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
     }

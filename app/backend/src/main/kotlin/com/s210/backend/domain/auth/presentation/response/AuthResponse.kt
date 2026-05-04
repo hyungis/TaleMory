@@ -1,6 +1,7 @@
 package com.s210.backend.domain.auth.presentation.response
 
 import com.s210.backend.domain.auth.application.dto.AuthResult
+import com.s210.backend.domain.auth.application.dto.AvailabilityResult
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.application.dto.OauthSignupProfile
 import java.time.LocalDateTime
@@ -16,6 +17,10 @@ data class SignupResponse(
 
 data class RefreshTokenResponse(
     val accessToken: String
+)
+
+data class AvailabilityResponse(
+    val available: Boolean,
 )
 
 data class KakaoCallbackResponse(
@@ -64,6 +69,9 @@ fun AuthResult.toAuthResponse(): AuthResponse =
             updatedAt = user.updatedAt,
         ),
     )
+
+fun AvailabilityResult.toAvailabilityResponse(): AvailabilityResponse =
+    AvailabilityResponse(available = available)
 
 fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
     when (this) {

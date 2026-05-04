@@ -1,6 +1,7 @@
 export interface SignupRequest {
   loginId: string
   password: string
+  passwordCheck: string
   email: string
   name: string
   nickname: string

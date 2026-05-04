@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { UserProfile } from '../../../../entities/user'
+import { formatPhoneNumber } from '../../../../shared/lib'
 
 interface Props {
   user: UserProfile
@@ -14,7 +15,7 @@ interface Props {
 export function ProfileEditModal({ user, onClose, onSave, isPending = false }: Props) {
   const [name, setName] = useState(user.name)
   const [nickname, setNickname] = useState(user.nickname)
-  const [phone, setPhone] = useState(user.phone ?? '')
+  const [phone, setPhone] = useState(formatPhoneNumber(user.phone ?? ''))
   const [agreeSms, setAgreeSms] = useState(user.agreeSms)
   const [agreeMarketing, setAgreeMarketing] = useState(user.agreeMarketing)
 
@@ -75,8 +76,10 @@ export function ProfileEditModal({ user, onClose, onSave, isPending = false }: P
 
         <Field label="전화번호">
           <input
+            type="tel"
+            inputMode="numeric"
             value={phone}
-            onChange={event => setPhone(event.target.value)}
+            onChange={event => setPhone(formatPhoneNumber(event.target.value))}
             placeholder="010-0000-0000"
             disabled={isPending}
             className="mp-input"

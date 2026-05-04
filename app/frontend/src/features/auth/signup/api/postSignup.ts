@@ -7,6 +7,7 @@ export async function postSignup(body: SignupRequest): Promise<SignupResponse> {
     {
       loginId: body.loginId,
       password: body.password,
+      passwordCheck: body.passwordCheck,
       email: body.email,
       name: body.name,
       nickname: body.nickname,

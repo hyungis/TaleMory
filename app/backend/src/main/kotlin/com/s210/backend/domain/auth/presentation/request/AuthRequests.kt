@@ -7,6 +7,7 @@ import com.s210.backend.domain.auth.application.dto.SignupCommand
 data class SignupRequest(
     val loginId: String,
     val password: String,
+    val passwordCheck: String? = null,
     val email: String,
     val name: String,
     val nickname: String,
@@ -17,12 +18,13 @@ data class SignupRequest(
 ) {
     fun toCommand(): SignupCommand =
         SignupCommand(
-            loginId = loginId,
+            loginId = loginId.trim(),
             password = password,
-            email = email,
-            name = name,
-            nickname = nickname,
-            phone = phone,
+            passwordCheck = passwordCheck,
+            email = email.trim(),
+            name = name.trim(),
+            nickname = nickname.trim(),
+            phone = phone?.trim()?.takeIf { it.isNotEmpty() },
             agreeSms = agreeSms,
             agreeMarketing = agreeMarketing,
             restoreConfirmed = restoreConfirmed,

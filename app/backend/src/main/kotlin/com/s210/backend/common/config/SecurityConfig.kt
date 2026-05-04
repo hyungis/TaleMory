@@ -31,6 +31,8 @@ class SecurityConfig(
                 it.requestMatchers(
                     "/api/health",
                     "/api/auth/signup",
+                    "/api/auth/login-id/check",
+                    "/api/auth/nickname/check",
                     "/api/auth/login",
                     "/api/auth/kakao/callback",
                     "/api/auth/kakao/signup",

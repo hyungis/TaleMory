@@ -16,6 +16,7 @@ import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvide
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.user.entity.OauthAccount
 import com.s210.backend.domain.user.entity.User
+import com.s210.backend.domain.user.exception.UserErrorCode
 import com.s210.backend.domain.user.infrastructure.repository.OauthAccountRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -124,6 +125,52 @@ class MemberServiceSignupRestoreTest {
     }
 
     @Test
+    fun `signUp throws INVALID_INPUT when password check differs`() {
+        val ex = assertThrows<BusinessException> {
+            service.signUp(signupCommand(restoreConfirmed = false, passwordCheck = "different-password"))
+        }
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
+    }
+
+    @Test
+    fun `signUp throws NICKNAME_DUPLICATED when active nickname already exists`() {
+        `when`(memberRepository.findByLoginIdAndDeletedAtIsNull("old-login")).thenReturn(null)
+        `when`(memberRepository.findByEmailAndDeletedAtIsNull("new@example.com")).thenReturn(null)
+        `when`(
+            memberRepository.findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc("old-login"),
+        ).thenReturn(null)
+        `when`(
+            memberRepository.findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc("new@example.com"),
+        ).thenReturn(null)
+        `when`(memberRepository.existsByNicknameAndDeletedAtIsNull("새 닉네임")).thenReturn(true)
+
+        val ex = assertThrows<BusinessException> {
+            service.signUp(signupCommand(restoreConfirmed = false))
+        }
+
+        assertEquals(UserErrorCode.NICKNAME_DUPLICATED, ex.errorCode)
+    }
+
+    @Test
+    fun `findLoginIdAvailability returns unavailable for active login id`() {
+        `when`(memberRepository.existsByLoginIdAndDeletedAtIsNull("used-login")).thenReturn(true)
+
+        val result = service.findLoginIdAvailability(" used-login ")
+
+        assertEquals(false, result.available)
+    }
+
+    @Test
+    fun `findNicknameAvailability returns available for unused nickname`() {
+        `when`(memberRepository.existsByNicknameAndDeletedAtIsNull("새 닉네임")).thenReturn(false)
+
+        val result = service.findNicknameAvailability(" 새 닉네임 ")
+
+        assertTrue(result.available)
+    }
+
+    @Test
     fun `kakao callback returns restore required for withdrawn oauth account without restoring immediately`() {
         val user = withdrawnUser()
         val oauthAccount = OauthAccount(
@@ -195,10 +242,14 @@ class MemberServiceSignupRestoreTest {
             it.deletedAt = LocalDateTime.now().minusDays(7)
         }
 
-    private fun signupCommand(restoreConfirmed: Boolean): SignupCommand =
+    private fun signupCommand(
+        restoreConfirmed: Boolean,
+        passwordCheck: String? = null,
+    ): SignupCommand =
         SignupCommand(
             loginId = "old-login",
             password = "new-password",
+            passwordCheck = passwordCheck,
             email = "new@example.com",
             name = "새 이름",
             nickname = "새 닉네임",
