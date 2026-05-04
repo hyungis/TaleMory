@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ChevronLeft,
+  ChevronRight,
+  ImageOff,
   Loader2,
   Mic,
   Pause,
@@ -25,6 +28,7 @@ import {
   commitOutroVoice,
   type SceneDto,
 } from '../api/highlightOutroApi'
+import { getStoryboardPages } from '../../storyboard-pages'
 import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 import '../../styles/creation-paper.css'
 
@@ -78,25 +82,35 @@ export function HighlightOutroStep({
   const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
+  const [storyboardImageUrls, setStoryboardImageUrls] = useState<Map<number, string | null>>(new Map())
   const [loadingScenes, setLoadingScenes] = useState(false)
 
   useEffect(() => {
     if (!storyId) return
     setLoadingScenes(true)
-    getScenes(storyId)
-      .then(data => {
-        if (data.length > 0) setScenes(data)
+    Promise.all([
+      getScenes(storyId).catch(() => [] as SceneDto[]),
+      getStoryboardPages(storyId).catch(() => null),
+    ])
+      .then(([scenesData, storyboardData]) => {
+        if (scenesData.length > 0) setScenes(scenesData)
+        if (storyboardData) {
+          const imageMap = new Map<number, string | null>()
+          storyboardData.pages.forEach((p, idx) => imageMap.set(idx, p.imageUrl))
+          setStoryboardImageUrls(imageMap)
+        }
       })
-      .catch(() => {})
       .finally(() => setLoadingScenes(false))
   }, [storyId])
 
   const displayPages: Array<{
     pageIndex: number
+    imageUrl: string | null
     sentences: Array<{ sentenceId: number | null; en: string; ko: string | null }>
   }> = scenes
     ? scenes.map((scene, idx) => ({
         pageIndex: idx,
+        imageUrl: storyboardImageUrls.get(idx) ?? null,
         sentences: scene.sentences.map(s => ({
           sentenceId: s.id,
           en: s.englishText,
@@ -108,6 +122,7 @@ export function HighlightOutroStep({
         const koSentences = page.ko ? splitSentences(page.ko) : []
         return {
           pageIndex: idx,
+          imageUrl: storyboardImageUrls.get(idx) ?? null,
           sentences: enSentences.map((en, sIdx) => ({
             sentenceId: null,
             en,
@@ -117,7 +132,7 @@ export function HighlightOutroStep({
       })
 
   const [highlights, setHighlights] = useState<HighlightSentence[]>([])
-  const [selectedPage, setSelectedPage] = useState<number | null>(null)
+  const [currentPage, setCurrentPage] = useState(0)
 
   const [outroText, setOutroText] = useState('')
   const [outroSignature, setOutroSignature] = useState('')
@@ -406,227 +421,218 @@ export function HighlightOutroStep({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {displayPages.map(({ pageIndex, sentences }) => {
-                const pageHighlights = highlights.filter(h => h.pageIndex === pageIndex)
-                const isExpanded = selectedPage === pageIndex
-                const hasSelection = pageHighlights.length > 0
-
-                return (
+            {/* Book spread: illustration + sentences */}
+            {displayPages.length > 0 && (() => {
+              const { pageIndex, imageUrl, sentences } = displayPages[currentPage] ?? displayPages[0]
+              return (
+                <>
                   <div
-                    key={pageIndex}
                     style={{
+                      display: 'flex',
                       borderRadius: 16,
-                      border: `2px ${hasSelection ? 'solid' : 'dashed'} ${
-                        hasSelection ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'
-                      }`,
-                      background: hasSelection ? '#eaf4dc' : '#fdf6dc',
-                      padding: '16px 18px',
-                      transition: 'all 0.2s ease',
+                      border: '2px solid var(--cr-caramel)',
+                      overflow: 'hidden',
+                      minHeight: 320,
+                      background: '#fffdf5',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPage(isExpanded ? null : pageIndex)}
+                    {/* Left: Illustration */}
+                    <div
                       style={{
+                        flex: '0 0 40%',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        width: '100%',
-                        background: 'transparent',
-                        border: 0,
-                        cursor: 'pointer',
-                        padding: 0,
-                        marginBottom: 8,
+                        justifyContent: 'center',
+                        padding: 24,
+                        background: 'linear-gradient(135deg, #e8ddb4 0%, #b4dc8c60 100%)',
+                        borderRight: '2px solid var(--cr-caramel)',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            background: 'var(--cr-sage-darker)',
-                            color: '#fdf6dc',
-                            display: 'grid',
-                            placeItems: 'center',
-                            fontFamily: 'var(--cr-font-serif)',
-                            fontWeight: 800,
-                            fontSize: 13,
-                          }}
-                        >
-                          {pageIndex + 1}
-                        </span>
-                        <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, fontWeight: 700, color: 'var(--cr-ink-soft)' }}>
-                          Page {pageIndex + 1}
-                        </span>
-                        {hasSelection && (
-                          <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, fontWeight: 700, color: 'var(--cr-sage-deep)' }}>
-                            ({pageHighlights.length}개 선택)
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)' }}>
-                        {isExpanded ? '접기 ▲' : '펼치기 ▼'}
-                      </span>
-                    </button>
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={`Page ${pageIndex + 1} 삽화`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
+                        />
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
+                          <ImageOff className="w-12 h-12" style={{ color: '#8b7a52', opacity: 0.5 }} />
+                          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: '#8b7a52', margin: 0 }}>
+                            삽화 준비 중...
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
-                    {!isExpanded && (
-                      <p
-                        style={{
-                          fontFamily: 'var(--cr-font-gaegu)',
-                          fontSize: 15,
-                          color: 'var(--cr-ink)',
-                          margin: 0,
-                          lineHeight: 1.5,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {sentences.map(s => s.en).join(' ')}
+                    {/* Right: Sentences */}
+                    <div style={{ flex: 1, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
+                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
+                        문장을 탭하여 강조 선택 후 녹음하세요
                       </p>
-                    )}
 
-                    {isExpanded && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
-                        {sentences.map((sentence, sIdx) => {
-                          const highlight = highlights.find(
-                            h => h.pageIndex === pageIndex && h.sentenceIndex === sIdx,
-                          )
-                          const isSelected = !!highlight
-                          const recording = isHighlightRecording(pageIndex, sIdx)
+                      {sentences.map((sentence, sIdx) => {
+                        const highlight = highlights.find(h => h.pageIndex === pageIndex && h.sentenceIndex === sIdx)
+                        const isSelected = !!highlight
+                        const recording = isHighlightRecording(pageIndex, sIdx)
 
-                          return (
-                            <div
-                              key={sIdx}
-                              style={{
-                                borderRadius: 14,
-                                border: `2px solid ${isSelected ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'}`,
-                                background: isSelected ? '#dceec8' : 'var(--cr-paper)',
-                                padding: '12px 14px',
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
-                                <span
-                                  style={{
-                                    fontFamily: 'var(--cr-font-gaegu)',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    color: 'var(--cr-ink-soft)',
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  {sIdx + 1}/{sentences.length}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en)}
-                                  disabled={isRecording}
-                                  style={{
-                                    padding: '4px 12px',
-                                    borderRadius: 999,
-                                    fontFamily: 'var(--cr-font-gaegu)',
-                                    fontWeight: 700,
-                                    fontSize: 12,
-                                    background: isSelected ? 'var(--cr-rust)' : 'var(--cr-sage-darker)',
-                                    color: '#fdf6dc',
-                                    border: `1.5px solid ${isSelected ? '#8a4a32' : '#2a3f1f'}`,
-                                    cursor: isRecording ? 'not-allowed' : 'pointer',
-                                    opacity: isRecording ? 0.5 : 1,
-                                  }}
-                                >
-                                  {isSelected ? '해제' : '선택'}
-                                </button>
-                              </div>
+                        return (
+                          <div
+                            key={sIdx}
+                            onClick={() => { if (!isRecording) toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en) }}
+                            style={{
+                              borderRadius: 14,
+                              border: `2px solid ${isSelected ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'}`,
+                              background: isSelected ? '#dceec8' : 'var(--cr-paper)',
+                              padding: '12px 14px',
+                              cursor: isRecording ? 'default' : 'pointer',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                              <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 12, fontWeight: 700, color: 'var(--cr-ink-soft)' }}>
+                                {sIdx + 1}/{sentences.length}
+                              </span>
+                              <span
+                                style={{
+                                  padding: '2px 10px',
+                                  borderRadius: 999,
+                                  fontFamily: 'var(--cr-font-gaegu)',
+                                  fontWeight: 700,
+                                  fontSize: 11,
+                                  background: isSelected ? 'var(--cr-rust)' : 'var(--cr-sage-darker)',
+                                  color: '#fdf6dc',
+                                  border: `1.5px solid ${isSelected ? '#8a4a32' : '#2a3f1f'}`,
+                                }}
+                              >
+                                {isSelected ? '선택됨' : '선택'}
+                              </span>
+                            </div>
 
-                              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, fontWeight: 600, color: 'var(--cr-ink)', margin: 0, lineHeight: 1.5 }}>
-                                {sentence.en}
+                            <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, fontWeight: 600, color: 'var(--cr-ink)', margin: 0, lineHeight: 1.5 }}>
+                              {sentence.en}
+                            </p>
+                            {sentence.ko && (
+                              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)', margin: '4px 0 0', fontStyle: 'italic' }}>
+                                {sentence.ko}
                               </p>
-                              {sentence.ko && (
-                                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)', margin: '4px 0 0', fontStyle: 'italic' }}>
-                                  {sentence.ko}
-                                </p>
-                              )}
+                            )}
 
-                              {isSelected && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                                  {highlight.uploading ? (
-                                    <span style={{ ...recBtnStyle(true), background: '#fbf2da', color: 'var(--cr-ink-soft)', borderColor: 'var(--cr-caramel)', boxShadow: 'none' }}>
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> 업로드 중...
-                                    </span>
-                                  ) : !recording ? (
+                            {isSelected && (
+                              <div
+                                style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}
+                                onClick={e => e.stopPropagation()}
+                              >
+                                {highlight.uploading ? (
+                                  <span style={{ ...recBtnStyle(true), background: '#fbf2da', color: 'var(--cr-ink-soft)', borderColor: 'var(--cr-caramel)', boxShadow: 'none' }}>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> 업로드 중...
+                                  </span>
+                                ) : !recording ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void startRecording({ kind: 'highlight', pageIndex, sentenceIndex: sIdx })}
+                                    disabled={isRecording}
+                                    style={{
+                                      ...recBtnStyle(false),
+                                      opacity: isRecording ? 0.4 : 1,
+                                      cursor: isRecording ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >
+                                    <Mic className="w-3.5 h-3.5" />
+                                    {highlight.audioUrl ? '다시 녹음' : '녹음하기'}
+                                  </button>
+                                ) : (
+                                  <button type="button" onClick={stopRecording} style={recBtnStyle(true)}>
+                                    <Square className="w-3.5 h-3.5" /> 녹음 중지
+                                  </button>
+                                )}
+
+                                {highlight.audioUrl && !recording && !highlight.uploading && (
+                                  <>
                                     <button
                                       type="button"
-                                      onClick={() => void startRecording({ kind: 'highlight', pageIndex, sentenceIndex: sIdx })}
-                                      disabled={isRecording}
+                                      onClick={() => playingUrl === highlight.audioUrl ? stopAudio() : playAudio(highlight.audioUrl!)}
                                       style={{
-                                        ...recBtnStyle(false),
-                                        opacity: isRecording ? 0.4 : 1,
-                                        cursor: isRecording ? 'not-allowed' : 'pointer',
+                                        background: 'var(--cr-sage)',
+                                        color: '#fdf6dc',
+                                        border: '2px solid var(--cr-sage-deep)',
+                                        borderRadius: 999,
+                                        padding: '6px 14px',
+                                        fontFamily: 'var(--cr-font-gaegu)',
+                                        fontWeight: 700,
+                                        fontSize: 13,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        boxShadow: '0 2px 0 var(--cr-sage-deep)',
                                       }}
                                     >
-                                      <Mic className="w-3.5 h-3.5" />
-                                      {highlight.audioUrl ? '다시 녹음' : '녹음하기'}
+                                      {playingUrl === highlight.audioUrl ? <><Pause className="w-3.5 h-3.5" /> 정지</> : <><Play className="w-3.5 h-3.5" /> 듣기</>}
                                     </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={stopRecording}
-                                      style={recBtnStyle(true)}
-                                    >
-                                      <Square className="w-3.5 h-3.5" /> 녹음 중지
-                                    </button>
-                                  )}
-
-                                  {highlight.audioUrl && !recording && !highlight.uploading && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          playingUrl === highlight.audioUrl
-                                            ? stopAudio()
-                                            : playAudio(highlight.audioUrl!)
-                                        }
-                                        style={{
-                                          background: 'var(--cr-sage)',
-                                          color: '#fdf6dc',
-                                          border: '2px solid var(--cr-sage-deep)',
-                                          borderRadius: 999,
-                                          padding: '6px 14px',
-                                          fontFamily: 'var(--cr-font-gaegu)',
-                                          fontWeight: 700,
-                                          fontSize: 13,
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: 6,
-                                          boxShadow: '0 2px 0 var(--cr-sage-deep)',
-                                        }}
-                                      >
-                                        {playingUrl === highlight.audioUrl ? (
-                                          <><Pause className="w-3.5 h-3.5" /> 정지</>
-                                        ) : (
-                                          <><Play className="w-3.5 h-3.5" /> 듣기</>
-                                        )}
-                                      </button>
-                                      <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontWeight: 700, fontSize: 12, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
-                                        녹음 완료
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                                    <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontWeight: 700, fontSize: 12, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
+                                      녹음 완료
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                )
-              })}
-            </div>
+
+                  {/* Page navigation */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 16 }}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                      disabled={currentPage === 0}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: 'var(--cr-paper)',
+                        color: 'var(--cr-ink)',
+                        border: '2px solid var(--cr-caramel-deep)',
+                        boxShadow: '0 2px 0 var(--cr-caramel-deep)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
+                        opacity: currentPage === 0 ? 0.4 : 1,
+                      }}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+
+                    <span style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 14, fontWeight: 700, color: 'var(--cr-ink-soft)', background: '#fbf2da', padding: '5px 16px', borderRadius: 999, border: '1.5px solid var(--cr-caramel)' }}>
+                      Page {currentPage + 1} / {displayPages.length}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.min(displayPages.length - 1, p + 1))}
+                      disabled={currentPage >= displayPages.length - 1}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: 'var(--cr-paper)',
+                        color: 'var(--cr-ink)',
+                        border: '2px solid var(--cr-caramel-deep)',
+                        boxShadow: '0 2px 0 var(--cr-caramel-deep)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        cursor: currentPage >= displayPages.length - 1 ? 'not-allowed' : 'pointer',
+                        opacity: currentPage >= displayPages.length - 1 ? 0.4 : 1,
+                      }}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
 
             {highlights.length > 0 && (
               <p style={{ marginTop: 14, textAlign: 'center', fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-sage-deep)', fontWeight: 700 }}>
