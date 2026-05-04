@@ -37,11 +37,11 @@ EMOTION_INSTRUCTIONS = {
     "HAPPY": "Happy.",
     "EXCITED": "Excited.",
     "CALM": "Calm.",
+    "CURIOUS": "Curious.",
+    "SURPRISED": "Surprised.",
     "SAD": "Sad.",
-    "SOFT": "Soft.",
-    "SERIOUS": "Serious.",
-    "ANGRY": "Angry.",
-    "NARRATION": "Calm narration.",
+    "TENDER": "Tender.",
+    "BRAVE": "Brave.",
 }
 
 
