@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { InvitationCard, StoryBookViewer, useStoryViewQuery } from '../../features/viewer'
 import { ROUTES } from '../../shared/constants'
+import '../../features/viewer/invitation/styles/invitation.css'
 
 /**
  * `/viewer/:storyId` 라우트.
@@ -68,6 +69,7 @@ export function ViewerPage() {
         isOwner
         onOpenBook={openBookMode}
         onOpenWebtoon={openWebtoonMode}
+        onBack={() => navigate(ROUTES.main)}
       />
       {showWebtoonNotice && (
         <WebtoonNoticeModal onClose={() => setShowWebtoonNotice(false)} />
@@ -78,10 +80,10 @@ export function ViewerPage() {
 
 function ViewerLoadingState() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a1a0a] text-[#f0e6c0]">
-      <div className="text-center">
-        <div className="w-12 h-12 mx-auto mb-4 border-4 border-[#b4dc8c]/30 border-t-[#b4dc8c] rounded-full animate-spin" />
-        <p className="text-sm">동화책을 불러오는 중이에요…</p>
+    <div className="iv-shell">
+      <div className="iv-status">
+        <div className="iv-status-spinner" aria-hidden="true" />
+        <p className="iv-status-text">동화책을 불러오는 중이에요…</p>
       </div>
     </div>
   )
@@ -89,10 +91,11 @@ function ViewerLoadingState() {
 
 function ViewerErrorState({ message, onBack }: { message: string; onBack: () => void }) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0a1a0a] text-[#f0e6c0] px-6">
-      <div className="text-center max-w-sm">
-        <p className="text-lg mb-3">⚠️ {message}</p>
-        <button onClick={onBack} className="px-5 py-2 rounded-full bg-[#2d5a27] hover:bg-[#3d6f34] text-sm">
+    <div className="iv-shell">
+      <div className="iv-status">
+        <span className="iv-status-error-icon" aria-hidden="true">!</span>
+        <p className="iv-status-error-msg">{message}</p>
+        <button type="button" onClick={onBack} className="iv-status-back-btn">
           메인으로 돌아가기
         </button>
       </div>
@@ -105,20 +108,14 @@ function WebtoonNoticeModal({ onClose }: { onClose: () => void }) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className="iv-notice-overlay"
       onClick={onClose}
     >
-      <div
-        className="bg-[#1a2414] border-2 border-[#b4dc8c]/60 rounded-2xl p-6 max-w-sm w-full text-center text-[#f0e6c0] shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <p className="text-2xl mb-2">🚧</p>
-        <h3 className="text-xl font-bold mb-2">아직 준비 중이에요</h3>
-        <p className="text-sm text-[#b4dc8c] mb-5">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
-        <button
-          onClick={onClose}
-          className="px-5 py-2 rounded-full bg-[#2d5a27] hover:bg-[#3d6f34] text-sm font-bold"
-        >
+      <div className="iv-notice-card" onClick={e => e.stopPropagation()}>
+        <p className="iv-notice-emoji" aria-hidden="true">🚧</p>
+        <h3 className="iv-notice-title">아직 준비 중이에요</h3>
+        <p className="iv-notice-desc">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
+        <button type="button" onClick={onClose} className="iv-notice-btn">
           알겠어요
         </button>
       </div>

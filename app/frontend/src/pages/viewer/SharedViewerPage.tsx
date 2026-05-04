@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { StoryBookViewer, usePublicStoryViewQuery } from '../../features/viewer'
 import { InvitationCard } from '../../features/viewer'
+import '../../features/viewer/invitation/styles/invitation.css'
 
 /**
  * `/shared/:shareToken` 라우트.
@@ -18,19 +19,26 @@ export function SharedViewerPage() {
 
   if (status === 'loading' || status === 'idle') {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#0a1a0a] text-[#f0e6c0]">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 border-4 border-[#b4dc8c]/30 border-t-[#b4dc8c] rounded-full animate-spin" />
-          <p className="text-sm">동화책을 불러오는 중이에요…</p>
+      <div className="iv-shell">
+        <div className="iv-bg-base" aria-hidden="true" />
+        <div className="iv-bg-grain" aria-hidden="true" />
+        <div className="iv-bg-crayon" aria-hidden="true" />
+        <div className="iv-status">
+          <div className="iv-status-spinner" aria-hidden="true" />
+          <p className="iv-status-text">동화책을 불러오는 중이에요…</p>
         </div>
       </div>
     )
   }
   if (status === 'error' || !story) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#0a1a0a] text-[#f0e6c0] px-6">
-        <div className="text-center max-w-sm">
-          <p className="text-lg mb-3">⚠️ {error?.message ?? '동화를 불러오지 못했어요.'}</p>
+      <div className="iv-shell">
+        <div className="iv-bg-base" aria-hidden="true" />
+        <div className="iv-bg-grain" aria-hidden="true" />
+        <div className="iv-bg-crayon" aria-hidden="true" />
+        <div className="iv-status">
+          <span className="iv-status-error-icon" aria-hidden="true">!</span>
+          <p className="iv-status-error-msg">{error?.message ?? '동화를 불러오지 못했어요.'}</p>
         </div>
       </div>
     )
@@ -60,6 +68,17 @@ export function SharedViewerPage() {
     }
   }
 
+  const handleBack = () => {
+    // 비로그인 공개 뷰어 — 직전 페이지가 있으면 뒤로, 없으면 닫기 시도 후 home 으로 fallback.
+    if (window.history.length > 1) {
+      window.history.back()
+    } else if (window.opener) {
+      window.close()
+    } else {
+      window.location.href = '/'
+    }
+  }
+
   if (mode === 'book') {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
@@ -71,25 +90,20 @@ export function SharedViewerPage() {
         isOwner={false}
         onOpenBook={openBookMode}
         onOpenWebtoon={() => setShowWebtoonNotice(true)}
+        onBack={handleBack}
       />
       {showWebtoonNotice && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          className="iv-notice-overlay"
           onClick={() => setShowWebtoonNotice(false)}
         >
-          <div
-            className="bg-[#1a2414] border-2 border-[#b4dc8c]/60 rounded-2xl p-6 max-w-sm w-full text-center text-[#f0e6c0] shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="text-2xl mb-2">🚧</p>
-            <h3 className="text-xl font-bold mb-2">아직 준비 중이에요</h3>
-            <p className="text-sm text-[#b4dc8c] mb-5">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
-            <button
-              onClick={() => setShowWebtoonNotice(false)}
-              className="px-5 py-2 rounded-full bg-[#2d5a27] hover:bg-[#3d6f34] text-sm font-bold"
-            >
+          <div className="iv-notice-card" onClick={e => e.stopPropagation()}>
+            <p className="iv-notice-emoji" aria-hidden="true">🚧</p>
+            <h3 className="iv-notice-title">아직 준비 중이에요</h3>
+            <p className="iv-notice-desc">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
+            <button type="button" onClick={() => setShowWebtoonNotice(false)} className="iv-notice-btn">
               알겠어요
             </button>
           </div>
