@@ -28,6 +28,7 @@ import {
   commitOutroVoice,
   type SceneDto,
 } from '../api/highlightOutroApi'
+import { getStoryboardPages } from '../../storyboard-pages'
 import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 import '../../styles/creation-paper.css'
 
@@ -81,27 +82,35 @@ export function HighlightOutroStep({
   const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
+  const [storyboardImageUrls, setStoryboardImageUrls] = useState<Map<number, string | null>>(new Map())
   const [loadingScenes, setLoadingScenes] = useState(false)
 
   useEffect(() => {
     if (!storyId) return
     setLoadingScenes(true)
-    getScenes(storyId)
-      .then(data => {
-        if (data.length > 0) setScenes(data)
+    Promise.all([
+      getScenes(storyId).catch(() => [] as SceneDto[]),
+      getStoryboardPages(storyId).catch(() => null),
+    ])
+      .then(([scenesData, storyboardData]) => {
+        if (scenesData.length > 0) setScenes(scenesData)
+        if (storyboardData) {
+          const imageMap = new Map<number, string | null>()
+          storyboardData.pages.forEach((p, idx) => imageMap.set(idx, p.imageUrl))
+          setStoryboardImageUrls(imageMap)
+        }
       })
-      .catch(() => {})
       .finally(() => setLoadingScenes(false))
   }, [storyId])
 
   const displayPages: Array<{
     pageIndex: number
-    illustrationUrl: string | null
+    imageUrl: string | null
     sentences: Array<{ sentenceId: number | null; en: string; ko: string | null }>
   }> = scenes
     ? scenes.map((scene, idx) => ({
         pageIndex: idx,
-        illustrationUrl: scene.illustrationUrl,
+        imageUrl: storyboardImageUrls.get(idx) ?? null,
         sentences: scene.sentences.map(s => ({
           sentenceId: s.id,
           en: s.englishText,
@@ -113,7 +122,7 @@ export function HighlightOutroStep({
         const koSentences = page.ko ? splitSentences(page.ko) : []
         return {
           pageIndex: idx,
-          illustrationUrl: null,
+          imageUrl: storyboardImageUrls.get(idx) ?? null,
           sentences: enSentences.map((en, sIdx) => ({
             sentenceId: null,
             en,
@@ -414,7 +423,7 @@ export function HighlightOutroStep({
 
             {/* Book spread: illustration + sentences */}
             {displayPages.length > 0 && (() => {
-              const { pageIndex, illustrationUrl, sentences } = displayPages[currentPage] ?? displayPages[0]
+              const { pageIndex, imageUrl, sentences } = displayPages[currentPage] ?? displayPages[0]
               return (
                 <>
                   <div
@@ -439,9 +448,9 @@ export function HighlightOutroStep({
                         borderRight: '2px solid var(--cr-caramel)',
                       }}
                     >
-                      {illustrationUrl ? (
+                      {imageUrl ? (
                         <img
-                          src={illustrationUrl}
+                          src={imageUrl}
                           alt={`Page ${pageIndex + 1} 삽화`}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
                         />
