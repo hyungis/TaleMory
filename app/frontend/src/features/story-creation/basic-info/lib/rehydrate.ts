@@ -9,11 +9,12 @@ import { apiGenderToStoryChild, difficultyToLevel } from './mappers'
  * NOTE: 파싱 실패(잘못된 JSON) 는 빈 배열/문자열로 폴백. 사용자 진행을 막지 않는다.
  */
 export function rehydrateStep1(draft: StoryDraftResponse): StoryProject['step1'] {
+  // travelEndDate 가 startDate 와 같아도(당일치기) 둘 다 push 해야
+  // step1 복원 시 "당일치기" 상태로 정확히 표시됨. (BasicInfoStep 의 lastDate 계산이
+  // length>=2 를 요구하므로, [a, a] 형태여야 endDate prop 이 살아난다.)
   const travelDates: string[] = []
   if (draft.travelStartDate) travelDates.push(draft.travelStartDate)
-  if (draft.travelEndDate && draft.travelEndDate !== draft.travelStartDate) {
-    travelDates.push(draft.travelEndDate)
-  }
+  if (draft.travelEndDate) travelDates.push(draft.travelEndDate)
 
   return {
     children: parseChildren(draft.mainCharacterJson),

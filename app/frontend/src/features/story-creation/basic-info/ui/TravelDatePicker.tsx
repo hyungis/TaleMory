@@ -60,9 +60,10 @@ function startOfDay(d: Date): Date {
  *
  * 동작:
  *  - 첫 클릭 → 출발일.
- *  - 두 번째 클릭 → 도착일 + 자동 닫힘.
- *  - 두 날짜 모두 선택된 상태에서 다시 클릭 → 새 출발일로 리셋.
- *  - 출발일과 같은 날 재클릭 → 단일 일정으로 끝.
+ *  - 두 번째 클릭 (다른 날) → 도착일 + 자동 닫힘.
+ *  - 출발일과 같은 날 재클릭 → 당일치기로 확정 (start === end) + 자동 닫힘.
+ *  - 당일치기 상태에서 다른 날 클릭 → 범위 확장 (도착일 추가).
+ *  - 범위 [a, b] 모두 선택된 상태에서 다시 클릭 → 새 출발일로 리셋.
  *  - 오늘 이후 날짜 → 비활성 (클릭 무시 + opacity 30%).
  */
 export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePickerProps) {
@@ -149,19 +150,25 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
     if (day > today) return
 
     const iso = toIso(day)
+    const isDayTrip = !!(start && end && sameDay(start, end))
 
-    if (!start || end) {
+    // [a, b] 범위가 이미 잡힌 상태(당일치기 [a, a] 는 제외) → 새 출발일로 리셋.
+    if (!start || (end && !isDayTrip)) {
       onChange(iso, null)
       return
     }
+    // 출발일과 같은 날 재클릭 → 당일치기로 확정 + 닫힘.
     if (sameDay(day, start)) {
-      onChange(iso, null)
+      onChange(iso, iso)
+      setIsOpen(false)
       return
     }
+    // 출발일보다 이전 날 → 새 출발일로 리셋.
     if (day < start) {
       onChange(iso, null)
       return
     }
+    // 출발일 이후 다른 날 → 도착일 설정 (당일치기 [a, a] 에서 범위 [a, b] 로 확장 포함).
     onChange(toIso(start), iso)
     setIsOpen(false)
   }
@@ -181,11 +188,14 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
 
   const triggerLabel = (() => {
     if (start && end) {
+      if (sameDay(start, end)) {
+        return `${start.getMonth() + 1}월 ${start.getDate()}일 (당일치기)`
+      }
       const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
       return `${start.getMonth() + 1}월 ${start.getDate()}일 ~ ${end.getMonth() + 1}월 ${end.getDate()}일 (${days}일)`
     }
     if (start) {
-      return `${start.getMonth() + 1}월 ${start.getDate()}일 — 도착일 선택`
+      return `${start.getMonth() + 1}월 ${start.getDate()}일 — 도착일 선택 (같은 날 재클릭 시 당일치기)`
     }
     return '여행 일정을 선택해주세요'
   })()

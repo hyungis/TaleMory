@@ -15,7 +15,9 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.storyboard.application.dto.ActiveImageRegenerateJob
 import com.s210.backend.domain.storyboard.application.dto.ActiveStoryJob
+import com.s210.backend.domain.storyboard.application.dto.ActiveTranslationJob
 import com.s210.backend.domain.storyboard.application.dto.LatestImageJob
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
@@ -296,6 +298,12 @@ class StoryboardGenerationService(
             storyId, JobType.STORYBOARD_IMAGE,
         )?.let { LatestImageJob(jobId = it.id, status = it.status) }
 
+        val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORY_SENTENCE_TRANSLATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+
         // Step 4 IMAGE 재생성 잡 복구 — 진행 중(PENDING/RUNNING) 단일 페이지 재생성 잡 1건.
         // BE 동시성 가드로 한 스토리당 활성 1개만 보장되므로 first 가 유일.
         // pageNumber 는 jobs.requestPayload(JSON) 의 `item.pageNumber` 를 파싱해 내려준다.
@@ -322,8 +330,25 @@ class StoryboardGenerationService(
             latestFinalStatus = latestFinalStatus,
             failedCountSinceLastSuccess = failedCount,
             latestImageJob = latestImageJob,
+            activeTranslationJob = activeTranslationJob?.let {
+                ActiveTranslationJob(
+                    jobId = it.id,
+                    pageNumber = parseTranslationPageNumber(it.requestPayload),
+                    status = it.status,
+                    createdAt = it.createdAt,
+                )
+            },
             activeImageRegenerateJob = activeImageRegenerateJob,
         )
+    }
+
+    private fun parseTranslationPageNumber(requestPayload: String?): Int? {
+        if (requestPayload.isNullOrBlank()) return null
+        return try {
+            objectMapper.readValue(requestPayload, StorySentenceTranslationRequestPayload::class.java).pageNumber
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**

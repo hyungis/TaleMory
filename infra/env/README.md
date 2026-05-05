@@ -212,7 +212,13 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_AI_WORKER_CONCURRENCY` | no | `3` |
 | `ENV_DEV_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
 | `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
+| `ENV_DEV_APP_AI_GEMINI_IMAGE_API_CONCURRENCY` | no | `10` |
+| `ENV_DEV_APP_AI_REPLICATE_IMAGE_API_CONCURRENCY` | no | `5` |
 | `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_QUEUE` | no | `ai.cpu.story.sentences.translate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY` | no | `ai.cpu.story.sentences.translate` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.completed` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.failed` |
 
 > Vite는 `VITE_` prefix만 클라이언트 번들에 주입. 새 frontend 변수 이름은 반드시 `VITE_`로 시작해야 함.
 
@@ -262,6 +268,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `AI_WORKER_CONCURRENCY` | `3` | `3` |
 | `AI_STORY_API_CONCURRENCY` | `5` | `5` |
 | `AI_IMAGE_API_CONCURRENCY` | `20` | `20` |
+| `AI_GEMINI_IMAGE_API_CONCURRENCY` | `10` | `10` |
+| `AI_REPLICATE_IMAGE_API_CONCURRENCY` | `5` | `5` |
 | `RABBITMQ_PREFETCH_COUNT` | `10` | `10` |
 | `AWS_S3_ENV_PREFIX` | `dev` | `prod` |
 
@@ -348,6 +356,10 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.regenerate.failed` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_QUEUE` | no | `ai.cpu.story.sentences.translate.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY` | no | `ai.cpu.story.sentences.translate` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.completed` |
+| `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.failed` |
 | `ENV_DEV_APP_GEMINI_API_KEY` | yes | (Gemini API 키 — storyboard 이미지 생성) |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
@@ -381,6 +393,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_AI_WORKER_CONCURRENCY` | no | `3` |
 | `ENV_DEV_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
 | `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
+| `ENV_DEV_APP_AI_GEMINI_IMAGE_API_CONCURRENCY` | no | `10` |
+| `ENV_DEV_APP_AI_REPLICATE_IMAGE_API_CONCURRENCY` | no | `5` |
 | `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
 
 ### MASTER APP (AI 출처)
@@ -406,6 +420,10 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.generate.failed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.regenerate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.regenerate.failed` |
+| `ENV_MASTER_APP_RABBITMQ_SENTENCE_TRANSLATE_QUEUE` | no | `ai.cpu.story.sentences.translate.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY` | no | `ai.cpu.story.sentences.translate` |
+| `ENV_MASTER_APP_RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.completed` |
+| `ENV_MASTER_APP_RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.failed` |
 | `ENV_MASTER_APP_GEMINI_API_KEY` | yes | (prod Gemini API 키 — storyboard 이미지 생성) |
 | `ENV_MASTER_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
 | `ENV_MASTER_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
@@ -439,4 +457,6 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_AI_WORKER_CONCURRENCY` | no | `3` |
 | `ENV_MASTER_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
 | `ENV_MASTER_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
+| `ENV_MASTER_APP_AI_GEMINI_IMAGE_API_CONCURRENCY` | no | `10` |
+| `ENV_MASTER_APP_AI_REPLICATE_IMAGE_API_CONCURRENCY` | no | `5` |
 | `ENV_MASTER_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |

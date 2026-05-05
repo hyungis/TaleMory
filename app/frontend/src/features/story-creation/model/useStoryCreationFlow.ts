@@ -39,6 +39,10 @@ interface CreationProgressSnapshot {
    * 더불어, STORY 잡이 진행 중이라 페이지가 아직 INSERT 되지 않은 짧은 구간을 메우는 2차 안전장치.
    */
   lastConfirmedSummaryJobId: string | null
+  /** Step 8 TTS 잡 id — 새로고침 시 폴링 재개용. */
+  storyGenerationJobId: number | null
+  /** Step 8 최종 삽화 잡 id — 새로고침 시 폴링 재개용. */
+  finalIllustrationJobId: number | null
 }
 
 function readProgressSnapshot(): CreationProgressSnapshot | null {
@@ -67,6 +71,10 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
         typeof parsed.lastConfirmedSummaryJobId === 'string'
           ? parsed.lastConfirmedSummaryJobId
           : null,
+      storyGenerationJobId:
+        typeof parsed.storyGenerationJobId === 'number' ? parsed.storyGenerationJobId : null,
+      finalIllustrationJobId:
+        typeof parsed.finalIllustrationJobId === 'number' ? parsed.finalIllustrationJobId : null,
     }
   } catch {
     return null
@@ -200,8 +208,12 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
    * 새로고침으로 sessionStorage 에서 복원되는 다른 state 와 달리 메모리 한정 — 새로고침 후에는
    * Step 4 가 storyboard-pages 캐시 기반으로 동작 (pages.length > 0 이면 정상 표시).
    */
-  const [storyGenerationJobId, setStoryGenerationJobIdState] = useState<number | null>(null)
-  const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<number | null>(null)
+  const [storyGenerationJobId, setStoryGenerationJobIdState] = useState<number | null>(
+    restored?.storyGenerationJobId ?? null,
+  )
+  const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<number | null>(
+    restored?.finalIllustrationJobId ?? null,
+  )
   /**
    * 마지막으로 본문 발행에 사용된 SUMMARY 잡 id. PromptStep 에서 confirm 시 비교 → 재발행 skip 판단.
    *
@@ -238,9 +250,11 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
         storyId,
         step3Story: projectData.step3.story,
         lastConfirmedSummaryJobId,
+        storyGenerationJobId,
+        finalIllustrationJobId,
       })
     }
-  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId])
+  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))

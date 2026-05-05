@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   CheckCircle2,
   FolderOpen,
@@ -17,6 +18,9 @@ import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { formatAudioTime, useVoiceClone } from '../model/useVoiceClone'
+import type { VoiceProfileDto } from '../api/voiceProfileApi'
+import { VoiceSaveModal } from './VoiceSaveModal'
+import { VoiceLoadModal } from './VoiceLoadModal'
 import '../../styles/creation-paper.css'
 
 interface VoiceCloneStepProps {
@@ -33,6 +37,8 @@ interface VoiceCloneStepProps {
  */
 export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceCloneStepProps) {
   const vc = useVoiceClone(storyId)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [showLoadModal, setShowLoadModal] = useState(false)
 
   const StatusIcon =
     vc.status === 'recording' ? Mic : vc.status === 'ready' ? CheckCircle2 : Radio
@@ -46,9 +52,26 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
 
   const progressPercent = vc.audioDuration > 0 ? (vc.audioCurrentTime / vc.audioDuration) * 100 : 0
 
-  const handleSave = async () => {
-    const name = await vc.saveVoiceRecording()
-    if (name && onVoiceSaved) onVoiceSaved(name)
+  /**
+   * 저장 모달의 onSubmit — 제목을 hook 으로 넘기고 성공 시 모달 닫음 + onVoiceSaved 콜백.
+   * 실패(null 반환)면 모달은 열어둔 채로 두어 사용자가 재시도/제목 변경 가능.
+   */
+  const handleSaveSubmit = async (title: string) => {
+    const name = await vc.saveVoiceRecording(title)
+    if (name) {
+      setShowSaveModal(false)
+      if (onVoiceSaved) onVoiceSaved(name)
+    }
+  }
+
+  /**
+   * 불러오기 모달의 onSelect — 선택된 프로필을 hook 에 적용 후 모달 닫음.
+   * onVoiceSaved 도 호출 — Step 7 진입 시 voiceModel 이 set 되어 있어야 다음 단계 가드 통과.
+   */
+  const handleProfileSelect = async (profile: VoiceProfileDto) => {
+    await vc.loadVoiceProfile(profile)
+    setShowLoadModal(false)
+    if (onVoiceSaved) onVoiceSaved(profile.title)
   }
 
   return (
@@ -87,7 +110,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               </div>
               <button
                 type="button"
-                onClick={() => void vc.loadExistingVoice()}
+                onClick={() => setShowLoadModal(true)}
                 className="cr-btn-back"
                 style={{ justifySelf: 'auto' }}
               >
@@ -124,6 +147,21 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               >
                 <Mic className="w-9 h-9" />
               </button>
+              {vc.status === 'recording' && (
+                <span
+                  aria-live="polite"
+                  style={{
+                    fontFamily: 'var(--cr-font-mono, var(--cr-font-gaegu))',
+                    fontSize: 28,
+                    fontWeight: 800,
+                    color: 'var(--cr-rust)',
+                    letterSpacing: '0.5px',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {formatAudioTime(vc.recordingElapsed)}
+                </span>
+              )}
               <p
                 style={{
                   fontFamily: 'var(--cr-font-gaegu)',
@@ -241,7 +279,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                 <button
                   type="button"
-                  onClick={() => void handleSave()}
+                  onClick={() => setShowSaveModal(true)}
                   disabled={!vc.recordedAudioUrl || vc.isSaving}
                   className="cr-btn-next"
                   style={{ justifySelf: 'auto' }}
@@ -340,89 +378,6 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               />
             )}
           </section>
-
-          {/* Section 3: TTS 저장 */}
-          <section className="cr-card">
-            <span className="cr-tape" aria-hidden="true" />
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                marginBottom: 14,
-                flexWrap: 'wrap',
-              }}
-            >
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '50%',
-                  background: 'var(--cr-sage-darker)',
-                  color: '#fdf6dc',
-                  display: 'grid',
-                  placeItems: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Save className="w-4 h-4" />
-              </span>
-              <div>
-                <div className="cr-step-label" style={{ marginBottom: 2 }}>
-                  STEP 3 · 저장
-                </div>
-                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 20, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
-                  TTS를 동화에 적용
-                </h3>
-              </div>
-            </div>
-
-            <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-ink-soft)', margin: '0 0 12px' }}>
-              {vc.ttsAudioUrl
-                ? 'TTS 가 생성됐어요. 제목을 입력하고 동화에 적용하세요.'
-                : '먼저 위에서 녹음을 저장하고 TTS 미리듣기를 완료해 주세요.'}
-            </p>
-
-            <div className="cr-field">
-              <label className="cr-label" style={{ fontSize: 16 }}>
-                TTS 보이스 제목
-              </label>
-              <input
-                type="text"
-                value={vc.voiceTitle}
-                onChange={e => vc.setVoiceTitle(e.target.value)}
-                placeholder="예: 엄마 제주 동화 목소리"
-                disabled={!vc.ttsAudioUrl}
-                className="cr-input"
-              />
-            </div>
-
-            <button
-              type="button"
-              disabled={!vc.ttsAudioUrl}
-              className="cr-btn-next"
-              style={{ justifySelf: 'flex-start', marginTop: 4 }}
-            >
-              <Save className="w-4 h-4" /> <span>TTS 음성 저장하기</span>
-            </button>
-
-            <div
-              style={{
-                marginTop: 14,
-                background: '#fbf2da',
-                border: '1.5px dashed var(--cr-caramel)',
-                borderRadius: 14,
-                padding: '12px 16px',
-              }}
-            >
-              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-caramel-deep)', fontWeight: 700, margin: '0 0 2px' }}>
-                저장 상태
-              </p>
-              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: 'var(--cr-ink)', fontWeight: 700, margin: 0 }}>
-                {vc.savedVoiceSummary}
-              </p>
-            </div>
-          </section>
         </main>
       </div>
 
@@ -498,6 +453,24 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
           </button>
         }
       />
+
+      {showSaveModal && (
+        <VoiceSaveModal
+          isSaving={vc.isSaving}
+          onSubmit={handleSaveSubmit}
+          onClose={() => {
+            // 저장 중에는 모달 안에서 disabled — 외부 닫기 시도도 막아 race 회피.
+            if (!vc.isSaving) setShowSaveModal(false)
+          }}
+        />
+      )}
+      {showLoadModal && (
+        <VoiceLoadModal
+          fetchProfiles={vc.fetchVoiceProfiles}
+          onSelect={handleProfileSelect}
+          onClose={() => setShowLoadModal(false)}
+        />
+      )}
     </div>
   )
 }

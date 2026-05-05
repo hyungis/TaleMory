@@ -9,6 +9,7 @@ export async function postLogin(body: LoginRequest): Promise<LoginResponse> {
     {
       loginId: body.loginId,
       password: body.password,
+      restoreConfirmed: body.restoreConfirmed ?? false,
     },
     {
       // 로그인 전 요청이므로 기존 Authorization 주입을 건너뛴다.

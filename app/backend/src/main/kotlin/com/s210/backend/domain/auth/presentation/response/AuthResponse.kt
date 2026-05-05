@@ -29,6 +29,7 @@ data class KakaoCallbackResponse(
     val user: AuthUserResponse? = null,
     val signupToken: String? = null,
     val profile: OauthSignupProfileResponse? = null,
+    val passwordRequired: Boolean = false,
 )
 
 data class OauthSignupProfileResponse(
@@ -85,6 +86,7 @@ fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
             status = CALLBACK_STATUS_RESTORE_REQUIRED,
             signupToken = signupToken,
             profile = profile.toResponse(),
+            passwordRequired = passwordRequired,
         )
         is OauthCallbackResult.LinkRequired -> KakaoCallbackResponse(
             status = CALLBACK_STATUS_LINK_REQUIRED,

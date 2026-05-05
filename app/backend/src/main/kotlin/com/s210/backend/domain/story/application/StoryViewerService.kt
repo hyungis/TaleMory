@@ -3,8 +3,6 @@ package com.s210.backend.domain.story.application
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
 import com.s210.backend.common.exception.BusinessException
-import com.s210.backend.common.exception.CommonErrorCode
-import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
 import com.s210.backend.domain.story.entity.Scene
 import com.s210.backend.domain.story.entity.SceneSentence
 import com.s210.backend.domain.story.entity.Story
@@ -37,9 +35,25 @@ class StoryViewerService(
     private val sceneSentenceRepository: SceneSentenceRepository,
     private val sceneHighlightVoiceRepository: SceneHighlightVoiceRepository,
     private val storyOutroRepository: StoryOutroRepository,
-    private val memberRepository: MemberRepository,
     private val objectMapper: ObjectMapper,
 ) {
+    companion object {
+        private const val SAMPLE_STORY_ID = 1L
+    }
+
+    fun findSampleStoryView(): StoryViewResponse {
+        val story = storyRepository.findById(SAMPLE_STORY_ID)
+            .orElseThrow { BusinessException(StoryErrorCode.STORY_NOT_FOUND) }
+
+        verifyPublished(story)
+
+        val scenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(story.id)
+        val sentencesByScene = loadSentencesByScene(scenes)
+        val outro = storyOutroRepository.findByStoryId(story.id)
+
+        return toViewResponse(story, scenes, sentencesByScene, outro)
+    }
+
     fun findPublicStoryView(shareToken: String): StoryViewResponse {
         val story = storyRepository.findByShareTokenAndDeletedAtIsNull(shareToken)
             ?: throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
@@ -53,8 +67,15 @@ class StoryViewerService(
         return toViewResponse(story, scenes, sentencesByScene, outro)
     }
 
-    fun findStoryView(loginId: String, storyId: Long): StoryViewResponse {
-        val userId = resolveUserId(loginId)
+    /**
+     * 인증된 사용자(@AuthenticationPrincipal CustomUser) 의 user.id 를 직접 받는다.
+     *
+     * 과거에는 JWT subject(`loginId`) 로 user 를 다시 조회했는데, OAuth 가입자는
+     * subject 가 `oauth:kakao:{providerUserId}` 형태이고 DB 의 user.loginId 는 빈 문자열이라
+     * `findByLoginIdAndDeletedAtIsNull(...)` 가 항상 null → USER_NOT_FOUND(404) 떨어졌다.
+     * JWT 의 `uid` 클레임이 OAuth/로컬 모두 채워져 있어서 user.id 만으로 충분하다.
+     */
+    fun findStoryView(userId: Long, storyId: Long): StoryViewResponse {
         val story = storyRepository.findById(storyId)
             .orElseThrow { BusinessException(StoryErrorCode.STORY_NOT_FOUND) }
 
@@ -66,12 +87,6 @@ class StoryViewerService(
         val outro = storyOutroRepository.findByStoryId(storyId)
 
         return toViewResponse(story, scenes, sentencesByScene, outro)
-    }
-
-    private fun resolveUserId(loginId: String): Long {
-        val user = memberRepository.findByLoginIdAndDeletedAtIsNull(loginId)
-            ?: throw BusinessException(CommonErrorCode.USER_NOT_FOUND)
-        return user.id
     }
 
     private fun verifyOwnership(story: Story, userId: Long) {

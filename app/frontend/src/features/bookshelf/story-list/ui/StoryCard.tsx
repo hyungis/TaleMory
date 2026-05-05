@@ -27,9 +27,7 @@ interface StoryCardProps {
  */
 export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs = 0 }: StoryCardProps) {
   const levelColor = getLevelColor(story.level)
-  // TODO: BE 가 coverImageUrl 응답 필드 추가하면 story.coverImageUrl 로 교체.
-  // 임시로 picsum.photos 의 seed 기반 placeholder — story.id 마다 다른 이미지가 나옴.
-  const previewCoverUrl = `https://picsum.photos/seed/talemory-${story.id}/400/600`
+  const previewCoverUrl = story.coverImageUrl ?? `https://picsum.photos/seed/talemory-${story.id}/400/600`
 
   return (
     <div
@@ -39,7 +37,7 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
       <div
         className={`aspect-[3/4] bg-gradient-to-br ${story.bgClass} vintage-cover relative overflow-hidden flex flex-col items-center justify-end text-[#F2EBD2]/80`}
       >
-        {/* 표지 이미지 — placeholder (추후 story.coverImageUrl 로 교체) */}
+        {/* 표지 이미지 */}
         <img
           src={previewCoverUrl}
           alt={story.title}

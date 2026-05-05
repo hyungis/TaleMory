@@ -208,7 +208,7 @@ export function FinalPreviewStep({
     const message = (() => {
       if (finalInProgress && ttsInProgress) return '동화책 만드는 중... (삽화 + 음성)'
       if (finalInProgress) return '컬러 삽화 마무리 중...'
-      if (ttsInProgress) return ttsJobQuery.data?.currentStep ?? '음성 생성 중...'
+      if (ttsInProgress) return '음성 생성 중...'
       return '동화 데이터 불러오는 중...'
     })()
     return (
