@@ -15,13 +15,22 @@ import '../styles/story-book.css'
 interface StoryBookViewerProps {
   story: StoryView
   onExit: () => void
+  /**
+   * 'full' (기본): 일반 뷰어 — 사이드 툴바 / 전체화면 / 책갈피 / 글자크기 / 한글 토글 등 모든 도구 노출.
+   * 'preview': About 페이지 미리보기 — 도구를 모두 숨기고 한글 해석은 항상 ON, localStorage 책갈피
+   *            동작 안 함. 문장 TTS / 페이지 TTS / 단어 사전 / 삽화 확대 / 페이지 전환은 그대로.
+   */
+  mode?: 'full' | 'preview'
 }
 
 type PageKind = 'cover' | 'scene' | 'backCover'
 
 interface ViewerPage {
   kind: PageKind
+  /** story.scenes 배열 내 인덱스 (scene 페이지일 때만). */
   sceneIndex?: number
+  /** "Page N" 라벨용 0-based 표시 인덱스. preview 모드에선 scene 0 가 빠지므로 sceneIndex 와 1 차이. */
+  displayIndex?: number
 }
 
 interface FlipState {
@@ -59,20 +68,40 @@ const storageKeyBookmark = (storyId: number) => `viewer-bookmark-${storyId}`
  * 책갈피·테마는 로그인 인프라 미완성이라 localStorage 에 저장. 추후 `/progress` API 연동 시
  * 별도 어댑터로 교체 가능.
  */
-export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
-  const pages: ViewerPage[] = useMemo(
-    () => [
+export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewerProps) {
+  const isPreview = mode === 'preview'
+  const pages: ViewerPage[] = useMemo(() => {
+    if (isPreview) {
+      /* About 페이지 미리보기:
+         - scene 0 는 표지와 동일 컷이므로 책 펼친 상태에선 생략.
+         - 뒷표지(편지지)는 About 하단의 별도 섹션이 이미 보여주고 있으므로 미포함 → 마지막 scene 에서
+           Next 가 자연스레 disabled 되며 중복 표시를 차단. */
+      return [
+        { kind: 'cover' as const },
+        ...story.scenes.slice(1).map((_, i) => ({
+          kind: 'scene' as const,
+          sceneIndex: i + 1,
+          displayIndex: i,
+        })),
+      ]
+    }
+    return [
       { kind: 'cover' as const },
-      ...story.scenes.map((_, i) => ({ kind: 'scene' as const, sceneIndex: i })),
+      ...story.scenes.map((_, i) => ({
+        kind: 'scene' as const,
+        sceneIndex: i,
+        displayIndex: i,
+      })),
       { kind: 'backCover' as const },
-    ],
-    [story.scenes],
-  )
+    ]
+  }, [story.scenes, isPreview])
 
   /* 책갈피 — 한 동화당 1개 (pageIndex 단일값).
      useState lazy initializer 로 마운트 시점에 localStorage 에서 읽어 즉시 적용 →
-     viewer 를 껐다 다시 들어올 때 책갈피 페이지부터 시작 (cover 깜빡임 없이). */
+     viewer 를 껐다 다시 들어올 때 책갈피 페이지부터 시작 (cover 깜빡임 없이).
+     preview 모드에선 localStorage 손대지 않음 (sample story 가 실 사용자 책갈피와 충돌하는 걸 방지). */
   const [bookmark, setBookmark] = useState<number | null>(() => {
+    if (isPreview) return null
     try {
       const raw = window.localStorage.getItem(storageKeyBookmark(story.storyId))
       if (raw) {
@@ -103,7 +132,8 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
 
   // 툴바 / 보기 설정 상태
   const [isToolbarOpen, setIsToolbarOpen] = useState(false)
-  const [showTranslation, setShowTranslation] = useState(false)
+  // preview 모드는 한글 해석을 항상 ON 으로 시작. 토글 UI 자체가 없어 setter 호출 경로 자연 차단.
+  const [showTranslation, setShowTranslation] = useState(isPreview)
   const [fontSize, setFontSize] = useState(22)
   const toolbarCloseTimerRef = useRef<number | null>(null)
 
@@ -117,6 +147,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const tts = useStoryTts()
 
   useEffect(() => {
+    if (isPreview) return
     try {
       const key = storageKeyBookmark(story.storyId)
       if (bookmark === null) {
@@ -127,7 +158,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     } catch {
       /* noop */
     }
-  }, [bookmark, story.storyId])
+  }, [bookmark, story.storyId, isPreview])
 
   /* 책을 다 읽으면(= 뒷표지 도달) 책갈피 자동 해제.
      storeBookmark 저장 effect 가 함께 발동해 localStorage 에서도 삭제. */
@@ -314,41 +345,46 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
 
   return (
     <div className={roomClass}>
-      {/* 좌측 호버 트리거 */}
-      <div
-        className="sb-side-trigger"
-        onMouseEnter={openToolbar}
-        onMouseLeave={scheduleToolbarClose}
-        aria-hidden
-      />
+      {/* preview 모드는 사이드 툴바 / 호버 트리거 / 전체화면 버튼 모두 숨김. */}
+      {!isPreview && (
+        <>
+          {/* 좌측 호버 트리거 */}
+          <div
+            className="sb-side-trigger"
+            onMouseEnter={openToolbar}
+            onMouseLeave={scheduleToolbarClose}
+            aria-hidden
+          />
 
-      {/* 사이드 툴바 */}
-      <ViewerToolbar
-        isOpen={isToolbarOpen}
-        ttsMode={tts.status.mode}
-        showTranslation={showTranslation}
-        fontSize={fontSize}
-        canBookmark={canBookmarkCurrent}
-        isBookmarked={isCurrentBookmarked}
-        bookmarkLabel={bookmarkLabel}
-        canJumpToBookmark={canJumpToBookmark}
-        onPlayFullBook={playFullBook}
-        onPause={tts.pause}
-        onResume={tts.resume}
-        onStop={tts.stop}
-        onTranslationToggle={() => setShowTranslation(v => !v)}
-        onFontSizeChange={setFontSize}
-        onToggleBookmark={toggleBookmark}
-        onJumpToBookmark={jumpToBookmark}
-        onMouseEnter={openToolbar}
-        onMouseLeave={scheduleToolbarClose}
-      />
+          {/* 사이드 툴바 */}
+          <ViewerToolbar
+            isOpen={isToolbarOpen}
+            ttsMode={tts.status.mode}
+            showTranslation={showTranslation}
+            fontSize={fontSize}
+            canBookmark={canBookmarkCurrent}
+            isBookmarked={isCurrentBookmarked}
+            bookmarkLabel={bookmarkLabel}
+            canJumpToBookmark={canJumpToBookmark}
+            onPlayFullBook={playFullBook}
+            onPause={tts.pause}
+            onResume={tts.resume}
+            onStop={tts.stop}
+            onTranslationToggle={() => setShowTranslation(v => !v)}
+            onFontSizeChange={setFontSize}
+            onToggleBookmark={toggleBookmark}
+            onJumpToBookmark={jumpToBookmark}
+            onMouseEnter={openToolbar}
+            onMouseLeave={scheduleToolbarClose}
+          />
 
-      <div className="sb-float-top">
-        <button onClick={toggleFullscreen} className="sb-float-btn" title="전체화면" aria-label="전체화면 토글">
-          <Maximize className="w-5 h-5" />
-        </button>
-      </div>
+          <div className="sb-float-top">
+            <button onClick={toggleFullscreen} className="sb-float-btn" title="전체화면" aria-label="전체화면 토글">
+              <Maximize className="w-5 h-5" />
+            </button>
+          </div>
+        </>
+      )}
 
       <div className={shellClass}>
         <div
@@ -379,7 +415,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           {current.kind === 'scene' && current.sceneIndex !== undefined && (
             <BookSpread
               scene={story.scenes[current.sceneIndex]}
-              pageIndex={current.sceneIndex}
+              pageIndex={current.displayIndex ?? current.sceneIndex}
               showTranslation={showTranslation}
               fontSize={fontSize}
               activeSentenceId={tts.status.activeSentenceId}
@@ -399,9 +435,9 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           <TurnSheet
             direction={flip.direction}
             fromScene={flipFromScene}
-            fromIndex={pages[flip.fromPageIndex].sceneIndex!}
+            fromIndex={pages[flip.fromPageIndex].displayIndex ?? pages[flip.fromPageIndex].sceneIndex!}
             toScene={flipToScene}
-            toIndex={pages[flip.toPageIndex].sceneIndex!}
+            toIndex={pages[flip.toPageIndex].displayIndex ?? pages[flip.toPageIndex].sceneIndex!}
             onEnd={handleFlipEnd}
           />
         )}
