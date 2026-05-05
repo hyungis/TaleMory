@@ -83,9 +83,10 @@ class FinalIllustrationGenerationService(
         val items = pages.map { page ->
             val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
                 ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-            val englishText = page.englishText?.takeIf { it.isNotBlank() }
+            val texts = page.pageTexts(objectMapper)
+            val englishText = texts.englishText?.takeIf { it.isNotBlank() }
                 ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-            val koreanText = page.koreanText?.takeIf { it.isNotBlank() }
+            val koreanText = texts.koreanText?.takeIf { it.isNotBlank() }
                 ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
             val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
                 ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)

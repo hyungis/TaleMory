@@ -1,6 +1,4 @@
-import { BookAudio, Pause, PlayCircle, Square, Languages, Type, Bookmark, BookmarkCheck, Palette, ArrowRightToLine } from 'lucide-react'
-
-export type ViewerTheme = 'forest' | 'sunset' | 'night'
+import { BookAudio, Pause, PlayCircle, Square, Languages, Type, Bookmark, BookmarkCheck, ArrowRightToLine } from 'lucide-react'
 
 interface ViewerToolbarProps {
   isOpen: boolean
@@ -12,8 +10,6 @@ interface ViewerToolbarProps {
   isBookmarked: boolean
   bookmarkLabel: string | null       // "Page N" 같은 표시 문자열 — 없으면 null
   canJumpToBookmark: boolean         // 저장된 책갈피가 현재 페이지가 아닐 때만 true
-  // 테마
-  theme: ViewerTheme
   // 액션
   onPlayFullBook: () => void
   onPause: () => void
@@ -23,16 +19,9 @@ interface ViewerToolbarProps {
   onFontSizeChange: (value: number) => void
   onToggleBookmark: () => void
   onJumpToBookmark: () => void
-  onThemeChange: (theme: ViewerTheme) => void
   onMouseEnter: () => void
   onMouseLeave: () => void
 }
-
-const THEME_OPTIONS: Array<{ value: ViewerTheme; label: string }> = [
-  { value: 'forest', label: '숲' },
-  { value: 'sunset', label: '노을' },
-  { value: 'night', label: '밤하늘' },
-]
 
 /**
  * 뷰어 사이드 툴바.
@@ -40,7 +29,6 @@ const THEME_OPTIONS: Array<{ value: ViewerTheme; label: string }> = [
  * - 한글 해석 토글
  * - 글자 크기 슬라이더
  * - 책갈피 (한 동화당 1개 — 토글 / 저장된 페이지로 점프)
- * - 테마 3종 (숲 / 노을 / 밤하늘)
  */
 export function ViewerToolbar({
   isOpen,
@@ -51,7 +39,6 @@ export function ViewerToolbar({
   isBookmarked,
   bookmarkLabel,
   canJumpToBookmark,
-  theme,
   onPlayFullBook,
   onPause,
   onResume,
@@ -60,7 +47,6 @@ export function ViewerToolbar({
   onFontSizeChange,
   onToggleBookmark,
   onJumpToBookmark,
-  onThemeChange,
   onMouseEnter,
   onMouseLeave,
 }: ViewerToolbarProps) {
@@ -123,7 +109,7 @@ export function ViewerToolbar({
               <Type className="w-3.5 h-3.5" />
               글자 크기
             </p>
-            <span className="text-xs text-[#8d6e63]">{fontSize}px</span>
+            <span className="sb-toolbar-fontsize-value">{fontSize}px</span>
           </div>
           <input
             type="range"
@@ -171,27 +157,6 @@ export function ViewerToolbar({
           )}
         </div>
 
-        {/* 테마 */}
-        <div className="sb-toolbar-section">
-          <p className="sb-toolbar-section-label flex items-center gap-1">
-            <Palette className="w-3.5 h-3.5" />
-            테마
-          </p>
-          <div className="sb-theme-swatches">
-            {THEME_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                className={`sb-theme-swatch ${theme === opt.value ? 'is-active' : ''}`}
-                onClick={() => onThemeChange(opt.value)}
-                title={`${opt.label} 테마`}
-              >
-                <span className={`sb-theme-swatch-chip is-${opt.value}`} />
-                <span>{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </aside>
   )

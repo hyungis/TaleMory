@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Copy, Share2, CheckCircle2, PartyPopper, Loader2, Library, Maximize } from 'lucide-react'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -24,6 +24,15 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
   const [publishing, setPublishing] = useState(false)
   const [published, setPublished] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /* BE 가 주는 shareUrl 은 상대경로(/shared/...) 라 그대로 두면 표시·복사·공유 모두
+     상대경로로 나간다. 책장(BookstoreScene) 처럼 origin 을 prefix 해서 full URL 로 변환.
+     SSR 환경 대비 window 가용성 가드. */
+  const fullShareUrl = useMemo(() => {
+    if (!shareUrl) return null
+    if (typeof window === 'undefined') return shareUrl
+    return shareUrl.startsWith('http') ? shareUrl : `${window.location.origin}${shareUrl}`
+  }, [shareUrl])
 
   useEffect(() => {
     if (!storyId) return
@@ -51,13 +60,13 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
   }, [storyId, publishing])
 
   const handleCopy = useCallback(async () => {
-    if (!shareUrl) return
+    if (!fullShareUrl) return
     try {
-      await navigator.clipboard.writeText(shareUrl)
+      await navigator.clipboard.writeText(fullShareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {}
-  }, [shareUrl])
+  }, [fullShareUrl])
 
   return (
     <div className="cr-shell">
@@ -140,7 +149,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                       fontFamily: 'ui-monospace, monospace',
                     }}
                   >
-                    {shareUrl}
+                    {fullShareUrl}
                   </code>
                   <button
                     type="button"
@@ -197,7 +206,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                     type="button"
                     onClick={() =>
                       navigator.share
-                        ?.({ url: shareUrl, title: '우리 가족 동화책' })
+                        ?.({ url: fullShareUrl ?? undefined, title: '우리 가족 동화책' })
                         .catch(() => {})
                     }
                     style={{

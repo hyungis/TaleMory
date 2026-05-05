@@ -18,6 +18,7 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.StoryParticipantParser
+import com.s210.backend.domain.storyboard.application.pageTexts
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageContext
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageItem
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImagePagePayload
@@ -109,9 +110,10 @@ class SceneIllustrationService(
 
         val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        val englishText = page.englishText?.takeIf { it.isNotBlank() }
+        val texts = page.pageTexts(objectMapper)
+        val englishText = texts.englishText?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        val koreanText = page.koreanText?.takeIf { it.isNotBlank() }
+        val koreanText = texts.koreanText?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
