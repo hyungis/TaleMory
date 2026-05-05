@@ -15,13 +15,22 @@ import '../styles/story-book.css'
 interface StoryBookViewerProps {
   story: StoryView
   onExit: () => void
+  /**
+   * 'full' (기본): 일반 뷰어 — 사이드 툴바 / 전체화면 / 책갈피 / 글자크기 / 한글 토글 등 모든 도구 노출.
+   * 'preview': About 페이지 미리보기 — 도구를 모두 숨기고 한글 해석은 항상 ON, localStorage 책갈피
+   *            동작 안 함. 문장 TTS / 페이지 TTS / 단어 사전 / 삽화 확대 / 페이지 전환은 그대로.
+   */
+  mode?: 'full' | 'preview'
 }
 
 type PageKind = 'cover' | 'scene' | 'backCover'
 
 interface ViewerPage {
   kind: PageKind
+  /** story.scenes 배열 내 인덱스 (scene 페이지일 때만). */
   sceneIndex?: number
+  /** "Page N" 라벨용 0-based 표시 인덱스. scene 0(표지) 가 본문에서 제외돼 sceneIndex 와 1 차이. */
+  displayIndex?: number
 }
 
 interface FlipState {
@@ -59,20 +68,32 @@ const storageKeyBookmark = (storyId: number) => `viewer-bookmark-${storyId}`
  * 책갈피·테마는 로그인 인프라 미완성이라 localStorage 에 저장. 추후 `/progress` API 연동 시
  * 별도 어댑터로 교체 가능.
  */
-export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
-  const pages: ViewerPage[] = useMemo(
-    () => [
-      { kind: 'cover' as const },
-      ...story.scenes.map((_, i) => ({ kind: 'scene' as const, sceneIndex: i })),
-      { kind: 'backCover' as const },
-    ],
-    [story.scenes],
-  )
+export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewerProps) {
+  const isPreview = mode === 'preview'
+  const pages: ViewerPage[] = useMemo(() => {
+    /* BE 는 page_number=0(표지) + page_number=1..N(본문) scene 을 모두 내려준다.
+       표지 일러스트는 `story.coverIllustrationUrl` 로 별도 제공되므로 책 펼침 흐름에선
+       scene 0 를 본문 페이지로 또 보여주면 안 됨 (앞표지 ↔ 첫 본문이 같은 컷으로 중복 노출).
+       두 모드 모두 scene 0 를 본문 rotation 에서 제외하고 sceneIndex 는 원본 배열 좌표로 유지. */
+    const contentScenes = story.scenes.slice(1).map((_, i) => ({
+      kind: 'scene' as const,
+      sceneIndex: i + 1,
+      displayIndex: i,
+    }))
+    if (isPreview) {
+      /* preview 는 뒷표지(편지지) 미포함 — About 하단의 별도 섹션이 이미 보여주고 있어
+         마지막 scene 에서 Next 가 자연스레 disabled 되며 중복 표시 차단. */
+      return [{ kind: 'cover' as const }, ...contentScenes]
+    }
+    return [{ kind: 'cover' as const }, ...contentScenes, { kind: 'backCover' as const }]
+  }, [story.scenes, isPreview])
 
   /* 책갈피 — 한 동화당 1개 (pageIndex 단일값).
      useState lazy initializer 로 마운트 시점에 localStorage 에서 읽어 즉시 적용 →
-     viewer 를 껐다 다시 들어올 때 책갈피 페이지부터 시작 (cover 깜빡임 없이). */
+     viewer 를 껐다 다시 들어올 때 책갈피 페이지부터 시작 (cover 깜빡임 없이).
+     preview 모드에선 localStorage 손대지 않음 (sample story 가 실 사용자 책갈피와 충돌하는 걸 방지). */
   const [bookmark, setBookmark] = useState<number | null>(() => {
+    if (isPreview) return null
     try {
       const raw = window.localStorage.getItem(storageKeyBookmark(story.storyId))
       if (raw) {
@@ -103,7 +124,8 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
 
   // 툴바 / 보기 설정 상태
   const [isToolbarOpen, setIsToolbarOpen] = useState(false)
-  const [showTranslation, setShowTranslation] = useState(false)
+  // preview 모드는 한글 해석을 항상 ON 으로 시작. 토글 UI 자체가 없어 setter 호출 경로 자연 차단.
+  const [showTranslation, setShowTranslation] = useState(isPreview)
   const [fontSize, setFontSize] = useState(22)
   const toolbarCloseTimerRef = useRef<number | null>(null)
 
@@ -117,6 +139,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
   const tts = useStoryTts()
 
   useEffect(() => {
+    if (isPreview) return
     try {
       const key = storageKeyBookmark(story.storyId)
       if (bookmark === null) {
@@ -127,7 +150,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     } catch {
       /* noop */
     }
-  }, [bookmark, story.storyId])
+  }, [bookmark, story.storyId, isPreview])
 
   /* 책을 다 읽으면(= 뒷표지 도달) 책갈피 자동 해제.
      storeBookmark 저장 effect 가 함께 발동해 localStorage 에서도 삭제. */
@@ -249,14 +272,16 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
 
   // 전체 책 자동 재생
   const playFullBook = () => {
+    /* scene 0(표지) 은 본문 rotation 에서 제외했으므로 sceneIndex 와 pageIndex 가 1:1 정렬.
+       즉 sceneIndex k(>=1) ↔ pageIndex k. 표지에서 시작하면 첫 본문 scene 1 부터 재생. */
     const startSceneIndex = current.kind === 'scene' && current.sceneIndex !== undefined
       ? current.sceneIndex
-      : 0
-    const targetPageIndex = startSceneIndex + 1
+      : 1
+    const targetPageIndex = startSceneIndex
 
     const startPlayback = () => {
       tts.speakFullBook(story.scenes, startSceneIndex, sceneIdx => {
-        setPageIndex(sceneIdx + 1)
+        setPageIndex(sceneIdx)
       })
     }
 
@@ -307,48 +332,53 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
     if (bookmark === null) return null
     if (bookmark < 0 || bookmark >= pages.length) return null
     const page = pages[bookmark]
-    if (page.kind !== 'scene' || page.sceneIndex === undefined) return null
-    return `Page ${page.sceneIndex + 1}`
+    if (page.kind !== 'scene' || page.displayIndex === undefined) return null
+    return `Page ${page.displayIndex + 1}`
   }, [bookmark, pages])
   const canJumpToBookmark = bookmark !== null && bookmark !== pageIndex
 
   return (
     <div className={roomClass}>
-      {/* 좌측 호버 트리거 */}
-      <div
-        className="sb-side-trigger"
-        onMouseEnter={openToolbar}
-        onMouseLeave={scheduleToolbarClose}
-        aria-hidden
-      />
+      {/* preview 모드는 사이드 툴바 / 호버 트리거 / 전체화면 버튼 모두 숨김. */}
+      {!isPreview && (
+        <>
+          {/* 좌측 호버 트리거 */}
+          <div
+            className="sb-side-trigger"
+            onMouseEnter={openToolbar}
+            onMouseLeave={scheduleToolbarClose}
+            aria-hidden
+          />
 
-      {/* 사이드 툴바 */}
-      <ViewerToolbar
-        isOpen={isToolbarOpen}
-        ttsMode={tts.status.mode}
-        showTranslation={showTranslation}
-        fontSize={fontSize}
-        canBookmark={canBookmarkCurrent}
-        isBookmarked={isCurrentBookmarked}
-        bookmarkLabel={bookmarkLabel}
-        canJumpToBookmark={canJumpToBookmark}
-        onPlayFullBook={playFullBook}
-        onPause={tts.pause}
-        onResume={tts.resume}
-        onStop={tts.stop}
-        onTranslationToggle={() => setShowTranslation(v => !v)}
-        onFontSizeChange={setFontSize}
-        onToggleBookmark={toggleBookmark}
-        onJumpToBookmark={jumpToBookmark}
-        onMouseEnter={openToolbar}
-        onMouseLeave={scheduleToolbarClose}
-      />
+          {/* 사이드 툴바 */}
+          <ViewerToolbar
+            isOpen={isToolbarOpen}
+            ttsMode={tts.status.mode}
+            showTranslation={showTranslation}
+            fontSize={fontSize}
+            canBookmark={canBookmarkCurrent}
+            isBookmarked={isCurrentBookmarked}
+            bookmarkLabel={bookmarkLabel}
+            canJumpToBookmark={canJumpToBookmark}
+            onPlayFullBook={playFullBook}
+            onPause={tts.pause}
+            onResume={tts.resume}
+            onStop={tts.stop}
+            onTranslationToggle={() => setShowTranslation(v => !v)}
+            onFontSizeChange={setFontSize}
+            onToggleBookmark={toggleBookmark}
+            onJumpToBookmark={jumpToBookmark}
+            onMouseEnter={openToolbar}
+            onMouseLeave={scheduleToolbarClose}
+          />
 
-      <div className="sb-float-top">
-        <button onClick={toggleFullscreen} className="sb-float-btn" title="전체화면" aria-label="전체화면 토글">
-          <Maximize className="w-5 h-5" />
-        </button>
-      </div>
+          <div className="sb-float-top">
+            <button onClick={toggleFullscreen} className="sb-float-btn" title="전체화면" aria-label="전체화면 토글">
+              <Maximize className="w-5 h-5" />
+            </button>
+          </div>
+        </>
+      )}
 
       <div className={shellClass}>
         <div
@@ -370,8 +400,6 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           {current.kind === 'cover' && (
             <BookCover
               title={story.title ?? '제목 없는 동화'}
-              subtitle="TaleMory"
-              authorLabel={story.mainCharacter?.name ? `${story.mainCharacter.name}의 가족 드림` : '우리 가족 드림'}
               illustrationUrl={story.coverIllustrationUrl}
             />
           )}
@@ -379,7 +407,7 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           {current.kind === 'scene' && current.sceneIndex !== undefined && (
             <BookSpread
               scene={story.scenes[current.sceneIndex]}
-              pageIndex={current.sceneIndex}
+              pageIndex={current.displayIndex ?? current.sceneIndex}
               showTranslation={showTranslation}
               fontSize={fontSize}
               activeSentenceId={tts.status.activeSentenceId}
@@ -391,7 +419,11 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           )}
 
           {current.kind === 'backCover' && (
-            <BookBackCover outro={story.outro} onRestart={() => goTo(0)} />
+            <BookBackCover
+              outro={story.outro}
+              onRestart={() => goTo(0)}
+              illustrationUrl={story.coverIllustrationUrl}
+            />
           )}
         </div>
 
@@ -399,9 +431,9 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
           <TurnSheet
             direction={flip.direction}
             fromScene={flipFromScene}
-            fromIndex={pages[flip.fromPageIndex].sceneIndex!}
+            fromIndex={pages[flip.fromPageIndex].displayIndex ?? pages[flip.fromPageIndex].sceneIndex!}
             toScene={flipToScene}
-            toIndex={pages[flip.toPageIndex].sceneIndex!}
+            toIndex={pages[flip.toPageIndex].displayIndex ?? pages[flip.toPageIndex].sceneIndex!}
             onEnd={handleFlipEnd}
           />
         )}
@@ -415,12 +447,18 @@ export function StoryBookViewer({ story, onExit }: StoryBookViewerProps) {
             {coverFlip.kind === 'cover' ? (
               <BookCover
                 title={story.title ?? '제목 없는 동화'}
-                subtitle="TaleMory"
-                authorLabel={story.mainCharacter?.name ? `${story.mainCharacter.name}의 가족 드림` : '우리 가족 드림'}
                 illustrationUrl={story.coverIllustrationUrl}
               />
             ) : (
-              <div className="sb-back-cover sb-back-cover-static" />
+              <div className="sb-back-cover sb-back-cover-static">
+                {story.coverIllustrationUrl && (
+                  <img
+                    src={story.coverIllustrationUrl}
+                    alt=""
+                    className="sb-back-cover-illust"
+                  />
+                )}
+              </div>
             )}
           </div>
         )}

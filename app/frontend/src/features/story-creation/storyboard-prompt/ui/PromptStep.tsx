@@ -32,6 +32,7 @@ interface PromptStepProps {
   onStoryJobStarted: (jobId: number) => void
   lastConfirmedSummaryJobId: string | null
   onSummaryConfirmed: (summaryJobId: string | null) => void
+  readOnly?: boolean
   onBack: () => void
   onNext: () => void
 }
@@ -49,6 +50,7 @@ export function PromptStep({
   onStoryJobStarted,
   lastConfirmedSummaryJobId,
   onSummaryConfirmed,
+  readOnly = false,
   onBack,
   onNext,
 }: PromptStepProps) {
@@ -118,7 +120,7 @@ export function PromptStep({
     lastConfirmedSummaryJobId !== null &&
     summary?.jobId !== undefined &&
     lastConfirmedSummaryJobId === summary.jobId
-  const isLocked = hasGeneratedPages || hasActiveOrCompletedStoryJob || hasMatchingConfirmedJob
+  const isLocked = readOnly || hasGeneratedPages || hasActiveOrCompletedStoryJob || hasMatchingConfirmedJob
 
   const handleConfirmAndNext = useCallback(async () => {
     const currentSummaryJobId = summary?.jobId ?? null

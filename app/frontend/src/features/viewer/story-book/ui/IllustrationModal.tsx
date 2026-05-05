@@ -57,11 +57,6 @@ export function IllustrationModal({ scene, onClose }: IllustrationModalProps) {
             <ImageIcon className="sb-illust-modal-empty-icon" strokeWidth={1.5} />
           )}
         </div>
-
-        <div className="sb-illust-modal-caption">
-          <p className="sb-illust-modal-label">Page {scene.pageNumber}</p>
-          <h3 className="sb-illust-modal-title">{`장면 ${scene.pageNumber}`}</h3>
-        </div>
       </div>
     </div>
   )

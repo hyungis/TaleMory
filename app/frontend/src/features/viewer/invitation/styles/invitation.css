@@ -237,15 +237,6 @@
   border-radius: 4px;
 }
 
-.iv-cover-author {
-  font-family: var(--iv-font-script);
-  font-size: 20px;
-  color: var(--iv-ink-soft);
-  margin-bottom: 4px;
-}
-.iv-cover-author .iv-by { color: var(--iv-caramel-deep); }
-.iv-cover-author .iv-name { color: var(--iv-sage-deep); font-weight: 700; }
-
 .iv-meta-row {
   display: inline-flex;
   gap: 8px;
@@ -482,7 +473,6 @@
   .iv-cover { padding: 22px 20px 18px; margin-bottom: 10px; }
   .iv-book-mark { width: 60px; height: 60px; }
   .iv-book-mark > svg { width: 30px; height: 30px; }
-  .iv-cover-author { font-size: 17px; }
   .iv-meta-pill { font-size: 12px; padding: 3px 10px; }
   .iv-mode { padding: 14px 12px 12px; }
   .iv-preview-strip { display: none; } /* 모바일에선 preview 생략 */

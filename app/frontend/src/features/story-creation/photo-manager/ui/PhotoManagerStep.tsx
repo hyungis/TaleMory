@@ -35,6 +35,7 @@ const MAX_CHARACTER_REFS = 3
 
 interface PhotoManagerStepProps {
   storyId: number | null
+  readOnly?: boolean
   onBack: () => void
   onNext: () => void
 }
@@ -48,7 +49,7 @@ interface PhotoManagerStepProps {
  *
  * 모든 mutation/검증/lock 로직은 기존 그대로 유지하고 마크업/스타일만 cr-* 클래스로 갈아엎음.
  */
-export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepProps) {
+export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: PhotoManagerStepProps) {
   const photosQuery = usePhotosQuery(storyId)
   const memoryUpload = usePhotoUpload(storyId, 'STORYBOARD')
   const refUpload = usePhotoUpload(storyId, 'CHARACTER_REF')
@@ -62,6 +63,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
   const summaryStatus = summaryQuery.data?.jobStatus ?? null
   const isSummaryLocked =
     summaryStatus === 'PENDING' || summaryStatus === 'RUNNING' || summaryStatus === 'SUCCESS'
+  const isReadOnly = isSummaryLocked || readOnly
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -125,6 +127,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
 
   const handleMemoryDragEnd = useCallback(
     (event: DragEndEvent) => {
+      if (isReadOnly) return
       const { active, over } = event
       if (!over || active.id === over.id) return
       const ids = memoryPhotos.map(p => p.photoId)
@@ -134,7 +137,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
       const next = arrayMove(ids, fromIdx, toIdx)
       reorderMutation.mutate(next)
     },
-    [memoryPhotos, reorderMutation],
+    [isReadOnly, memoryPhotos, reorderMutation],
   )
 
   const handleToggleRef = useCallback(
@@ -213,14 +216,19 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
             </div>
           )}
 
-          {isSummaryLocked && (
+          {isReadOnly && (
             <div className="cr-banner" role="status">
               <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <div>
-                <strong>본문이 생성되어 이 단계는 읽기 전용이에요.</strong>
+                <strong>
+                  {readOnly && !isSummaryLocked
+                    ? '최종삽화가 생성되어 이 단계는 읽기 전용이에요.'
+                    : '본문이 생성되어 이 단계는 읽기 전용이에요.'}
+                </strong>
                 <span style={{ fontSize: 14, opacity: 0.9 }}>
-                  사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 본문/이미지를
-                  이어 작업할 수 있어요.
+                  {readOnly && !isSummaryLocked
+                    ? '사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.'
+                    : '사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 본문/이미지를 이어 작업할 수 있어요.'}
                 </span>
               </div>
             </div>
@@ -240,7 +248,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
             </div>
           </div>
 
-          {!isSummaryLocked && (
+          {!isReadOnly && (
             <div className="cr-card">
               <span className="cr-tape" aria-hidden="true" />
               <PhotoUploadZone
@@ -305,7 +313,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
                       deleteMutation.isPending && deleteMutation.variables === photo.photoId
                     }
                     isReordering={reorderMutation.isPending}
-                    isMutationLocked={isSummaryLocked}
+                    isMutationLocked={isReadOnly}
                   />
                 ))}
               </SortableContext>
@@ -357,12 +365,12 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
             </div>
           </div>
 
-          {!isSummaryLocked && refAtCapacity ? (
+          {!isReadOnly && refAtCapacity ? (
             <div className="cr-banner" role="status">
               대표 사진이 최대치({MAX_CHARACTER_REFS}장)에 도달했어요. 추가하려면 기존 대표
               사진을 해제하거나 삭제해주세요.
             </div>
-          ) : !isSummaryLocked ? (
+          ) : !isReadOnly ? (
             <div className="cr-card" style={{ padding: 18 }}>
               <span className="cr-tape" aria-hidden="true" />
               <PhotoUploadZone
@@ -390,7 +398,7 @@ export function PhotoManagerStep({ storyId, onBack, onNext }: PhotoManagerStepPr
                   isRemoving={
                     deleteMutation.isPending && deleteMutation.variables === photo.photoId
                   }
-                  isMutationLocked={isSummaryLocked}
+                  isMutationLocked={isReadOnly}
                 />
               ))}
             </div>

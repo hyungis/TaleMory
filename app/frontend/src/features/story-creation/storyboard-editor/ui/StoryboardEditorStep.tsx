@@ -11,6 +11,7 @@ import {
   ImageIcon,
   LayoutGrid,
   Loader2,
+  Lock,
   Pencil,
   Quote,
   RefreshCw,
@@ -78,6 +79,7 @@ interface StoryboardEditorStepProps {
   storyGenerationJobId: number | null
   /** STORY 잡이 종결(SUCCESS/FAILED/CANCELLED/타임아웃) 시 호출 — 부모 flow 의 jobId 를 null 로. */
   onStoryJobFinished: () => void
+  readOnly?: boolean
   onBack: () => void
   onNext: () => void
 }
@@ -100,6 +102,7 @@ export function StoryboardEditorStep({
   storyId,
   storyGenerationJobId,
   onStoryJobFinished,
+  readOnly = false,
   onBack,
   onNext,
 }: StoryboardEditorStepProps) {
@@ -530,6 +533,7 @@ export function StoryboardEditorStep({
 
   const handleDraftBlur = useCallback(
     (pageNumber: number, original: string | null) => {
+      if (readOnly) return
       if (isTranslationInProgress) return
       const value = drafts[pageNumber] ?? ''
       const trimmed = value.trim()
@@ -548,20 +552,22 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [drafts, isTranslationInProgress, patchMut, queryClient, storyId],
+    [drafts, isTranslationInProgress, patchMut, queryClient, readOnly, storyId],
   )
 
   const handleGenerateAllImages = useCallback(() => {
+    if (readOnly) return
     if (isTranslationInProgress) return
     setImageGenerationError(null)
     generateImagesMut.mutate(undefined, {
       onSuccess: res => setCurrentImageJobId(res.jobId),
     })
-  }, [generateImagesMut, isTranslationInProgress])
+  }, [generateImagesMut, isTranslationInProgress, readOnly])
 
   const handleRegenerateImage = useCallback(
     (pageNumber: number) => {
       const userPrompt = (regeneratePrompts[pageNumber] ?? '').trim()
+      if (readOnly) return
       if (userPrompt.length === 0) return
       if (regenRemaining <= 0) return // 동화 한도 소진 — 호출 자체 차단.
       if (isTranslationInProgress) return
@@ -606,7 +612,7 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [regenerateImageMut, regeneratePrompts, regenRemaining, isTranslationInProgress, queryClient, storyId],
+    [regenerateImageMut, regeneratePrompts, regenRemaining, isTranslationInProgress, queryClient, readOnly, storyId],
   )
 
   /**
@@ -615,6 +621,7 @@ export function StoryboardEditorStep({
    */
   const handleSelectVersion = useCallback(
     (pageNumber: number, version: number) => {
+      if (readOnly) return
       if (storyId === null) return
       selectVersionMut.mutate(
         { pageNumber, version },
@@ -630,7 +637,7 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [selectVersionMut, queryClient, storyId],
+    [selectVersionMut, queryClient, readOnly, storyId],
   )
 
   // 진행 중 여부 — 어떤 이미지 잡이든 PENDING/RUNNING 이면 모든 image 액션 disable.
@@ -641,7 +648,11 @@ export function StoryboardEditorStep({
     imageJobQuery.data?.status !== 'FAILED' &&
     imageJobQuery.data?.status !== 'CANCELLED'
 
+  const allStoryboardTextReady =
+    pages.length > 0 &&
+    pages.every(p => p.englishText?.trim() && p.koreanText?.trim())
   const allImagesReady = pages.length > 0 && pages.every(p => !!p.imageUrl)
+  const canProceedToStyle = readOnly || (allStoryboardTextReady && allImagesReady)
   const someImagesReady = pages.some(p => !!p.imageUrl)
 
   return (
@@ -660,6 +671,18 @@ export function StoryboardEditorStep({
 
             {/* 동화 단위 재생성 카운터 — 헤더 우측 위치. 한도 도달 시 빨간색 강조.
                 pages 가 있는 경우에만 노출 (Step 4 본 화면). */}
+            {readOnly && (
+              <div className="cr-banner" role="status">
+                <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+                <div>
+                  <strong>최종삽화가 생성되어 이 단계는 읽기 전용이에요.</strong>
+                  <span style={{ fontSize: 14, opacity: 0.9 }}>
+                    본문/이미지를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.
+                  </span>
+                </div>
+              </div>
+            )}
+
             {pages.length > 0 && regenStatusQuery.data && (
               <div className="flex justify-end mb-4">
                 <span
@@ -733,6 +756,7 @@ export function StoryboardEditorStep({
                     onClick={handleGenerateAllImages}
                     disabled={
 	                      storyId === null ||
+	                      readOnly ||
 	                      generateImagesMut.isPending ||
 	                      isImageJobInProgress ||
 	                      isTranslationInProgress
@@ -908,9 +932,9 @@ export function StoryboardEditorStep({
                       setRegeneratePrompts(prev => ({ ...prev, [currentPage.pageNumber]: value }))
                     }
                     onRegenerateImage={() => handleRegenerateImage(currentPage.pageNumber)}
-	                    regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending || isTranslationInProgress}
+	                    regenerateDisabled={readOnly || isImageJobInProgress || regenerateImageMut.isPending || isTranslationInProgress}
 	                    patchPending={patchMut.isPending}
-	                    translationLocked={isTranslationInProgress}
+	                    translationLocked={readOnly || isTranslationInProgress}
 	                    translationPending={
 	                      isTranslationInProgress &&
 	                      effectiveTranslationPageNumber === currentPage.pageNumber
@@ -977,7 +1001,14 @@ export function StoryboardEditorStep({
         currentStep={4}
         onBack={onBack}
 	        onNext={onNext}
-	        nextDisabled={isTranslationInProgress}
+	        nextDisabled={
+            !canProceedToStyle ||
+            isTranslationInProgress ||
+            isImageJobInProgress ||
+            generateImagesMut.isPending ||
+            pagesQuery.isLoading ||
+            pagesQuery.isFetching
+          }
         nextLabel="다음: 그림 스타일 선택"
       />
     </div>
@@ -1071,6 +1102,22 @@ function PageCard(props: {
     wasTranslationPendingRef.current = translationPending
   }, [translationPending])
 
+  // 재생성 진행 중이면 패널 자동 열기 — 새로고침으로 진입한 경우에도 사용자가
+  // counter("X / Y 남음") 와 진행 메시지를 즉시 볼 수 있게.
+  // 재생성이 끝나면 (true → false transition) 패널을 자동으로 닫음 — 그렇지 않으면
+  // 'regenOpen' 이 박혀 .open 클래스가 유지되고, hover 안 해도 재생성 버튼이 계속
+  // 보이고 이미지에 grayscale 필터가 그대로 적용됨.
+  const wasRegeneratingRef = useRef(false)
+  useEffect(() => {
+    if (isRegeneratingThis) {
+      setRegenOpen(true)
+      wasRegeneratingRef.current = true
+    } else if (wasRegeneratingRef.current) {
+      setRegenOpen(false)
+      wasRegeneratingRef.current = false
+    }
+  }, [isRegeneratingThis])
+
   return (
     <div className="cr-card" style={{ padding: 0 }}>
       <span className="cr-tape" aria-hidden="true" />
@@ -1093,7 +1140,7 @@ function PageCard(props: {
         <div className="flex flex-col gap-2.5">
           {/* 이미지 영역 — hover 시 흑백 + 어둡게 + 중앙에 새로고침 버튼 노출. */}
           <div
-            className={`cr-sketch-image-wrap min-h-[240px] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
+            className={`cr-sketch-image-wrap ${imageSrc ? 'min-h-[240px]' : 'aspect-[4/3]'} rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
           >
             {imageSrc ? (
               <img
@@ -1133,6 +1180,17 @@ function PageCard(props: {
                 <RefreshCw className="w-7 h-7" strokeWidth={2.4} />
               )}
             </button>
+
+            {/* 재생성 진행 중 오버레이 — hover 와 무관하게 항상 보임.
+                새로고침으로 복귀했을 때도 사용자가 진행 상태를 즉시 인지할 수 있게.
+                edit-btn(z-index 2) 위(z-index 3)에 떠서 이미지/스피너 모두 덮음. */}
+            {isRegeneratingThis && (
+              <div className="cr-sketch-regen-overlay" role="status" aria-live="polite">
+                <Loader2 className="w-12 h-12 animate-spin" strokeWidth={2.2} />
+                <p className="cr-sketch-regen-overlay-text">그림을 다시 그리고 있어요</p>
+                <p className="cr-sketch-regen-overlay-sub">잠시만 기다려주세요…</p>
+              </div>
+            )}
           </div>
 
           {/* 버전 picker — 재생성 이력이 있는 페이지에서만 표시. */}

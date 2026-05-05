@@ -60,10 +60,12 @@ class StoryboardImageGenerationService(
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
     private val pageVersionRepository: StoryboardPageImageVersionRedisRepository,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        storyboardEditGuard.assertEditable(story)
         assertNoActiveTranslationJob(storyId)
         val stylePreset = resolveStylePreset(story)
 
@@ -195,6 +197,7 @@ class StoryboardImageGenerationService(
         userPrompt: String,
     ): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        storyboardEditGuard.assertEditable(story)
         assertNoActiveTranslationJob(storyId)
         val stylePreset = resolveStylePreset(story)
 

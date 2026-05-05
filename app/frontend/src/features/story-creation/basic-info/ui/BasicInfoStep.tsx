@@ -31,6 +31,7 @@ interface BasicInfoStepProps {
   onChildAdd: () => void
   onChildAppend: (child: StoryChild) => void
   onChildRemove: (index: number) => void
+  readOnly?: boolean
   onBack: () => void
   onStoryCreated: (storyId: number) => void
   onStaleStoryIdReset?: () => void
@@ -51,6 +52,7 @@ export function BasicInfoStep({
   onChildAdd,
   onChildAppend,
   onChildRemove,
+  readOnly = false,
   onBack,
   onStoryCreated,
   onStaleStoryIdReset,
@@ -75,6 +77,7 @@ export function BasicInfoStep({
   const summaryStatus = summaryQuery.data?.jobStatus ?? null
   const isSummaryLocked =
     summaryStatus === 'PENDING' || summaryStatus === 'RUNNING' || summaryStatus === 'SUCCESS'
+  const isReadOnly = isSummaryLocked || readOnly
 
   const handleDateRangeChange = (start: string | null, end: string | null) => {
     // 당일치기(start === end)도 [start, end] 두 개 모두 저장해야
@@ -100,7 +103,7 @@ export function BasicInfoStep({
   const handleNext = useCallback(async () => {
     setSubmitError(null)
 
-    if (isSummaryLocked && storyId !== null) {
+    if (isReadOnly && storyId !== null) {
       onStoryCreated(storyId)
       return
     }
@@ -171,7 +174,7 @@ export function BasicInfoStep({
     data,
     firstDate,
     lastDate,
-    isSummaryLocked,
+    isReadOnly,
     onChildUpdate,
     onStaleStoryIdReset,
     onStoryCreated,
@@ -195,14 +198,19 @@ export function BasicInfoStep({
           />
 
           {/* SUMMARY 락 안내 */}
-          {isSummaryLocked && (
+          {isReadOnly && (
             <div className="cr-banner" role="status">
               <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
               <div>
-                <strong>본문이 생성되어 이 단계는 읽기 전용이에요.</strong>
+                <strong>
+                  {readOnly && !isSummaryLocked
+                    ? '최종삽화가 생성되어 이 단계는 읽기 전용이에요.'
+                    : '본문이 생성되어 이 단계는 읽기 전용이에요.'}
+                </strong>
                 <span style={{ fontSize: 14, opacity: 0.9 }}>
-                  가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면
-                  본문/이미지를 이어 작업할 수 있어요.
+                  {readOnly && !isSummaryLocked
+                    ? '가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.'
+                    : '가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 본문/이미지를 이어 작업할 수 있어요.'}
                 </span>
               </div>
             </div>
@@ -213,12 +221,12 @@ export function BasicInfoStep({
 
             {/* fieldset 으로 잠금 시 모든 form control 일괄 비활성. */}
             <fieldset
-              disabled={isSummaryLocked}
+              disabled={isReadOnly}
               style={{
                 border: 0,
                 padding: 0,
                 margin: 0,
-                opacity: isSummaryLocked ? 0.7 : 1,
+                opacity: isReadOnly ? 0.7 : 1,
               }}
             >
               <ChildrenList
@@ -244,7 +252,7 @@ export function BasicInfoStep({
               <LevelPicker
                 value={data.level}
                 onChange={v => onUpdate('level', v)}
-                disabled={isSummaryLocked}
+                disabled={isReadOnly}
               />
 
               <div className="cr-field">
@@ -289,7 +297,7 @@ export function BasicInfoStep({
         nextLabel={
           isSubmitting
             ? '저장 중…'
-            : isSummaryLocked
+            : isReadOnly
               ? '사진 단계로 이동'
               : '사진 업로드하러 가기'
         }

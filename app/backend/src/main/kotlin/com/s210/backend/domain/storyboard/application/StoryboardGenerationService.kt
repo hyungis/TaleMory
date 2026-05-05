@@ -61,6 +61,7 @@ class StoryboardGenerationService(
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -70,6 +71,7 @@ class StoryboardGenerationService(
             userId, storyId, !prompt.isNullOrBlank(),
         )
         val story = ownedStory(userId, storyId)
+        storyboardEditGuard.assertEditable(story)
 
         // [본문 발행 가드 1 — race 차단, plan D7-A]
         // 활성 본문 잡(PENDING/RUNNING) 이 존재하면 즉시 거부 (race 가 더 일찍 cheap 한 fail).
@@ -228,7 +230,8 @@ class StoryboardGenerationService(
      * `updateAt` 을 오늘 날짜로 갱신. 빈 입력 → INVALID_INPUT.
      */
     fun editSummary(userId: Long, storyId: Long, newSummaryKo: String): StoryBoardResult {
-        ownedStory(userId, storyId)
+        val story = ownedStory(userId, storyId)
+        storyboardEditGuard.assertEditable(story)
 
         // 활성 본문 잡이 있는 동안엔 줄거리 변경 거부 — 진행 중 본문이 stale grounding 으로 가는 것 차단.
         val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(

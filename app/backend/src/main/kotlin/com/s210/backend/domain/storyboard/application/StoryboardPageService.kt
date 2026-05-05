@@ -40,6 +40,7 @@ class StoryboardPageService(
     private val jobRepository: StoryGenerationJobRepository,
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -79,7 +80,8 @@ class StoryboardPageService(
         pageNumber: Int,
         koreanText: String,
     ): StoryboardPageResult {
-        ownedStory(userId, storyId)
+        val story = ownedStory(userId, storyId)
+        storyboardEditGuard.assertEditable(story)
         assertNoActiveTranslationJob(storyId)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -160,4 +162,5 @@ class StoryboardPageService(
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
     }
+
 }

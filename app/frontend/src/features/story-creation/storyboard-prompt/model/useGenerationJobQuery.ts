@@ -4,7 +4,9 @@ import type { ApiError } from '../../../../shared/api'
 import { getGenerationJob } from '../api/getGenerationJob'
 import type { GenerationJobResponse, JobStatusApi } from '../api/types'
 
-const POLLING_INTERVAL_MS = 3_000
+// BE 가 cache-aside (Redis 10분 TTL) 로 polling read 부담을 흡수하므로 3s 가 아닌 5s 로 완화.
+// 진행 중 잡은 캐시 hit 위주라 사용자가 체감하는 응답성은 거의 동일.
+const POLLING_INTERVAL_MS = 5_000
 /**
  * AI 워커가 예기치 못한 크래시(OOM/네트워크 단절/무한 루프 등)로 결과를 돌려주지 못해
  * DB job 이 PENDING/RUNNING 에 박제되는 경우 FE 가 무한 polling 에 갇히는 걸 막는 상한선.
@@ -24,7 +26,7 @@ export type GenerationJobQueryResult = UseQueryResult<GenerationJobResponse, Api
  * 생성 작업 상태 polling 훅 — `GET /generation-jobs/{jobId}`.
  *
  * - `jobId === null` 이면 disabled.
- * - 3초 간격 `refetchInterval` — 종결 상태(SUCCESS/FAILED/CANCELLED) 도달 시 자동 중지.
+ * - 5초 간격 `refetchInterval` — 종결 상태(SUCCESS/FAILED/CANCELLED) 도달 시 자동 중지.
  * - `jobId` 세팅 시점부터 5분 경과하면 `isTimedOut=true` 로 폴링 종료 (AI 크래시 방어).
  * - `staleTime: 0` — 폴링 중에는 매번 fresh 하게 받는다.
  */

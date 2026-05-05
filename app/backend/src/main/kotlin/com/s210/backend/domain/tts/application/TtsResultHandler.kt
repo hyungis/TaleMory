@@ -2,9 +2,11 @@ package com.s210.backend.domain.tts.application
 
 import tools.jackson.databind.ObjectMapper
 import com.s210.backend.common.redis.JobStatusRedisRepository
+import com.s210.backend.common.transaction.afterCommit
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepository
 import com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope
@@ -39,7 +41,7 @@ class TtsResultHandler(
     private val sceneRepository: SceneRepository,
     private val sceneSentenceRepository: SceneSentenceRepository,
     private val ttsCacheService: TtsCacheService,
-    private val jobStatusRepo: JobStatusRedisRepository,
+    private val jobStatusRedisRepo: JobStatusRedisRepository,
     private val previewRedis: com.s210.backend.common.redis.TtsPreviewRedisRepository,
     private val objectMapper: ObjectMapper,
 ) {
@@ -81,6 +83,7 @@ class TtsResultHandler(
                 job.errorMessage = "$code: $msg".take(65_535)
                 job.finishedAt = LocalDateTime.now()
                 tryUpdateRedisStatus(job.storyId, "failed", null, "$code: $msg")
+                tryInvalidatePollingCache(job.id)
                 log.info(
                     "[TTS:RES:HANDLE:DONE] jobId={}, storyId={}, status={}, elapsedMs={}",
                     envelope.jobId, job.storyId, envelope.status, elapsedMs(started),
@@ -183,8 +186,9 @@ class TtsResultHandler(
             }
         }
 
-        // 4) Redis job status
+        // 4) Redis job status (operational sidecar) + polling cache invalidate.
         tryUpdateRedisStatus(storyId, "done", 100, null)
+        tryInvalidatePollingCache(job.id)
     }
 
     private fun tryStoreCache(vpId: Long, text: String, audioUrl: String) {
@@ -197,8 +201,9 @@ class TtsResultHandler(
 
     private fun tryUpdateRedisStatus(storyId: Long, stage: String, progress: Int?, errorMessage: String?) {
         try {
-            jobStatusRepo.setStatus(
+            jobStatusRedisRepo.setStatus(
                 storyId = storyId,
+                jobType = JobType.TTS,
                 stage = stage,
                 progress = progress ?: 0,
                 currentStep = if (stage == "done") "TTS 완료" else "TTS 실패",
@@ -206,6 +211,24 @@ class TtsResultHandler(
             )
         } catch (e: Exception) {
             log.warn("Redis job status HSET failed (non-fatal): {}", e.message)
+        }
+    }
+
+    /**
+     * Polling cache (String JSON) invalidate — 잡 종결 시 stale RUNNING 응답을 제거.
+     * 다음 FE polling 은 cache miss → DB 종결 응답을 받고 (정책상) 다시 적재 안 함.
+     *
+     * **afterCommit 필수**: 호출자(`onResult`)가 `@Transactional` 안이라 이 시점엔
+     * `job.status = SUCCESS/FAILED` 가 DB 미반영. 즉시 invalidate 하면 다른 스레드 polling 이
+     * 미반영 DB(RUNNING)를 다시 캐시에 적재해 stale 박제 race 가 발생 — commit 후로 미룬다.
+     */
+    private fun tryInvalidatePollingCache(jobId: Long) {
+        afterCommit {
+            try {
+                jobStatusRedisRepo.invalidateJobResponse(jobId)
+            } catch (e: Exception) {
+                log.warn("Redis polling cache invalidate failed (non-fatal): {}", e.message)
+            }
         }
     }
 

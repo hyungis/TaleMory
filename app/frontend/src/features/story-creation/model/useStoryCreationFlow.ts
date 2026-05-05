@@ -43,6 +43,7 @@ interface CreationProgressSnapshot {
   storyGenerationJobId: number | null
   /** Step 8 최종 삽화 잡 id — 새로고침 시 폴링 재개용. */
   finalIllustrationJobId: number | null
+  storyboardReadOnlyLocked: boolean
 }
 
 function readProgressSnapshot(): CreationProgressSnapshot | null {
@@ -75,6 +76,8 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
         typeof parsed.storyGenerationJobId === 'number' ? parsed.storyGenerationJobId : null,
       finalIllustrationJobId:
         typeof parsed.finalIllustrationJobId === 'number' ? parsed.finalIllustrationJobId : null,
+      storyboardReadOnlyLocked:
+        parsed.storyboardReadOnlyLocked === true || typeof parsed.finalIllustrationJobId === 'number',
     }
   } catch {
     return null
@@ -123,6 +126,7 @@ export interface UseStoryCreationFlowResult {
    * 메모리 한정 — 새로고침 시 sessionStorage 미영속.
    */
   finalIllustrationJobId: number | null
+  storyboardReadOnlyLocked: boolean
   /**
    * 마지막으로 사용자가 "스토리 확정하고 다음" 으로 본문 발행에 사용한 SUMMARY 잡의 id (string).
    * Step 3 으로 돌아와서 confirm 다시 누를 때 이 값과 현재 summary jobId 를 비교해
@@ -214,6 +218,9 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
   const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<number | null>(
     restored?.finalIllustrationJobId ?? null,
   )
+  const [storyboardReadOnlyLocked, setStoryboardReadOnlyLocked] = useState<boolean>(
+    restored?.storyboardReadOnlyLocked ?? false,
+  )
   /**
    * 마지막으로 본문 발행에 사용된 SUMMARY 잡 id. PromptStep 에서 confirm 시 비교 → 재발행 skip 판단.
    *
@@ -252,9 +259,10 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
         lastConfirmedSummaryJobId,
         storyGenerationJobId,
         finalIllustrationJobId,
+        storyboardReadOnlyLocked,
       })
     }
-  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId])
+  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId, storyboardReadOnlyLocked])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))
@@ -345,6 +353,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
 
   const setFinalIllustrationJobId = useCallback((jobId: number | null) => {
     setFinalIllustrationJobIdState(jobId)
+    if (jobId !== null) setStoryboardReadOnlyLocked(true)
   }, [])
 
   const setLastConfirmedSummaryJobId = useCallback((jobId: string | null) => {
@@ -374,6 +383,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     storyId,
     storyGenerationJobId,
     finalIllustrationJobId,
+    storyboardReadOnlyLocked,
     lastConfirmedSummaryJobId,
     setCurrentStep,
     handleNext,

@@ -102,7 +102,7 @@ export function AboutPage() {
             </div>
           )}
           {status === 'success' && sampleStory && (
-            <StoryBookViewer story={sampleStory} onExit={() => {}} />
+            <StoryBookViewer story={sampleStory} onExit={() => {}} mode="preview" />
           )}
         </div>
       </section>
@@ -122,6 +122,7 @@ export function AboutPage() {
               signature: OUTRO_SIGNATURE,
             }}
             onRestart={() => {}}
+            illustrationUrl={null}
           />
         </div>
       </section>
