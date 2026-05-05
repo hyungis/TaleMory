@@ -736,3 +736,246 @@ tts.md 12번 순서대로 하자.
 3. batch 또는 speaker reuse 중 무엇이 먼저인지 결정
 
 여기까지 정하면 이후 구현 방향이 거의 확정된다.
+
+## 13. TensorRT 실험 정리
+
+### 13-1. 기존 내용 요약
+
+이 문서는 TTS 처리 흐름, 병목 위치, worker 분리 방향을 정리하기 위한 문서다.
+
+- backend는 미리듣기와 본문 TTS 작업을 MQ로 발행하고, AI worker는 작업을 consume한 뒤 CosyVoice 서버를 호출한다.
+- reference audio는 AI worker에서 다운로드한 뒤 CosyVoice API 요청의 multipart 파일로 전달된다.
+- CosyVoice 서버 로그의 `[COSYVOICE:REQ]`, `[TEMP]`, `[PREPARE]`, `[COLLECT]`, `[RESP]` 중 실제 합성 시간은 대부분 `[COLLECT]`에 잡힌다.
+- `[COSYVOICE:INFER:DONE] elapsedMs=0.xx`는 실제 합성 완료 시간이 아니다. CosyVoice inference가 generator 형태라서 실제 계산은 `_collect_wav_audio()`에서 output을 수집할 때 발생한다.
+- 기존 병목은 reference 처리보다 CosyVoice flow/decoder 합성 구간이 훨씬 크다.
+- 개선 우선순위는 worker 분리, timing 로그 추가, reference 재사용, batch endpoint 또는 TensorRT 실험 순서로 본다.
+
+### 13-2. 기준 성능
+
+초기 서버 로그 기준으로 `/inference_cross_lingual` 37건을 보면 다음과 같았다.
+
+| 항목 | 값 |
+| --- | ---: |
+| 요청 수 | 37 |
+| 전체 음성 길이 | 212.72초 |
+| `PREPARE` 합계 | 7.11초 |
+| `COLLECT` 합계 | 518.13초 |
+| 요청당 평균 `COLLECT` | 14.00초 |
+| weighted RTF | 2.44 |
+| first request부터 final response까지 | 약 9분 2초 |
+
+즉 실제 병목은 `COLLECT`이고, 서버 기준 합성 구간만 약 8분 38초 이상이었다.
+
+### 13-3. fp16 및 서버 내 TensorRT 빌드 시도
+
+`--fp16`은 이 환경에서 성능이 나빠졌다. 예시로 6.28초 음성 생성에 `COLLECT elapsedMs=117649.34`, `rtf=18.734`가 나왔다. 따라서 현재 환경에서는 `--fp16`을 쓰지 않는다.
+
+서버를 바로 `--load_trt`로 켜서 TensorRT plan을 만들면 실패했다.
+
+```bash
+python server2.py --port 8001 --model_dir "$MODEL_DIR" --load_trt --trt_concurrent 1
+```
+
+실패 이유는 AutoModel이 PyTorch 모델을 먼저 GPU에 올린 상태에서 TensorRT builder가 추가 메모리를 요구했기 때문이다. 로그상 GPU 메모리가 이미 약 5.6GB 사용 중인 상태에서 TRT 빌드가 시작되었고, `OutOfMemory` 이후 `build_serialized_network`가 `None`을 반환해 `TypeError: a bytes-like object is required, not 'NoneType'`로 끝났다.
+
+결론은 서버 실행 중 빌드하지 말고, 서버를 끈 상태에서 plan 파일을 따로 만든 뒤 서버에서 그 plan을 로드하는 방식이 맞다.
+
+### 13-4. TensorRT plan 별도 생성 절차
+
+모델 경로를 먼저 지정한다.
+
+```bash
+export MODEL_DIR=/home/ssafy/work/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B
+```
+
+plan 생성 스크립트 위치는 다음처럼 둔다.
+
+```bash
+cd ~/work/CosyVoice
+python build_trt_plan.py
+```
+
+`build_trt_plan.py`는 `$MODEL_DIR/flow.decoder.estimator.fp32.onnx`를 읽어서 `$MODEL_DIR/flow.decoder.estimator.fp32.mygpu.plan`을 생성한다.
+
+처음 성공한 설정은 `max_shape=768`이었지만, 실제 요청에서 shape 826이 들어오면서 실패했다.
+
+```text
+Set dimension [2,80,826] for tensor x does not satisfy any optimization profiles.
+Valid range for profile 0: [2,80,4]..[2,80,768].
+```
+
+따라서 현재 권장 설정은 `opt=768`, `max=1024`다. 긴 문장이 들어와도 1024까지는 처리하고, 자주 나오는 700~900대 shape에 맞춰 최적화하기 위해서다.
+
+```python
+min_shape = [(2, 80, 4), (2, 1, 4), (2, 80, 4), (2, 80, 4)]
+opt_shape = [(2, 80, 768), (2, 1, 768), (2, 80, 768), (2, 80, 768)]
+max_shape = [(2, 80, 1024), (2, 1, 1024), (2, 80, 1024), (2, 80, 1024)]
+input_names = ["x", "mask", "mu", "cond"]
+```
+
+중요한 점은 `build_trt_plan.py`와 CosyVoice 런타임의 `get_trt_kwargs()`가 같은 shape 범위를 써야 한다는 것이다.
+
+수정 대상:
+
+```bash
+~/work/CosyVoice/build_trt_plan.py
+~/work/CosyVoice/cosyvoice/cli/model.py
+```
+
+수정 위치를 찾는 명령어는 다음과 같다.
+
+```bash
+grep -n "def get_trt_kwargs" -A12 ~/work/CosyVoice/cosyvoice/cli/model.py
+grep -n "set_memory_pool_limit\|opt_shape\|max_shape" -A8 ~/work/CosyVoice/build_trt_plan.py
+```
+
+`build_trt_plan.py`가 없으면 `~/work/CosyVoice/build_trt_plan.py`로 새로 만든다. 핵심은 ONNX 입력, plan 출력, profile shape, workspace를 명확히 지정하는 것이다.
+
+```python
+import os
+import tensorrt as trt
+
+model_dir = os.environ["MODEL_DIR"]
+onnx_path = f"{model_dir}/flow.decoder.estimator.fp32.onnx"
+plan_path = f"{model_dir}/flow.decoder.estimator.fp32.mygpu.plan"
+
+logger = trt.Logger(trt.Logger.INFO)
+builder = trt.Builder(logger)
+network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+parser = trt.OnnxParser(network, logger)
+
+with open(onnx_path, "rb") as f:
+    if not parser.parse(f.read()):
+        for i in range(parser.num_errors):
+            print(parser.get_error(i))
+        raise RuntimeError("failed to parse onnx")
+
+config = builder.create_builder_config()
+config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1GB
+
+profile = builder.create_optimization_profile()
+input_names = ["x", "mask", "mu", "cond"]
+min_shape = [(2, 80, 4), (2, 1, 4), (2, 80, 4), (2, 80, 4)]
+opt_shape = [(2, 80, 768), (2, 1, 768), (2, 80, 768), (2, 80, 768)]
+max_shape = [(2, 80, 1024), (2, 1, 1024), (2, 80, 1024), (2, 80, 1024)]
+
+for name, min_s, opt_s, max_s in zip(input_names, min_shape, opt_shape, max_shape):
+    profile.set_shape(name, min_s, opt_s, max_s)
+
+config.add_optimization_profile(profile)
+engine_bytes = builder.build_serialized_network(network, config)
+if engine_bytes is None:
+    raise RuntimeError("TensorRT build failed")
+
+with open(plan_path, "wb") as f:
+    f.write(engine_bytes)
+
+print(f"saved: {plan_path}")
+```
+
+`model.py`에서는 다음 함수 안의 shape를 동일하게 맞춘다.
+
+```python
+def get_trt_kwargs(self):
+    min_shape = [(2, 80, 4), (2, 1, 4), (2, 80, 4), (2, 80, 4)]
+    opt_shape = [(2, 80, 768), (2, 1, 768), (2, 80, 768), (2, 80, 768)]
+    max_shape = [(2, 80, 1024), (2, 1, 1024), (2, 80, 1024), (2, 80, 1024)]
+    input_names = ["x", "mask", "mu", "cond"]
+    return {
+        "min_shape": min_shape,
+        "opt_shape": opt_shape,
+        "max_shape": max_shape,
+        "input_names": input_names,
+    }
+```
+
+### 13-5. 빌드 및 실행 명령어
+
+기존 plan을 백업한다.
+
+```bash
+cp "$MODEL_DIR"/flow.decoder.estimator.fp32.mygpu.plan \
+   "$MODEL_DIR"/flow.decoder.estimator.fp32.mygpu.plan.opt512.bak
+```
+
+기존 plan을 지우고 새로 만든다.
+
+```bash
+rm -f "$MODEL_DIR"/flow.decoder.estimator.fp32.mygpu.plan
+cd ~/work/CosyVoice
+python build_trt_plan.py
+ls -lh "$MODEL_DIR"/flow.decoder.estimator.fp32.mygpu.plan
+```
+
+서버 실행은 다음처럼 한다. `--fp16`은 붙이지 않는다.
+
+```bash
+cd ~/work/CosyVoice/runtime/python/fastapi
+python server2.py --port 8001 --model_dir "$MODEL_DIR" --load_trt --trt_concurrent 1
+```
+
+문제가 생기면 백업 plan으로 되돌린다.
+
+```bash
+cp "$MODEL_DIR"/flow.decoder.estimator.fp32.mygpu.plan.opt512.bak \
+   "$MODEL_DIR"/flow.decoder.estimator.fp32.mygpu.plan
+```
+
+기본 서버 실행에는 영향이 없다. `--load_trt`를 붙이지 않고 실행하면 기존 PyTorch 경로로 돈다.
+
+```bash
+python server2.py --port 8001 --model_dir "$MODEL_DIR"
+```
+
+### 13-6. 최종 실측 결과
+
+Docker 컨테이너 로그 기준으로 story TTS worker는 정상 완료했다.
+
+```text
+[TTS:WORKER:CONSUME] jobId=39 storyId=8 voiceId=13 sentenceCount=34
+[TTS:STORY:GENERATE:DONE] storyId=8 voiceId=13 sentenceCount=34 elapsedMs=243599
+[TTS:WORKER:PUBLISH] jobId=39 storyId=8 elapsedMs=243603
+```
+
+backend도 결과를 정상 consume했고 DB 반영까지 끝났다.
+
+```text
+TTS job 39 SUCCESS - storyId=8, applied=34/34
+```
+
+worker 로그에서 계산한 결과는 다음과 같다.
+
+| 항목 | 값 |
+| --- | ---: |
+| 문장 수 | 34 |
+| 전체 worker 처리 시간 | 243.60초 |
+| CosyVoice HTTP 합계 | 237.08초 |
+| 요청당 CosyVoice 평균 | 6.97초 |
+| 요청당 CosyVoice 최소 | 4.05초 |
+| 요청당 CosyVoice 최대 | 9.80초 |
+| 전체 음성 길이 | 198.80초 |
+| weighted RTF | 1.19 |
+
+초기 기준과 비교하면 다음 정도 개선이다.
+
+| 항목 | 기존 | TRT 적용 후 | 개선 |
+| --- | ---: | ---: | ---: |
+| 요청당 평균 합성 시간 | 약 14.00초 | 약 6.97초 | 약 50% 감소 |
+| weighted RTF | 약 2.44 | 약 1.19 | 약 51% 감소 |
+| 전체 story 처리 | 약 8분 45초 수준 | 약 4분 04초 | 약 2배 빨라짐 |
+
+### 13-7. 추가 판단
+
+TensorRT workspace를 늘리면 builder가 더 많은 tactic을 검토할 수 있어서 plan 품질이 좋아질 가능성은 있다. 하지만 무조건 빨라지는 것은 아니고, RTX 4050 Laptop GPU에서는 너무 크게 잡으면 다시 OOM이 난다. 현실적인 실험 범위는 1GB에서 2GB 정도다.
+
+`max_shape`를 크게 잡는 것도 무조건 빠르게 만들지 않는다. `max_shape`는 처리 가능한 최대 길이를 늘리는 값이고, 속도는 주로 실제 입력이 `opt_shape`에 얼마나 가까운지에 영향을 받는다. 현재 로그에서 700~900대 shape가 나왔으므로 `opt=768`, `max=1024`가 합리적인 시작점이다.
+
+`--trt_concurrent`를 늘린다고 현재 story 처리 시간이 바로 줄어들 가능성은 낮다. 지금 worker가 문장을 순차적으로 CosyVoice에 보내는 구조라면 TRT context가 여러 개 있어도 동시에 쓸 일이 별로 없다. 병렬 요청 구조를 만들기 전에는 `--trt_concurrent 1`이 가장 안전하다.
+
+페이지에서 `Unexpected worker error`가 떴던 원인은 서버 실패가 아니라 AI worker timeout일 가능성이 높다. CosyVoice 서버는 200 OK를 반환했지만 한 요청이 60초를 넘었고, AI worker 기본 timeout이 60초였다. 느린 요청을 허용하려면 worker 환경 변수에 다음 값을 둔다.
+
+```bash
+COSYVOICE_TIMEOUT_SEC=180
+```
+
+TRT 적용 후에는 요청당 시간이 10초 안팎으로 줄었기 때문에 timeout 문제는 크게 줄어든다.
