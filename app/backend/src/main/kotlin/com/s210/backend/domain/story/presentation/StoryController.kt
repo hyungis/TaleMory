@@ -85,7 +85,7 @@ class StoryController(
         @PathVariable storyId: Long,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<StoryViewResponse>> {
-        val result = storyViewerService.findStoryView(user.username, storyId)
+        val result = storyViewerService.findStoryView(user.userId, storyId)
         return ResponseEntity.ok(ApiResponse(data = result))
     }
 
