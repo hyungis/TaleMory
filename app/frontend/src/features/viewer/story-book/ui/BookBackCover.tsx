@@ -6,18 +6,23 @@ import { useLetterTyping } from '../model/useLetterTyping'
 interface BookBackCoverProps {
   outro: OutroView | null
   onRestart: () => void
+  /** 앞표지와 같은 일러스트(`coverIllustrationUrl`) — 뒷표지 배경에 full-bleed 로 깔린다. */
+  illustrationUrl: string | null
 }
 
 /**
  * 뒷표지 + 편지지 애니메이션.
- * 편지지가 위에서 날아 착지 → 글자 타이핑 → 서명/버튼 노출 순서.
+ * 표지 일러스트가 full-bleed 로 배경에 깔리고, 그 위에 다크 그라디언트 오버레이,
+ * 그 위에 편지지가 날아 착지 → 글자 타이핑 → 서명/버튼 순서로 노출.
  * outro 데이터가 없으면 기본 마무리 멘트 사용.
  */
-export function BookBackCover({ outro, onRestart }: BookBackCoverProps) {
+export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCoverProps) {
   const paperRef = useRef<HTMLDivElement>(null)
   const [isLanded, setIsLanded] = useState(false)
   const text = outro?.outroText ?? '따뜻한 이야기를 함께 읽어주셔서 고마워요.'
-  const signature = outro?.signature ?? '— 동화책 작가'
+  /* 사용자가 서명을 비워둔 경우엔 라인 자체를 숨김 — 기본 폴백("동화책 작가") 으로 메우면
+     사용자 의도(익명 편지)와 어긋남. trim 후 빈 문자열도 미작성으로 간주. */
+  const signature = outro?.signature?.trim() || null
   const audioUrl = outro?.audioUrl ?? null
 
   const [replayKey, setReplayKey] = useState(0)
@@ -50,6 +55,9 @@ export function BookBackCover({ outro, onRestart }: BookBackCoverProps) {
 
   return (
     <div className="sb-back-cover">
+      {illustrationUrl && (
+        <img src={illustrationUrl} alt="" className="sb-back-cover-illust" />
+      )}
       <div
         ref={paperRef}
         key={replayKey}
@@ -67,7 +75,9 @@ export function BookBackCover({ outro, onRestart }: BookBackCoverProps) {
           })}
         </p>
 
-        <p className={`sb-letter-signature ${isComplete ? 'is-visible' : ''}`}>{signature}</p>
+        {signature && (
+          <p className={`sb-letter-signature ${isComplete ? 'is-visible' : ''}`}>{signature}</p>
+        )}
 
         <div className={`sb-letter-controls ${isComplete ? 'is-visible' : ''}`}>
           <button className="sb-letter-btn" onClick={handleReplay}>

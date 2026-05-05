@@ -28,7 +28,6 @@ export function BookSpreadLeft({ scene, pageIndex, onIllustrationClick }: LeftPa
             <ImageIcon className="sb-illust-empty-icon" strokeWidth={1.5} />
           )}
         </button>
-        <p className="sb-illust-caption">Page {scene.pageNumber} 장면</p>
       </div>
       <span className="sb-page-num left">{pageIndex * 2 + 1}</span>
     </div>
@@ -92,7 +91,6 @@ export function BookSpreadRight({
           </button>
         )}
       </div>
-      <h2 className="sb-body-title">{`장면 ${scene.pageNumber}`}</h2>
       <p className="sb-body-text" style={bodyStyle}>
         {scene.sentences.map(sentence => {
           const isActive = activeSentenceId === sentence.sentenceId

@@ -3,19 +3,44 @@ import type { StoryView } from '../model/types'
 /**
  * 뷰어 UI 개발용 Mock 데이터.
  * 로그인 + 실제 동화 생성 플로우 완성 후 BE 응답으로 교체.
+ *
+ * 구조:
+ *  - `coverIllustrationUrl` 와 `scenes[0]` (pageNumber=0) 가 같은 이미지를 가리키도록 — BE 의
+ *    `StoryViewerService` 가 `coverIllustrationUrl = scenes.firstOrNull()?.illustrationUrl` 로
+ *    내려주는 형태와 동일하게 유지. 뷰어는 표지 일러스트는 `coverIllustrationUrl` 로만 그리고,
+ *    scene 0 는 본문 rotation 에서 제외 (FE 가 slice(1) 로 컷팅) 한다.
+ *  - picsum.photos seed 기반 URL — 같은 seed 면 매번 같은 그림이 와서 디자인 검증 안정적.
  */
+
+const COVER_URL = 'https://picsum.photos/seed/talemory-cover-haesol/960/720'
+const PAGE_URLS = [
+  'https://picsum.photos/seed/talemory-page1-airport/960/720',
+  'https://picsum.photos/seed/talemory-page2-window/960/720',
+  'https://picsum.photos/seed/talemory-page3-captain/960/720',
+  'https://picsum.photos/seed/talemory-page4-sunset/960/720',
+]
+
 export const MOCK_STORY_VIEW: StoryView = {
   storyId: 1,
   title: '해솔이의 첫 비행 이야기',
   mainCharacter: { name: '해솔' },
-  coverIllustrationUrl: null,
+  coverIllustrationUrl: COVER_URL,
   publishedAt: '2026-04-20T12:00:00',
 
   scenes: [
+    // 표지 (page 0) — 본문 rotation 에서 제외되지만 BE 응답 형태와 맞추려 포함.
+    {
+      sceneId: 100,
+      pageNumber: 0,
+      illustrationUrl: COVER_URL,
+      characterAnchors: [],
+      sentences: [],
+    },
+    // 본문 page 1
     {
       sceneId: 101,
       pageNumber: 1,
-      illustrationUrl: null,
+      illustrationUrl: PAGE_URLS[0],
       characterAnchors: [],
       sentences: [
         {
@@ -47,10 +72,11 @@ export const MOCK_STORY_VIEW: StoryView = {
         },
       ],
     },
+    // 본문 page 2
     {
       sceneId: 102,
       pageNumber: 2,
-      illustrationUrl: null,
+      illustrationUrl: PAGE_URLS[1],
       characterAnchors: [],
       sentences: [
         {
@@ -82,10 +108,11 @@ export const MOCK_STORY_VIEW: StoryView = {
         },
       ],
     },
+    // 본문 page 3
     {
       sceneId: 103,
       pageNumber: 3,
-      illustrationUrl: null,
+      illustrationUrl: PAGE_URLS[2],
       characterAnchors: [],
       sentences: [
         {
@@ -117,10 +144,11 @@ export const MOCK_STORY_VIEW: StoryView = {
         },
       ],
     },
+    // 본문 page 4
     {
       sceneId: 104,
       pageNumber: 4,
-      illustrationUrl: null,
+      illustrationUrl: PAGE_URLS[3],
       characterAnchors: [],
       sentences: [
         {

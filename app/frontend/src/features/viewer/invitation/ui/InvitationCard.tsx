@@ -25,9 +25,8 @@ export function InvitationCard({
   onBack,
 }: InvitationCardProps) {
   const title = story.title?.trim() || '제목 없는 동화'
-  const author = story.mainCharacter?.name?.trim() || '우리 가족'
   const pageCount = story.scenes.length
-  const monthLabel = formatMonthLabel(story.publishedAt)
+  const publishedAtLabel = formatPublishedAtLabel(story.publishedAt)
 
   return (
     <section className="iv-shell">
@@ -108,20 +107,15 @@ export function InvitationCard({
           <h1 className="iv-cover-title">{title}</h1>
           <div className="iv-cover-title-underline" aria-hidden="true" />
 
-          <div className="iv-cover-author">
-            <span className="iv-by">written by</span>{' '}
-            <span className="iv-name">{author}</span>
-          </div>
-
           <div className="iv-meta-row">
             <span className="iv-meta-pill">
               <span className="iv-meta-dot" aria-hidden="true" />
               {pageCount} 페이지
             </span>
-            {monthLabel && (
+            {publishedAtLabel && (
               <span className="iv-meta-pill">
                 <span className="iv-meta-dot iv-rust" aria-hidden="true" />
-                {monthLabel}
+                {publishedAtLabel}
               </span>
             )}
             <span className="iv-meta-pill">
@@ -212,10 +206,10 @@ export function InvitationCard({
   )
 }
 
-/** "2026년 5월" 같은 발행 월 라벨. publishedAt 없으면 null. */
-function formatMonthLabel(publishedAt: string | null): string | null {
+/** "2026년 5월 6일" 같은 발행일 라벨. publishedAt 없으면 null. */
+function formatPublishedAtLabel(publishedAt: string | null): string | null {
   if (!publishedAt) return null
   const date = new Date(publishedAt)
   if (Number.isNaN(date.getTime())) return null
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
 }
