@@ -15,7 +15,7 @@ from app.services.final_illustration_service import (
     generate_final_illustration_item,
     revise_final_illustration,
 )
-from app.worker_async import ApiJob, publisher_channel, submit_image_api_message, submit_message
+from app.worker_async import ApiJob, publisher_channel, submit_replicate_image_api_message, submit_message
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def _dispatch_generate_batch_message(channel: Any, delivery_tag: int, body: byte
 
 
 def _dispatch_generate_item_message(channel: Any, delivery_tag: int, body: bytes) -> None:
-    submit_image_api_message(
+    submit_replicate_image_api_message(
         consumer_channel=channel,
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_generate_item_job(body),
@@ -60,7 +60,7 @@ def _dispatch_generate_item_message(channel: Any, delivery_tag: int, body: bytes
 
 
 def _dispatch_revise_message(channel: Any, delivery_tag: int, body: bytes) -> None:
-    submit_image_api_message(
+    submit_replicate_image_api_message(
         consumer_channel=channel,
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_revise_job(body),

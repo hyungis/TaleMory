@@ -16,7 +16,7 @@ from app.services.storyboard_image_service import (
     generate_storyboard_image_item,
     regenerate_storyboard_image,
 )
-from app.worker_async import ApiJob, publisher_channel, submit_image_api_message, submit_message
+from app.worker_async import ApiJob, publisher_channel, submit_gemini_image_api_message, submit_message
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def _dispatch_generate_item_message(
     delivery_tag: int,
     body: bytes,
 ) -> None:
-    submit_image_api_message(
+    submit_gemini_image_api_message(
         consumer_channel=channel,
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_generate_item_job(body),
@@ -73,7 +73,7 @@ def _dispatch_regenerate_message(
     delivery_tag: int,
     body: bytes,
 ) -> None:
-    submit_image_api_message(
+    submit_gemini_image_api_message(
         consumer_channel=channel,
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_regenerate_job(body),
