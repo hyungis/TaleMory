@@ -232,31 +232,82 @@
 .about-sample__viewer-wrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  border-radius: 16px;
+  /* 4/3 — 16/10 보다 세로로 더 여유. 펼친 책에서 영문+한글 번역이 스크롤 없이 한 화면에 들어가도록. */
+  aspect-ratio: 4 / 3;
   overflow: hidden;
-  box-shadow:
-    0 4px 0 #e8dcc8,
-    0 12px 40px rgba(107, 90, 62, 0.18);
-  border: 3px solid #e8dcc8;
+  /* border / box-shadow / border-radius 제거 → about 페이지 배경에 자연스럽게 녹아들게. */
 }
 
-/* 뷰어의 전체화면 스타일을 컨테이너에 맞게 오버라이드 */
+/* 뷰어의 전체화면 스타일을 컨테이너에 맞게 오버라이드.
+   배경/노이즈도 제거 → 컨테이너가 about-page 배경 그대로 노출. */
 .about-sample__viewer-wrapper .sb-room {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   padding: 20px 40px;
+  background: transparent;
+}
+.about-sample__viewer-wrapper .sb-room::before,
+.about-sample__viewer-wrapper .sb-room::after {
+  display: none;
 }
 
+/* 펼친 책: 폭을 넓혀 본문 + 한글 해석이 한 화면에 들어가고 삽화도 안 짤리게. */
 .about-sample__viewer-wrapper .sb-shell {
-  width: min(900px, 100%);
+  width: min(1100px, 100%);
 }
 
-/* 임베드 모드에서는 전체화면/닫기 버튼 숨김 */
+/* 표지 단면: 가로로 너무 길어 보이는 문제 → width: auto 로 base aspect-ratio (2/2.7) 가
+   세로 책 비율을 유지하도록. */
+.about-sample__viewer-wrapper .sb-shell.is-cover {
+  width: auto;
+}
+
+/* 표지 일러스트가 작은 동그라미로 박혀있던 걸 → 표지 전체를 덮도록 풀-블리드 이미지로 전환.
+   원래 cover-single 의 sage→caramel 그라데이션 위에 작게 떠있던 형태였음. */
+.about-sample__viewer-wrapper .sb-cover-illust {
+  position: absolute;
+  inset: 0;
+  z-index: 1;            /* 텍스트 (z-index 3) 와 어두운 오버레이 (z-index 2) 보다 아래 */
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: none;
+  border-radius: inherit;
+  box-shadow: none;
+  object-fit: cover;
+}
+/* 풀-블리드 이미지 위 텍스트 가독성 확보용 어두운 그라데이션. */
+.about-sample__viewer-wrapper .sb-cover-single::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.55) 100%);
+  pointer-events: none;
+}
+/* dashed 안쪽 테두리 제거 — 풀-블리드 이미지와 어울리지 않음. */
+.about-sample__viewer-wrapper .sb-cover-single::after {
+  display: none;
+}
+/* hint 도 텍스트 z-index 위로 끌어올림 (이미지·오버레이 위로). */
+.about-sample__viewer-wrapper .sb-cover-hint {
+  z-index: 3;
+}
+
+/* 임베드 모드에서는 전체화면/닫기 버튼 숨김 (mode="preview" 가 컴포넌트에서도 숨기지만
+   레거시 호출처 호환을 위해 CSS 단도 유지). */
 .about-sample__viewer-wrapper .sb-float-top {
   display: none;
+}
+
+/* 한글 번역을 영문 본문에서 더 아래로 띄우고 글자도 키움 — 책 크기가 커진 만큼 시각적 분리를 강조. */
+.about-sample__viewer-wrapper .sb-body-translation {
+  margin-top: 48px;
+  padding-top: 28px;
+  font-size: 1.6rem;
+  line-height: 1.9;
 }
 
 .about-sample__loading {
@@ -399,11 +450,7 @@
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
-  .about-sample__viewer-wrapper {
-    aspect-ratio: 4 / 3;
-    border-radius: 12px;
-  }
-
+  /* aspect-ratio 4/3 은 메인 룰에 이미 동일 — 명시적으로 두지 않음. border-radius 도 메인에서 제거됨. */
   .about-sample__viewer-wrapper .sb-room {
     padding: 12px 16px;
   }
