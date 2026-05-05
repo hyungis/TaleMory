@@ -5,6 +5,7 @@ from typing import Any
 from app.core.config import settings
 from app.mq.client import create_channel, create_connection, declare_ai_topology
 from app.mq.publisher import StoryResultPublisher
+from app.schemas.mq_story_sentence_translation import StorySentenceTranslationJobMessage
 from app.schemas.mq_storyboard import StoryError, StoryGenerateJobMessage, StoryRegenerateJobMessage
 from app.schemas.mq_storyboard_summary import (
     StorySummaryGenerateJobMessage,
@@ -20,6 +21,7 @@ from app.services.storyboard_summary_service import (
     regenerate_storyboard_summary,
 )
 from app.services.storyboard_service import generate_storyboard, regenerate_storyboard
+from app.services.story_sentence_translation_service import translate_story_sentences
 from app.worker_async import ApiJob, publisher_channel, submit_story_api_message
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,12 @@ def register_storyboard_consumers(channel: Any) -> None:
     channel.basic_consume(
         queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_summary_regenerate_message(
+            ch, method.delivery_tag, body
+        ),
+    )
+    channel.basic_consume(
+        queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE,
+        on_message_callback=lambda ch, method, properties, body: _dispatch_sentence_translate_message(
             ch, method.delivery_tag, body
         ),
     )
@@ -115,6 +123,23 @@ def _dispatch_regenerate_message(
     )
 
 
+def _dispatch_sentence_translate_message(
+    channel: Any,
+    delivery_tag: int,
+    body: bytes,
+) -> None:
+    logger.info(
+        "[SENTENCE:TRANSLATE] dispatch deliveryTag=%d, queue=%s, bytes=%d",
+        delivery_tag, settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE, len(body),
+    )
+    submit_story_api_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        job_factory=lambda: _create_sentence_translate_job(body),
+        task_name="translate story sentences message",
+    )
+
+
 def _dispatch_summary_regenerate_message(
     channel: Any,
     delivery_tag: int,
@@ -159,6 +184,19 @@ def _create_summary_generate_job(body: bytes) -> ApiJob:
         task=lambda: generate_storyboard_summary(request),
         on_success=lambda result: _publish_summary_result(message, story_id, result, "GENERATE"),
         on_error=lambda exc: _publish_summary_failure(message, story_id, exc, "GENERATE"),
+    )
+
+
+def _create_sentence_translate_job(body: bytes) -> ApiJob:
+    message = StorySentenceTranslationJobMessage.model_validate_json(body)
+    logger.info(
+        "[SENTENCE:TRANSLATE] received jobId=%s, storyId=%s, pageNumber=%s, koreanLen=%d",
+        message.jobId, message.storyId, message.pageNumber, len(message.payload.koreanText),
+    )
+    return ApiJob(
+        task=lambda: translate_story_sentences(message.payload),
+        on_success=lambda result: _publish_sentence_translation_result(message, result),
+        on_error=lambda exc: _publish_sentence_translation_failure(message, exc),
     )
 
 
@@ -298,6 +336,47 @@ def _publish_summary_result(
         "GEN" if action == "GENERATE" else "REGEN",
         message.jobId, len(result.summaryKo), result.usage.costUsd,
     )
+    return True
+
+
+def _publish_sentence_translation_result(
+    message: StorySentenceTranslationJobMessage,
+    result: Any,
+) -> bool:
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        publisher.publish_sentence_translation_result(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            page_number=message.pageNumber,
+            payload=result,
+        )
+    logger.info(
+        "[SENTENCE:TRANSLATE] published result jobId=%s, storyId=%s, pageNumber=%s, sentenceCount=%d, costUsd=%s",
+        message.jobId, message.storyId, message.pageNumber, result.sentenceCount, result.usage.costUsd,
+    )
+    return True
+
+
+def _publish_sentence_translation_failure(
+    message: StorySentenceTranslationJobMessage,
+    exc: BaseException,
+) -> bool:
+    if isinstance(exc, ValueError):
+        code = "TRANSLATE_STORY_SENTENCES_ERROR"
+    elif isinstance(exc, RuntimeError):
+        code = "TRANSLATE_STORY_SENTENCES_RUNTIME_ERROR"
+    else:
+        raise exc
+
+    with publisher_channel() as channel:
+        publisher = StoryResultPublisher(channel)
+        publisher.publish_sentence_translation_failure(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            page_number=message.pageNumber,
+            error=StoryError(code=code, message=str(exc)),
+        )
     return True
 
 
@@ -447,6 +526,44 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
     logger.info(
         "[SUMMARY:REGEN] published result — jobId=%s, summaryKoLen=%d, costUsd=%s",
         message.jobId, len(result.summaryKo), result.usage.costUsd,
+    )
+
+
+def handle_sentence_translate_message(body: bytes, publisher: StoryResultPublisher) -> None:
+    message = StorySentenceTranslationJobMessage.model_validate_json(body)
+    logger.info(
+        "[SENTENCE:TRANSLATE] received jobId=%s, storyId=%s, pageNumber=%s, koreanLen=%d",
+        message.jobId, message.storyId, message.pageNumber, len(message.payload.koreanText),
+    )
+
+    try:
+        result = translate_story_sentences(message.payload)
+    except ValueError as exc:
+        publisher.publish_sentence_translation_failure(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            page_number=message.pageNumber,
+            error=StoryError(code="TRANSLATE_STORY_SENTENCES_ERROR", message=str(exc)),
+        )
+        return
+    except RuntimeError as exc:
+        publisher.publish_sentence_translation_failure(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            page_number=message.pageNumber,
+            error=StoryError(code="TRANSLATE_STORY_SENTENCES_RUNTIME_ERROR", message=str(exc)),
+        )
+        return
+
+    publisher.publish_sentence_translation_result(
+        job_id=message.jobId,
+        story_id=message.storyId,
+        page_number=message.pageNumber,
+        payload=result,
+    )
+    logger.info(
+        "[SENTENCE:TRANSLATE] published result jobId=%s, storyId=%s, pageNumber=%s, sentenceCount=%d, costUsd=%s",
+        message.jobId, message.storyId, message.pageNumber, result.sentenceCount, result.usage.costUsd,
     )
 
 

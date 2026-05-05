@@ -115,3 +115,16 @@ class StoryboardRegenerateRequest(BaseModel):
     originalRequest: StoryboardGenerateRequest
     currentStoryboard: StoryboardGenerateResponse
     feedbackInstruction: str = Field(..., min_length=1, max_length=2000)
+
+
+class StorySentenceTranslationRequest(BaseModel):
+    koreanText: str = Field(..., min_length=1, max_length=10000)
+
+
+class StorySentenceTranslationResponse(BaseModel):
+    sentences: list[StorySentence] = Field(..., min_length=1)
+    englishText: str
+    koreanText: str
+    sentenceCount: int
+    wordCount: int
+    usage: UsageInfo

@@ -57,6 +57,13 @@ def declare_ai_topology(channel: Any) -> None:
         routing_key=settings.RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY,
     )
 
+    channel.queue_declare(queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY,
+    )
+
     channel.queue_declare(queue=settings.RABBITMQ_REGENERATE_QUEUE, durable=True)
     channel.queue_bind(
         queue=settings.RABBITMQ_REGENERATE_QUEUE,

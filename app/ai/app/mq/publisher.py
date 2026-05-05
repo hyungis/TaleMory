@@ -24,6 +24,10 @@ from app.schemas.mq_storyboard_image import (
     StoryboardImageSuccessPayload,
 )
 from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
+from app.schemas.mq_story_sentence_translation import (
+    StorySentenceTranslationFailureEnvelope,
+    StorySentenceTranslationSuccessEnvelope,
+)
 from app.schemas.mq_storyboard_summary import StorySummaryFailureEnvelope, StorySummarySuccessEnvelope
 from app.schemas.mq_tts import StoryTtsResultPayload, TtsError, TtsFailureEnvelope, TtsSuccessEnvelope
 from app.schemas.mq_tts_preview import (
@@ -33,6 +37,7 @@ from app.schemas.mq_tts_preview import (
     PreviewTtsSuccessEnvelope,
 )
 from app.schemas.storyboard import StoryboardGenerateResponse
+from app.schemas.storyboard import StorySentenceTranslationResponse
 from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
 
@@ -113,6 +118,42 @@ class StoryResultPublisher:
         )
         self._publish(
             routing_key=_summary_failed_routing_key_for_action(action),
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_sentence_translation_result(
+        self,
+        job_id: str,
+        story_id: int | None,
+        page_number: int | None,
+        payload: StorySentenceTranslationResponse,
+    ) -> None:
+        envelope = StorySentenceTranslationSuccessEnvelope(
+            jobId=job_id,
+            storyId=story_id,
+            pageNumber=page_number,
+            payload=payload,
+        )
+        self._publish(
+            routing_key=settings.RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY,
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_sentence_translation_failure(
+        self,
+        job_id: str,
+        story_id: int | None,
+        page_number: int | None,
+        error: StoryError,
+    ) -> None:
+        envelope = StorySentenceTranslationFailureEnvelope(
+            jobId=job_id,
+            storyId=story_id,
+            pageNumber=page_number,
+            error=error,
+        )
+        self._publish(
+            routing_key=settings.RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY,
             message=envelope.model_dump(mode="json"),
         )
 
