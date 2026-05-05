@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
-import { ROUTES } from '../../shared/constants'
 import { BookBackCover, StoryBookViewer, useSampleStoryViewQuery } from '../../features/viewer'
 import { BookshelfDoodles } from '../../features/bookshelf'
 import './styles/about.css'
