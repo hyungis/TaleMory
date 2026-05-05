@@ -15,11 +15,11 @@ EmotionType = Annotated[
         "HAPPY",
         "EXCITED",
         "CALM",
+        "CURIOUS",
+        "SURPRISED",
         "SAD",
-        "SOFT",
-        "SERIOUS",
-        "ANGRY",
-        "NARRATION",
+        "TENDER",
+        "BRAVE",
     ],
     _emotion_upper,
 ]
@@ -85,7 +85,6 @@ class StorySentenceRequest(BaseModel):
 class StoryTtsOptions(BaseModel):
     defaultEmotion: EmotionType
     defaultStylePrompt: str | None = None
-    generateFullBookAudio: bool = True
     speakingRate: float | None = None
     pitch: float | None = None
     volumeGain: float | None = None

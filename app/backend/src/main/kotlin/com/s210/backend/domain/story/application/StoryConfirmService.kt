@@ -236,6 +236,10 @@ class StoryConfirmService(
 
         val sentenceCount = allSentences.size
         val cacheMisses = missSentences.size
+        log.info(
+            "[TTS:CONFIRM:CACHE] storyId={}, voiceProfileId={}, sentenceCount={}, cacheHits={}, cacheMisses={}",
+            storyId, voiceProfileId, sentenceCount, cacheHits, cacheMisses,
+        )
 
         // 12) Job status Redis HSET (best-effort)
         try {
@@ -251,6 +255,11 @@ class StoryConfirmService(
 
         // 13) MQ publish (cache miss 있을 때만) 또는 즉시 SUCCESS
         val finalStatus = if (cacheMisses > 0) {
+            val publishStarted = System.nanoTime()
+            log.info(
+                "[TTS:CONFIRM:PUBLISH:START] jobId={}, storyId={}, voiceProfileId={}, sentenceCount={}",
+                ttsJob.id, storyId, voiceProfileId, cacheMisses,
+            )
             ttsService.publish(
                     StoryTtsJobMessage(
                         jobId = ttsJob.id.toString(),
@@ -264,6 +273,10 @@ class StoryConfirmService(
                             sentences = missSentences,
                         ),
                     )
+            )
+            log.info(
+                "[TTS:CONFIRM:PUBLISH:DONE] jobId={}, storyId={}, sentenceCount={}, elapsedMs={}",
+                ttsJob.id, storyId, cacheMisses, (System.nanoTime() - publishStarted) / 1_000_000,
             )
             JobStatus.PENDING
         } else {

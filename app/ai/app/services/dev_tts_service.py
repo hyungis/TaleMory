@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
+from time import perf_counter
 import wave
 from datetime import UTC, datetime
 from io import BytesIO
@@ -22,6 +24,7 @@ from app.services.storage_service import (
     store_file,
 )
 
+logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 22050
 SAMPLE_WIDTH = 2
@@ -34,16 +37,20 @@ EMOTION_INSTRUCTIONS = {
     "HAPPY": "Happy.",
     "EXCITED": "Excited.",
     "CALM": "Calm.",
+    "CURIOUS": "Curious.",
+    "SURPRISED": "Surprised.",
     "SAD": "Sad.",
-    "SOFT": "Soft.",
-    "SERIOUS": "Serious.",
-    "ANGRY": "Angry.",
-    "NARRATION": "Calm narration.",
+    "TENDER": "Tender.",
+    "BRAVE": "Brave.",
 }
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _elapsed_ms(started: float) -> int:
+    return int((perf_counter() - started) * 1000)
 
 
 def _ensure_parent(path: Path) -> None:
@@ -131,8 +138,14 @@ def resolve_reference_voice(
     reference_audio_url: str | None = None,
     reference_audio_s3_key: str | None = None,
 ) -> Path:
+    started = perf_counter()
     reference_path = _voice_reference_path(voice_id)
     if reference_path.exists():
+        logger.info(
+            "[TTS:REFERENCE] voiceId=%s source=cache elapsedMs=%d",
+            voice_id,
+            _elapsed_ms(started),
+        )
         return reference_path
 
     remote_s3_key = reference_audio_s3_key
@@ -142,9 +155,24 @@ def resolve_reference_voice(
         remote_url = None
 
     if remote_s3_key:
+        download_started = perf_counter()
         audio_bytes = download_s3_bytes(remote_s3_key)
+        logger.info(
+            "[TTS:REFERENCE:DOWNLOAD] voiceId=%s source=s3 key=%s bytes=%d elapsedMs=%d",
+            voice_id,
+            remote_s3_key,
+            len(audio_bytes),
+            _elapsed_ms(download_started),
+        )
     elif remote_url and _is_http_url(remote_url):
+        download_started = perf_counter()
         audio_bytes = _download_url_bytes(remote_url)
+        logger.info(
+            "[TTS:REFERENCE:DOWNLOAD] voiceId=%s source=url bytes=%d elapsedMs=%d",
+            voice_id,
+            len(audio_bytes),
+            _elapsed_ms(download_started),
+        )
     else:
         raise FileNotFoundError(
             f"Reference voice not found locally and no downloadable remote source provided: {voice_id}"
@@ -152,6 +180,11 @@ def resolve_reference_voice(
 
     _ensure_parent(reference_path)
     reference_path.write_bytes(audio_bytes)
+    logger.info(
+        "[TTS:REFERENCE] voiceId=%s source=remote elapsedMs=%d",
+        voice_id,
+        _elapsed_ms(started),
+    )
     return reference_path
 
 
@@ -189,37 +222,6 @@ def _voice_metadata(voice_id: str) -> dict[str, Any]:
     if not metadata_path.exists():
         raise FileNotFoundError(voice_id)
     return _read_json(metadata_path)
-
-
-def _concat_wavs(paths: list[Path], output_path: Path, pause_ms: int = 900) -> None:
-    if not paths:
-        raise ValueError("No wav files to concatenate")
-
-    _ensure_parent(output_path)
-    with wave.open(str(paths[0]), "rb") as first_file:
-        nchannels = first_file.getnchannels()
-        sampwidth = first_file.getsampwidth()
-        framerate = first_file.getframerate()
-
-    with wave.open(str(output_path), "wb") as out_file:
-        out_file.setnchannels(nchannels)
-        out_file.setsampwidth(sampwidth)
-        out_file.setframerate(framerate)
-
-        silence_frame_count = int(framerate * max(0, pause_ms) / 1000)
-        silence = b"\x00" * silence_frame_count * nchannels * sampwidth
-
-        for index, path in enumerate(paths):
-            with wave.open(str(path), "rb") as in_file:
-                if (
-                    in_file.getnchannels() != nchannels
-                    or in_file.getsampwidth() != sampwidth
-                    or in_file.getframerate() != framerate
-                ):
-                    raise ValueError("All story sentence wav files must share the same audio parameters")
-                out_file.writeframes(in_file.readframes(in_file.getnframes()))
-                if index < len(paths) - 1 and silence:
-                    out_file.writeframes(silence)
 
 
 def create_pending_manifest(job_id: str | int, job_type: str, extra: dict[str, Any]) -> None:
@@ -342,13 +344,23 @@ def generate_preview(
     reference_audio_url: str | None = None,
     reference_audio_s3_key: str | None = None,
 ) -> dict[str, Any]:
+    started = perf_counter()
     reference_path = resolve_reference_voice(voice_id, reference_audio_url, reference_audio_s3_key)
 
     preview_id = f"preview_{uuid4().hex[:12]}"
+    cosy_started = perf_counter()
     audio_bytes, resolved_format = synthesize_cross_lingual_tts(
         text=_cross_lingual_text(text),
         prompt_wav_path=reference_path,
         audio_format=output_format,
+    )
+    logger.info(
+        "[TTS_PREVIEW:COSYVOICE] previewId=%s voiceId=%s textLen=%d audioBytes=%d elapsedMs=%d",
+        preview_id,
+        voice_id,
+        len(text),
+        len(audio_bytes),
+        _elapsed_ms(cosy_started),
     )
     output_path = (
         settings.TTS_STORAGE_ROOT
@@ -357,8 +369,24 @@ def generate_preview(
         / voice_id
         / f"{preview_id}.{resolved_format}"
     )
+    store_started = perf_counter()
     stored_audio = store_bytes(output_path, audio_bytes, _audio_content_type(resolved_format))
+    logger.info(
+        "[TTS_PREVIEW:STORE] previewId=%s voiceId=%s storageMode=%s elapsedMs=%d audioUrl=%s",
+        preview_id,
+        voice_id,
+        settings.TTS_STORAGE_MODE,
+        _elapsed_ms(store_started),
+        stored_audio.url,
+    )
     duration_ms = _duration_ms_from_audio(audio_bytes, resolved_format, text)
+    logger.info(
+        "[TTS_PREVIEW:GENERATE:DONE] previewId=%s voiceId=%s durationMs=%d elapsedMs=%d",
+        preview_id,
+        voice_id,
+        duration_ms,
+        _elapsed_ms(started),
+    )
 
     return {
         "previewId": preview_id,
@@ -393,6 +421,7 @@ def generate_story_tts_result(
     request: dict[str, Any],
     progress_callback: Callable[[int], None] | None = None,
 ) -> dict[str, Any]:
+    started = perf_counter()
     voice_id = request["voiceId"]
     reference_path = resolve_reference_voice(
         voice_id,
@@ -401,22 +430,24 @@ def generate_story_tts_result(
     )
 
     story_id = request["storyId"]
-    sentence_paths: list[Path] = []
-    items: list[dict[str, Any]] = []
 
     default_emotion = request["options"]["defaultEmotion"]
     default_style_prompt = request["options"].get("defaultStylePrompt")
     output_format = request.get("format", "wav")
+    items: list[dict[str, Any]] = []
 
     for index, sentence in enumerate(request["sentences"], start=1):
         sentence_id = sentence["sentenceId"]
         emotion = sentence.get("emotion") or default_emotion
         style_prompt = sentence.get("stylePrompt") or default_style_prompt
+        sentence_started = perf_counter()
+        cosy_started = perf_counter()
         audio_bytes, resolved_format = synthesize_cross_lingual_tts(
             text=_cross_lingual_text(sentence["text"]),
             prompt_wav_path=reference_path,
             audio_format=output_format,
         )
+        cosy_elapsed = _elapsed_ms(cosy_started)
         sentence_path = (
             settings.TTS_STORAGE_ROOT
             / "generated"
@@ -425,9 +456,22 @@ def generate_story_tts_result(
             / "sentences"
             / f"{sentence_id}.{resolved_format}"
         )
+        store_started = perf_counter()
         stored_sentence = store_bytes(sentence_path, audio_bytes, _audio_content_type(resolved_format))
-        if resolved_format == "wav":
-            sentence_paths.append(sentence_path)
+        store_elapsed = _elapsed_ms(store_started)
+        logger.info(
+            "[TTS:STORY:SENTENCE] storyId=%s voiceId=%s sentenceId=%s index=%d/%d textLen=%d audioBytes=%d cosyMs=%d storeMs=%d elapsedMs=%d",
+            story_id,
+            voice_id,
+            sentence_id,
+            index,
+            len(request["sentences"]),
+            len(sentence["text"]),
+            len(audio_bytes),
+            cosy_elapsed,
+            store_elapsed,
+            _elapsed_ms(sentence_started),
+        )
         items.append(
             {
                 "sentenceId": sentence_id,
@@ -461,24 +505,23 @@ def generate_story_tts_result(
         "summary": {
             "sentenceCount": len(items),
         },
+        "usage": {
+            "model": "cosyvoice",
+            "inputTokens": None,
+            "outputTokens": None,
+            "totalTokens": None,
+            "costUsd": None,
+            "promptTemplateVersion": "tts_v1",
+        },
     }
 
-    if request["options"].get("generateFullBookAudio") and sentence_paths and all(
-        item["audio"]["format"] == "wav" for item in items
-    ):
-        full_book_path = (
-            settings.TTS_STORAGE_ROOT / "generated" / "story-tts" / str(story_id) / "full-book" / "full-book.wav"
-        )
-        _concat_wavs(sentence_paths, full_book_path)
-        stored_full_book = store_file(full_book_path, "audio/wav")
-        result["fullBookAudio"] = {
-            "audioUrl": stored_full_book.url,
-            "s3Key": stored_full_book.key,
-            "format": "wav",
-        }
-    elif request["options"].get("generateFullBookAudio"):
-        result["fullBookAudio"] = None
-
+    logger.info(
+        "[TTS:STORY:GENERATE:DONE] storyId=%s voiceId=%s sentenceCount=%d elapsedMs=%d",
+        story_id,
+        voice_id,
+        len(items),
+        _elapsed_ms(started),
+    )
     return result
 
 
