@@ -2,7 +2,11 @@ package com.s210.backend.domain.story.infrastructure.repository
 
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.model.StoryStatus
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
 interface StoryRepository : JpaRepository<Story, Long> {
@@ -20,6 +24,10 @@ interface StoryRepository : JpaRepository<Story, Long> {
     fun findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId: Long): List<Story>
 
     fun findByIdAndUserId(id: Long, userId: Long): Story?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Story s WHERE s.id = :id")
+    fun findByIdForUpdate(@Param("id") id: Long): Story?
 
     /**
      * DRAFT 만료 배치 잡 (`StoryExpirationJob`) 전용 조회.
