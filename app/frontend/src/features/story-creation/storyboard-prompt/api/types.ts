@@ -151,12 +151,6 @@ export interface GenerationJobResponse {
   startedAt: string | null
   finishedAt: string | null
   createdAt: string
-  /** 진행 중 단계 설명 (Task 16 BE 추가 — 옵셔널). */
-  currentStep?: string | null
-  /** 진행률 0~100 (Task 16 BE 추가 — 옵셔널). */
-  progress?: number | null
-  /** 현재 단계 식별자 (Task 16 BE 추가 — 옵셔널). */
-  stage?: string | null
 }
 
 export type JobTypeApi =
