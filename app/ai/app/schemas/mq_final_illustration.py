@@ -63,7 +63,7 @@ class FinalIllustrationSuccessEnvelope(BaseModel):
     jobId: str
     type: FinalIllustrationSuccessType
     storyId: int
-    pageNumber: int = Field(..., ge=1)
+    pageNumber: int = Field(..., ge=0)
     status: Literal["COMPLETED"] = "COMPLETED"
     payload: FinalIllustrationSuccessPayload
 
@@ -72,6 +72,6 @@ class FinalIllustrationFailureEnvelope(BaseModel):
     jobId: str
     type: FinalIllustrationFailureType
     storyId: int
-    pageNumber: int | None = Field(default=None, ge=1)
+    pageNumber: int | None = Field(default=None, ge=0)
     status: Literal["FAILED"] = "FAILED"
     error: FinalIllustrationError

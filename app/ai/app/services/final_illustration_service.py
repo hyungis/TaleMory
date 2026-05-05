@@ -32,6 +32,17 @@ _ONE_PIXEL_PNG = base64.b64decode(
 _REPLICATE_API_BASE = "https://api.replicate.com/v1"
 _REPLICATE_POLL_INTERVAL_SECONDS = 1.5
 _REPLICATE_TIMEOUT_SECONDS = 300
+_COVER_PAGE_NUMBER = 0
+_DEFAULT_COVER_SCENE_SUMMARY = (
+    "Front cover composition for the whole story. Show the main child and companions in a symbolic, "
+    "inviting scene that represents the journey, recurring motif, and emotional theme. This is not a "
+    "specific interior page."
+)
+_DEFAULT_COVER_IMAGE_PROMPT = (
+    "A children's storybook front cover composition. The main child stands in a welcoming story scene "
+    "with the recurring motif visible. Leave clean open space near the upper third for the title overlay. "
+    "Do not render text."
+)
 
 
 def generate_final_illustrations(request_model: FinalIllustrationGenerateRequest) -> FinalIllustrationGenerateResponse:
@@ -151,6 +162,28 @@ def _build_revise_item(
 
 def _build_final_prompt(item: FinalIllustrationGenerateItemRequest) -> str:
     additional_instruction = item.additionalInstruction.strip() if item.additionalInstruction else "None"
+    if item.pageNumber == _COVER_PAGE_NUMBER:
+        scene_summary = item.page.sceneSummary or _DEFAULT_COVER_SCENE_SUMMARY
+        image_prompt = item.page.imagePrompt or _DEFAULT_COVER_IMAGE_PROMPT
+        return "\n".join(
+            [
+                "Style prompt:",
+                item.stylePrompt,
+                "",
+                "Create a finished full-color children's storybook front cover illustration.",
+                "Follow image 1 as the rough cover layout reference while applying the rendering style from the style prompt.",
+                "This is the front cover for the whole story, not an interior page.",
+                "Make the composition iconic, inviting, polished, and representative of the full journey.",
+                "Preserve the main character identity, companion roles, broad composition, framing, and major visual motifs from image 1.",
+                "Leave clean open space near the upper third where the app can overlay the title later.",
+                "Absolutely no visible text anywhere in the image. Do not draw the title, page number, captions, signs, labels, or letters.",
+                f"Story title for context only, do not render it: {item.storyboard.title}",
+                f"Story synopsis: {item.storyboard.synopsis}",
+                f"Cover scene summary: {scene_summary}",
+                f"Cover intent: {image_prompt}",
+                f"Additional instruction: {additional_instruction}",
+            ]
+        )
 
     return "\n".join(
         [
@@ -231,15 +264,16 @@ def _resolve_reference_string(image_url: str | None, s3_key: str | None) -> str 
     if not s3_key:
         return None
 
+    downloaded = _download_reference_image_from_s3(s3_key)
+    if downloaded is not None:
+        mime_type, raw_bytes = downloaded
+        return f"data:{mime_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
+
     public_url = _resolve_story_asset_url(s3_key)
     if public_url:
         return public_url
 
-    downloaded = _download_reference_image_from_s3(s3_key)
-    if downloaded is None:
-        return None
-    mime_type, raw_bytes = downloaded
-    return f"data:{mime_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
+    return None
 
 
 def _resolve_story_asset_url(s3_key: str) -> str | None:
