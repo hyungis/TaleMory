@@ -11,7 +11,7 @@ data class StoryboardPageTexts(
 )
 
 fun StoryboardPage.pageTexts(objectMapper: ObjectMapper): StoryboardPageTexts {
-    val sentences = parseSentences(objectMapper)
+    val sentences = parseSentencesList(objectMapper)
     return StoryboardPageTexts(
         englishText = sentences.joinToString(" ") { it.englishText.trim() }.ifBlank { null },
         koreanText = sentences.joinToString(" ") { it.koreanText.trim() }.ifBlank { null },
@@ -19,7 +19,7 @@ fun StoryboardPage.pageTexts(objectMapper: ObjectMapper): StoryboardPageTexts {
 }
 
 fun StoryboardPage.replaceKoreanText(objectMapper: ObjectMapper, koreanText: String) {
-    val existing = parseSentences(objectMapper)
+    val existing = parseSentencesList(objectMapper)
     val englishText = existing.joinToString(" ") { it.englishText.trim() }.ifBlank { "" }
     val emotion = existing.firstOrNull()?.emotion ?: "NEUTRAL"
     sentences = objectMapper.writeValueAsString(
@@ -34,7 +34,7 @@ fun StoryboardPage.replaceKoreanText(objectMapper: ObjectMapper, koreanText: Str
     )
 }
 
-private fun StoryboardPage.parseSentences(objectMapper: ObjectMapper): List<StorySentenceDto> {
+fun StoryboardPage.parseSentencesList(objectMapper: ObjectMapper): List<StorySentenceDto> {
     val raw = sentences?.takeIf { it.isNotBlank() } ?: return emptyList()
     return runCatching {
         objectMapper.readValue<List<StorySentenceDto>>(raw)
