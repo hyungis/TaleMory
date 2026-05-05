@@ -1,15 +1,33 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { ROUTES } from '../../shared/constants'
-import { StoryBookViewer, useSampleStoryViewQuery } from '../../features/viewer'
+import { BookBackCover, StoryBookViewer, useSampleStoryViewQuery } from '../../features/viewer'
+import { BookshelfDoodles } from '../../features/bookshelf'
 import './styles/about.css'
+
+const OUTRO_TEXT = '오늘도 우리 가족과 함께 동화책을 읽어서 정말 행복했어!\n다음에 또 재밌는 이야기 읽자, 사랑해~'
+const OUTRO_SIGNATURE = '— 사랑하는 엄마가'
+/** 타이핑 완료 후 잠시 보여주고 다시 시작하는 간격 (ms) */
+const REPLAY_INTERVAL = OUTRO_TEXT.length * 75 + 3000
 
 export function AboutPage() {
   const navigate = useNavigate()
   const { status, data: sampleStory } = useSampleStoryViewQuery()
+  const [outroKey, setOutroKey] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => setOutroKey(k => k + 1), REPLAY_INTERVAL)
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <div className="about-page">
+      {/* 배경 doodles + 텍스처 */}
+      <div className="about-doodles-bg" aria-hidden="true">
+        <BookshelfDoodles />
+      </div>
+
       {/* 상단 네비게이션 */}
       <nav className="about-nav">
         <button
@@ -87,6 +105,25 @@ export function AboutPage() {
           {status === 'success' && sampleStory && (
             <StoryBookViewer story={sampleStory} onExit={() => {}} />
           )}
+        </div>
+      </section>
+
+      {/* 아웃트로 체험 섹션 */}
+      <section className="about-outro">
+        <h2 className="about-section-title">동화를 다 읽으면, 편지가 도착해요</h2>
+        <p className="about-outro__desc">
+          녹음한 목소리와 따뜻한 메시지가 편지지 위에 담겨요
+        </p>
+        <div className="about-outro__wrapper">
+          <BookBackCover
+            key={outroKey}
+            outro={{
+              outroText: OUTRO_TEXT,
+              audioUrl: null,
+              signature: OUTRO_SIGNATURE,
+            }}
+            onRestart={() => {}}
+          />
         </div>
       </section>
 
