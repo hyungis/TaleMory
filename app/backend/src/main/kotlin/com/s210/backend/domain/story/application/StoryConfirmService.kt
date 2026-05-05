@@ -3,6 +3,7 @@ package com.s210.backend.domain.story.application
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.common.redis.JobStatusRedisRepository
+import com.s210.backend.common.transaction.afterCommit
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -271,10 +272,11 @@ class StoryConfirmService(
             storyId, voiceProfileId, sentenceCount, cacheHits, cacheMisses,
         )
 
-        // 12) Job status Redis HSET (best-effort)
+        // 12) Job status Redis HSET (best-effort) — operational sidecar (진행률 sidecar).
         try {
             jobStatusRedisRepo.setStatus(
                 storyId = storyId,
+                jobType = JobType.TTS,
                 stage = "tts",
                 progress = if (sentenceCount > 0) (cacheHits * 100 / sentenceCount) else 100,
                 currentStep = "TTS 생성 중 ($cacheHits/$sentenceCount)",
@@ -316,10 +318,14 @@ class StoryConfirmService(
             try {
                 jobStatusRedisRepo.setStatus(
                     storyId = storyId,
+                    jobType = JobType.TTS,
                     stage = "done",
                     progress = 100,
                     currentStep = "TTS 완료 (전부 캐시 적중)",
                 )
+                // 즉시 SUCCESS 분기 — polling cache 도 함께 정리해 stale RUNNING 응답이 남지 않도록.
+                // afterCommit: ttsJob.status = SUCCESS 가 DB 반영된 다음에 invalidate (pre-commit race 차단).
+                afterCommit { jobStatusRedisRepo.invalidateJobResponse(ttsJob.id) }
             } catch (e: Exception) {
                 log.warn("Redis status finalize failed: {}", e.message)
             }

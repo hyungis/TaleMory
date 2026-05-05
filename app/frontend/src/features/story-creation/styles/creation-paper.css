@@ -1029,6 +1029,43 @@
   cursor: not-allowed;
 }
 
+/* 재생성 진행 중 오버레이 — hover/패널 토글과 무관하게 항상 보임.
+   새로고침 후 polling 으로 복귀했을 때도 즉시 "다시 그리는 중" 인지 가능하도록.
+   .cr-sketch-edit-btn(z-index 2) 보다 위(z-index 3)에 떠 있어 이미지/스피너 모두를 덮는다. */
+.cr-sketch-regen-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(20, 35, 15, 0.62);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  color: #fdf6dc;
+  border-radius: inherit;
+  animation: crFadeIn 0.2s ease-out;
+  pointer-events: none;
+  text-align: center;
+  padding: 12px;
+}
+.cr-sketch-regen-overlay-text {
+  font-family: var(--cr-font-gaegu);
+  font-weight: 700;
+  font-size: 16px;
+  margin: 6px 0 0;
+  letter-spacing: 0.2px;
+}
+.cr-sketch-regen-overlay-sub {
+  font-family: var(--cr-font-gaegu);
+  font-weight: 500;
+  font-size: 12px;
+  opacity: 0.85;
+  margin: 0;
+}
+
 .cr-regen-panel {
   background: #fbf2da;
   border: 1.5px dashed var(--cr-caramel);

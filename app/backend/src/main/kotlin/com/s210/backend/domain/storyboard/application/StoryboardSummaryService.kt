@@ -4,6 +4,7 @@ import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.mq.RoutingKeys
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -50,6 +51,7 @@ class StoryboardSummaryService(
     private val storyBoardRepository: StoryBoardRepository,
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
+    private val jobStatusRedisRepo: JobStatusRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -238,6 +240,14 @@ class StoryboardSummaryService(
      */
     @Transactional(readOnly = true)
     fun findSummary(userId: Long, storyId: Long): SummaryResponseData {
+        // 1) Cache-aside read — 진행 중 SUMMARY 잡은 같은 storyId 로 polling 이 반복되므로 hit 율 ↑.
+        //    소유권 검증은 캐시 hit 경로에서도 항상 DB 의 stories.user_id 로 수행 — 인가 우회 차단.
+        val cached = tryReadCachedSummary(storyId)
+        if (cached != null) {
+            ownedStory(userId, storyId)
+            return cached
+        }
+
         val story = ownedStory(userId, storyId)
 
         val latestJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
@@ -246,7 +256,7 @@ class StoryboardSummaryService(
         ) ?: return SummaryResponseData(summaryKo = null, jobStatus = null, jobId = null)
 
         val jobIdStr = latestJob.id.toString()
-        return when (latestJob.status) {
+        val response = when (latestJob.status) {
             JobStatus.PENDING, JobStatus.RUNNING, JobStatus.CANCELLED ->
                 SummaryResponseData(
                     summaryKo = null,
@@ -277,6 +287,38 @@ class StoryboardSummaryService(
                     jobId = jobIdStr,
                 )
             }
+        }
+
+        // 2) 적재 — 잡이 PENDING/RUNNING 일 때만. 종결(SUCCESS/FAILED) / null / CANCELLED 는 적재 안 함.
+        //    종결 응답은 어차피 FE 가 polling 멈추므로 캐시 의미 없음 + listener invalidate 와 의미 충돌.
+        if (latestJob.status == JobStatus.PENDING || latestJob.status == JobStatus.RUNNING) {
+            tryWriteCachedSummary(storyId, response)
+        }
+
+        return response
+    }
+
+    /**
+     * Cache hit 시 deserialize. 실패는 swallow + WARN + **invalidate** — 깨진 캐시가 박제되지 않도록.
+     * invalidate 안 하면 다음 polling 도 같은 깨진 JSON 을 읽고 또 실패 → 5분 동안 stale.
+     */
+    private fun tryReadCachedSummary(storyId: Long): SummaryResponseData? {
+        return try {
+            val json = jobStatusRedisRepo.getCachedSummaryResponse(storyId) ?: return null
+            objectMapper.readValue(json, SummaryResponseData::class.java)
+        } catch (e: Exception) {
+            log.warn("SummaryResponse cache read/parse failed storyId={}, invalidating: {}", storyId, e.message)
+            runCatching { jobStatusRedisRepo.invalidateSummaryResponse(storyId) }
+            null
+        }
+    }
+
+    private fun tryWriteCachedSummary(storyId: Long, response: SummaryResponseData) {
+        try {
+            val json = objectMapper.writeValueAsString(response)
+            jobStatusRedisRepo.cacheSummaryResponse(storyId, json)
+        } catch (e: Exception) {
+            log.warn("SummaryResponse cache write failed storyId={}: {}", storyId, e.message)
         }
     }
 

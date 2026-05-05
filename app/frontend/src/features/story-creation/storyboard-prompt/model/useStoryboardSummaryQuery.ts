@@ -4,7 +4,9 @@ import type { ApiError } from '../../../../shared/api'
 import { getStoryboardSummary } from '../api/getStoryboardSummary'
 import type { SummaryJobStatus, SummaryResponseData } from '../api/types'
 
-const POLLING_INTERVAL_MS = 3_000
+// BE 가 cache-aside (Redis 10분 TTL) 로 polling read 부담을 흡수하므로 3s 가 아닌 5s 로 완화.
+// 진행 중 잡은 캐시 hit 위주라 사용자가 체감하는 응답성은 거의 동일.
+const POLLING_INTERVAL_MS = 5_000
 /**
  * AI 워커 크래시로 잡이 PENDING/RUNNING 에 박제되는 경우 무한 polling 을 막는 상한선.
  * 실제 OpenAI 호출은 보통 30초 ~ 1분 내 완료되므로 5분 마진이면 충분.
@@ -32,7 +34,7 @@ export type StoryboardSummaryQueryResult = UseQueryResult<SummaryResponseData, A
  * 줄거리(요약) 상태 polling 훅 — `GET /stories/{storyId}/storyboard/summary`.
  *
  * - storyId === null → disabled.
- * - jobStatus 가 PENDING/RUNNING 일 때만 3초 refetch. SUCCESS/FAILED/null 이면 polling 중단.
+ * - jobStatus 가 PENDING/RUNNING 일 때만 5초 refetch. SUCCESS/FAILED/null 이면 polling 중단.
  * - PENDING/RUNNING 진입 시점부터 5분 경과 시 `isTimedOut=true` 로 polling 종료.
  *   `null → PENDING` 또는 `SUCCESS → PENDING (재생성)` 같은 transition 에 맞춰 타이머 reset.
  * - staleTime: 0 — polling 중에는 매번 fresh.
