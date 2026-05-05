@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   AlignJustify,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle,
   History,
   ImageIcon,
@@ -44,6 +46,28 @@ import '../../styles/creation-paper.css'
 const FAILED_LIMIT = 3
 /** 한도 초과 시 자동 메인 이동까지의 카운트다운(ms). 사용자가 메시지를 읽을 시간 + "지금 이동" 으로 단축 가능. */
 const LIMIT_EXCEEDED_REDIRECT_MS = 5_000
+
+const PROHIBITED_IMAGE_MESSAGE =
+  '저작권이 보호된 사진이라 이미지 생성이 불가능합니다. 다른 사진을 다시 제출해주세요. 예) 디즈니 관련 사진'
+
+function getStoryboardImageFailureMessage(errorMessage?: string | null): string {
+  if (!errorMessage) {
+    return '이미지 생성에 실패했어요. 내용을 조금 바꿔 다시 시도해주세요.'
+  }
+
+  const cleanMessage = errorMessage.replace(/^pageNumber=\d+;\s*/i, '')
+  const normalized = cleanMessage.toUpperCase()
+  if (
+    normalized.includes('PROHIBITED_CONTENT') ||
+    normalized.includes('PROHIBITED CONTENT') ||
+    normalized.includes('COPYRIGHT') ||
+    normalized.includes('COPYRIGHTED')
+  ) {
+    return PROHIBITED_IMAGE_MESSAGE
+  }
+
+  return cleanMessage
+}
 
 interface StoryboardEditorStepProps {
   storyId: number | null
@@ -98,6 +122,8 @@ export function StoryboardEditorStep({
   // ────────────────────────────────────────────────────────────
   const stateQuery = useStoryboardStateQuery(storyId)
   const stateData = stateQuery.data
+  const [currentTranslationJobId, setCurrentTranslationJobId] = useState<number | null>(null)
+  const [currentTranslationPageNumber, setCurrentTranslationPageNumber] = useState<number | null>(null)
 
   // sessionStorage 의 jobId 가 우선 — 없으면 BE state 의 active job id 로 회복.
   const recoveredJobId = stateData?.activeJob?.jobId ?? null
@@ -115,6 +141,18 @@ export function StoryboardEditorStep({
     storyJobStatus !== 'SUCCESS' &&
     storyJobStatus !== 'FAILED' &&
     storyJobStatus !== 'CANCELLED'
+
+  const activeTranslationJob = stateData?.activeTranslationJob ?? null
+  const effectiveTranslationJobId = currentTranslationJobId ?? activeTranslationJob?.jobId ?? null
+  const effectiveTranslationPageNumber = currentTranslationPageNumber ?? activeTranslationJob?.pageNumber ?? null
+  const translationJobQuery = useGenerationJobQuery(effectiveTranslationJobId)
+  const translationJobStatus = translationJobQuery.data?.status ?? activeTranslationJob?.status
+  const isTranslationInProgress =
+    effectiveTranslationJobId !== null &&
+    !translationJobQuery.isTimedOut &&
+    translationJobStatus !== 'SUCCESS' &&
+    translationJobStatus !== 'FAILED' &&
+    translationJobStatus !== 'CANCELLED'
 
   // FAILED 분기:
   //  (a) 같은 세션에서 polling 도중 FAILED — storyJobStatus / timeout 으로 감지
@@ -196,6 +234,27 @@ export function StoryboardEditorStep({
     storyJobQuery.isTimedOut,
     effectiveStoryJobId,
     onStoryJobFinished,
+    queryClient,
+    storyId,
+  ])
+
+  useEffect(() => {
+    const status = translationJobQuery.data?.status
+    if (
+      effectiveTranslationJobId !== null &&
+      (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED' || translationJobQuery.isTimedOut)
+    ) {
+      setCurrentTranslationJobId(null)
+      setCurrentTranslationPageNumber(null)
+      if (storyId !== null) {
+        void queryClient.refetchQueries({ queryKey: ['storyboard-pages', storyId] })
+        void queryClient.refetchQueries({ queryKey: ['storyboard-state', storyId] })
+      }
+    }
+  }, [
+    translationJobQuery.data?.status,
+    translationJobQuery.isTimedOut,
+    effectiveTranslationJobId,
     queryClient,
     storyId,
   ])
@@ -302,6 +361,7 @@ export function StoryboardEditorStep({
   // 폴링이 끝날 때까지 유지되어 mutate inflight 뿐 아니라 server 폴링 동안에도 스피너 노출.
   const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null)
   const [regenerateErrors, setRegenerateErrors] = useState<Record<number, string>>({})
+  const [imageGenerationError, setImageGenerationError] = useState<string | null>(null)
 
   // ────────────────────────────────────────────────────────────
   // 페이지 재생성 잡 새로고침 복구 — 단일 페이지 재생성 polling 도 동일 패턴으로 자동 재개.
@@ -349,20 +409,27 @@ export function StoryboardEditorStep({
       // 종결 표식 — recovery effect 가 stale state cache 로 같은 잡을 다시 살리는 것을 차단.
       finishedImageJobIdsRef.current.add(currentImageJobId)
       setCurrentImageJobId(null)
+      const failureMessage =
+        status === 'FAILED'
+          ? getStoryboardImageFailureMessage(imageJobQuery.data?.errorMessage)
+          : status === 'CANCELLED'
+            ? '이미지 생성이 취소되었습니다.'
+            : imageJobQuery.isTimedOut
+              ? '이미지 생성 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+              : null
       // 단일 페이지 재생성 폴링 종료 — 페이지별 스피너 해제 + 실패 시 메시지 / 성공 시 캐시버스터.
       if (regeneratingPageNumber !== null) {
-        if (status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut) {
+        if (failureMessage) {
           const failedPage = regeneratingPageNumber
           setRegenerateErrors(prev => ({
             ...prev,
-            [failedPage]:
-              status === 'FAILED'
-                ? '그림 재생성에 실패했어요. 잠시 후 다시 시도해 주세요.'
-                : status === 'CANCELLED'
-                  ? '그림 재생성이 취소됐어요.'
-                  : '그림 재생성이 너무 오래 걸려 중단됐어요.',
+            [failedPage]: failureMessage,
           }))
         }
+      } else if (failureMessage) {
+        setImageGenerationError(failureMessage)
+      } else {
+        setImageGenerationError(null)
       }
       if (storyId !== null) {
         // 단순 invalidate 가 아닌 refetch — staleTime/observer 상태와 무관하게 반드시 새로 받도록.
@@ -388,6 +455,7 @@ export function StoryboardEditorStep({
     }
   }, [
     imageJobQuery.data?.status,
+    imageJobQuery.data?.errorMessage,
     imageJobQuery.isTimedOut,
     currentImageJobId,
     regeneratingPageNumber,
@@ -428,25 +496,30 @@ export function StoryboardEditorStep({
   // 보기 모드 — 'grid' (한 줄 3장 갤러리) / 'individual' (페이지마다 글+이미지+재생성).
   // 그리드에서 사진 클릭 시 individual 모드로 전환 + 해당 페이지로 스크롤.
   const [viewMode, setViewMode] = useState<'grid' | 'individual'>('individual')
-  const [pendingScrollPage, setPendingScrollPage] = useState<number | null>(null)
+  const [currentPageIndex, setCurrentPageIndex] = useState(0)
 
   const handleSelectPageFromGrid = useCallback((pageNumber: number) => {
+    setCurrentPageIndex(Math.max(0, pages.findIndex(page => page.pageNumber === pageNumber)))
     setViewMode('individual')
-    setPendingScrollPage(pageNumber)
-  }, [])
+  }, [pages])
 
   // viewMode 가 individual 로 바뀐 직후 카드가 mount 되면 해당 페이지로 부드럽게 스크롤.
   useEffect(() => {
-    if (viewMode !== 'individual' || pendingScrollPage === null) return
-    const rafId = window.requestAnimationFrame(() => {
-      const el = document.getElementById(`storyboard-page-${pendingScrollPage}`)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      setPendingScrollPage(null)
+    setCurrentPageIndex(prev => {
+      if (pages.length === 0) return 0
+      return Math.min(prev, pages.length - 1)
     })
-    return () => window.cancelAnimationFrame(rafId)
-  }, [viewMode, pendingScrollPage])
+  }, [pages.length])
+
+  const currentPage = pages[currentPageIndex] ?? null
+
+  const handlePrevPage = useCallback(() => {
+    setCurrentPageIndex(prev => Math.max(0, prev - 1))
+  }, [])
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPageIndex(prev => Math.min(pages.length - 1, prev + 1))
+  }, [pages.length])
 
   const handleDraftChange = useCallback((pageNumber: number, value: string) => {
     setDrafts(prev => ({ ...prev, [pageNumber]: value }))
@@ -454,26 +527,41 @@ export function StoryboardEditorStep({
 
   const handleDraftBlur = useCallback(
     (pageNumber: number, original: string | null) => {
+      if (isTranslationInProgress) return
       const value = drafts[pageNumber] ?? ''
       const trimmed = value.trim()
       if (trimmed.length === 0) return
       if (trimmed === (original ?? '').trim()) return // 변화 없으면 PATCH 안 보냄
-      patchMut.mutate({ pageNumber, koreanText: trimmed })
+      patchMut.mutate(
+        { pageNumber, koreanText: trimmed },
+        {
+          onSuccess: res => {
+            setCurrentTranslationJobId(res.translationJobId ?? null)
+            setCurrentTranslationPageNumber(res.translationJobId ? pageNumber : null)
+            if (storyId !== null) {
+              void queryClient.refetchQueries({ queryKey: ['storyboard-state', storyId] })
+            }
+          },
+        },
+      )
     },
-    [drafts, patchMut],
+    [drafts, isTranslationInProgress, patchMut, queryClient, storyId],
   )
 
   const handleGenerateAllImages = useCallback(() => {
+    if (isTranslationInProgress) return
+    setImageGenerationError(null)
     generateImagesMut.mutate(undefined, {
       onSuccess: res => setCurrentImageJobId(res.jobId),
     })
-  }, [generateImagesMut])
+  }, [generateImagesMut, isTranslationInProgress])
 
   const handleRegenerateImage = useCallback(
     (pageNumber: number) => {
       const userPrompt = (regeneratePrompts[pageNumber] ?? '').trim()
       if (userPrompt.length === 0) return
       if (regenRemaining <= 0) return // 동화 한도 소진 — 호출 자체 차단.
+      if (isTranslationInProgress) return
       setRegeneratingPageNumber(pageNumber)
       // 이 페이지 이전 에러는 새 시도 시 리셋.
       setRegenerateErrors(prev => {
@@ -502,7 +590,7 @@ export function StoryboardEditorStep({
             // 한도 초과를 BE 에서 거부한 케이스 (`STORY_018`) 메시지 그대로 노출.
             setRegenerateErrors(prev => ({
               ...prev,
-              [pageNumber]: err.message || '그림 재생성 요청에 실패했어요.',
+              [pageNumber]: getStoryboardImageFailureMessage(err.message),
             }))
             setRegeneratingPageNumber(null)
             // 한도 거부였을 가능성에 대비해 카운터 동기화.
@@ -515,7 +603,7 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [regenerateImageMut, regeneratePrompts, regenRemaining, queryClient, storyId],
+    [regenerateImageMut, regeneratePrompts, regenRemaining, isTranslationInProgress, queryClient, storyId],
   )
 
   /**
@@ -641,13 +729,18 @@ export function StoryboardEditorStep({
                     type="button"
                     onClick={handleGenerateAllImages}
                     disabled={
-                      storyId === null ||
-                      generateImagesMut.isPending ||
-                      isImageJobInProgress
+	                      storyId === null ||
+	                      generateImagesMut.isPending ||
+	                      isImageJobInProgress ||
+	                      isTranslationInProgress
                     }
                     className="bg-[#2d5a27] text-[#f0e6c0] px-6 py-4 rounded-xl font-bold hover:bg-[#3d6f34] border border-[#b4dc8c]/40 transition-colors flex items-center gap-2 shadow-[0_4px_0_#1a3a14] disabled:opacity-40 disabled:cursor-not-allowed text-lg"
                   >
-                    {isImageJobInProgress ? (
+	                    {isTranslationInProgress ? (
+	                      <>
+	                        <Loader2 className="w-5 h-5 animate-spin" /> 번역 중
+	                      </>
+	                    ) : isImageJobInProgress ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" /> 그리는 중
                       </>
@@ -660,14 +753,27 @@ export function StoryboardEditorStep({
                 </div>
                 {generateImagesMut.error && (
                   <p className="mt-3 text-[#a3413f] text-sm">
-                    그림 생성 시작에 실패했어요: {generateImagesMut.error.message}
+                    그림 생성 시작에 실패했어요: {getStoryboardImageFailureMessage(generateImagesMut.error.message)}
                   </p>
                 )}
               </div>
             )}
 
+            {imageGenerationError && (
+              <div
+                className="cr-card"
+                style={{ padding: '14px 18px', marginBottom: 24 }}
+              >
+                <span className="cr-tape" aria-hidden="true" />
+                <p className="font-bold inline-flex items-start gap-2 text-[#a3413f]">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{imageGenerationError}</span>
+                </p>
+              </div>
+            )}
+
             {/* 진행 중 안내 (이미 일부 페이지가 생성됐어도 동일한 표시) */}
-            {isImageJobInProgress && (
+	            {isImageJobInProgress && (
               <div
                 className="cr-card"
                 style={{ textAlign: 'center', padding: '14px 18px', marginBottom: 32 }}
@@ -771,36 +877,81 @@ export function StoryboardEditorStep({
               />
             )}
 
-            {pages.length > 0 && viewMode === 'individual' && (
-              <div className="space-y-4">
-                {pages.map(page => (
-                  <div
-                    key={page.pageNumber}
-                    id={`storyboard-page-${page.pageNumber}`}
-                    style={{ scrollMarginTop: '24px' }}
+            {currentPage && viewMode === 'individual' && (
+              <div className="flex items-center gap-3 md:gap-5">
+                <div className="hidden md:flex shrink-0">
+                  <button
+                    type="button"
+                    onClick={handlePrevPage}
+	                    disabled={currentPageIndex === 0}
+                    aria-label="이전 페이지"
+                    className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
                   >
-                    <PageCard
-                      storyId={storyId}
-                      page={page}
-                      draft={drafts[page.pageNumber] ?? ''}
-                      onDraftChange={value => handleDraftChange(page.pageNumber, value)}
-                      onDraftBlur={() => handleDraftBlur(page.pageNumber, page.koreanText)}
-                      regeneratePrompt={regeneratePrompts[page.pageNumber] ?? ''}
-                      onRegeneratePromptChange={value =>
-                        setRegeneratePrompts(prev => ({ ...prev, [page.pageNumber]: value }))
-                      }
-                      onRegenerateImage={() => handleRegenerateImage(page.pageNumber)}
-                      regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending}
-                      patchPending={patchMut.isPending}
-                      regenRemaining={regenRemaining}
-                      regenLimit={regenLimit}
-                      isRegeneratingThis={regeneratingPageNumber === page.pageNumber}
-                      regenerateError={regenerateErrors[page.pageNumber] ?? null}
-                      onSelectVersion={handleSelectVersion}
-                      isSelectingVersion={selectVersionMut.isPending}
-                    />
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <PageCard
+                    storyId={storyId}
+                    page={currentPage}
+                    pageIndex={currentPageIndex}
+                    pageCount={pages.length}
+                    draft={drafts[currentPage.pageNumber] ?? ''}
+                    onDraftChange={value => handleDraftChange(currentPage.pageNumber, value)}
+                    onDraftBlur={() => handleDraftBlur(currentPage.pageNumber, currentPage.koreanText)}
+                    regeneratePrompt={regeneratePrompts[currentPage.pageNumber] ?? ''}
+                    onRegeneratePromptChange={value =>
+                      setRegeneratePrompts(prev => ({ ...prev, [currentPage.pageNumber]: value }))
+                    }
+                    onRegenerateImage={() => handleRegenerateImage(currentPage.pageNumber)}
+	                    regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending || isTranslationInProgress}
+	                    patchPending={patchMut.isPending}
+	                    translationLocked={isTranslationInProgress}
+	                    translationPending={
+	                      isTranslationInProgress &&
+	                      effectiveTranslationPageNumber === currentPage.pageNumber
+	                    }
+	                    regenRemaining={regenRemaining}
+                    regenLimit={regenLimit}
+                    isRegeneratingThis={regeneratingPageNumber === currentPage.pageNumber}
+                    regenerateError={regenerateErrors[currentPage.pageNumber] ?? null}
+                    onSelectVersion={handleSelectVersion}
+                    isSelectingVersion={selectVersionMut.isPending}
+                  />
+                  <div className="mt-3 flex items-center justify-center gap-3 md:hidden">
+                    <button
+                      type="button"
+                      onClick={handlePrevPage}
+	                      disabled={currentPageIndex === 0}
+                      aria-label="이전 페이지"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextPage}
+	                      disabled={currentPageIndex === pages.length - 1}
+                      aria-label="다음 페이지"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
                   </div>
-                ))}
+                </div>
+
+                <div className="hidden md:flex shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleNextPage}
+	                    disabled={currentPageIndex === pages.length - 1}
+                    aria-label="다음 페이지"
+                    className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -822,7 +973,8 @@ export function StoryboardEditorStep({
       <CreationFooter
         currentStep={4}
         onBack={onBack}
-        onNext={onNext}
+	        onNext={onNext}
+	        nextDisabled={isTranslationInProgress}
         nextLabel="다음: 그림 스타일 선택"
       />
     </div>
@@ -841,6 +993,8 @@ export function StoryboardEditorStep({
 function PageCard(props: {
   storyId: number | null
   page: StoryboardPageItem
+  pageIndex: number
+  pageCount: number
   draft: string
   onDraftChange: (value: string) => void
   onDraftBlur: () => void
@@ -849,6 +1003,8 @@ function PageCard(props: {
   onRegenerateImage: () => void
   regenerateDisabled: boolean
   patchPending: boolean
+  translationLocked: boolean
+  translationPending: boolean
   /** 동화 단위 남은 재생성 횟수. 0 이면 모든 페이지 input/button disabled. */
   regenRemaining: number
   /** 동화 단위 한도 (UI 안내 문구에 사용). */
@@ -865,6 +1021,8 @@ function PageCard(props: {
   const {
     storyId,
     page,
+    pageIndex,
+    pageCount,
     draft,
     onDraftChange,
     onDraftBlur,
@@ -873,6 +1031,8 @@ function PageCard(props: {
     onRegenerateImage,
     regenerateDisabled,
     patchPending,
+    translationLocked,
+    translationPending,
     regenRemaining,
     regenLimit,
     isRegeneratingThis,
@@ -896,18 +1056,30 @@ function PageCard(props: {
   // 한글 해석 — 기본은 read-only 표시. "직접 편집" 클릭 시 textarea 로 전환.
   // blur 시 onDraftBlur (PATCH) + 표시 모드 복귀.
   const [editingKorean, setEditingKorean] = useState(false)
+  const wasTranslationPendingRef = useRef(false)
   // 그림 다시 그리기 패널 토글 — 이미지 위 hover 아이콘 클릭 시 input 영역이 펼쳐짐.
   const [regenOpen, setRegenOpen] = useState(false)
   const koreanText = draft.trim()
+
+  useEffect(() => {
+    if (wasTranslationPendingRef.current && !translationPending) {
+      setEditingKorean(false)
+    }
+    wasTranslationPendingRef.current = translationPending
+  }, [translationPending])
 
   return (
     <div className="cr-card" style={{ padding: 0 }}>
       <span className="cr-tape" aria-hidden="true" />
       {/* Header — Page 배지 + 저장 중 인디케이터 */}
-      <div className="flex items-center justify-between px-5 pt-3 pb-2">
-        <span className="cr-page-badge">페이지 {page.pageNumber}</span>
+      <div className="relative flex items-center justify-center px-5 pt-3 pb-2">
+        <div className="inline-flex min-w-[7.5rem] items-center justify-center rounded-lg border-2 border-[#9A7548]/35 bg-[#F4E4BC] px-4 py-1.5 text-sm font-bold text-[#3E2A18] shadow-sm">
+          <span>페이지 {pageIndex + 1}</span>
+          <span className="mx-2 text-[#9A7548]">/</span>
+          <span>{pageCount}</span>
+        </div>
         {patchPending && (
-          <span className="text-[#9A7548] text-xs inline-flex items-center gap-1.5">
+          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9A7548] text-xs inline-flex items-center gap-1.5">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> 저장 중
           </span>
         )}
@@ -918,16 +1090,16 @@ function PageCard(props: {
         <div className="flex flex-col gap-2.5">
           {/* 이미지 영역 — hover 시 흑백 + 어둡게 + 중앙에 새로고침 버튼 노출. */}
           <div
-            className={`cr-sketch-image-wrap aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
+            className={`cr-sketch-image-wrap min-h-[240px] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
           >
             {imageSrc ? (
               <img
                 src={imageSrc}
                 alt={`페이지 ${page.pageNumber} 그림`}
-                className="w-full h-full object-cover"
+                className="w-full h-auto object-contain"
                 draggable={false}
-              />
-            ) : (
+	              />
+	            ) : (
               <div className="text-center text-[#3F6B2E] p-4 max-w-[85%]">
                 <ImageIcon className="w-9 h-9 mx-auto mb-2 opacity-60" />
                 <p className="font-bold text-xs">아직 그림이 없어요</p>
@@ -1045,8 +1217,18 @@ function PageCard(props: {
         </div>
 
         {/* ── 우측: 큰 따옴표 + 영어 본문 + 한글 해석 (읽기/편집 토글) ── */}
-        <div className="bg-[#F4E4BC]/85 rounded-xl p-4 md:p-5 flex flex-col border border-[#9A7548]/15">
-          <Quote className="w-6 h-6 text-[#3F6B2E] opacity-70 mb-1.5" aria-hidden="true" />
+	        <div className="relative bg-[#F4E4BC]/85 rounded-xl p-4 md:p-5 flex flex-col border border-[#9A7548]/15">
+	          {translationPending && (
+	            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#FFF8E0]/70 backdrop-blur-[1px]">
+	              <div className="inline-flex flex-col items-center gap-2 rounded-xl border-2 border-[#3F6B2E]/25 bg-[#FFF8E0] px-5 py-4 text-[#3F6B2E] shadow-sm">
+	                <Loader2 className="h-6 w-6 animate-spin" />
+	                <span className="text-sm font-bold text-[#3E2A18]">
+	                  바뀐 한글해설을 영어대사로 번역중입니다.
+	                </span>
+	              </div>
+	            </div>
+	          )}
+	          <Quote className="w-6 h-6 text-[#3F6B2E] opacity-70 mb-1.5" aria-hidden="true" />
           {/* 영어 본문 — 메인. 카드를 줄여도 본문은 잘 보이게 큰 사이즈 유지. */}
           <p className="text-[#3E2A18] text-lg md:text-xl leading-relaxed font-medium mb-4 whitespace-pre-wrap">
             {page.englishText?.trim() || '(영어 본문이 아직 없어요)'}
@@ -1059,29 +1241,67 @@ function PageCard(props: {
                 한글 해석
               </span>
               {!editingKorean && (
-                <button
-                  type="button"
-                  onClick={() => setEditingKorean(true)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors"
+	                <button
+	                  type="button"
+	                  disabled={translationLocked}
+	                  onClick={() => setEditingKorean(true)}
+	                  className="inline-flex items-center gap-1 text-xs font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Pencil className="w-3 h-3" /> 직접 편집
                 </button>
               )}
             </div>
-            {editingKorean ? (
+	            {editingKorean ? (
+	              <>
               <textarea
                 value={draft}
-                onChange={e => onDraftChange(e.target.value)}
-                onBlur={() => {
-                  onDraftBlur()
-                  setEditingKorean(false)
-                }}
-                autoFocus
-                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5"
-                maxLength={4000}
-                placeholder="한글 해석을 다듬어 주세요"
-              />
-            ) : (
+	                onChange={e => onDraftChange(e.target.value)}
+	                onKeyDown={e => {
+		                  if (!translationLocked && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+	                    e.preventDefault()
+	                    onDraftBlur()
+	                    setEditingKorean(false)
+	                  }
+	                }}
+		                disabled={translationLocked}
+		                autoFocus
+	                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5 disabled:cursor-not-allowed disabled:opacity-60"
+	                maxLength={4000}
+		                placeholder="한글 번역을 입력해주세요."
+	              />
+	              <div className="mt-2 flex justify-end gap-2">
+	                <button
+	                  type="button"
+	                  onClick={() => {
+	                    onDraftChange(page.koreanText ?? '')
+	                    setEditingKorean(false)
+	                  }}
+	                  disabled={patchPending}
+	                  className="inline-flex items-center justify-center rounded-lg border border-[#9A7548]/35 bg-[#F4E4BC] px-3 py-1.5 text-xs font-bold text-[#6B4A28] transition-colors hover:bg-[#E9DBBE] disabled:cursor-not-allowed disabled:opacity-50"
+	                >
+	                  취소
+	                </button>
+	                <button
+		                  type="button"
+		                  onClick={() => {
+		                    if (translationLocked) return
+		                    onDraftBlur()
+		                    setEditingKorean(false)
+		                  }}
+		                  disabled={patchPending || translationLocked || draft.trim().length === 0}
+	                  className="inline-flex items-center justify-center rounded-lg border border-[#3F6B2E]/35 bg-[#3F6B2E] px-3 py-1.5 text-xs font-bold text-[#FFF8E0] transition-colors hover:bg-[#4F7B3E] disabled:cursor-not-allowed disabled:opacity-50"
+	                >
+	                  {patchPending ? (
+	                    <>
+	                      <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> 저장 중
+	                    </>
+	                  ) : (
+	                    '확인'
+	                  )}
+	                </button>
+	              </div>
+	            </>
+	            ) : (
               <p className="text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold whitespace-pre-wrap min-h-[2.5rem]">
                 {koreanText || (
                   <span className="text-[#9A7548]/60 font-normal italic">

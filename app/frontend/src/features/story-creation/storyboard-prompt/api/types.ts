@@ -98,6 +98,12 @@ export interface StoryboardStateResponse {
     jobId: number
     status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
   } | null
+  activeTranslationJob: {
+    jobId: number
+    pageNumber: number | null
+    status: 'PENDING' | 'RUNNING'
+    createdAt: string
+  } | null
   /**
    * 진행 중인 단일 페이지 재생성 잡 — STORYBOARD_IMAGE_REGENERATE 의 PENDING/RUNNING 1건.
    *

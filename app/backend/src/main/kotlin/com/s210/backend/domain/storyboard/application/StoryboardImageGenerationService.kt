@@ -64,6 +64,7 @@ class StoryboardImageGenerationService(
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        assertNoActiveTranslationJob(storyId)
         val stylePreset = resolveStylePreset(story)
 
         // 1) storyboard_pages 가 채워져 있어야 한다 (P2 listener 가 STORY 결과 받을 때 INSERT).
@@ -165,6 +166,7 @@ class StoryboardImageGenerationService(
         userPrompt: String,
     ): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        assertNoActiveTranslationJob(storyId)
         val stylePreset = resolveStylePreset(story)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -355,6 +357,17 @@ class StoryboardImageGenerationService(
         if (story.deletedAt != null) throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
+    }
+
+    private fun assertNoActiveTranslationJob(storyId: Long) {
+        val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORY_SENTENCE_TRANSLATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeTranslationJob != null) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_TRANSLATION_IN_PROGRESS)
+        }
     }
 
     companion object {

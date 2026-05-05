@@ -15,7 +15,7 @@ from app.services.final_illustration_service import (
     generate_final_illustration_item,
     revise_final_illustration,
 )
-from app.worker_async import ApiJob, publisher_channel, submit_image_api_message, submit_message
+from app.worker_async import ApiJob, publisher_channel, submit_replicate_image_api_message, submit_message
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def _dispatch_generate_batch_message(channel: Any, delivery_tag: int, body: byte
 
 
 def _dispatch_generate_item_message(channel: Any, delivery_tag: int, body: bytes) -> None:
-    submit_image_api_message(
+    submit_replicate_image_api_message(
         consumer_channel=channel,
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_generate_item_job(body),
@@ -60,7 +60,7 @@ def _dispatch_generate_item_message(channel: Any, delivery_tag: int, body: bytes
 
 
 def _dispatch_revise_message(channel: Any, delivery_tag: int, body: bytes) -> None:
-    submit_image_api_message(
+    submit_replicate_image_api_message(
         consumer_channel=channel,
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_revise_job(body),
@@ -72,12 +72,7 @@ def _create_generate_item_job(body: bytes) -> ApiJob:
     message = FinalIllustrationGenerateItemJobMessage.model_validate_json(body)
     page_number = message.payload.item.pageNumber
     return ApiJob(
-        task=lambda: generate_final_illustration_item(
-            story_id=message.storyId,
-            item=message.payload.item,
-            seed=message.payload.seed,
-            render_options=message.payload.renderOptions,
-        ),
+        task=lambda: _generate_final_illustration_item_with_log(message),
         on_success=lambda result: _publish_final_illustration_result(message, result, "GENERATE"),
         on_error=lambda exc: _publish_final_illustration_failure(
             message.jobId,
@@ -93,7 +88,7 @@ def _create_revise_job(body: bytes) -> ApiJob:
     message = FinalIllustrationReviseJobMessage.model_validate_json(body)
     page_number = message.payload.item.pageNumber
     return ApiJob(
-        task=lambda: revise_final_illustration(message.payload),
+        task=lambda: _revise_final_illustration_with_log(message),
         on_success=lambda response: _publish_final_illustration_result(
             message,
             response.result,
@@ -108,6 +103,29 @@ def _create_revise_job(body: bytes) -> ApiJob:
             "REVISE",
         ),
     )
+
+
+def _generate_final_illustration_item_with_log(message: FinalIllustrationGenerateItemJobMessage) -> Any:
+    page_number = message.payload.item.pageNumber
+    logger.info(
+        "[FINAL_ILLUSTRATION:GEN] start jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
+        message.jobId, message.storyId, page_number, message.payload.seed,
+    )
+    return generate_final_illustration_item(
+        story_id=message.storyId,
+        item=message.payload.item,
+        seed=message.payload.seed,
+        render_options=message.payload.renderOptions,
+    )
+
+
+def _revise_final_illustration_with_log(message: FinalIllustrationReviseJobMessage) -> Any:
+    page_number = message.payload.item.pageNumber
+    logger.info(
+        "[FINAL_ILLUSTRATION:REVISE] start jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
+        message.jobId, message.storyId, page_number, message.payload.seed,
+    )
+    return revise_final_illustration(message.payload)
 
 
 def _process_generate_batch_message(body: bytes) -> bool:
@@ -160,6 +178,14 @@ def _publish_final_illustration_result(
             result=result,
             action=action,
         )
+    logger.info(
+        "[FINAL_ILLUSTRATION:%s] done jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
+        "GEN" if action == "GENERATE" else "REVISE",
+        message.jobId,
+        message.storyId,
+        message.payload.item.pageNumber,
+        seed,
+    )
     return True
 
 
@@ -190,11 +216,24 @@ def _publish_final_illustration_failure(
             error=FinalIllustrationError(code=code, message=message),
             action=action,
         )
+    logger.warning(
+        "[FINAL_ILLUSTRATION:%s] failed jobId=%s, storyId=%s, pageNumber=%s, code=%s, message=%s",
+        "GEN" if action == "GENERATE" else "REVISE",
+        job_id,
+        story_id,
+        page_number,
+        code,
+        message,
+    )
     return True
 
 
 def handle_generate_batch_message(body: bytes, publisher: FinalIllustrationJobPublisher) -> None:
     message = FinalIllustrationGenerateJobMessage.model_validate_json(body)
+    logger.info(
+        "[FINAL_ILLUSTRATION:BATCH] start jobId=%s, storyId=%s, itemCount=%d, seed=%s",
+        message.jobId, message.storyId, len(message.payload.items), message.payload.seed,
+    )
 
     for item in message.payload.items:
         publisher.publish_generate_item_job(
@@ -208,6 +247,10 @@ def handle_generate_batch_message(body: bytes, publisher: FinalIllustrationJobPu
                 ),
             )
         )
+    logger.info(
+        "[FINAL_ILLUSTRATION:BATCH] done jobId=%s, storyId=%s, publishedItems=%d",
+        message.jobId, message.storyId, len(message.payload.items),
+    )
 
 
 def handle_generate_item_message(body: bytes, publisher: FinalIllustrationJobPublisher) -> None:

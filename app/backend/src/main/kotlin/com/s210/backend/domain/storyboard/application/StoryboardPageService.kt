@@ -2,13 +2,23 @@ package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.mq.RabbitMQConfig
+import com.s210.backend.common.mq.RoutingKeys
+import com.s210.backend.domain.job.entity.StoryGenerationJob
+import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationJobMessage
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPageResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPagesResult
+import org.slf4j.LoggerFactory
+import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -27,8 +37,11 @@ class StoryboardPageService(
     private val storyRepository: StoryRepository,
     private val storyBoardRepository: StoryBoardRepository,
     private val storyboardPageRepository: StoryboardPageRepository,
+    private val jobRepository: StoryGenerationJobRepository,
+    private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * `GET /api/stories/{storyId}/storyboard/pages`
@@ -67,6 +80,7 @@ class StoryboardPageService(
         koreanText: String,
     ): StoryboardPageResult {
         ownedStory(userId, storyId)
+        assertNoActiveTranslationJob(storyId)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
@@ -78,15 +92,66 @@ class StoryboardPageService(
         if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
         page.replaceKoreanText(objectMapper, trimmed)
+        val translationJob = publishTranslationJob(storyId, pageNumber, trimmed)
         // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
 
-        return StoryboardPageResult.from(page, objectMapper)
+        return StoryboardPageResult.from(page, objectMapper, translationJobId = translationJob.id)
+    }
+
+    private fun publishTranslationJob(
+        storyId: Long,
+        pageNumber: Int,
+        koreanText: String,
+    ): StoryGenerationJob {
+        val payload = StorySentenceTranslationRequestPayload(
+            pageNumber = pageNumber,
+            koreanText = koreanText,
+        )
+        val job = jobRepository.save(
+            StoryGenerationJob(
+                storyId = storyId,
+                jobType = JobType.STORY_SENTENCE_TRANSLATION,
+                status = JobStatus.PENDING,
+                requestPayload = objectMapper.writeValueAsString(payload),
+            ),
+        )
+
+        val envelope = StorySentenceTranslationJobMessage(
+            jobId = job.id.toString(),
+            storyId = storyId,
+            pageNumber = pageNumber,
+            payload = payload,
+        )
+        rabbitTemplate.convertAndSend(
+            RabbitMQConfig.REQUEST_EXCHANGE,
+            RoutingKeys.STORY_SENTENCE_TRANSLATE,
+            envelope,
+        )
+        log.info(
+            "[SENTENCE:TRANSLATE] published jobId={}, storyId={}, pageNumber={}, koreanLen={}",
+            job.id,
+            storyId,
+            pageNumber,
+            koreanText.length,
+        )
+        return job
     }
 
     /**
      * 소유권 + 삭제 여부 검증.
      * StoryboardGenerationService 의 동명 메서드와 동일 패턴 — 향후 공통 helper 로 추출 검토.
      */
+    private fun assertNoActiveTranslationJob(storyId: Long) {
+        val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORY_SENTENCE_TRANSLATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeTranslationJob != null) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_TRANSLATION_IN_PROGRESS)
+        }
+    }
+
     private fun ownedStory(userId: Long, storyId: Long): Story {
         val story = storyRepository.findById(storyId).orElseThrow {
             BusinessException(StoryErrorCode.STORY_NOT_FOUND)

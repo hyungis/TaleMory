@@ -19,10 +19,15 @@ data class StoryboardPageResult(
     val sceneSummary: String?,
     val imagePrompt: String?,
     val imageUrl: String?,
+    val translationJobId: Long? = null,
     val sentences: List<StorySentenceDto>?,
 ) {
     companion object {
-        fun from(entity: StoryboardPage, objectMapper: ObjectMapper): StoryboardPageResult {
+        fun from(
+            entity: StoryboardPage,
+            objectMapper: ObjectMapper,
+            translationJobId: Long? = null,
+        ): StoryboardPageResult {
             val texts = entity.pageTexts(objectMapper)
             val parsedSentences = entity.parseSentencesList(objectMapper)
             return StoryboardPageResult(
@@ -32,6 +37,7 @@ data class StoryboardPageResult(
                 sceneSummary = entity.sceneSummary,
                 imagePrompt = entity.imagePrompt,
                 imageUrl = entity.imageUrl,
+                translationJobId = translationJobId,
                 sentences = parsedSentences.ifEmpty { null },
             )
         }

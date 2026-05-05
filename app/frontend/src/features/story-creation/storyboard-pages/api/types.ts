@@ -15,6 +15,7 @@ export interface StoryboardPageItem {
   sceneSummary: string | null
   imagePrompt: string | null
   imageUrl: string | null
+  translationJobId?: number | null
   sentences: StoryboardSentenceItem[] | null
 }
 
