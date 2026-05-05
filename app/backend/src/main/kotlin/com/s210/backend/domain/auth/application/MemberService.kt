@@ -121,6 +121,10 @@ class MemberService(
     }
 
     fun login(command: LoginCommand): AuthResult {
+        restoreWithdrawnPasswordUserIfRequested(command)?.let {
+            return it
+        }
+
         val authenticationToken = UsernamePasswordAuthenticationToken(command.loginId, command.password)
         val authentication = authenticationManager.authenticate(authenticationToken)
         val tokenInfo: TokenInfo = jwtTokenProvider.createToken(authentication)
@@ -182,6 +186,7 @@ class MemberService(
                 if (!command.restoreConfirmed) {
                     throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
                 }
+                requireRestorePasswordIfNeeded(existingOauthAccount.user, command.password)
                 requireAvailableNickname(command.nickname, existingOauthAccount.user.id)
                 restoreUser(existingOauthAccount.user, command)
             }
@@ -194,6 +199,7 @@ class MemberService(
             if (!command.restoreConfirmed) {
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
+            requireRestorePasswordIfNeeded(withdrawnEmailUser, command.password)
             requireAvailableNickname(command.nickname, withdrawnEmailUser.id)
             restoreUser(withdrawnEmailUser, command)
             oauthAccountRepository.save(
@@ -260,6 +266,7 @@ class MemberService(
                 return OauthCallbackResult.RestoreRequired(
                     signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
                     profile = oauthUserProfile.toSignupProfile(),
+                    passwordRequired = oauthAccount.user.hasPassword(),
                 )
             }
             return OauthCallbackResult.Login(createOauthLoginResult(oauthAccount.user, oauthUserProfile.provider))
@@ -279,6 +286,7 @@ class MemberService(
             return OauthCallbackResult.RestoreRequired(
                 signupToken = oauthSignupTokenProvider.createToken(oauthUserProfile),
                 profile = oauthUserProfile.toSignupProfile(),
+                passwordRequired = withdrawnEmailUser.hasPassword(),
             )
         }
 
@@ -310,6 +318,40 @@ class MemberService(
             user = user,
             provider = provider,
         )
+    }
+
+    private fun createPasswordLoginResult(user: User): AuthResult {
+        val principal = createPasswordPrincipal(user)
+        val authentication = UsernamePasswordAuthenticationToken(principal, "", principal.authorities)
+        val tokenInfo = jwtTokenProvider.createToken(authentication)
+
+        refreshTokenInfoRepositoryRedis.save(principal.username, tokenInfo.refreshToken)
+
+        return AuthResult(
+            grantType = tokenInfo.grantType,
+            accessToken = tokenInfo.accessToken,
+            refreshToken = tokenInfo.refreshToken,
+            user = user,
+        )
+    }
+
+    private fun restoreWithdrawnPasswordUserIfRequested(command: LoginCommand): AuthResult? {
+        val activeLoginUser = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
+        if (activeLoginUser != null) {
+            return null
+        }
+
+        val withdrawnLoginUser = memberRepository
+            .findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.loginId)
+            ?: return null
+
+        requireMatchingPassword(withdrawnLoginUser, command.password)
+        if (!command.restoreConfirmed) {
+            throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+        }
+
+        restoreUser(withdrawnLoginUser)
+        return createPasswordLoginResult(withdrawnLoginUser)
     }
 
     private fun validateOauthSignupCommand(command: OauthSignupCommand) {
@@ -357,6 +399,23 @@ class MemberService(
         if (command.passwordCheck != null && command.password != command.passwordCheck) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+    }
+
+    private fun requireMatchingPassword(user: User, password: String) {
+        val passwordHash = user.passwordHash
+        if (passwordHash.isNullOrBlank() || !passwordEncoder.matches(password, passwordHash)) {
+            throw BusinessException(AuthErrorCode.INVALID_CREDENTIALS)
+        }
+    }
+
+    private fun requireRestorePasswordIfNeeded(user: User, password: String?) {
+        if (!user.hasPassword()) {
+            return
+        }
+
+        val rawPassword = password?.takeIf { it.isNotBlank() }
+            ?: throw BusinessException(AuthErrorCode.INVALID_CREDENTIALS)
+        requireMatchingPassword(user, rawPassword)
     }
 
     private fun requireValidEmail(email: String) {
@@ -501,6 +560,17 @@ class MemberService(
             authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
         )
     }
+
+    private fun createPasswordPrincipal(user: User): CustomUser =
+        CustomUser(
+            userId = user.id,
+            loginId = user.loginId ?: "",
+            password = user.passwordHash ?: "",
+            authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
+        )
+
+    private fun User.hasPassword(): Boolean =
+        !passwordHash.isNullOrBlank()
 
     private fun requireSupportedProvider(provider: String) {
         if (provider != SUPPORTED_PROVIDER) {

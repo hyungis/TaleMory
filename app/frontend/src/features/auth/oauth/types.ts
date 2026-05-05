@@ -19,6 +19,7 @@ export interface KakaoSignupRequest {
   name: string
   nickname: string
   phone?: string
+  password?: string
   termAgreements?: TermAgreement[]
   restoreConfirmed?: boolean
   linkConfirmed?: boolean
@@ -38,6 +39,7 @@ export interface KakaoRestoreRequiredCallbackPayload {
   status: 'RESTORE_REQUIRED'
   signupToken: string
   profile: KakaoSignupProfile
+  passwordRequired?: boolean
 }
 
 export interface KakaoLinkRequiredCallbackPayload {

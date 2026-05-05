@@ -33,11 +33,13 @@ data class SignupRequest(
 data class LoginRequest(
     val loginId: String,
     val password: String,
+    val restoreConfirmed: Boolean = false,
 ) {
     fun toCommand(): LoginCommand =
         LoginCommand(
-            loginId = loginId,
+            loginId = loginId.trim(),
             password = password,
+            restoreConfirmed = restoreConfirmed,
         )
 }
 
@@ -63,6 +65,7 @@ data class KakaoSignupRequest(
     val name: String,
     val nickname: String,
     val phone: String? = null,
+    val password: String? = null,
     val termAgreements: List<TermAgreementRequest> = emptyList(),
     val restoreConfirmed: Boolean = false,
     val linkConfirmed: Boolean = false,
@@ -74,6 +77,7 @@ data class KakaoSignupRequest(
             name = name.trim(),
             nickname = nickname.trim(),
             phone = phone?.trim()?.takeIf { it.isNotEmpty() },
+            password = password,
             termAgreements = termAgreements.map { it.toCommand() },
             restoreConfirmed = restoreConfirmed,
             linkConfirmed = linkConfirmed,

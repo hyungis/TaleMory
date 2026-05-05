@@ -3,6 +3,7 @@ import type { AuthUser, OauthProvider } from '../../../entities'
 export interface LoginRequest {
   loginId: string
   password: string
+  restoreConfirmed?: boolean
 }
 
 export interface LoginResponse {

@@ -4,6 +4,7 @@ import { isApiError } from '../../../../shared/api'
 import { KakaoOAuthButton } from '../../oauth'
 import { setAuthSession } from '../../model/authSession'
 import { useLoginPost } from '../model/useLoginPost'
+import type { LoginRequest } from '../types'
 
 interface LoginFormValues {
   id: string
@@ -21,6 +22,8 @@ const INITIAL_VALUES: LoginFormValues = {
   id: '',
   password: '',
 }
+
+const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 
 function validate(values: LoginFormValues): string | null {
   if (!values.id.trim()) return '아이디를 입력해주세요.'
@@ -70,6 +73,7 @@ const inputStyle: CSSProperties = {
 export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const [values, setValues] = useState<LoginFormValues>(INITIAL_VALUES)
   const [error, setError] = useState('')
+  const [restoreRequest, setRestoreRequest] = useState<LoginRequest | null>(null)
   const { isPending, login } = useLoginPost()
 
   const handleChange = useCallback(
@@ -91,27 +95,60 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         return
       }
 
-      try {
-        const result = await login({
+      const request: LoginRequest = {
           loginId: values.id.trim(),
           password: values.password,
-        })
+      }
+
+      try {
+        const result = await login(request)
         setAuthSession(result)
         setError('')
         onSuccess()
       } catch (submitError) {
+        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE) {
+          setError('')
+          setRestoreRequest(request)
+          return
+        }
+
         setError(getLoginErrorMessage(submitError))
       }
     },
     [isPending, login, onSuccess, values],
   )
 
+  const handleRestoreCancel = useCallback(() => {
+    if (!isPending) {
+      setRestoreRequest(null)
+    }
+  }, [isPending])
+
+  const handleRestoreConfirm = useCallback(async () => {
+    if (restoreRequest === null || isPending) return
+
+    try {
+      const result = await login({
+        ...restoreRequest,
+        restoreConfirmed: true,
+      })
+      setAuthSession(result)
+      setError('')
+      setRestoreRequest(null)
+      onSuccess()
+    } catch (restoreError) {
+      setRestoreRequest(null)
+      setError(getLoginErrorMessage(restoreError))
+    }
+  }, [isPending, login, onSuccess, restoreRequest])
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      aria-busy={isPending}
-      style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}
-    >
+    <>
+      <form
+        onSubmit={handleSubmit}
+        aria-busy={isPending}
+        style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}
+      >
       <div>
         <label style={labelStyle}>아이디</label>
         <input
@@ -242,6 +279,67 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           회원가입
         </button>
       </p>
-    </form>
+      </form>
+
+      {restoreRequest && (
+        <LoginRestoreConfirmDialog
+          isPending={isPending}
+          onCancel={handleRestoreCancel}
+          onConfirm={handleRestoreConfirm}
+        />
+      )}
+    </>
+  )
+}
+
+function LoginRestoreConfirmDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="login-restore-account-title"
+      onClick={() => {
+        if (!isPending) onCancel()
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
+        onClick={event => event.stopPropagation()}
+      >
+        <h3 id="login-restore-account-title" className="mb-3 text-xl font-bold text-[#2a1b12]">
+          계정 복구
+        </h3>
+        <p className="mb-5 text-sm leading-6 text-[#6a5632]">
+          탈퇴한 계정입니다. 계정을 복구하고 로그인할까요?
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="flex-1 rounded-xl border border-[#8b7a52]/60 bg-[#e8ddb4] py-3 font-bold text-[#2a1b12] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            아니오
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 rounded-xl border border-[#b4dc8c]/40 bg-[#2d5a27] py-3 font-bold text-[#f0e6c0] shadow-[0_4px_0_#1a3a14] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPending ? '복구 중...' : '예'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
