@@ -1248,3 +1248,303 @@
   height: 1px;
   background: rgba(163, 117, 72, 0.3);
 }
+
+/* ==========================================================================
+   Step 8 (FinalPreviewStep) — 완성 동화책 펼침 미리보기.
+   다른 step 들과 동일한 paper-craft 팔레트 + 손글씨 폰트 + caramel/sage 입체감.
+   ========================================================================== */
+
+/* 성공 배지 — sage 입체 pill */
+.cr-final-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--cr-sage);
+  color: #fdf6dc;
+  padding: 8px 22px;
+  border-radius: 999px;
+  border: 2px solid var(--cr-sage-deep);
+  box-shadow: 0 3px 0 var(--cr-sage-deep), 0 6px 14px rgba(95, 125, 80, 0.25);
+  font-family: var(--cr-font-serif);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.03em;
+}
+
+/* 책 펼침 컨테이너 — caramel border + cream gradient + 종이 stack 그림자 */
+.cr-spread {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--cr-caramel-deep);
+  border-radius: 18px;
+  box-shadow:
+    0 3px 0 var(--cr-caramel-deep),
+    0 14px 32px rgba(140, 100, 60, 0.22);
+  overflow: hidden;
+  min-height: 480px;
+}
+
+/* 책 가운데 책등 그림자 */
+.cr-spread-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 40px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(140, 100, 60, 0.18) 47%,
+    rgba(140, 100, 60, 0.3) 50%,
+    rgba(140, 100, 60, 0.18) 53%,
+    transparent
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+.cr-spread-page {
+  position: relative;
+  padding: 28px 28px 36px;
+  display: flex;
+  flex-direction: column;
+  min-height: 440px;
+}
+.cr-spread-page-left { padding-right: 36px; }
+.cr-spread-page-right { padding-left: 36px; gap: 12px; }
+
+.cr-spread-page-num {
+  position: absolute;
+  bottom: 14px;
+  font-family: var(--cr-font-pen);
+  font-size: 14px;
+  color: var(--cr-ink-soft);
+}
+.cr-spread-page-left .cr-spread-page-num { left: 30px; }
+.cr-spread-page-right .cr-spread-page-num { right: 30px; }
+
+.cr-spread-illust {
+  flex: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid var(--cr-caramel);
+  box-shadow: inset 0 2px 6px rgba(140, 100, 60, 0.16);
+  background: linear-gradient(135deg, #c9d8b2, #e8c79b);
+  display: flex;
+}
+.cr-spread-illust img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cr-spread-illust-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255, 250, 230, 0.95);
+}
+.cr-spread-illust-empty p {
+  font-family: var(--cr-font-pen);
+  font-size: 14px;
+  color: rgba(255, 250, 230, 0.9);
+  margin: 0;
+}
+
+.cr-spread-eyebrow {
+  font-family: var(--cr-font-pen);
+  font-size: 14px;
+  color: var(--cr-sage-deep);
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.cr-spread-title {
+  font-family: var(--cr-font-serif);
+  font-size: 22px;
+  color: var(--cr-ink);
+  margin: 0 0 4px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.cr-spread-english {
+  font-family: var(--cr-font-serif);
+  font-size: 17px;
+  color: var(--cr-ink);
+  line-height: 1.7;
+  margin: 0;
+}
+.cr-spread-korean {
+  font-family: var(--cr-font-pen);
+  font-size: 16px;
+  color: var(--cr-ink-soft);
+  line-height: 1.65;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--cr-caramel);
+}
+
+.cr-spread-tts {
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+/* TTS 미니 플레이어 — paper pill + sage 재생 버튼 */
+.cr-tts-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
+  background: #fdf6dc;
+  border: 2px solid var(--cr-caramel);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 var(--cr-caramel);
+}
+.cr-tts-player-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--cr-sage-deep);
+  border: 2px solid var(--cr-sage-darker);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.cr-tts-player-btn:hover { transform: translateY(-1px); background: var(--cr-sage); }
+.cr-tts-player-label {
+  font-family: var(--cr-font-pen);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--cr-ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cr-tts-player.is-disabled { opacity: 0.55; }
+.cr-tts-player.is-disabled .cr-tts-player-btn {
+  background: var(--cr-ink-soft);
+  border-color: var(--cr-ink-soft);
+  cursor: not-allowed;
+}
+
+/* 페이지 넘김 화살표 — caramel deep 입체 */
+.cr-final-nav-arrow {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--cr-paper);
+  color: var(--cr-caramel-deep);
+  border: 2px solid var(--cr-caramel-deep);
+  box-shadow: 0 3px 0 var(--cr-caramel-deep), 0 6px 14px rgba(140, 100, 60, 0.18);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.cr-final-nav-arrow:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--cr-caramel-deep), 0 8px 16px rgba(140, 100, 60, 0.22);
+}
+.cr-final-nav-arrow:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--cr-caramel-deep);
+}
+.cr-final-nav-arrow:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: 0 1px 0 var(--cr-caramel-deep);
+}
+
+/* 페이지 인디케이터 pill */
+.cr-final-page-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fbf2da;
+  color: var(--cr-ink-soft);
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--cr-caramel);
+  font-family: var(--cr-font-serif);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* 아웃트로 카드 본문 */
+.cr-final-outro-text {
+  font-family: var(--cr-font-serif);
+  font-size: 18px;
+  color: var(--cr-ink);
+  line-height: 1.6;
+  text-align: center;
+  font-style: italic;
+  margin: 0;
+}
+.cr-final-outro-signature {
+  text-align: right;
+  font-family: var(--cr-font-pen);
+  font-size: 16px;
+  color: var(--cr-ink-soft);
+  font-weight: 700;
+  margin: 12px 0 0;
+}
+
+/* 진행/오류 화면 — paper-craft 카드 형태로 통일 */
+.cr-final-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cr-final-status-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 28px;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--cr-caramel-deep);
+  border-radius: 18px;
+  box-shadow: 0 3px 0 var(--cr-caramel-deep), 0 8px 22px rgba(140, 100, 60, 0.16);
+}
+.cr-final-status-text {
+  font-family: var(--cr-font-gaegu);
+  font-size: 18px;
+  color: var(--cr-ink);
+  margin: 0;
+  font-weight: 700;
+}
+.cr-final-status-error-msg {
+  font-family: var(--cr-font-gaegu);
+  font-size: 18px;
+  color: var(--cr-rust);
+  margin: 0;
+  font-weight: 700;
+}
+.cr-final-status-error-detail {
+  font-family: var(--cr-font-pen);
+  font-size: 14px;
+  color: var(--cr-ink-soft);
+  margin: 0;
+  max-width: 480px;
+  text-align: center;
+}
+
+/* 모바일 — 책을 세로로 쌓음 */
+@media (max-width: 768px) {
+  .cr-spread { grid-template-columns: 1fr; min-height: 0; }
+  .cr-spread-spine { display: none; }
+  .cr-spread-page-left { padding: 24px 22px 16px; }
+  .cr-spread-page-right { padding: 16px 22px 32px; }
+  .cr-spread-illust { aspect-ratio: 4 / 3; }
+  .cr-final-nav-arrow { width: 40px; height: 40px; }
+}

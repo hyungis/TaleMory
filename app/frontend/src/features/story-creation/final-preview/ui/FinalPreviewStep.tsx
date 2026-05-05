@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Sparkles,
 } from 'lucide-react'
 import { BookSpread } from './BookSpread'
 import {
@@ -15,6 +16,7 @@ import {
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
+import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
 import '../../styles/creation-paper.css'
 
@@ -33,7 +35,8 @@ interface FinalPreviewStepProps {
 }
 
 /**
- * STEP 08 — paper-craft 톤. 완성된 동화책 미리보기 전용.
+ * STEP 08 — 완성된 동화책 미리보기 (paper-craft 톤).
+ * 다른 step 들과 동일하게 `<StepTitleBlock>` + `<section className="cr-card">` + 손글씨 폰트.
  * 발행/책장보관/뷰어/공유 같은 실제 액션은 Step 9 (PublishStoryStep) 로 위임.
  */
 export function FinalPreviewStep({
@@ -106,8 +109,8 @@ export function FinalPreviewStep({
     (finalJobQuery.data?.status === 'PENDING' || finalJobQuery.data?.status === 'RUNNING')
   const blocking = ttsInProgress || finalInProgress || loadingScenes
 
+  // ===== 진행 중 화면 =====
   if (blocking) {
-    // 두 잡 진행 중일 땐 "어떤 단계가 미완" 인지 사용자에게 표시.
     const message = (() => {
       if (finalInProgress && ttsInProgress) return '동화책 만드는 중... (삽화 + 음성)'
       if (finalInProgress) return '컬러 삽화 마무리 중...'
@@ -115,18 +118,22 @@ export function FinalPreviewStep({
       return '동화 데이터 불러오는 중...'
     })()
     return (
-      <div className="cr-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Loader2 className="w-10 h-10 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
-          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-ink)', margin: 0 }}>
-            {message}
-          </p>
+      <div className="cr-shell">
+        <CreationDoodlesBg />
+        <CreationHeader currentStep={8} />
+        <div className="cr-scroll">
+          <main className="cr-shell-inner cr-fade-in cr-final-status">
+            <div className="cr-final-status-inner">
+              <Loader2 className="w-7 h-7 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
+              <p className="cr-final-status-text">{message}</p>
+            </div>
+          </main>
         </div>
       </div>
     )
   }
 
-  // 둘 중 하나라도 terminal-error(FAILED/CANCELLED) 면 에러 화면.
+  // ===== terminal-error (FAILED/CANCELLED) =====
   const isTerminalError = (status?: string) => status === 'FAILED' || status === 'CANCELLED'
   const failedJob = isTerminalError(ttsJobQuery.data?.status)
     ? ttsJobQuery.data
@@ -135,190 +142,126 @@ export function FinalPreviewStep({
       : null
   if (failedJob) {
     return (
-      <div
-        className="cr-shell"
-        style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}
-      >
-        <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-rust)' }}>
-          동화 생성에 실패했어요.
-        </p>
-        {failedJob.errorMessage && (
-          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-ink-soft)' }}>
-            {failedJob.errorMessage}
-          </p>
-        )}
-        <button type="button" onClick={onBack} className="cr-btn-back">
-          이전 단계로
-        </button>
+      <div className="cr-shell">
+        <CreationDoodlesBg />
+        <CreationHeader currentStep={8} />
+        <div className="cr-scroll">
+          <main
+            className="cr-shell-inner cr-fade-in cr-final-status"
+            style={{ flexDirection: 'column', gap: 14 }}
+          >
+            <div className="cr-final-status-inner" style={{ flexDirection: 'column', gap: 10, padding: '22px 28px' }}>
+              <p className="cr-final-status-error-msg">동화 생성에 실패했어요.</p>
+              {failedJob.errorMessage && (
+                <p className="cr-final-status-error-detail">{failedJob.errorMessage}</p>
+              )}
+              <button type="button" onClick={onBack} className="cr-btn-back" style={{ marginTop: 6 }}>
+                이전 단계로
+              </button>
+            </div>
+          </main>
+        </div>
       </div>
     )
   }
 
+  // ===== 데이터 없음 =====
   if (error || !currentScene) {
     return (
-      <div className="cr-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, color: 'var(--cr-ink)' }}>
-          {error ?? '씬 데이터가 없어요. 이전 단계를 확인하세요.'}
-        </p>
+      <div className="cr-shell">
+        <CreationDoodlesBg />
+        <CreationHeader currentStep={8} />
+        <div className="cr-scroll">
+          <main className="cr-shell-inner cr-fade-in cr-final-status">
+            <div className="cr-final-status-inner">
+              <p className="cr-final-status-text">
+                {error ?? '씬 데이터가 없어요. 이전 단계를 확인하세요.'}
+              </p>
+            </div>
+          </main>
+        </div>
       </div>
     )
   }
 
+  // ===== 정상 화면 =====
   return (
     <div className="cr-shell">
       <CreationDoodlesBg />
       <CreationHeader currentStep={8} />
 
       <div className="cr-scroll">
-        <main className="cr-shell-inner cr-fade-in" style={{ maxWidth: 1300 }}>
-          {/* 성공 배지 */}
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--cr-sage)',
-                color: '#fdf6dc',
-                padding: '8px 22px',
-                borderRadius: 999,
-                border: '2px solid var(--cr-sage-deep)',
-                boxShadow: '0 3px 0 var(--cr-sage-deep), 0 6px 14px rgba(95,125,80,0.25)',
-                fontFamily: 'var(--cr-font-serif)',
-                fontWeight: 800,
-                fontSize: 16,
-              }}
-            >
-              ✦ 세상에 하나뿐인 동화책 완성!
-            </span>
-          </div>
+        <main className="cr-shell-inner cr-fade-in" style={{ maxWidth: 1200 }}>
+          <StepTitleBlock
+            stepNumber={8}
+            title="동화책이 완성됐어요"
+            subtitle="펼쳐진 책처럼 한 장씩 넘기며 미리 살펴보세요."
+          />
 
-          {/* 펼쳐진 책 + 좌우 chevron */}
-          <div style={{ position: 'relative' }}>
-            <BookSpread scene={currentScene} pageIndex={resultPageIndex} />
+          {/* 책 펼침 + 페이지 넘김 + 페이지 인디케이터 */}
+          <section className="cr-card">
+            <span className="cr-tape" aria-hidden="true" />
 
-            <button
-              type="button"
-              onClick={prevPage}
-              disabled={resultPageIndex === 0}
-              aria-label="이전 페이지"
-              style={{
-                position: 'absolute',
-                left: -18,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                background: 'var(--cr-paper)',
-                color: 'var(--cr-ink)',
-                border: '2px solid var(--cr-caramel-deep)',
-                boxShadow: '0 3px 0 var(--cr-caramel-deep), 0 6px 14px rgba(140,100,60,0.2)',
-                display: 'grid',
-                placeItems: 'center',
-                cursor: resultPageIndex === 0 ? 'not-allowed' : 'pointer',
-                opacity: resultPageIndex === 0 ? 0.4 : 1,
-                zIndex: 30,
-              }}
-            >
-              <ChevronLeft className="w-7 h-7" />
-            </button>
-            <button
-              type="button"
-              onClick={nextPage}
-              disabled={resultPageIndex >= totalPages - 1}
-              aria-label="다음 페이지"
-              style={{
-                position: 'absolute',
-                right: -18,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                background: 'var(--cr-paper)',
-                color: 'var(--cr-ink)',
-                border: '2px solid var(--cr-caramel-deep)',
-                boxShadow: '0 3px 0 var(--cr-caramel-deep), 0 6px 14px rgba(140,100,60,0.2)',
-                display: 'grid',
-                placeItems: 'center',
-                cursor: resultPageIndex >= totalPages - 1 ? 'not-allowed' : 'pointer',
-                opacity: resultPageIndex >= totalPages - 1 ? 0.4 : 1,
-                zIndex: 30,
-              }}
-            >
-              <ChevronRight className="w-7 h-7" />
-            </button>
-          </div>
+            <div style={{ textAlign: 'center', marginBottom: 18 }}>
+              <span className="cr-final-badge">
+                <Sparkles className="w-4 h-4" />
+                세상에 하나뿐인 동화책 완성!
+              </span>
+            </div>
 
-          {/* 페이지 표시 */}
-          <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                background: '#fbf2da',
-                color: 'var(--cr-ink-soft)',
-                padding: '6px 16px',
-                borderRadius: 999,
-                border: '1.5px solid var(--cr-caramel)',
-                fontFamily: 'var(--cr-font-serif)',
-                fontWeight: 700,
-                fontSize: 14,
-              }}
-            >
-              <BookOpen className="w-4 h-4" />
-              Page {resultPageIndex + 1} / {totalPages}
-            </span>
-          </div>
+            <div style={{ position: 'relative' }}>
+              <BookSpread scene={currentScene} pageIndex={resultPageIndex} />
 
-          {/* 아웃트로 */}
-          {outro && (
-            <div
-              style={{
-                marginTop: 32,
-                maxWidth: 640,
-                marginInline: 'auto',
-                position: 'relative',
-                background: 'linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%)',
-                border: '2.5px solid var(--cr-caramel-deep)',
-                borderRadius: 22,
-                padding: '22px 26px',
-                boxShadow: '0 2px 0 var(--cr-caramel-deep), 0 8px 22px rgba(140,100,60,0.16)',
-              }}
-            >
-              <span className="cr-tape" aria-hidden="true" />
-              <p
+              <button
+                type="button"
+                onClick={prevPage}
+                disabled={resultPageIndex === 0}
+                aria-label="이전 페이지"
+                className="cr-final-nav-arrow"
                 style={{
-                  fontFamily: 'var(--cr-font-serif)',
-                  fontSize: 18,
-                  color: 'var(--cr-ink)',
-                  lineHeight: 1.6,
-                  textAlign: 'center',
-                  fontStyle: 'italic',
-                  margin: 0,
+                  position: 'absolute',
+                  left: -22,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 30,
                 }}
               >
-                {outro.outroText}
-              </p>
-              {outro.signature && (
-                <p
-                  style={{
-                    textAlign: 'right',
-                    fontFamily: 'var(--cr-font-gaegu)',
-                    fontSize: 16,
-                    color: 'var(--cr-ink-soft)',
-                    fontWeight: 700,
-                    margin: '12px 0 0',
-                  }}
-                >
-                  — {outro.signature}
-                </p>
-              )}
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={nextPage}
+                disabled={resultPageIndex >= totalPages - 1}
+                aria-label="다음 페이지"
+                className="cr-final-nav-arrow"
+                style={{
+                  position: 'absolute',
+                  right: -22,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 30,
+                }}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
-          )}
 
+            <div style={{ textAlign: 'center', marginTop: 18 }}>
+              <span className="cr-final-page-pill">
+                <BookOpen className="w-4 h-4" />
+                Page {resultPageIndex + 1} / {totalPages}
+              </span>
+            </div>
+          </section>
+
+          {/* 아웃트로 — 별도 카드로 분리 */}
+          {outro && (
+            <section className="cr-card" style={{ maxWidth: 720, marginInline: 'auto', marginTop: 28 }}>
+              <span className="cr-tape" aria-hidden="true" />
+              <p className="cr-final-outro-text">{outro.outroText}</p>
+              {outro.signature && <p className="cr-final-outro-signature">— {outro.signature}</p>}
+            </section>
+          )}
         </main>
       </div>
 
