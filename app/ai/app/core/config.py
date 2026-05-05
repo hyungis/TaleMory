@@ -31,6 +31,7 @@ class Settings(BaseModel):
     COSYVOICE_CROSS_LINGUAL_PATH: str = getenv("COSYVOICE_CROSS_LINGUAL_PATH", "/inference_cross_lingual")
     COSYVOICE_ZERO_SHOT_PATH: str = getenv("COSYVOICE_ZERO_SHOT_PATH", "/inference_zero_shot")
     COSYVOICE_TIMEOUT_SEC: float = float(getenv("COSYVOICE_TIMEOUT_SEC", "60"))
+    TTS_STORY_SENTENCE_CONCURRENCY: int = int(getenv("TTS_STORY_SENTENCE_CONCURRENCY", "1"))
     TTS_STORAGE_ROOT: Path = Path(
         getenv("TTS_STORAGE_ROOT", str(Path(__file__).resolve().parents[2] / ".runtime" / "storage"))
     )
