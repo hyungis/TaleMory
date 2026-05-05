@@ -30,6 +30,7 @@ _FIXED_STORYBOARD_SKETCH_INSTRUCTION = (
     "watercolor washes, painted shading, polished lighting, or final illustration rendering."
 )
 
+_COVER_PAGE_NUMBER = 0
 _GEMINI_RETRY_DELAY_SECONDS = 0.5
 _CHARACTER_REFERENCE_OBJECT_PATH_TEMPLATE = "stories/{story_id}/storyboard-character/reference.png"
 _MAX_GEMINI_REFERENCE_IMAGES = 3
@@ -331,10 +332,26 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         f"{child.name} ({child.age}, {child.gender.lower()})" for child in item.children
     )
     companions = ", ".join(item.companions) if item.companions else "family"
+    is_cover = item.pageNumber == _COVER_PAGE_NUMBER
     has_character_reference = bool(item.characterReferenceImageUrls or item.characterReferenceImageS3Keys)
     has_scene_reference = bool(item.referenceImageUrls or item.referenceImageS3Keys)
+    scene_summary = item.page.sceneSummary or (
+        "Front cover composition for the whole story. Show the main child and companions in a symbolic, "
+        "inviting scene that represents the journey, recurring motif, and emotional theme. This is not a "
+        "specific interior page."
+    )
+    image_prompt = item.page.imagePrompt or (
+        "A children's storybook front cover composition. The main child stands in a welcoming story scene "
+        "with the recurring motif visible. Leave clean open space near the upper third for the title overlay. "
+        "Do not render text."
+    )
+    page_text_lines = []
+    if item.page.englishText:
+        page_text_lines.append(f"- English text: {item.page.englishText}")
+    if item.page.koreanText:
+        page_text_lines.append(f"- Korean text: {item.page.koreanText}")
     parts = [
-        f"# Storyboard Image Prompt - Page {item.pageNumber}",
+        "# Storyboard Cover Image Prompt - Page 0" if is_cover else f"# Storyboard Image Prompt - Page {item.pageNumber}",
         "",
         "## Non-Negotiable Visual Mode",
         "- Black-and-white rough pre-coloring storyboard sketch only.",
@@ -350,16 +367,19 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         ),
         "",
         "## Objective",
-        "- Create a rough pre-coloring children's storybook storyboard sketch for layout and scene planning.",
+        (
+            "- Create a rough pre-coloring children's storybook front cover sketch for the whole story."
+            if is_cover
+            else "- Create a rough pre-coloring children's storybook storyboard sketch for layout and scene planning."
+        ),
         "",
         "## Story Context",
         f"- Title: {item.storyboard.title}",
         f"- Synopsis: {item.storyboard.synopsis}",
-        f"- Page: {item.pageNumber}",
-        f"- Scene summary: {item.page.sceneSummary}",
-        f"- English text: {item.page.englishText}",
-        f"- Korean text: {item.page.koreanText}",
-        f"- Base image prompt: {item.page.imagePrompt}",
+        f"- Page: {'0 (front cover)' if is_cover else item.pageNumber}",
+        f"- Scene summary: {scene_summary}",
+        *page_text_lines,
+        f"- Base image prompt: {image_prompt}",
         "",
         "## Characters",
         f"- Main children: {child_descriptions}",
@@ -371,7 +391,16 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         ),
         "",
         "## Visual Direction",
-        "- Rough storyboard sketch, monochrome pencil/ink lines, no polished final rendering, child-safe composition.",
+        (
+            "- Front cover composition: iconic, inviting, and representative of the whole story rather than one interior page."
+            if is_cover
+            else "- Rough storyboard sketch, monochrome pencil/ink lines, no polished final rendering, child-safe composition."
+        ),
+        (
+            "- Leave clean open space near the upper third where the app can overlay the title later; do not draw text there."
+            if is_cover
+            else "- Compose the requested interior page scene clearly for later illustration planning."
+        ),
         "- If the base image prompt asks for an illustration, storybook look, warmth, or any color style, reinterpret it as black-and-white sketch composition only.",
         "",
         "## Hard Constraints",
@@ -397,7 +426,11 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
                     "If character and scene references conflict, preserve the character reference identity and borrow the scene/outfit from the scene reference."
                 ),
                 "- The output must be the requested storyboard page scene, not a character reference sheet.",
-                "- Place the characters naturally inside the page scene described above. Do not render isolated front-facing character lineup poses unless the page scene explicitly asks for that.",
+                (
+                    "- Place the characters naturally inside the front cover composition. Do not render a character reference sheet or isolated lineup."
+                    if is_cover
+                    else "- Place the characters naturally inside the page scene described above. Do not render isolated front-facing character lineup poses unless the page scene explicitly asks for that."
+                ),
                 "- Convert all reference-image color information into monochrome line structure. Treat color as forbidden noise.",
             ]
         )

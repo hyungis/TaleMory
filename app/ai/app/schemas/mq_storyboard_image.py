@@ -62,7 +62,7 @@ class StoryboardImageSuccessEnvelope(BaseModel):
     jobId: str
     type: StoryboardImageSuccessType
     storyId: int
-    pageNumber: int = Field(..., ge=1)
+    pageNumber: int = Field(..., ge=0)
     status: Literal["COMPLETED"] = "COMPLETED"
     payload: StoryboardImageSuccessPayload
 
@@ -71,6 +71,6 @@ class StoryboardImageFailureEnvelope(BaseModel):
     jobId: str
     type: StoryboardImageFailureType
     storyId: int
-    pageNumber: int | None = Field(default=None, ge=1)
+    pageNumber: int | None = Field(default=None, ge=0)
     status: Literal["FAILED"] = "FAILED"
     error: StoryboardImageError
