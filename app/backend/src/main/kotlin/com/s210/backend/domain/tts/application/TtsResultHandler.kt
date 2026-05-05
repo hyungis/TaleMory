@@ -5,6 +5,7 @@ import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepository
 import com.s210.backend.domain.tts.application.dto.PreviewTtsResultEnvelope
@@ -81,6 +82,7 @@ class TtsResultHandler(
                 job.errorMessage = "$code: $msg".take(65_535)
                 job.finishedAt = LocalDateTime.now()
                 tryUpdateRedisStatus(job.storyId, "failed", null, "$code: $msg")
+                tryInvalidatePollingCache(job.id)
                 log.info(
                     "[TTS:RES:HANDLE:DONE] jobId={}, storyId={}, status={}, elapsedMs={}",
                     envelope.jobId, job.storyId, envelope.status, elapsedMs(started),
@@ -183,8 +185,9 @@ class TtsResultHandler(
             }
         }
 
-        // 4) Redis job status
+        // 4) Redis job status (operational sidecar) + polling cache invalidate.
         tryUpdateRedisStatus(storyId, "done", 100, null)
+        tryInvalidatePollingCache(job.id)
     }
 
     private fun tryStoreCache(vpId: Long, text: String, audioUrl: String) {
@@ -199,6 +202,7 @@ class TtsResultHandler(
         try {
             jobStatusRepo.setStatus(
                 storyId = storyId,
+                jobType = JobType.TTS,
                 stage = stage,
                 progress = progress ?: 0,
                 currentStep = if (stage == "done") "TTS 완료" else "TTS 실패",
@@ -206,6 +210,18 @@ class TtsResultHandler(
             )
         } catch (e: Exception) {
             log.warn("Redis job status HSET failed (non-fatal): {}", e.message)
+        }
+    }
+
+    /**
+     * Polling cache (String JSON) invalidate — 잡 종결 시 stale RUNNING 응답을 제거.
+     * 다음 FE polling 은 cache miss → DB 종결 응답을 받고 (정책상) 다시 적재 안 함.
+     */
+    private fun tryInvalidatePollingCache(jobId: Long) {
+        try {
+            jobStatusRepo.invalidateJobResponse(jobId)
+        } catch (e: Exception) {
+            log.warn("Redis polling cache invalidate failed (non-fatal): {}", e.message)
         }
     }
 

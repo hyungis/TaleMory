@@ -2,12 +2,14 @@ package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
 import com.s210.backend.common.s3.S3DeletionEvent
 import com.s210.backend.common.s3.S3Service
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.entity.StoryBoard
 import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.story.infrastructure.repository.SceneHighlightVoiceRepository
@@ -71,6 +73,7 @@ class StoryboardResultListener(
     private val finalIllustrationResultHandler: FinalIllustrationResultHandler,
     private val s3Service: S3Service,
     private val applicationEventPublisher: ApplicationEventPublisher,
+    private val jobStatusRedisRepo: JobStatusRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -279,6 +282,9 @@ class StoryboardResultListener(
         }
 
         page.replaceTranslatedSentences(objectMapper, payload.sentences)
+
+        tryInvalidatePollingCaches(job)
+
         log.info(
             "Sentence translation job {} SUCCESS storyId={}, pageNumber={}, sentenceCount={}, costUsd={}",
             job.id,
@@ -367,6 +373,10 @@ class StoryboardResultListener(
             story.synopsis = payload.summaryKo
             story.title = payload.title
         }
+
+        // Polling cache invalidate — `/generation-jobs/{jobId}` + `/storyboard/summary` 둘 다.
+        // 다음 FE polling 은 cache miss → DB 종결 응답을 받고 (정책상) 다시 적재 안 함.
+        tryInvalidatePollingCaches(job)
 
         log.info(
             "Summary job {} SUCCESS — storyId={}, summaryKoLen={}, costUsd={}",
@@ -632,6 +642,7 @@ class StoryboardResultListener(
         job.finishedAt = LocalDateTime.now()
         // costUsd: 페이지별 usage 가 따로 와서 합산해야 정확. PR 통합 단계에선 누적 X
         // (필요 시 후속 이슈에서 누적 로직 추가).
+        tryInvalidatePollingCaches(job)
         log.info(
             "Image job {} SUCCESS — storyId={}, seed={}, pagesDone={}",
             job.id, job.storyId, seed, totalPagesDone,
@@ -696,6 +707,8 @@ class StoryboardResultListener(
                 )
             },
         )
+
+        tryInvalidatePollingCaches(job)
 
         // 5) Story.title / Story.synopsis 는 STORY (본문) 잡 SUCCESS 시 건드리지 않는다.
         //    - 본문 생성은 직전 SUMMARY 잡 결과를 grounding 으로 받았을 뿐, title/synopsis 의 SOT 가 아님.
@@ -798,6 +811,8 @@ class StoryboardResultListener(
             log.warn("Redis illust version push failed for sceneId={}: {}", scene.id, e.message)
         }
 
+        tryInvalidatePollingCaches(job)
+
         log.info(
             "Scene image job {} SUCCESS — storyId={}, sceneId={}",
             job.id, job.storyId, job.sceneId,
@@ -809,6 +824,27 @@ class StoryboardResultListener(
         // TEXT 컬럼이지만 극단적으로 긴 에러 방어 차원에서 64KB 로 상한.
         job.errorMessage = "$code: $message".take(65_535)
         job.finishedAt = LocalDateTime.now()
+        tryInvalidatePollingCaches(job)
         log.warn("Job {} FAILED — {}: {}", job.id, code, message)
+    }
+
+    /**
+     * 잡 종결 시 polling cache 정리 — best-effort.
+     *
+     * 두 종류의 캐시를 한꺼번에 무효화:
+     *  1) `/api/generation-jobs/{jobId}` 캐시 — 모든 잡 타입 공통.
+     *  2) `/storyboard/summary` 캐시 — SUMMARY 잡 한정 (storyId 단위 캐시).
+     *
+     * Redis 일시 장애 시 swallow + WARN. 그래도 TTL 10분이 self-healing 해 줌.
+     */
+    private fun tryInvalidatePollingCaches(job: StoryGenerationJob) {
+        try {
+            jobStatusRedisRepo.invalidateJobResponse(job.id)
+            if (job.jobType == JobType.STORYBOARD_STORY_SUMMARY) {
+                jobStatusRedisRepo.invalidateSummaryResponse(job.storyId)
+            }
+        } catch (e: Exception) {
+            log.warn("Redis polling cache invalidate failed for job {} (non-fatal): {}", job.id, e.message)
+        }
     }
 }

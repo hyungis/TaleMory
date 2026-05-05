@@ -2,11 +2,14 @@ package com.s210.backend.domain.job.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.job.presentation.response.JobResponse
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
@@ -17,6 +20,16 @@ import tools.jackson.databind.ObjectMapper
  *
  * 현재 MR 에서는 FE polling 용 단건 조회만 구현 (API 명세 #56).
  * 목록/취소 (#57, #58) 은 후속 이슈.
+ *
+ * Polling 부담 완화 — Redis cache-aside 패턴:
+ *  1) 캐시 hit 면 그대로 응답 (DB 조회 0회).
+ *  2) 캐시 miss 면 DB 조회. **status 가 PENDING/RUNNING 일 때만** 캐시 적재.
+ *     → 종결 잡은 캐시하지 않음. 어차피 FE 가 종결 응답 받으면 polling 멈추므로 메모리 낭비 없음.
+ *  3) listener 가 종결 시 캐시 invalidate — stale RUNNING 응답이 남지 않도록.
+ *
+ * 캐시 미동기화 (예: Redis 일시 장애로 invalidate 누락) 안전망:
+ *  - TTL 10분 — 그 안에 stale 캐시 자동 만료.
+ *  - 소유권 검증은 항상 DB 의 stories.user_id 를 보므로 캐시된 응답을 인가 우회로 쓸 수 없음.
  */
 @Service
 @Transactional(readOnly = true)
@@ -24,23 +37,70 @@ class JobService(
     private val jobRepository: StoryGenerationJobRepository,
     private val storyRepository: StoryRepository,
     private val objectMapper: ObjectMapper,
+    private val jobStatusRedisRepo: JobStatusRedisRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * 단건 조회 + 소유권 검증 (해당 Job 이 속한 Story 의 userId 로 확인).
      * 존재하지 않으면 404, 다른 사용자 것이면 403.
+     *
+     * Cache-aside:
+     *  - hit  → 캐시 응답 그대로 (소유권 재검증은 DB 없이 캐시 안의 storyId → DB stories 1회로 가능 BUT
+     *           storyId/userId 검증을 캐시 응답에서 신뢰하면 staleness 위험 → 안전하게 DB 1회 검증 수행).
+     *  - miss → DB 조회 + 진행 중일 때만 적재.
      */
     fun findJob(userId: Long, jobId: Long): JobResponse {
+        // 1) 캐시 우선 — 진행 중 잡은 같은 jobId 로 polling 이 반복되므로 hit 율 극대화.
+        val cached = tryReadCachedResponse(jobId)
+        if (cached != null) {
+            // 캐시 응답이라도 소유권은 항상 DB 기준으로 검증 — 인가 우회 위험 차단.
+            assertOwnedByStoryId(userId, cached.storyId)
+            return cached
+        }
+
+        // 2) Cache miss → DB.
         val job = jobRepository.findById(jobId).orElseThrow {
             BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         }
         assertOwned(userId, job)
+        val response = job.toResponse()
 
-        return job.toResponse()
+        // 3) 진행 중일 때만 적재. 종결 잡은 캐시 안 함.
+        if (job.status == JobStatus.PENDING || job.status == JobStatus.RUNNING) {
+            tryWriteCachedResponse(jobId, response)
+        }
+
+        return response
+    }
+
+    /** Cache hit 시 deserialize. 실패는 swallow + WARN — 캐시 깨졌으면 DB fallback. */
+    private fun tryReadCachedResponse(jobId: Long): JobResponse? {
+        return try {
+            val json = jobStatusRedisRepo.getCachedJobResponse(jobId) ?: return null
+            objectMapper.readValue(json, JobResponse::class.java)
+        } catch (e: Exception) {
+            log.warn("JobResponse cache read/parse failed jobId={}: {}", jobId, e.message)
+            null
+        }
+    }
+
+    private fun tryWriteCachedResponse(jobId: Long, response: JobResponse) {
+        try {
+            val json = objectMapper.writeValueAsString(response)
+            jobStatusRedisRepo.cacheJobResponse(jobId, json)
+        } catch (e: Exception) {
+            log.warn("JobResponse cache write failed jobId={}: {}", jobId, e.message)
+        }
     }
 
     private fun assertOwned(userId: Long, job: StoryGenerationJob) {
-        val story = storyRepository.findById(job.storyId).orElseThrow {
+        assertOwnedByStoryId(userId, job.storyId)
+    }
+
+    /** storyId 기준 소유권 검증 — DB stories.user_id 1회 조회 (캐시 hit 경로용). */
+    private fun assertOwnedByStoryId(userId: Long, storyId: Long) {
+        val story = storyRepository.findById(storyId).orElseThrow {
             BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         }
         if (story.userId != userId) {
