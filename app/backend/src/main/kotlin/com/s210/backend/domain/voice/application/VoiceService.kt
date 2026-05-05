@@ -29,9 +29,7 @@ class VoiceService(
 
         private const val SCRIPT_TEMPLATE =
             "Hello, %s! This story is for you. " +
-            "That quick beige fox jumped over each lazy dog, shouting through the thin valley. " +
-            "She whispered soft thoughts about azure skies and emerald trees. " +
-            "Zealous children gathered near ancient temples, listening to strange stories about hidden treasures."
+            "That quick beige fox jumped over each lazy dog, shouting through the thin valley."
 
         private const val DEFAULT_CHILD_NAME = "my dear"
     }
