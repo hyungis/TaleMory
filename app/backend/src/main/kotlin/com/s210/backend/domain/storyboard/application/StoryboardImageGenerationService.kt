@@ -73,6 +73,16 @@ class StoryboardImageGenerationService(
         val pages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
         if (pages.isEmpty()) throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
+        // 표지(page 0) row 가 없으면 생성 — AI STORY 잡은 page 1..N 만 만들므로 여기서 보장.
+        if (pages.none { it.pageNumber == 0 }) {
+            storyboardPageRepository.save(
+                StoryboardPage(
+                    storyBoardId = storyBoard.id,
+                    pageNumber = 0,
+                ),
+            )
+        }
+
         // 2) 마지막 SUCCESS STORY 잡에서 영문 title / synopsis / sourcePhotoIds 추출.
         val storyPayload = loadLastSuccessStoryPayload(storyId)
         val sourcePhotoIdsByPage: Map<Int, List<Int>> =
@@ -88,21 +98,40 @@ class StoryboardImageGenerationService(
             .findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(storyId)
             .associateBy { it.id }
 
-        // 5) 페이지별 item 조립.
-        val items = pages.map { page ->
+        // 5) 페이지별 item 조립 (page 0 = 표지는 별도 처리).
+        val contentPages = pages.filter { it.pageNumber != 0 }
+        val items = mutableListOf<StoryboardImageItem>()
+
+        // 표지(page 0) item — 텍스트 없이 컨텍스트만 전달.
+        items.add(
+            StoryboardImageItem(
+                pageNumber = 0,
+                storyboard = StoryboardImageContext(title = storyPayload.title, synopsis = storyPayload.synopsis),
+                page = StoryboardImagePagePayload(pageNumber = 0),
+                children = children,
+                companions = companions,
+                referenceImageS3Keys = emptyList(),
+                additionalInstruction = "This is the front cover, not an interior page.",
+            ),
+        )
+
+        // 본문 페이지 items.
+        contentPages.forEach { page ->
             val s3Keys = (sourcePhotoIdsByPage[page.pageNumber] ?: emptyList())
                 .mapNotNull { photoMap[it.toLong()]?.imageUrl }
                 .take(MAX_REFERENCE_IMAGES)
-            buildItem(
-                page = page,
-                title = storyPayload.title,
-                synopsis = storyPayload.synopsis,
-                children = children,
-                companions = companions,
-                referenceImageS3Keys = s3Keys,
-                stylePreset = stylePreset?.code,
-                stylePreviewUrl = stylePreset?.previewUrl,
-                userPromptOverride = null,
+            items.add(
+                buildItem(
+                    page = page,
+                    title = storyPayload.title,
+                    synopsis = storyPayload.synopsis,
+                    children = children,
+                    companions = companions,
+                    referenceImageS3Keys = s3Keys,
+                    stylePreset = stylePreset?.code,
+                    stylePreviewUrl = stylePreset?.previewUrl,
+                    userPromptOverride = null,
+                ),
             )
         }
 
