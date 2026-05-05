@@ -54,6 +54,28 @@ services:
       - prod-app-net
       - prod-infra-net
 
+  ai-tts-story-worker:
+    image: ${IMAGE_PREFIX:-s210}-ai:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["python", "worker_tts_story.py"]
+    scale: ${AI_TTS_STORY_WORKER_REPLICAS:-1}
+    env_file:
+      - ${ENV_DIR:-/tmp/env}/app.master.env
+    networks:
+      - prod-app-net
+      - prod-infra-net
+
+  ai-tts-preview-worker:
+    image: ${IMAGE_PREFIX:-s210}-ai:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["python", "worker_tts_preview.py"]
+    scale: ${AI_TTS_PREVIEW_WORKER_REPLICAS:-1}
+    env_file:
+      - ${ENV_DIR:-/tmp/env}/app.master.env
+    networks:
+      - prod-app-net
+      - prod-infra-net
+
 networks:
   prod-app-net:
     name: prod-s210-app-net

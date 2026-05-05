@@ -51,6 +51,28 @@ services:
       - dev-app-net
       - dev-infra-net
 
+  ai-tts-story-worker:
+    image: ${IMAGE_PREFIX:-s210}-ai:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["python", "worker_tts_story.py"]
+    scale: ${AI_TTS_STORY_WORKER_REPLICAS:-1}
+    env_file:
+      - ${ENV_DIR:-/tmp/env}/app.dev.env
+    networks:
+      - dev-app-net
+      - dev-infra-net
+
+  ai-tts-preview-worker:
+    image: ${IMAGE_PREFIX:-s210}-ai:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["python", "worker_tts_preview.py"]
+    scale: ${AI_TTS_PREVIEW_WORKER_REPLICAS:-1}
+    env_file:
+      - ${ENV_DIR:-/tmp/env}/app.dev.env
+    networks:
+      - dev-app-net
+      - dev-infra-net
+
 networks:
   dev-app-net:
     name: dev-s210-app-net
