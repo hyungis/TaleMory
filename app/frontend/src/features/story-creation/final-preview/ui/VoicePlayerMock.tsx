@@ -22,7 +22,7 @@ export function VoicePlayerMock({ voiceModel }: VoicePlayerMockProps) {
         <Play className="w-5 h-5 ml-1" />
       </button>
       <div className="flex-1">
-        <div className="flex justify-between text-xs text-[#8b7a52] font-sans mb-1 font-bold">
+        <div className="flex justify-between text-sm text-[#8b7a52] font-sans mb-1 font-bold">
           <span>0:00</span>
           <span className="text-[#2d5a27] flex items-center gap-1">
             <Mic className="w-3 h-3" /> {label}

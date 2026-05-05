@@ -237,7 +237,7 @@ export function PromptStep({
                 marginTop: 16,
                 color: 'var(--cr-rust)',
                 fontFamily: 'var(--cr-font-gaegu)',
-                fontSize: 15,
+                fontSize: 17,
                 fontWeight: 700,
                 textAlign: 'center',
               }}
@@ -367,7 +367,7 @@ function LoadingCard({
         style={{
           fontFamily: 'var(--cr-font-serif)',
           fontWeight: 800,
-          fontSize: 22,
+          fontSize: 24,
           color: 'var(--cr-ink)',
           margin: '0 0 6px',
         }}
@@ -390,7 +390,7 @@ function FailureCard({ message, onRetry }: { message: string; onRetry: () => voi
         style={{
           fontFamily: 'var(--cr-font-serif)',
           fontWeight: 800,
-          fontSize: 22,
+          fontSize: 24,
           color: 'var(--cr-rust)',
           margin: '0 0 8px',
         }}
@@ -402,7 +402,7 @@ function FailureCard({ message, onRetry }: { message: string; onRetry: () => voi
           fontFamily: 'var(--cr-font-gaegu)',
           color: 'var(--cr-ink-soft)',
           margin: '0 0 18px',
-          fontSize: 16,
+          fontSize: 18,
         }}
       >
         {message}
@@ -484,7 +484,7 @@ function ResultSection(props: {
         style={{
           marginTop: 8,
           fontFamily: 'var(--cr-font-gaegu)',
-          fontSize: 13,
+          fontSize: 15,
           color: 'var(--cr-ink-soft)',
         }}
       >
@@ -508,7 +508,7 @@ function ResultSection(props: {
             fontFamily: 'var(--cr-font-gaegu)',
             color: 'var(--cr-sage-deep)',
             fontWeight: 700,
-            fontSize: 15,
+            fontSize: 17,
           }}
         >
           <BookOpenCheck className="w-4 h-4" />
@@ -520,7 +520,7 @@ function ResultSection(props: {
             style={{
               fontFamily: 'var(--cr-font-serif)',
               fontWeight: 800,
-              fontSize: 18,
+              fontSize: 20,
               color: 'var(--cr-ink)',
               marginBottom: 8,
               display: 'flex',
@@ -566,7 +566,7 @@ function ResultSection(props: {
             style={{
               marginTop: 8,
               fontFamily: 'var(--cr-font-gaegu)',
-              fontSize: 13,
+              fontSize: 15,
               color: 'var(--cr-ink-soft)',
             }}
           >

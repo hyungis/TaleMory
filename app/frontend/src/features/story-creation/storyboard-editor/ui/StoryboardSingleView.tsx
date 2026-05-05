@@ -38,7 +38,7 @@ export function StoryboardSingleView({
       <div className="flex justify-center mb-6">
         <div className="bg-[#2a1b12]/70 px-6 py-2.5 rounded-full border-2 border-[#4a3a24] shadow-sm flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-[#b4dc8c]" />
-          <span className="text-[#f0e6c0] font-bold text-lg">
+          <span className="text-[#f0e6c0] font-bold text-xl">
             {index + 1} / {pages.length}
           </span>
         </div>
@@ -63,12 +63,12 @@ export function StoryboardSingleView({
               {/* 왼쪽: 스케치 */}
               <div className="w-full lg:w-1/2 flex flex-col gap-3">
                 <div className="flex justify-between items-center px-2">
-                  <span className="bg-[#2d5a27] text-[#b4dc8c] px-4 py-1 rounded-full shadow-sm text-lg font-bold border border-[#b4dc8c]/50">
+                  <span className="bg-[#2d5a27] text-[#b4dc8c] px-4 py-1 rounded-full shadow-sm text-xl font-bold border border-[#b4dc8c]/50">
                     Page {index + 1}
                   </span>
                   <button
                     type="button"
-                    className="text-sm text-[#8b7a52] flex items-center gap-1 hover:text-[#2d5a27] bg-[#e8ddb4] px-3 py-1 rounded-full border border-[#8b7a52]/40"
+                    className="text-base text-[#8b7a52] flex items-center gap-1 hover:text-[#2d5a27] bg-[#e8ddb4] px-3 py-1 rounded-full border border-[#8b7a52]/40"
                   >
                     <ImageIcon className="w-4 h-4" /> 참고 원본 사진
                   </button>
@@ -86,7 +86,7 @@ export function StoryboardSingleView({
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-center gap-2 bg-[#e8ddb4] border border-[#8b7a52]/40 px-4 py-2 rounded-full text-sm mt-1">
+                <div className="flex items-center justify-center gap-2 bg-[#e8ddb4] border border-[#8b7a52]/40 px-4 py-2 rounded-full text-base mt-1">
                   <RefreshCcw className={`w-4 h-4 ${disabled ? 'text-[#8b7a52]/50' : 'text-[#2d5a27]'}`} />
                   <span className="text-[#8b7a52]">이 그림 재생성</span>
                   <span className={`font-bold ${disabled ? 'text-[#8b7a52]/50' : 'text-[#2d5a27]'}`}>
@@ -103,14 +103,14 @@ export function StoryboardSingleView({
                     value={page.en}
                     onChange={e => onPageUpdate(index, { en: e.target.value })}
                     rows={5}
-                    className="w-full text-2xl text-[#2d5a27] font-sans leading-relaxed mt-4 mb-4 bg-transparent border-none focus:outline-none resize-none"
+                    className="w-full text-3xl text-[#2d5a27] font-sans leading-relaxed mt-4 mb-4 bg-transparent border-none focus:outline-none resize-none"
                   />
                   <div className="border-t border-[#8b7a52]/40 pt-4">
                     <textarea
                       value={page.ko}
                       onChange={e => onPageUpdate(index, { ko: e.target.value })}
                       rows={3}
-                      className="w-full text-[#8b7a52] text-base bg-transparent border-none focus:outline-none resize-none font-sans"
+                      className="w-full text-[#8b7a52] text-lg bg-transparent border-none focus:outline-none resize-none font-sans"
                     />
                   </div>
                 </div>

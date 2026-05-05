@@ -318,7 +318,7 @@ function StatusText(props: PhotoItemUploadingProps | PhotoItemErrorProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
         <div
           style={{
-            fontSize: 15,
+            fontSize: 17,
             color: 'var(--cr-sage-deep)',
             fontWeight: 700,
             display: 'flex',
@@ -329,7 +329,7 @@ function StatusText(props: PhotoItemUploadingProps | PhotoItemErrorProps) {
         >
           <Loader2 className="w-4 h-4 animate-spin" /> 업로드 중…
         </div>
-        <div style={{ fontSize: 13, color: 'var(--cr-ink-soft)', opacity: 0.7 }}>
+        <div style={{ fontSize: 15, color: 'var(--cr-ink-soft)', opacity: 0.7 }}>
           {props.fileName}
         </div>
       </div>
@@ -339,7 +339,7 @@ function StatusText(props: PhotoItemUploadingProps | PhotoItemErrorProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
       <div
         style={{
-          fontSize: 15,
+          fontSize: 17,
           color: 'var(--cr-rust)',
           fontWeight: 700,
           display: 'flex',
@@ -350,10 +350,10 @@ function StatusText(props: PhotoItemUploadingProps | PhotoItemErrorProps) {
       >
         <AlertCircle className="w-4 h-4" /> 업로드 실패
       </div>
-      <div style={{ fontSize: 13, color: 'var(--cr-ink-soft)', opacity: 0.7 }}>
+      <div style={{ fontSize: 15, color: 'var(--cr-ink-soft)', opacity: 0.7 }}>
         {props.fileName}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--cr-rust)' }}>{props.error}</div>
+      <div style={{ fontSize: 14, color: 'var(--cr-rust)' }}>{props.error}</div>
     </div>
   )
 }

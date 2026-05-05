@@ -14,7 +14,7 @@ export function EmptyPhotoState() {
         border: '2px dashed var(--cr-caramel)',
         color: 'var(--cr-ink-soft)',
         fontFamily: 'var(--cr-font-gaegu)',
-        fontSize: 16,
+        fontSize: 18,
       }}
     >
       <ImageOff

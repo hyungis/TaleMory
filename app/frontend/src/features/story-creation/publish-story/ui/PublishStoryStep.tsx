@@ -147,7 +147,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                   style={{
                     fontFamily: 'var(--cr-font-serif)',
                     fontWeight: 800,
-                    fontSize: 32,
+                    fontSize: 34,
                     color: 'var(--cr-ink)',
                     margin: '0 0 8px',
                     letterSpacing: '-0.5px',
@@ -158,7 +158,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                 <p
                   style={{
                     fontFamily: 'var(--cr-font-gaegu)',
-                    fontSize: 17,
+                    fontSize: 19,
                     color: 'var(--cr-ink-soft)',
                     margin: '0 0 28px',
                   }}
@@ -181,7 +181,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                   <code
                     style={{
                       flex: 1,
-                      fontSize: 13,
+                      fontSize: 15,
                       color: 'var(--cr-ink)',
                       textAlign: 'left',
                       overflow: 'hidden',
@@ -203,7 +203,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                       padding: '6px 14px',
                       fontFamily: 'var(--cr-font-gaegu)',
                       fontWeight: 700,
-                      fontSize: 14,
+                      fontSize: 16,
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
@@ -231,7 +231,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                     type="button"
                     onClick={onSaveToBookshelf}
                     className="cr-btn-back"
-                    style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 17 }}
+                    style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 19 }}
                   >
                     <Library className="w-5 h-5" /> 내 책장 보관하기
                   </button>
@@ -239,7 +239,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                     type="button"
                     onClick={onOpenViewer}
                     className="cr-btn-next"
-                    style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 17 }}
+                    style={{ justifySelf: 'auto', padding: '14px 24px', fontSize: 19 }}
                   >
                     <Maximize className="w-5 h-5" /> 뷰어로 열기
                   </button>
@@ -258,7 +258,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                       padding: '14px 24px',
                       fontFamily: 'var(--cr-font-serif)',
                       fontWeight: 700,
-                      fontSize: 17,
+                      fontSize: 19,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -280,7 +280,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                       style={{
                         fontFamily: 'var(--cr-font-serif)',
                         fontWeight: 800,
-                        fontSize: 28,
+                        fontSize: 30,
                         color: 'var(--cr-ink)',
                         margin: '0 0 8px',
                         letterSpacing: '-0.5px',
@@ -291,7 +291,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                     <p
                       style={{
                         fontFamily: 'var(--cr-font-gaegu)',
-                        fontSize: 17,
+                        fontSize: 19,
                         color: 'var(--cr-ink-soft)',
                         margin: '0 0 28px',
                         lineHeight: 1.5,
@@ -317,7 +317,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                       style={{
                         fontFamily: 'var(--cr-font-serif)',
                         fontWeight: 800,
-                        fontSize: 32,
+                        fontSize: 34,
                         color: 'var(--cr-ink)',
                         margin: '0 0 8px',
                         letterSpacing: '-0.5px',
@@ -328,7 +328,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                     <p
                       style={{
                         fontFamily: 'var(--cr-font-gaegu)',
-                        fontSize: 17,
+                        fontSize: 19,
                         color: 'var(--cr-ink-soft)',
                         margin: '0 0 28px',
                       }}
@@ -342,7 +342,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                       <p
                         style={{
                           fontFamily: 'var(--cr-font-gaegu)',
-                          fontSize: 14,
+                          fontSize: 16,
                           color: 'var(--cr-rust)',
                           marginBottom: 14,
                         }}
@@ -365,7 +365,7 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
                           color: 'var(--cr-ink-soft)',
                           fontFamily: 'var(--cr-font-gaegu)',
                           fontWeight: 700,
-                          fontSize: 16,
+                          fontSize: 18,
                           boxShadow: '0 2px 0 var(--cr-caramel-deep)',
                         }}
                       >

@@ -225,7 +225,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
                     ? '최종삽화가 생성되어 이 단계는 읽기 전용이에요.'
                     : '본문이 생성되어 이 단계는 읽기 전용이에요.'}
                 </strong>
-                <span style={{ fontSize: 14, opacity: 0.9 }}>
+                <span style={{ fontSize: 16, opacity: 0.9 }}>
                   {readOnly && !isSummaryLocked
                     ? '사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.'
                     : '사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 본문/이미지를 이어 작업할 수 있어요.'}
@@ -271,7 +271,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
                   padding: '32px 0',
                   color: 'var(--cr-ink-soft)',
                   fontFamily: 'var(--cr-font-gaegu)',
-                  fontSize: 16,
+                  fontSize: 18,
                 }}
               >
                 <Loader2 className="w-5 h-5 animate-spin" /> 사진 목록 불러오는 중…
@@ -354,7 +354,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
                   fontFamily: "'Gaegu', cursive",
                   color: 'var(--cr-ink-soft)',
                   fontWeight: 500,
-                  fontSize: 16,
+                  fontSize: 18,
                 }}
               >
                 (character reference)
@@ -525,7 +525,7 @@ function CharacterRefRequiredModal({ onClose }: { onClose: () => void }) {
             style={{
               fontFamily: 'var(--cr-font-serif)',
               fontWeight: 800,
-              fontSize: 22,
+              fontSize: 24,
               color: 'var(--cr-ink)',
               margin: 0,
               letterSpacing: '-0.5px',
@@ -538,7 +538,7 @@ function CharacterRefRequiredModal({ onClose }: { onClose: () => void }) {
         <div
           style={{
             fontFamily: 'var(--cr-font-gaegu)',
-            fontSize: 16,
+            fontSize: 18,
             color: 'var(--cr-ink)',
             lineHeight: 1.6,
             marginBottom: 18,

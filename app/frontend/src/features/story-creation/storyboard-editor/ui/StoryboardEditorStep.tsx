@@ -676,7 +676,7 @@ export function StoryboardEditorStep({
                 <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                 <div>
                   <strong>최종삽화가 생성되어 이 단계는 읽기 전용이에요.</strong>
-                  <span style={{ fontSize: 14, opacity: 0.9 }}>
+                  <span style={{ fontSize: 16, opacity: 0.9 }}>
                     본문/이미지를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.
                   </span>
                 </div>
@@ -686,7 +686,7 @@ export function StoryboardEditorStep({
             {pages.length > 0 && regenStatusQuery.data && (
               <div className="flex justify-end mb-4">
                 <span
-                  className={`inline-flex items-center gap-1.5 font-bold text-sm px-3 py-1.5 rounded-full border-2 shadow-sm ${
+                  className={`inline-flex items-center gap-1.5 font-bold text-base px-3 py-1.5 rounded-full border-2 shadow-sm ${
                     regenRemaining > 0
                       ? 'bg-[#E9DBBE] border-[#9A7548]/50 text-[#6B4A28]'
                       : 'bg-[#F8C8C7] border-[#a3413f] text-[#a3413f]'
@@ -743,7 +743,7 @@ export function StoryboardEditorStep({
                 <span className="cr-tape" aria-hidden="true" />
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <h3 className="text-xl font-bold mb-1 flex items-center gap-2" style={{ fontFamily: 'var(--cr-font-serif)', color: 'var(--cr-ink)' }}>
+                    <h3 className="text-2xl font-bold mb-1 flex items-center gap-2" style={{ fontFamily: 'var(--cr-font-serif)', color: 'var(--cr-ink)' }}>
                       <ImageIcon className="w-6 h-6" />
                       모든 페이지 그림 만들기
                     </h3>
@@ -761,7 +761,7 @@ export function StoryboardEditorStep({
 	                      isImageJobInProgress ||
 	                      isTranslationInProgress
                     }
-                    className="bg-[#2d5a27] text-[#f0e6c0] px-6 py-4 rounded-xl font-bold hover:bg-[#3d6f34] border border-[#b4dc8c]/40 transition-colors flex items-center gap-2 shadow-[0_4px_0_#1a3a14] disabled:opacity-40 disabled:cursor-not-allowed text-lg"
+                    className="bg-[#2d5a27] text-[#f0e6c0] px-6 py-4 rounded-xl font-bold hover:bg-[#3d6f34] border border-[#b4dc8c]/40 transition-colors flex items-center gap-2 shadow-[0_4px_0_#1a3a14] disabled:opacity-40 disabled:cursor-not-allowed text-xl"
                   >
 	                    {isTranslationInProgress ? (
 	                      <>
@@ -779,7 +779,7 @@ export function StoryboardEditorStep({
                   </button>
                 </div>
                 {generateImagesMut.error && (
-                  <p className="mt-3 text-[#a3413f] text-sm">
+                  <p className="mt-3 text-[#a3413f] text-base">
                     그림 생성 시작에 실패했어요: {getStoryboardImageFailureMessage(generateImagesMut.error.message)}
                   </p>
                 )}
@@ -808,7 +808,7 @@ export function StoryboardEditorStep({
                 <span className="cr-tape" aria-hidden="true" />
                 <p
                   className="font-bold inline-flex items-center gap-2"
-                  style={{ color: 'var(--cr-sage-deep)', fontFamily: 'var(--cr-font-gaegu)', fontSize: 16 }}
+                  style={{ color: 'var(--cr-sage-deep)', fontFamily: 'var(--cr-font-gaegu)', fontSize: 18 }}
                 >
                   <Loader2 className="w-5 h-5 animate-spin" />
                   AI 가 페이지를 그리는 중이에요. 완성된 페이지부터 자동으로 표시됩니다.
@@ -984,7 +984,7 @@ export function StoryboardEditorStep({
 
             {/* 진행 상태 배지 — 하단 푸터 위 (footer 가 좁아 중앙 status 는 footer 밖으로 분리). */}
             <div className="mt-8 flex justify-center">
-              <div className={`font-bold flex items-center gap-2 px-5 py-2 rounded-full border-2 text-sm shadow-sm ${
+              <div className={`font-bold flex items-center gap-2 px-5 py-2 rounded-full border-2 text-base shadow-sm ${
                 allImagesReady
                   ? 'bg-[#B9D38F]/40 border-[#3F6B2E] text-[#1F3318]'
                   : 'bg-[#E9DBBE] border-[#9A7548]/40 text-[#6B4A28]'
@@ -1123,13 +1123,13 @@ function PageCard(props: {
       <span className="cr-tape" aria-hidden="true" />
       {/* Header — Page 배지 + 저장 중 인디케이터 */}
       <div className="relative flex items-center justify-center px-5 pt-3 pb-2">
-        <div className="inline-flex min-w-[7.5rem] items-center justify-center rounded-lg border-2 border-[#9A7548]/35 bg-[#F4E4BC] px-4 py-1.5 text-sm font-bold text-[#3E2A18] shadow-sm">
+        <div className="inline-flex min-w-[7.5rem] items-center justify-center rounded-lg border-2 border-[#9A7548]/35 bg-[#F4E4BC] px-4 py-1.5 text-base font-bold text-[#3E2A18] shadow-sm">
           <span>페이지 {pageIndex + 1}</span>
           <span className="mx-2 text-[#9A7548]">/</span>
           <span>{pageCount}</span>
         </div>
         {patchPending && (
-          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9A7548] text-xs inline-flex items-center gap-1.5">
+          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9A7548] text-sm inline-flex items-center gap-1.5">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> 저장 중
           </span>
         )}
@@ -1150,14 +1150,9 @@ function PageCard(props: {
                 draggable={false}
 	              />
 	            ) : (
-              <div className="text-center text-[#3F6B2E] p-4 max-w-[85%]">
-                <ImageIcon className="w-9 h-9 mx-auto mb-2 opacity-60" />
-                <p className="font-bold text-xs">아직 그림이 없어요</p>
-                {page.sceneSummary && (
-                  <p className="text-[11px] text-[#6B4A28] mt-1.5 italic line-clamp-2">
-                    {page.sceneSummary}
-                  </p>
-                )}
+              <div className="text-center text-[#3F6B2E] p-4">
+                <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-60" />
+                <p className="font-bold text-sm">아직 그림이 없어요</p>
               </div>
             )}
 
@@ -1227,7 +1222,7 @@ function PageCard(props: {
                   disabled={inputDisabled}
                   autoFocus
                   className="cr-input"
-                  style={{ padding: '8px 12px', fontSize: 14 }}
+                  style={{ padding: '8px 12px', fontSize: 16 }}
                 />
                 <button
                   type="button"
@@ -1247,7 +1242,7 @@ function PageCard(props: {
               {isRegeneratingThis && (
                 <p
                   style={{
-                    fontSize: 11,
+                    fontSize: 13,
                     color: 'var(--cr-sage-deep)',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1261,7 +1256,7 @@ function PageCard(props: {
               {regenerateError && !isRegeneratingThis && (
                 <p
                   style={{
-                    fontSize: 11,
+                    fontSize: 13,
                     color: 'var(--cr-rust)',
                     display: 'inline-flex',
                     alignItems: 'flex-start',
@@ -1283,7 +1278,7 @@ function PageCard(props: {
 	            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#FFF8E0]/70 backdrop-blur-[1px]">
 	              <div className="inline-flex flex-col items-center gap-2 rounded-xl border-2 border-[#3F6B2E]/25 bg-[#FFF8E0] px-5 py-4 text-[#3F6B2E] shadow-sm">
 	                <Loader2 className="h-6 w-6 animate-spin" />
-	                <span className="text-sm font-bold text-[#3E2A18]">
+	                <span className="text-base font-bold text-[#3E2A18]">
 	                  바뀐 한글해설을 영어대사로 번역중입니다.
 	                </span>
 	              </div>
@@ -1291,14 +1286,14 @@ function PageCard(props: {
 	          )}
 	          <Quote className="w-6 h-6 text-[#3F6B2E] opacity-70 mb-1.5" aria-hidden="true" />
           {/* 영어 본문 — 메인. 카드를 줄여도 본문은 잘 보이게 큰 사이즈 유지. */}
-          <p className="text-[#3E2A18] text-lg md:text-xl leading-relaxed font-medium mb-4 whitespace-pre-wrap">
+          <p className="text-[#3E2A18] text-xl md:text-2xl leading-relaxed font-medium mb-4 whitespace-pre-wrap">
             {page.englishText?.trim() || '(영어 본문이 아직 없어요)'}
           </p>
 
           {/* 한글 해석 — 기본 read-only, "직접 편집" 클릭 시 textarea 전환 */}
           <div className="border-t border-[#9A7548]/25 pt-3 mt-auto">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[#9A7548] text-xs font-bold uppercase tracking-wide">
+              <span className="text-[#9A7548] text-sm font-bold uppercase tracking-wide">
                 한글 해석
               </span>
               {!editingKorean && (
@@ -1306,7 +1301,7 @@ function PageCard(props: {
 	                  type="button"
 	                  disabled={translationLocked}
 	                  onClick={() => setEditingKorean(true)}
-	                  className="inline-flex items-center gap-1 text-xs font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45"
+	                  className="inline-flex items-center gap-1 text-sm font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Pencil className="w-3 h-3" /> 직접 편집
                 </button>
@@ -1326,7 +1321,7 @@ function PageCard(props: {
 	                }}
 		                disabled={translationLocked}
 		                autoFocus
-	                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5 disabled:cursor-not-allowed disabled:opacity-60"
+	                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-lg md:text-xl leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5 disabled:cursor-not-allowed disabled:opacity-60"
 	                maxLength={4000}
 		                placeholder="한글 번역을 입력해주세요."
 	              />
@@ -1338,7 +1333,7 @@ function PageCard(props: {
 	                    setEditingKorean(false)
 	                  }}
 	                  disabled={patchPending}
-	                  className="inline-flex items-center justify-center rounded-lg border border-[#9A7548]/35 bg-[#F4E4BC] px-3 py-1.5 text-xs font-bold text-[#6B4A28] transition-colors hover:bg-[#E9DBBE] disabled:cursor-not-allowed disabled:opacity-50"
+	                  className="inline-flex items-center justify-center rounded-lg border border-[#9A7548]/35 bg-[#F4E4BC] px-3 py-1.5 text-sm font-bold text-[#6B4A28] transition-colors hover:bg-[#E9DBBE] disabled:cursor-not-allowed disabled:opacity-50"
 	                >
 	                  취소
 	                </button>
@@ -1350,7 +1345,7 @@ function PageCard(props: {
 		                    setEditingKorean(false)
 		                  }}
 		                  disabled={patchPending || translationLocked || draft.trim().length === 0}
-	                  className="inline-flex items-center justify-center rounded-lg border border-[#3F6B2E]/35 bg-[#3F6B2E] px-3 py-1.5 text-xs font-bold text-[#FFF8E0] transition-colors hover:bg-[#4F7B3E] disabled:cursor-not-allowed disabled:opacity-50"
+	                  className="inline-flex items-center justify-center rounded-lg border border-[#3F6B2E]/35 bg-[#3F6B2E] px-3 py-1.5 text-sm font-bold text-[#FFF8E0] transition-colors hover:bg-[#4F7B3E] disabled:cursor-not-allowed disabled:opacity-50"
 	                >
 	                  {patchPending ? (
 	                    <>
@@ -1363,7 +1358,7 @@ function PageCard(props: {
 	              </div>
 	            </>
 	            ) : (
-              <p className="text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold whitespace-pre-wrap min-h-[2.5rem]">
+              <p className="text-[#6B4A28] text-lg md:text-xl leading-relaxed font-bold whitespace-pre-wrap min-h-[2.5rem]">
                 {koreanText || (
                   <span className="text-[#9A7548]/60 font-normal italic">
                     한글 해석이 비어 있어요. "직접 편집" 을 눌러 입력해주세요.
@@ -1414,11 +1409,11 @@ function PageGrid({
             />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8b7a52]">
-              <ImageIcon className="w-10 h-10 opacity-50 mb-2" />
-              <p className="text-sm font-bold">아직 그림 없음</p>
+              <ImageIcon className="w-12 h-12 opacity-50 mb-2" />
+              <p className="text-base font-bold">아직 그림이 없어요</p>
             </div>
           )}
-          <span className="absolute top-2 left-2 inline-flex items-center justify-center bg-[#2d5a27]/90 text-[#f0e6c0] text-xs font-bold px-2.5 py-1 rounded-full border border-[#b4dc8c]/50 shadow-sm">
+          <span className="absolute top-2 left-2 inline-flex items-center justify-center bg-[#2d5a27]/90 text-[#f0e6c0] text-sm font-bold px-2.5 py-1 rounded-full border border-[#b4dc8c]/50 shadow-sm">
             페이지 {page.pageNumber}
           </span>
         </button>
@@ -1479,7 +1474,7 @@ function VersionPicker({
   return (
     <div className="flex items-center gap-1.5">
       <label
-        className="text-[#3F6B2E] font-bold text-xs inline-flex items-center gap-1.5"
+        className="text-[#3F6B2E] font-bold text-sm inline-flex items-center gap-1.5"
         htmlFor={`version-picker-${pageNumber}`}
       >
         <History className="w-3.5 h-3.5" /> 이전 버전
@@ -1489,7 +1484,7 @@ function VersionPicker({
         value={currentValue}
         onChange={handleChange}
         disabled={disabled}
-        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-xs text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`페이지 ${pageNumber} 이미지 버전 선택`}
       >
         {sorted.map(entry => (
@@ -1520,9 +1515,9 @@ function FailedRetryCard(props: {
     <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
       <span className="cr-tape" aria-hidden="true" />
       <AlertTriangle className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--cr-rust)' }} />
-      <p className="font-bold text-lg mb-2" style={{ color: 'var(--cr-rust)', fontFamily: 'var(--cr-font-serif)' }}>본문 생성에 실패했어요</p>
+      <p className="font-bold text-xl mb-2" style={{ color: 'var(--cr-rust)', fontFamily: 'var(--cr-font-serif)' }}>본문 생성에 실패했어요</p>
       <p className="text-[#8b7a52] mb-1">잠시 후 다시 시도해 주세요.</p>
-      <p className="text-[#8b7a52] text-sm mb-6">
+      <p className="text-[#8b7a52] text-base mb-6">
         남은 시도 횟수: <span className="font-bold text-[#2d5a27]">{remaining}</span>회
       </p>
       <div className="flex items-center justify-center gap-3">
@@ -1592,7 +1587,7 @@ function LimitExceededCard(props: {
     >
       <span className="cr-tape" aria-hidden="true" style={{ background: 'rgba(216, 133, 124, 0.7)' }} />
       <AlertTriangle className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--cr-rust)' }} />
-      <p className="text-[#a3413f] font-bold text-xl mb-3">죄송합니다</p>
+      <p className="text-[#a3413f] font-bold text-2xl mb-3">죄송합니다</p>
       <p className="text-[#2d5a27] font-bold mb-2">
         본문 생성이 {failedCount}회 연속 실패했어요 (한도 {limit}회).
       </p>
@@ -1602,7 +1597,7 @@ function LimitExceededCard(props: {
         잠시 후 다시 시도해 주시면 감사하겠습니다.
       </p>
       <div className="flex flex-col items-center gap-3">
-        <p className="text-[#8b7a52] text-sm">
+        <p className="text-[#8b7a52] text-base">
           {secondsLeft > 0 ? (
             <>
               <span className="font-bold text-[#2d5a27]">{secondsLeft}</span>초 후 자동으로 이동돼요

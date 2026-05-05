@@ -73,7 +73,7 @@ export function CreationFooter({
             style={{
               marginLeft: 10,
               fontFamily: 'var(--cr-font-gaegu)',
-              fontSize: 14,
+              fontSize: 16,
               color: 'var(--cr-sage-deep)',
               fontWeight: 700,
             }}

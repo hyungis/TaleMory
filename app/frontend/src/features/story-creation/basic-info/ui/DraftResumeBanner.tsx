@@ -75,7 +75,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
         <div
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 16,
+            fontSize: 18,
             color: '#5f7d50',
             letterSpacing: '0.5px',
             display: 'inline-flex',
@@ -93,7 +93,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
               color: '#6b4a18',
               padding: '1px 9px',
               borderRadius: 8,
-              fontSize: 13,
+              fontSize: 15,
               fontWeight: 700,
               letterSpacing: '0.8px',
             }}
@@ -104,7 +104,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
         <h2
           style={{
             fontFamily: 'var(--font-display-serif)',
-            fontSize: 30,
+            fontSize: 32,
             margin: '2px 0 6px',
             color: '#4a3b2a',
             fontWeight: 700,
@@ -120,7 +120,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
           <div
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 18,
+              fontSize: 20,
               color: '#6b5638',
               display: 'flex',
               alignItems: 'center',
@@ -139,7 +139,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
         <div
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 16,
+            fontSize: 18,
             color: '#8a7558',
             marginTop: 2,
           }}
@@ -159,7 +159,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
           padding: '14px 26px',
           borderRadius: 999,
           fontFamily: 'var(--font-display)',
-          fontSize: 22,
+          fontSize: 24,
           fontWeight: 700,
           cursor: 'pointer',
           display: 'inline-flex',

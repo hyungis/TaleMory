@@ -19,14 +19,19 @@ interface BookBackCoverProps {
 export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCoverProps) {
   const paperRef = useRef<HTMLDivElement>(null)
   const [isLanded, setIsLanded] = useState(false)
-  const text = outro?.outroText ?? '따뜻한 이야기를 함께 읽어주셔서 고마워요.'
+  /* 사용자가 마무리 멘트를 안 적은 경우엔 편지지 자체를 안 띄움 — 기본 폴백 멘트로 메우면
+     사용자 의도(편지 없음)와 어긋나고, 빈 종이에 깜빡이는 이모지처럼 보여 산만함.
+     trim 후 빈 문자열도 미작성으로 간주. */
+  const text = outro?.outroText?.trim() || ''
+  const hasLetter = text.length > 0
   /* 사용자가 서명을 비워둔 경우엔 라인 자체를 숨김 — 기본 폴백("동화책 작가") 으로 메우면
      사용자 의도(익명 편지)와 어긋남. trim 후 빈 문자열도 미작성으로 간주. */
   const signature = outro?.signature?.trim() || null
   const audioUrl = outro?.audioUrl ?? null
 
   const [replayKey, setReplayKey] = useState(0)
-  const { chars, isComplete } = useLetterTyping(text, true)
+  /* hasLetter=false 면 typing 도 시작하지 않음 — useLetterTyping 의 enabled 플래그로 끔. */
+  const { chars, isComplete } = useLetterTyping(text, hasLetter)
 
   // 편지지 날아드는 애니메이션: mount 직후 is-landing 클래스 붙이기
   useEffect(() => {
@@ -58,38 +63,51 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
       {illustrationUrl && (
         <img src={illustrationUrl} alt="" className="sb-back-cover-illust" />
       )}
-      <div
-        ref={paperRef}
-        key={replayKey}
-        className={`sb-letter ${isLanded ? 'is-landing' : ''}`}
-      >
-        <p className="sb-letter-text">
-          {chars.map((char, idx) => {
-            if (char.kind === 'newline') {
-              return <span key={idx} className="sb-letter-char newline" style={{ animationDelay: `${char.delayMs}ms` }}><br /></span>
-            }
-            if (char.kind === 'space') {
-              return <span key={idx} className="sb-letter-char space" style={{ animationDelay: `${char.delayMs}ms` }}>&nbsp;</span>
-            }
-            return <span key={idx} className="sb-letter-char" style={{ animationDelay: `${char.delayMs}ms` }}>{char.ch}</span>
-          })}
-        </p>
+      {hasLetter && (
+        <div
+          ref={paperRef}
+          key={replayKey}
+          className={`sb-letter ${isLanded ? 'is-landing' : ''}`}
+        >
+          <p className="sb-letter-text">
+            {chars.map((char, idx) => {
+              if (char.kind === 'newline') {
+                return <span key={idx} className="sb-letter-char newline" style={{ animationDelay: `${char.delayMs}ms` }}><br /></span>
+              }
+              if (char.kind === 'space') {
+                return <span key={idx} className="sb-letter-char space" style={{ animationDelay: `${char.delayMs}ms` }}>&nbsp;</span>
+              }
+              return <span key={idx} className="sb-letter-char" style={{ animationDelay: `${char.delayMs}ms` }}>{char.ch}</span>
+            })}
+          </p>
 
-        {signature && (
-          <p className={`sb-letter-signature ${isComplete ? 'is-visible' : ''}`}>{signature}</p>
-        )}
+          {signature && (
+            <p className={`sb-letter-signature ${isComplete ? 'is-visible' : ''}`}>{signature}</p>
+          )}
 
-        <div className={`sb-letter-controls ${isComplete ? 'is-visible' : ''}`}>
-          <button className="sb-letter-btn" onClick={handleReplay}>
-            <RotateCcw className="w-4 h-4" />
-            다시 듣기
-          </button>
+          <div className={`sb-letter-controls ${isComplete ? 'is-visible' : ''}`}>
+            <button className="sb-letter-btn" onClick={handleReplay}>
+              <RotateCcw className="w-4 h-4" />
+              다시 듣기
+            </button>
+            <button className="sb-letter-btn" onClick={onRestart}>
+              <BookOpen className="w-4 h-4" />
+              처음부터 읽기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 편지가 없을 땐 "처음부터 읽기" 하나만 노출 — "다시 듣기" 는 재생할 텍스트/오디오가
+          없어서 의미가 없고, 단일 CTA 가 시각적으로도 깔끔. 뒷표지 사진 위 하단 중앙에 배치. */}
+      {!hasLetter && (
+        <div className="sb-letter-controls is-visible sb-letter-controls-standalone">
           <button className="sb-letter-btn" onClick={onRestart}>
             <BookOpen className="w-4 h-4" />
             처음부터 읽기
           </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }
