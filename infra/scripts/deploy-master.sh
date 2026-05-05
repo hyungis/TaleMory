@@ -62,4 +62,20 @@ compose_cmd up -d --no-build $(resolve_services)
 
 bash "$SCRIPT_DIR/health-check-${ENV_NAME}.sh" "$SERVICE"
 
+# ── Legacy uvicorn AI 컨테이너 정리 ──
+# 옛 deploy/app/docker-compose.yml 의 잔재 (prod-ai). BE 가 보이스 미리듣기를 RabbitMQ
+# 로 마이그레이션 (9702e30) 한 후 HTTP→AI 호출이 0 건 — 더 이상 필요 없다.
+# 새 compose 는 모든 AI 서비스를 worker.py / worker_tts_*.py 로 override 하므로 어떤
+# 시나리오에서도 uvicorn HTTP 서버를 띄우지 않는다. legacy 컨테이너가 살아있으면
+# 자원/포트 점유 + 운영 혼동이 누적되므로 CI/CD 가 매번 정리해 잔재가 쌓이지 않게 한다.
+# health-check 통과 후 cleanup 하여 새 시스템 정상 확인 후에만 legacy 를 제거한다.
+# 컨테이너가 없으면 silent 통과 (idempotent).
+for legacy in prod-ai; do
+  if docker ps -a --format '{{.Names}}' | grep -qx "${legacy}"; then
+    echo "[CLEANUP] removing legacy uvicorn container: ${legacy}"
+    docker stop "${legacy}" >/dev/null 2>&1 || true
+    docker rm   "${legacy}" >/dev/null 2>&1 || true
+  fi
+done
+
 echo "deploy-${ENV_NAME} OK ($SERVICE = $TAG)"
