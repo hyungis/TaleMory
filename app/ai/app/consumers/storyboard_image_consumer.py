@@ -85,11 +85,7 @@ def _create_generate_item_job(body: bytes) -> ApiJob:
     message = StoryboardImageGenerateItemJobMessage.model_validate_json(body)
     page_number = message.payload.item.pageNumber
     return ApiJob(
-        task=lambda: generate_storyboard_image_item(
-            story_id=message.storyId,
-            item=message.payload.item,
-            seed=message.payload.seed,
-        ),
+        task=lambda: _generate_storyboard_image_item_with_log(message),
         on_success=lambda result: _publish_image_result(message, result, "GENERATE"),
         on_error=lambda exc: _publish_image_failure(
             message.jobId,
@@ -105,7 +101,7 @@ def _create_regenerate_job(body: bytes) -> ApiJob:
     message = StoryboardImageRegenerateJobMessage.model_validate_json(body)
     page_number = message.payload.item.pageNumber
     return ApiJob(
-        task=lambda: regenerate_storyboard_image(message.payload),
+        task=lambda: _regenerate_storyboard_image_with_log(message),
         on_success=lambda response: _publish_image_result(
             message,
             response.result,
@@ -120,6 +116,32 @@ def _create_regenerate_job(body: bytes) -> ApiJob:
             "REGENERATE",
         ),
     )
+
+
+def _generate_storyboard_image_item_with_log(message: StoryboardImageGenerateItemJobMessage) -> Any:
+    page_number = message.payload.item.pageNumber
+    logger.info(
+        "[IMAGE:GEN] start jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
+        message.jobId, message.storyId, page_number, message.payload.seed,
+    )
+    return generate_storyboard_image_item(
+        story_id=message.storyId,
+        item=message.payload.item,
+        seed=message.payload.seed,
+    )
+
+
+def _regenerate_storyboard_image_with_log(message: StoryboardImageRegenerateJobMessage) -> Any:
+    page_number = message.payload.item.pageNumber
+    logger.info(
+        "[IMAGE:REGEN] start jobId=%s, storyId=%s, pageNumber=%s, seed=%s, outputVersion=%s",
+        message.jobId,
+        message.storyId,
+        page_number,
+        message.payload.seed,
+        message.payload.outputVersion,
+    )
+    return regenerate_storyboard_image(message.payload)
 
 
 def _process_generate_batch_message(body: bytes) -> bool:
@@ -172,6 +194,14 @@ def _publish_image_result(
             result=result,
             action=action,
         )
+    logger.info(
+        "[IMAGE:%s] done jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
+        "GEN" if action == "GENERATE" else "REGEN",
+        message.jobId,
+        message.storyId,
+        message.payload.item.pageNumber,
+        seed,
+    )
     return True
 
 
@@ -202,11 +232,24 @@ def _publish_image_failure(
             error=StoryboardImageError(code=code, message=message),
             action=action,
         )
+    logger.warning(
+        "[IMAGE:%s] failed jobId=%s, storyId=%s, pageNumber=%s, code=%s, message=%s",
+        "GEN" if action == "GENERATE" else "REGEN",
+        job_id,
+        story_id,
+        page_number,
+        code,
+        message,
+    )
     return True
 
 
 def handle_generate_batch_message(body: bytes, publisher: StoryboardImageJobPublisher) -> None:
     message = StoryboardImageGenerateJobMessage.model_validate_json(body)
+    logger.info(
+        "[IMAGE:BATCH] start jobId=%s, storyId=%s, itemCount=%d, seed=%s",
+        message.jobId, message.storyId, len(message.payload.items), message.payload.seed,
+    )
     # BE 가 보낸 사용자 선택 character source 사진(`characterSourceImageS3Keys`)을 helper 로 전달.
     # 누락 시 helper 가 fallback 으로 페이지별 referenceImage 들을 pool 해서 사용 (= 사용자 선택 무시).
     # HTTP REST 진입점 (services.storyboard_image_service.generate_storyboard_images) 과 동일한 시그니처.
@@ -229,6 +272,10 @@ def handle_generate_batch_message(body: bytes, publisher: StoryboardImageJobPubl
                 ),
             )
         )
+    logger.info(
+        "[IMAGE:BATCH] done jobId=%s, storyId=%s, publishedItems=%d",
+        message.jobId, message.storyId, len(items),
+    )
 
 
 def handle_generate_item_message(body: bytes, publisher: StoryboardImageJobPublisher) -> None:
