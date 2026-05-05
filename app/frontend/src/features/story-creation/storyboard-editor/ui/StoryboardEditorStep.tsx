@@ -11,6 +11,7 @@ import {
   ImageIcon,
   LayoutGrid,
   Loader2,
+  Lock,
   Pencil,
   Quote,
   RefreshCw,
@@ -78,6 +79,7 @@ interface StoryboardEditorStepProps {
   storyGenerationJobId: number | null
   /** STORY 잡이 종결(SUCCESS/FAILED/CANCELLED/타임아웃) 시 호출 — 부모 flow 의 jobId 를 null 로. */
   onStoryJobFinished: () => void
+  readOnly?: boolean
   onBack: () => void
   onNext: () => void
 }
@@ -100,6 +102,7 @@ export function StoryboardEditorStep({
   storyId,
   storyGenerationJobId,
   onStoryJobFinished,
+  readOnly = false,
   onBack,
   onNext,
 }: StoryboardEditorStepProps) {
@@ -530,6 +533,7 @@ export function StoryboardEditorStep({
 
   const handleDraftBlur = useCallback(
     (pageNumber: number, original: string | null) => {
+      if (readOnly) return
       if (isTranslationInProgress) return
       const value = drafts[pageNumber] ?? ''
       const trimmed = value.trim()
@@ -548,20 +552,22 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [drafts, isTranslationInProgress, patchMut, queryClient, storyId],
+    [drafts, isTranslationInProgress, patchMut, queryClient, readOnly, storyId],
   )
 
   const handleGenerateAllImages = useCallback(() => {
+    if (readOnly) return
     if (isTranslationInProgress) return
     setImageGenerationError(null)
     generateImagesMut.mutate(undefined, {
       onSuccess: res => setCurrentImageJobId(res.jobId),
     })
-  }, [generateImagesMut, isTranslationInProgress])
+  }, [generateImagesMut, isTranslationInProgress, readOnly])
 
   const handleRegenerateImage = useCallback(
     (pageNumber: number) => {
       const userPrompt = (regeneratePrompts[pageNumber] ?? '').trim()
+      if (readOnly) return
       if (userPrompt.length === 0) return
       if (regenRemaining <= 0) return // 동화 한도 소진 — 호출 자체 차단.
       if (isTranslationInProgress) return
@@ -606,7 +612,7 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [regenerateImageMut, regeneratePrompts, regenRemaining, isTranslationInProgress, queryClient, storyId],
+    [regenerateImageMut, regeneratePrompts, regenRemaining, isTranslationInProgress, queryClient, readOnly, storyId],
   )
 
   /**
@@ -615,6 +621,7 @@ export function StoryboardEditorStep({
    */
   const handleSelectVersion = useCallback(
     (pageNumber: number, version: number) => {
+      if (readOnly) return
       if (storyId === null) return
       selectVersionMut.mutate(
         { pageNumber, version },
@@ -630,7 +637,7 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [selectVersionMut, queryClient, storyId],
+    [selectVersionMut, queryClient, readOnly, storyId],
   )
 
   // 진행 중 여부 — 어떤 이미지 잡이든 PENDING/RUNNING 이면 모든 image 액션 disable.
@@ -641,7 +648,11 @@ export function StoryboardEditorStep({
     imageJobQuery.data?.status !== 'FAILED' &&
     imageJobQuery.data?.status !== 'CANCELLED'
 
+  const allStoryboardTextReady =
+    pages.length > 0 &&
+    pages.every(p => p.englishText?.trim() && p.koreanText?.trim())
   const allImagesReady = pages.length > 0 && pages.every(p => !!p.imageUrl)
+  const canProceedToStyle = readOnly || (allStoryboardTextReady && allImagesReady)
   const someImagesReady = pages.some(p => !!p.imageUrl)
 
   return (
@@ -660,6 +671,18 @@ export function StoryboardEditorStep({
 
             {/* 동화 단위 재생성 카운터 — 헤더 우측 위치. 한도 도달 시 빨간색 강조.
                 pages 가 있는 경우에만 노출 (Step 4 본 화면). */}
+            {readOnly && (
+              <div className="cr-banner" role="status">
+                <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+                <div>
+                  <strong>최종삽화가 생성되어 이 단계는 읽기 전용이에요.</strong>
+                  <span style={{ fontSize: 14, opacity: 0.9 }}>
+                    본문/이미지를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.
+                  </span>
+                </div>
+              </div>
+            )}
+
             {pages.length > 0 && regenStatusQuery.data && (
               <div className="flex justify-end mb-4">
                 <span
@@ -733,6 +756,7 @@ export function StoryboardEditorStep({
                     onClick={handleGenerateAllImages}
                     disabled={
 	                      storyId === null ||
+	                      readOnly ||
 	                      generateImagesMut.isPending ||
 	                      isImageJobInProgress ||
 	                      isTranslationInProgress
@@ -908,9 +932,9 @@ export function StoryboardEditorStep({
                       setRegeneratePrompts(prev => ({ ...prev, [currentPage.pageNumber]: value }))
                     }
                     onRegenerateImage={() => handleRegenerateImage(currentPage.pageNumber)}
-	                    regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending || isTranslationInProgress}
+	                    regenerateDisabled={readOnly || isImageJobInProgress || regenerateImageMut.isPending || isTranslationInProgress}
 	                    patchPending={patchMut.isPending}
-	                    translationLocked={isTranslationInProgress}
+	                    translationLocked={readOnly || isTranslationInProgress}
 	                    translationPending={
 	                      isTranslationInProgress &&
 	                      effectiveTranslationPageNumber === currentPage.pageNumber
@@ -977,7 +1001,14 @@ export function StoryboardEditorStep({
         currentStep={4}
         onBack={onBack}
 	        onNext={onNext}
-	        nextDisabled={isTranslationInProgress}
+	        nextDisabled={
+            !canProceedToStyle ||
+            isTranslationInProgress ||
+            isImageJobInProgress ||
+            generateImagesMut.isPending ||
+            pagesQuery.isLoading ||
+            pagesQuery.isFetching
+          }
         nextLabel="다음: 그림 스타일 선택"
       />
     </div>

@@ -41,6 +41,7 @@ class StoryboardImageVersionService(
     private val jobRepository: StoryGenerationJobRepository,
     private val pageVersionRepository: StoryboardPageImageVersionRedisRepository,
     private val objectMapper: ObjectMapper,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -90,7 +91,8 @@ class StoryboardImageVersionService(
         pageNumber: Int,
         version: Int,
     ): String {
-        ownedStory(userId, storyId)
+        val story = ownedStory(userId, storyId)
+        storyboardEditGuard.assertEditable(story)
         val page = resolvePage(storyId, pageNumber)
 
         // Redis 에서 해당 버전 url 찾기.
@@ -188,4 +190,5 @@ class StoryboardImageVersionService(
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
     }
+
 }

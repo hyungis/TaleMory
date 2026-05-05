@@ -67,6 +67,8 @@ export function CreationPage() {
     navigate(ROUTES.mainBookshelf, { replace: true })
   }, [navigate])
 
+  const storyboardReadOnly = flow.storyboardReadOnlyLocked
+
   const handleBack = useCallback(() => {
     if (flow.currentStep > 1) {
       flow.handlePrev()
@@ -87,6 +89,7 @@ export function CreationPage() {
           onChildAdd={flow.addChild}
           onChildAppend={flow.prependChild}
           onChildRemove={flow.removeChildAt}
+          readOnly={storyboardReadOnly}
           onBack={handleBack}
           onStoryCreated={storyId => {
             flow.setStoryId(storyId)
@@ -104,6 +107,7 @@ export function CreationPage() {
       {flow.currentStep === 2 && (
         <PhotoManagerStep
           storyId={flow.storyId}
+          readOnly={storyboardReadOnly}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
@@ -117,6 +121,7 @@ export function CreationPage() {
           onStoryJobStarted={flow.setStoryGenerationJobId}
           lastConfirmedSummaryJobId={flow.lastConfirmedSummaryJobId}
           onSummaryConfirmed={flow.setLastConfirmedSummaryJobId}
+          readOnly={storyboardReadOnly}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
@@ -127,6 +132,7 @@ export function CreationPage() {
           storyId={flow.storyId}
           storyGenerationJobId={flow.storyGenerationJobId}
           onStoryJobFinished={() => flow.setStoryGenerationJobId(null)}
+          readOnly={storyboardReadOnly}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
