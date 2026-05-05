@@ -1071,6 +1071,15 @@ function PageCard(props: {
     wasTranslationPendingRef.current = translationPending
   }, [translationPending])
 
+  // 재생성 진행 중이면 패널 자동 열기 — 새로고침으로 진입한 경우에도 사용자가
+  // counter("X / Y 남음") 와 진행 메시지를 즉시 볼 수 있게. 사용자가 명시적으로
+  // 닫고 싶으면 닫을 수 있음 (이 effect 는 false→true transition 만 트리거하므로).
+  useEffect(() => {
+    if (isRegeneratingThis) {
+      setRegenOpen(true)
+    }
+  }, [isRegeneratingThis])
+
   return (
     <div className="cr-card" style={{ padding: 0 }}>
       <span className="cr-tape" aria-hidden="true" />
@@ -1133,6 +1142,17 @@ function PageCard(props: {
                 <RefreshCw className="w-7 h-7" strokeWidth={2.4} />
               )}
             </button>
+
+            {/* 재생성 진행 중 오버레이 — hover 와 무관하게 항상 보임.
+                새로고침으로 복귀했을 때도 사용자가 진행 상태를 즉시 인지할 수 있게.
+                edit-btn(z-index 2) 위(z-index 3)에 떠서 이미지/스피너 모두 덮음. */}
+            {isRegeneratingThis && (
+              <div className="cr-sketch-regen-overlay" role="status" aria-live="polite">
+                <Loader2 className="w-12 h-12 animate-spin" strokeWidth={2.2} />
+                <p className="cr-sketch-regen-overlay-text">그림을 다시 그리고 있어요</p>
+                <p className="cr-sketch-regen-overlay-sub">잠시만 기다려주세요…</p>
+              </div>
+            )}
           </div>
 
           {/* 버전 picker — 재생성 이력이 있는 페이지에서만 표시. */}
