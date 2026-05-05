@@ -151,6 +151,8 @@ RABBITMQ_SENTENCE_TRANSLATE_QUEUE=ai.cpu.story.sentences.translate.request.queue
 RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY=ai.cpu.story.sentences.translate
 RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY=ai.result.story.sentences.translate.completed
 RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY=ai.result.story.sentences.translate.failed
+AI_GEMINI_IMAGE_API_CONCURRENCY=10
+AI_REPLICATE_IMAGE_API_CONCURRENCY=5
 ```
 
 - [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
@@ -315,6 +317,8 @@ RABBITMQ_SENTENCE_TRANSLATE_QUEUE=ai.cpu.story.sentences.translate.request.queue
 RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY=ai.cpu.story.sentences.translate
 RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY=ai.result.story.sentences.translate.completed
 RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY=ai.result.story.sentences.translate.failed
+AI_GEMINI_IMAGE_API_CONCURRENCY=10
+AI_REPLICATE_IMAGE_API_CONCURRENCY=5
 ```
 
 - [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료
