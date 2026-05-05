@@ -1103,11 +1103,18 @@ function PageCard(props: {
   }, [translationPending])
 
   // 재생성 진행 중이면 패널 자동 열기 — 새로고침으로 진입한 경우에도 사용자가
-  // counter("X / Y 남음") 와 진행 메시지를 즉시 볼 수 있게. 사용자가 명시적으로
-  // 닫고 싶으면 닫을 수 있음 (이 effect 는 false→true transition 만 트리거하므로).
+  // counter("X / Y 남음") 와 진행 메시지를 즉시 볼 수 있게.
+  // 재생성이 끝나면 (true → false transition) 패널을 자동으로 닫음 — 그렇지 않으면
+  // 'regenOpen' 이 박혀 .open 클래스가 유지되고, hover 안 해도 재생성 버튼이 계속
+  // 보이고 이미지에 grayscale 필터가 그대로 적용됨.
+  const wasRegeneratingRef = useRef(false)
   useEffect(() => {
     if (isRegeneratingThis) {
       setRegenOpen(true)
+      wasRegeneratingRef.current = true
+    } else if (wasRegeneratingRef.current) {
+      setRegenOpen(false)
+      wasRegeneratingRef.current = false
     }
   }, [isRegeneratingThis])
 
@@ -1133,13 +1140,13 @@ function PageCard(props: {
         <div className="flex flex-col gap-2.5">
           {/* 이미지 영역 — hover 시 흑백 + 어둡게 + 중앙에 새로고침 버튼 노출. */}
           <div
-            className={`cr-sketch-image-wrap min-h-[240px] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
+            className={`cr-sketch-image-wrap aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
           >
             {imageSrc ? (
               <img
                 src={imageSrc}
                 alt={`페이지 ${page.pageNumber} 그림`}
-                className="w-full h-auto object-contain"
+                className="w-full h-full object-contain"
                 draggable={false}
 	              />
 	            ) : (
