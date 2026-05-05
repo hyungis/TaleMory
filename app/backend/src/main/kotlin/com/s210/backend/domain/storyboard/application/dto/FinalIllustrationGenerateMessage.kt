@@ -53,8 +53,8 @@ data class FinalIllustrationContext(
 
 data class FinalIllustrationPagePayload(
     val pageNumber: Int,
-    val sceneSummary: String,
-    val englishText: String,
-    val koreanText: String,
-    val imagePrompt: String,
+    val sceneSummary: String? = null,
+    val englishText: String? = null,
+    val koreanText: String? = null,
+    val imagePrompt: String? = null,
 )
