@@ -1140,13 +1140,13 @@ function PageCard(props: {
         <div className="flex flex-col gap-2.5">
           {/* 이미지 영역 — hover 시 흑백 + 어둡게 + 중앙에 새로고침 버튼 노출. */}
           <div
-            className={`cr-sketch-image-wrap min-h-[240px] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
+            className={`cr-sketch-image-wrap aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
           >
             {imageSrc ? (
               <img
                 src={imageSrc}
                 alt={`페이지 ${page.pageNumber} 그림`}
-                className="w-full h-auto object-contain"
+                className="w-full h-full object-contain"
                 draggable={false}
 	              />
 	            ) : (
