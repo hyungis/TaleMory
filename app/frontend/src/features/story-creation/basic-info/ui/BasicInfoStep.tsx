@@ -56,7 +56,12 @@ export function BasicInfoStep({
   onStaleStoryIdReset,
 }: BasicInfoStepProps) {
   const firstDate = data.travelDates[0] ?? ''
-  const lastDate = data.travelDates[data.travelDates.length - 1] ?? ''
+  // 두 항목이 모두 있을 때만 lastDate 가 의미 있음.
+  // 한 개([a])는 "출발일만 선택, 도착일 미정", 두 개([a, a])는 "당일치기 확정".
+  const lastDate =
+    data.travelDates.length >= 2
+      ? data.travelDates[data.travelDates.length - 1] ?? ''
+      : ''
 
   const personsQuery = usePersonsQuery('CHILD')
   const personPost = usePersonPost()
@@ -72,9 +77,11 @@ export function BasicInfoStep({
     summaryStatus === 'PENDING' || summaryStatus === 'RUNNING' || summaryStatus === 'SUCCESS'
 
   const handleDateRangeChange = (start: string | null, end: string | null) => {
+    // 당일치기(start === end)도 [start, end] 두 개 모두 저장해야
+    // TravelDatePicker 가 "도착일 미정" 상태와 "당일치기" 상태를 구분할 수 있다.
     const next: string[] = []
     if (start) next.push(start)
-    if (end && end !== start) next.push(end)
+    if (end) next.push(end)
     onUpdate('travelDates', next)
   }
 
@@ -244,7 +251,7 @@ export function BasicInfoStep({
                 <label className="cr-label">여행 일정</label>
                 <TravelDatePicker
                   startDate={firstDate || null}
-                  endDate={lastDate && lastDate !== firstDate ? lastDate : null}
+                  endDate={lastDate || null}
                   onChange={handleDateRangeChange}
                 />
               </div>
