@@ -117,14 +117,20 @@ class StoryViewerService(
     ): StoryViewResponse {
         val allSentences = sentencesByScene.values.flatten()
         val highlightAudioMap = loadHighlightAudioMap(allSentences)
+        val coverScene = scenes.firstOrNull { it.pageNumber == 0 }
+        val bodyScenes = if (coverScene != null) {
+            scenes.filter { it.pageNumber != 0 }
+        } else {
+            scenes
+        }
 
         return StoryViewResponse(
             storyId = story.id,
             title = story.title,
             mainCharacter = parseMainCharacter(story.mainCharacterJson),
-            coverIllustrationUrl = scenes.firstOrNull()?.illustrationUrl,
+            coverIllustrationUrl = coverScene?.illustrationUrl ?: scenes.firstOrNull()?.illustrationUrl,
             publishedAt = story.publishedAt,
-            scenes = scenes.map { scene ->
+            scenes = bodyScenes.map { scene ->
                 SceneViewResponse(
                     sceneId = scene.id,
                     pageNumber = scene.pageNumber,
