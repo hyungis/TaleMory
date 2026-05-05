@@ -156,11 +156,90 @@ class StoryConfirmServiceTest {
     }
 
     // -----------------------------------------------------------------------
-    // 5. Scenes already exist (idempotency guard)
+    // 5. Scenes already exist → idempotent response (returns existing result)
+    //    뒤로갔다 다시 미리보기 / 새로고침 / 더블클릭 / 네트워크 retry 같은 정상 흐름에서
+    //    409 가 떨어지면 안 되므로, 기존 결과를 그대로 200 으로 돌려준다.
     // -----------------------------------------------------------------------
 
     @Test
-    fun `throws INVALID_STORY_STATE when scenes already exist`() {
+    fun `returns existing result idempotently when scenes already exist`() {
+        val story = createStory(status = StoryStatus.DRAFT, voiceProfileId = 5L)
+        `when`(storyRepository.findByIdAndUserId(storyId, userId)).thenReturn(story)
+
+        val successStoryJob = createJob(storyId = storyId, jobType = JobType.STORYBOARD_STORY, status = JobStatus.SUCCESS)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_STORY))
+            .thenReturn(successStoryJob)
+
+        val successImageJob = createJob(storyId = storyId, jobType = JobType.STORYBOARD_IMAGE, status = JobStatus.SUCCESS)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.STORYBOARD_IMAGE))
+            .thenReturn(successImageJob)
+
+        // 이미 confirm 된 상태 — scene 3개, sentence 9개, 기존 TTS / FINAL 잡 존재
+        `when`(sceneRepository.countByStoryId(storyId)).thenReturn(3L)
+
+        val existingTtsJob = createJob(
+            id = 777L,
+            storyId = storyId,
+            jobType = JobType.TTS,
+            status = JobStatus.PENDING,
+        )
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.TTS))
+            .thenReturn(existingTtsJob)
+
+        val existingFinalJob = createJob(
+            id = 555L,
+            storyId = storyId,
+            jobType = JobType.FINAL_ILLUSTRATION,
+            status = JobStatus.SUCCESS,
+        )
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.FINAL_ILLUSTRATION))
+            .thenReturn(existingFinalJob)
+
+        val existingScenes = (1..3).map { i ->
+            Scene(id = i.toLong(), storyId = storyId, pageNumber = i, illustrationUrl = null, characterAnchors = null)
+        }
+        `when`(sceneRepository.findAllByStoryId(storyId)).thenReturn(existingScenes)
+
+        val existingSentences = (1..9).map { i ->
+            SceneSentence(
+                id = i.toLong(),
+                sceneId = ((i - 1) / 3 + 1).toLong(),
+                sentenceOrder = (i - 1) % 3 + 1,
+                englishText = "sentence $i",
+                koreanText = null,
+                ttsAudioUrl = null,
+                speakerKey = null,
+                bubbleSlot = null,
+                hasHighlighted = false,
+            )
+        }
+        `when`(sceneSentenceRepository.findAllBySceneIdIn(existingScenes.map { it.id }))
+            .thenReturn(existingSentences)
+
+        val result = service.confirmStoryboard(storyId, userId)
+
+        // 기존 잡 id 와 상태가 그대로 응답에 실리고, sceneCount/sentenceCount 가 일치해야 함
+        assertEquals(777L, result.jobId)
+        assertEquals("TTS", result.jobType)
+        assertEquals(JobStatus.PENDING.name, result.status)
+        assertEquals(3, result.sceneCount)
+        assertEquals(9, result.sentenceCount)
+        assertEquals(0, result.cacheHits)
+        assertEquals(0, result.cacheMisses)
+        assertEquals(555L, result.finalIllustrationJobId)
+
+        // 멱등 응답이라 새 잡 INSERT 나 MQ publish 같은 사이드이펙트가 없어야 함
+        verify(jobRepository, never()).save(org.mockito.ArgumentMatchers.any(StoryGenerationJob::class.java))
+        verify(ttsService, never()).publish(org.mockito.ArgumentMatchers.any(StoryTtsJobMessage::class.java))
+    }
+
+    // -----------------------------------------------------------------------
+    // 5b. Idempotent response requires existing TTS job
+    //     scene 은 있는데 TTS 잡이 사라진 비정상 상태 → INVALID_STORY_STATE
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `throws INVALID_STORY_STATE when idempotent path finds no TTS job`() {
         val story = createStory(status = StoryStatus.DRAFT, voiceProfileId = 5L)
         `when`(storyRepository.findByIdAndUserId(storyId, userId)).thenReturn(story)
 
@@ -173,11 +252,12 @@ class StoryConfirmServiceTest {
             .thenReturn(successImageJob)
 
         `when`(sceneRepository.countByStoryId(storyId)).thenReturn(3L)
+        `when`(jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.TTS))
+            .thenReturn(null)
 
         val ex = assertThrows<BusinessException> {
             service.confirmStoryboard(storyId, userId)
         }
-
         assertEquals(StoryErrorCode.INVALID_STORY_STATE, ex.errorCode)
     }
 
@@ -496,8 +576,10 @@ class StoryConfirmServiceTest {
         jobType: JobType,
         status: JobStatus,
         resultPayload: String? = null,
+        id: Long = 0,
     ): StoryGenerationJob =
         StoryGenerationJob(
+            id = id,
             storyId = storyId,
             jobType = jobType,
             status = status,
