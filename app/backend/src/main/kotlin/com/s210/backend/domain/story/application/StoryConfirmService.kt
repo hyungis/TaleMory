@@ -85,8 +85,18 @@ class StoryConfirmService(
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
-        // 3) 멱등성 가드 — 이미 confirm 됐는지
-        if (sceneRepository.countByStoryId(storyId) > 0) {
+        // 3) 멱등성 가드 — TTS 잡이 이미 발행되어 진행/성공 상태면 재confirm 차단.
+        //
+        //    Option B 적용 후 scenes/scene_sentences 는 Step 7 진입 시 prepareScenes 가
+        //    미리 INSERT 하므로, 옛 scene-count(>0) 가드는 더 이상 "중복 confirm" 의 신호가 아니다
+        //    (정상 흐름에서도 scenes 가 이미 존재). 대신 TTS 잡 자체의 존재 여부로 판정.
+        //
+        //    FAILED 상태는 재시도 허용 — 사용자가 Step 8 에서 재confirm 트리거 시 새 TTS 잡 발행.
+        val existingTtsJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.TTS)
+        if (existingTtsJob != null && existingTtsJob.status in setOf(
+                JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS,
+            )
+        ) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
@@ -136,34 +146,54 @@ class StoryConfirmService(
             ?.let { runCatching { parseFinalUrlMap(it) }.getOrNull() }
             ?: emptyMap()
 
-        // 7) Scene + SceneSentence INSERT
+        // 7) Scene + SceneSentence 확보.
+        //
+        //    Option B 적용 후엔 Step 7 의 prepareScenes 가 이미 row 를 만들어둔 상태가 정상 흐름이다.
+        //    이 경우엔 INSERT 를 스킵하고 기존 row 를 그대로 사용 (FE 가 강조 녹음한 hasHighlighted 플래그도 보존).
+        //    단, illustrationUrl 은 prepareScenes 시점엔 storyboard_pages.imageUrl(보통 null) 로 채워졌을 수 있으므로
+        //    여기서 최신 FINAL_ILLUSTRATION 잡 결과로 보강(이미 채워져 있으면 덮어쓰지 않음).
+        //
+        //    Legacy fallback: prepareScenes 호출 없이 직접 confirm 이 들어온 경우 — 옛 흐름대로
+        //    STORY job result payload 에서 sentences 를 파싱해 INSERT.
         var totalSentences = 0
-        val createdScenes = pages.map { page ->
-            val scene = sceneRepository.save(
-                Scene(
-                    storyId = storyId,
-                    pageNumber = page.pageNumber,
-                    illustrationUrl = finalUrlsByPage[page.pageNumber] ?: page.imageUrl,
-                    characterAnchors = null,
-                )
-            )
-            val sentences = pageToSentences[page.pageNumber].orEmpty()
-            sentences.forEachIndexed { idx, s ->
-                sceneSentenceRepository.save(
-                    SceneSentence(
-                        sceneId = scene.id,
-                        sentenceOrder = idx + 1,
-                        englishText = s.englishText,
-                        koreanText = s.koreanText,
-                        ttsAudioUrl = null,
-                        speakerKey = null,
-                        bubbleSlot = null,
-                        hasHighlighted = false,
+        val existingScenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(storyId)
+        val createdScenes = if (existingScenes.isNotEmpty()) {
+            // 기존 scene illustrationUrl 보강 — 비어있으면 최신 final 결과로 채움.
+            existingScenes.forEach { scene ->
+                if (scene.illustrationUrl.isNullOrBlank()) {
+                    finalUrlsByPage[scene.pageNumber]?.let { scene.illustrationUrl = it }
+                }
+            }
+            totalSentences = sceneSentenceRepository.findAllBySceneIdIn(existingScenes.map { it.id }).size
+            existingScenes
+        } else {
+            pages.map { page ->
+                val scene = sceneRepository.save(
+                    Scene(
+                        storyId = storyId,
+                        pageNumber = page.pageNumber,
+                        illustrationUrl = finalUrlsByPage[page.pageNumber] ?: page.imageUrl,
+                        characterAnchors = null,
                     )
                 )
-                totalSentences++
+                val sentences = pageToSentences[page.pageNumber].orEmpty()
+                sentences.forEachIndexed { idx, s ->
+                    sceneSentenceRepository.save(
+                        SceneSentence(
+                            sceneId = scene.id,
+                            sentenceOrder = idx + 1,
+                            englishText = s.englishText,
+                            koreanText = s.koreanText,
+                            ttsAudioUrl = null,
+                            speakerKey = null,
+                            bubbleSlot = null,
+                            hasHighlighted = false,
+                        )
+                    )
+                    totalSentences++
+                }
+                scene
             }
-            scene
         }
 
         // 8) StoryOutro 보장

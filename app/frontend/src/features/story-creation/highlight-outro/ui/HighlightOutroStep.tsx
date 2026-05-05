@@ -19,6 +19,7 @@ import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import {
   getScenes,
+  prepareScenes,
   presignHighlightVoice,
   uploadAudioToS3,
   commitHighlightVoice,
@@ -88,19 +89,39 @@ export function HighlightOutroStep({
   useEffect(() => {
     if (!storyId) return
     setLoadingScenes(true)
-    Promise.all([
-      getScenes(storyId).catch(() => [] as SceneDto[]),
-      getStoryboardPages(storyId).catch(() => null),
-    ])
-      .then(([scenesData, storyboardData]) => {
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        // 1) Step 7 진입 시 scenes 정규화 — `storyboard_pages.sentences` JSON 을 scenes/scene_sentences 로 평탄화.
+        //    멱등: 이미 prepared 면 alreadyPrepared=true 로 즉시 return. 실패해도 throw 하지 않고 이어서 getScenes 시도
+        //    (구버전 confirm 흐름으로 만들어진 row 가 남아있는 등의 fallback 경로).
+        await prepareScenes(storyId).catch(err => {
+          console.warn('prepareScenes failed (proceed with getScenes anyway):', err)
+        })
+
+        const [scenesData, storyboardData] = await Promise.all([
+          getScenes(storyId).catch(() => [] as SceneDto[]),
+          getStoryboardPages(storyId).catch(() => null),
+        ])
+
+        if (cancelled) return
+
         if (scenesData.length > 0) setScenes(scenesData)
         if (storyboardData) {
           const imageMap = new Map<number, string | null>()
           storyboardData.pages.forEach((p, idx) => imageMap.set(idx, p.imageUrl))
           setStoryboardImageUrls(imageMap)
         }
-      })
-      .finally(() => setLoadingScenes(false))
+      } finally {
+        if (!cancelled) setLoadingScenes(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [storyId])
 
   const displayPages: Array<{
