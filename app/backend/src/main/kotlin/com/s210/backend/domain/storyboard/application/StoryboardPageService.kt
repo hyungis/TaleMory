@@ -80,6 +80,7 @@ class StoryboardPageService(
         koreanText: String,
     ): StoryboardPageResult {
         ownedStory(userId, storyId)
+        assertNoActiveTranslationJob(storyId)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
@@ -140,6 +141,17 @@ class StoryboardPageService(
      * 소유권 + 삭제 여부 검증.
      * StoryboardGenerationService 의 동명 메서드와 동일 패턴 — 향후 공통 helper 로 추출 검토.
      */
+    private fun assertNoActiveTranslationJob(storyId: Long) {
+        val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORY_SENTENCE_TRANSLATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeTranslationJob != null) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_TRANSLATION_IN_PROGRESS)
+        }
+    }
+
     private fun ownedStory(userId: Long, storyId: Long): Story {
         val story = storyRepository.findById(storyId).orElseThrow {
             BusinessException(StoryErrorCode.STORY_NOT_FOUND)
