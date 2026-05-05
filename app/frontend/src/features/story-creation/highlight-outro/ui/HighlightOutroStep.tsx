@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Square,
   Star,
+  Trash2,
   MessageSquareHeart,
 } from 'lucide-react'
 import type { StoryProject } from '../../model/types'
@@ -172,6 +173,33 @@ export function HighlightOutroStep({
 
   const [highlights, setHighlights] = useState<HighlightSentence[]>([])
   const [currentPage, setCurrentPage] = useState(0)
+
+  /**
+   * Step 7 재진입 시 기존 강조 녹음 복원.
+   *
+   * `scenes` 가 로드되면 sentence.hasHighlighted=true 또는 highlightVoiceUrl 있는 row 를
+   * `highlights` state 로 매핑해 UI 가 "선택됨 + 듣기 버튼 + 녹음 완료" 상태로 시작하도록.
+   * displayPages 의 pageIndex/sentenceIndex 가 scenes.map 의 idx 와 일치하므로 그대로 사용.
+   */
+  useEffect(() => {
+    if (!scenes) return
+    const restored: HighlightSentence[] = []
+    scenes.forEach((scene, pageIndex) => {
+      scene.sentences.forEach((sentence, sIdx) => {
+        if (sentence.hasHighlighted || sentence.highlightVoiceUrl) {
+          restored.push({
+            pageIndex,
+            sentenceIndex: sIdx,
+            sentenceId: sentence.id,
+            text: sentence.englishText,
+            audioUrl: sentence.highlightVoiceUrl,
+            uploading: false,
+          })
+        }
+      })
+    })
+    setHighlights(restored)
+  }, [scenes])
 
   const [outroText, setOutroText] = useState('')
   const [outroSignature, setOutroSignature] = useState('')
@@ -607,6 +635,37 @@ export function HighlightOutroStep({
                                       }}
                                     >
                                       {playingUrl === highlight.audioUrl ? <><Pause className="w-3.5 h-3.5" /> 정지</> : <><Play className="w-3.5 h-3.5" /> 듣기</>}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        // 강조 녹음 명시적 삭제 — BE soft delete + scene_sentence.has_highlighted=false 까지 한 짝.
+                                        // 재생 중이면 먼저 stop 해야 audio src 가 사라진 뒤에도 누수 없음.
+                                        if (playingUrl === highlight.audioUrl) stopAudio()
+                                        if (storyId && highlight.sentenceId) {
+                                          deleteHighlightVoice(storyId, highlight.sentenceId).catch(() => {})
+                                        }
+                                        setHighlights(prev =>
+                                          prev.filter(h => !(h.pageIndex === pageIndex && h.sentenceIndex === sIdx)),
+                                        )
+                                      }}
+                                      aria-label="강조 녹음 삭제"
+                                      style={{
+                                        background: 'transparent',
+                                        color: 'var(--cr-rust)',
+                                        border: '2px solid var(--cr-rust)',
+                                        borderRadius: 999,
+                                        padding: '6px 14px',
+                                        fontFamily: 'var(--cr-font-gaegu)',
+                                        fontWeight: 700,
+                                        fontSize: 13,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                      }}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" /> 삭제
                                     </button>
                                     <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontWeight: 700, fontSize: 12, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
                                       녹음 완료

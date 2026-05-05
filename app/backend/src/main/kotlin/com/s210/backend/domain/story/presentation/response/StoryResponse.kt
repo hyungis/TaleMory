@@ -89,7 +89,13 @@ data class SentenceResponse(
     val ttsAudioUrl: String?,
     val speakerKey: String?,
     val bubbleSlot: String?,
-    val hasHighlighted: Boolean
+    val hasHighlighted: Boolean,
+    /**
+     * 사용자가 녹음한 강조 문장 audio URL (활성 row 기준).
+     * `hasHighlighted=true` 라도 voice row 가 soft-delete 되어있으면 null.
+     * Step 7 재진입 시 FE 가 이 값으로 기존 녹음을 복원해 듣기/재녹음 가능 상태로 표시.
+     */
+    val highlightVoiceUrl: String?,
 )
 
 data class OutroResponse(

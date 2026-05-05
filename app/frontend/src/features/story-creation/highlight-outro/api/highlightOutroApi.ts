@@ -18,6 +18,11 @@ export interface SentenceDto {
   speakerKey: string | null
   bubbleSlot: string | null
   hasHighlighted: boolean
+  /**
+   * 사용자가 녹음한 강조 audio URL. 활성 row 가 없으면 null.
+   * Step 7 재진입 시 기존 녹음 복원에 사용.
+   */
+  highlightVoiceUrl: string | null
 }
 
 export interface PresignedUrlDto {

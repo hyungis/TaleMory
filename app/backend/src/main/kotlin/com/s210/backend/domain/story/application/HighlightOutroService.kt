@@ -149,6 +149,17 @@ class HighlightOutroService(
             .findBySceneIdInOrderBySceneIdAscSentenceOrderAsc(sceneIds)
             .groupBy { it.sceneId }
 
+        // 활성 강조 녹음 일괄 조회 → sentence_id → audio_url 매핑.
+        // Step 7 재진입 시 사용자가 이미 녹음한 audio 를 그대로 듣기/재녹음 가능 상태로 복원하기 위함.
+        val allSentenceIds = sentencesByScene.values.flatten().map { it.id }
+        val highlightVoiceBySentenceId: Map<Long, String> = if (allSentenceIds.isEmpty()) {
+            emptyMap()
+        } else {
+            sceneHighlightVoiceRepository
+                .findAllBySentenceIdInAndDeletedAtIsNull(allSentenceIds)
+                .associate { it.sentenceId to it.audioUrl }
+        }
+
         return scenes.map { scene ->
             SceneResponse(
                 id = scene.id,
@@ -164,6 +175,7 @@ class HighlightOutroService(
                         speakerKey = s.speakerKey,
                         bubbleSlot = s.bubbleSlot?.name,
                         hasHighlighted = s.hasHighlighted,
+                        highlightVoiceUrl = highlightVoiceBySentenceId[s.id],
                     )
                 },
             )
