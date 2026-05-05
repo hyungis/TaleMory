@@ -648,7 +648,11 @@ export function StoryboardEditorStep({
     imageJobQuery.data?.status !== 'FAILED' &&
     imageJobQuery.data?.status !== 'CANCELLED'
 
+  const allStoryboardTextReady =
+    pages.length > 0 &&
+    pages.every(p => p.englishText?.trim() && p.koreanText?.trim())
   const allImagesReady = pages.length > 0 && pages.every(p => !!p.imageUrl)
+  const canProceedToStyle = readOnly || (allStoryboardTextReady && allImagesReady)
   const someImagesReady = pages.some(p => !!p.imageUrl)
 
   return (
@@ -997,7 +1001,14 @@ export function StoryboardEditorStep({
         currentStep={4}
         onBack={onBack}
 	        onNext={onNext}
-	        nextDisabled={isTranslationInProgress}
+	        nextDisabled={
+            !canProceedToStyle ||
+            isTranslationInProgress ||
+            isImageJobInProgress ||
+            generateImagesMut.isPending ||
+            pagesQuery.isLoading ||
+            pagesQuery.isFetching
+          }
         nextLabel="다음: 그림 스타일 선택"
       />
     </div>
