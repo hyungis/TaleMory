@@ -267,7 +267,7 @@ function createAbortSupport(signal?: AbortSignal, timeoutMs?: number): {
   }
 
   const controller = new AbortController()
-  let timeoutId: number | undefined
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
   let abortListener: (() => void) | undefined
 
   if (signal) {
