@@ -13,7 +13,6 @@ from urllib import error, request
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.core.config import settings
 from app.schemas.tts import PreviewOptions, VoiceRegisterRequest
@@ -435,10 +434,9 @@ def generate_story_tts_result(
     default_emotion = request["options"]["defaultEmotion"]
     default_style_prompt = request["options"].get("defaultStylePrompt")
     output_format = request.get("format", "wav")
-    sentences = request["sentences"]
-    max_workers = max(1, min(len(sentences) or 1, settings.TTS_STORY_SENTENCE_CONCURRENCY))
+    items: list[dict[str, Any]] = []
 
-    def generate_one(index: int, sentence: dict[str, Any]) -> dict[str, Any]:
+    for index, sentence in enumerate(request["sentences"], start=1):
         sentence_id = sentence["sentenceId"]
         emotion = sentence.get("emotion") or default_emotion
         style_prompt = sentence.get("stylePrompt") or default_style_prompt
@@ -467,17 +465,15 @@ def generate_story_tts_result(
             voice_id,
             sentence_id,
             index,
-            len(sentences),
+            len(request["sentences"]),
             len(sentence["text"]),
             len(audio_bytes),
             cosy_elapsed,
             store_elapsed,
             _elapsed_ms(sentence_started),
         )
-
-        return {
-            "index": index,
-            "item": {
+        items.append(
+            {
                 "sentenceId": sentence_id,
                 "appliedStyle": {
                     "emotion": emotion,
@@ -489,29 +485,10 @@ def generate_story_tts_result(
                     "durationMs": _duration_ms_from_audio(audio_bytes, resolved_format, sentence["text"]),
                     "format": resolved_format,
                 },
-            },
-        }
-
-    completed = 0
-    results: list[dict[str, Any]] = []
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(generate_one, index, sentence)
-            for index, sentence in enumerate(sentences, start=1)
-        ]
-
-        for future in as_completed(futures):
-            results.append(future.result())
-            completed += 1
-
-            if progress_callback is not None:
-                progress_callback(min(95, int(completed / len(sentences) * 90) + 5))
-
-    items = [
-        result["item"]
-        for result in sorted(results, key=lambda result: result["index"])
-    ]
+            }
+        )
+        if progress_callback is not None:
+            progress_callback(min(95, int(index / len(request["sentences"]) * 90) + 5))
 
     result: dict[str, Any] = {
         "storyId": story_id,
