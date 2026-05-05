@@ -48,7 +48,9 @@ class SceneIllustrationService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        private const val SCENE_REGEN_LIMIT = 2
+        // Step 8 (FinalPreviewStep) 에서 페이지별로 최종 삽화를 3번까지 다시 그릴 수 있도록 허용.
+        // 기존 2 였다가 사용자 요청으로 3 으로 상향 — story 단위 총량(STORY_REGEN_LIMIT) 은 유지.
+        private const val SCENE_REGEN_LIMIT = 3
         private const val STORY_REGEN_LIMIT = 10
         private const val MAX_REFERENCE_IMAGES = 3
     }
