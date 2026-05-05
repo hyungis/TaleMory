@@ -1,6 +1,7 @@
 package com.s210.backend.domain.auth.presentation.response
 
 import com.s210.backend.domain.auth.application.dto.AuthResult
+import com.s210.backend.domain.auth.application.dto.AvailabilityResult
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.application.dto.OauthSignupProfile
 import java.time.LocalDateTime
@@ -16,6 +17,10 @@ data class SignupResponse(
 
 data class RefreshTokenResponse(
     val accessToken: String
+)
+
+data class AvailabilityResponse(
+    val available: Boolean,
 )
 
 data class KakaoCallbackResponse(
@@ -65,6 +70,9 @@ fun AuthResult.toAuthResponse(): AuthResponse =
         ),
     )
 
+fun AvailabilityResult.toAvailabilityResponse(): AvailabilityResponse =
+    AvailabilityResponse(available = available)
+
 fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
     when (this) {
         is OauthCallbackResult.Login -> authResult.toKakaoCallbackResponse()
@@ -75,6 +83,11 @@ fun OauthCallbackResult.toKakaoCallbackResponse(): KakaoCallbackResponse =
         )
         is OauthCallbackResult.RestoreRequired -> KakaoCallbackResponse(
             status = CALLBACK_STATUS_RESTORE_REQUIRED,
+            signupToken = signupToken,
+            profile = profile.toResponse(),
+        )
+        is OauthCallbackResult.LinkRequired -> KakaoCallbackResponse(
+            status = CALLBACK_STATUS_LINK_REQUIRED,
             signupToken = signupToken,
             profile = profile.toResponse(),
         )
@@ -101,3 +114,4 @@ private fun OauthSignupProfile.toResponse(): OauthSignupProfileResponse =
 private const val CALLBACK_STATUS_LOGIN = "LOGIN"
 private const val CALLBACK_STATUS_SIGNUP_REQUIRED = "SIGNUP_REQUIRED"
 private const val CALLBACK_STATUS_RESTORE_REQUIRED = "RESTORE_REQUIRED"
+private const val CALLBACK_STATUS_LINK_REQUIRED = "LINK_REQUIRED"

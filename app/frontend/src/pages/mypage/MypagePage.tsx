@@ -118,9 +118,7 @@ export function MypagePage() {
     navigate(target, { replace: true })
   }
 
-  const handleProfileSave = async (
-    patch: Pick<UserProfile, 'name' | 'nickname' | 'phone' | 'agreeSms' | 'agreeMarketing'>,
-  ) => {
+  const handleProfileSave = async (patch: Pick<UserProfile, 'name' | 'nickname' | 'phone'>) => {
     const nextUser = await meUpdate.mutateAsync({
       ...patch,
       phone: patch.phone ?? null,

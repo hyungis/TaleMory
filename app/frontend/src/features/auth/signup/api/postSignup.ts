@@ -7,12 +7,12 @@ export async function postSignup(body: SignupRequest): Promise<SignupResponse> {
     {
       loginId: body.loginId,
       password: body.password,
+      passwordCheck: body.passwordCheck,
       email: body.email,
       name: body.name,
       nickname: body.nickname,
       phone: body.phone,
-      agreeSms: body.agreeSms,
-      agreeMarketing: body.agreeMarketing,
+      termAgreements: body.termAgreements,
       restoreConfirmed: body.restoreConfirmed ?? false,
     },
     {

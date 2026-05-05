@@ -1,12 +1,14 @@
+import type { TermAgreement } from '../terms'
+
 export interface SignupRequest {
   loginId: string
   password: string
+  passwordCheck: string
   email: string
   name: string
   nickname: string
   phone?: string
-  agreeSms: boolean
-  agreeMarketing: boolean
+  termAgreements: TermAgreement[]
   restoreConfirmed?: boolean
 }
 
