@@ -49,17 +49,16 @@ class FinalIllustrationGenerationService(
      * @return enqueue 된 (또는 멱등 재사용된) 잡 id.
      */
     fun enqueue(storyId: Long, stylePresetId: Long): Long {
-        val story = storyRepository.findById(storyId).orElseThrow {
-            BusinessException(StoryErrorCode.STORY_NOT_FOUND)
-        }
+        val story = storyRepository.findByIdForUpdate(storyId)
+            ?: throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         if (story.deletedAt != null) throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
 
         // 1) 멱등 가드.
-        findReusableJob(storyId, stylePresetId)?.let { return it.id }
-
         val stylePreset = stylePresetRepository.findById(stylePresetId).orElseThrow {
             BusinessException(StoryErrorCode.STYLE_PRESET_NOT_FOUND)
         }
+
+        findReusableJob(storyId, stylePresetId, stylePreset.code)?.let { return it.id }
 
         // 2) storyboard_pages 가 채워져 있어야 함.
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -171,17 +170,34 @@ class FinalIllustrationGenerationService(
      * 같은 storyId + JobType.FINAL_ILLUSTRATION 의 최근 잡이
      * PENDING/RUNNING/SUCCESS 이고 requestPayload.stylePresetId 가 같으면 재사용.
      */
-    private fun findReusableJob(storyId: Long, stylePresetId: Long): StoryGenerationJob? {
+    private fun findReusableJob(storyId: Long, stylePresetId: Long, styleCode: String): StoryGenerationJob? {
         val recent = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
             storyId, JobType.FINAL_ILLUSTRATION,
         ) ?: return null
         if (recent.status !in REUSABLE_STATUSES) return null
-        val savedStylePresetId = try {
-            objectMapper.readValue(recent.requestPayload, FinalIllustrationJobMeta::class.java).stylePresetId
-        } catch (e: Exception) {
-            return null
+        return if (requestMatchesStyle(recent.requestPayload, stylePresetId, styleCode)) recent else null
+    }
+
+    private fun requestMatchesStyle(requestPayload: String?, stylePresetId: Long, styleCode: String): Boolean {
+        if (requestPayload.isNullOrBlank()) return false
+        return try {
+            val root = objectMapper.readTree(requestPayload)
+
+            val savedStylePresetId = root.get("stylePresetId")?.asLong()
+            if (savedStylePresetId == stylePresetId) return true
+
+            val items = root.path("payload").path("items")
+            if (!items.isArray) return false
+
+            var hasItems = false
+            for (item in items) {
+                hasItems = true
+                if (item.get("stylePrompt")?.asText() != styleCode) return false
+            }
+            hasItems
+        } catch (_: Exception) {
+            false
         }
-        return if (savedStylePresetId == stylePresetId) recent else null
     }
 
     private fun loadLastSuccessStoryPayload(storyId: Long): StoryboardPayload {
