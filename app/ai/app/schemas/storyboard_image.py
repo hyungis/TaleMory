@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.storyboard import ChildInfo
 
@@ -9,15 +9,29 @@ class StoryboardImageContext(BaseModel):
 
 
 class StoryboardImagePageInput(BaseModel):
-    pageNumber: int = Field(..., ge=1)
-    sceneSummary: str = Field(..., min_length=1, max_length=1000)
-    englishText: str = Field(..., min_length=1, max_length=4000)
-    koreanText: str = Field(..., min_length=1, max_length=4000)
-    imagePrompt: str = Field(..., min_length=1, max_length=2000)
+    pageNumber: int = Field(..., ge=0)
+    sceneSummary: str | None = Field(default=None, max_length=1000)
+    englishText: str | None = Field(default=None, max_length=4000)
+    koreanText: str | None = Field(default=None, max_length=4000)
+    imagePrompt: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_page_text(self) -> "StoryboardImagePageInput":
+        if self.pageNumber == 0:
+            return self
+        if not self.sceneSummary or not self.sceneSummary.strip():
+            raise ValueError("sceneSummary is required for storyboard pages")
+        if not self.englishText or not self.englishText.strip():
+            raise ValueError("englishText is required for storyboard pages")
+        if not self.koreanText or not self.koreanText.strip():
+            raise ValueError("koreanText is required for storyboard pages")
+        if not self.imagePrompt or not self.imagePrompt.strip():
+            raise ValueError("imagePrompt is required for storyboard pages")
+        return self
 
 
 class StoryboardImageGenerateItemRequest(BaseModel):
-    pageNumber: int = Field(..., ge=1)
+    pageNumber: int = Field(..., ge=0)
     storyboard: StoryboardImageContext
     page: StoryboardImagePageInput
     children: list[ChildInfo] = Field(..., min_length=1)
@@ -34,7 +48,7 @@ class StoryboardImageGenerateRequest(BaseModel):
     seed: int = Field(..., ge=0)
     characterSourceImageUrls: list[str] = Field(default_factory=list, max_length=3)
     characterSourceImageS3Keys: list[str] = Field(default_factory=list, max_length=3)
-    items: list[StoryboardImageGenerateItemRequest] = Field(..., min_length=1, max_length=20)
+    items: list[StoryboardImageGenerateItemRequest] = Field(..., min_length=1, max_length=21)
 
 
 class StoryboardCharacterReferenceGenerateRequest(BaseModel):
