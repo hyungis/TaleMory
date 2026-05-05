@@ -40,6 +40,7 @@ class StoryboardPageService(
     private val jobRepository: StoryGenerationJobRepository,
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -80,7 +81,7 @@ class StoryboardPageService(
         koreanText: String,
     ): StoryboardPageResult {
         val story = ownedStory(userId, storyId)
-        assertStoryboardEditable(story)
+        storyboardEditGuard.assertEditable(story)
         assertNoActiveTranslationJob(storyId)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -162,9 +163,4 @@ class StoryboardPageService(
         return story
     }
 
-    private fun assertStoryboardEditable(story: Story) {
-        if (story.stylePresetId != null) {
-            throw BusinessException(StoryErrorCode.STORYBOARD_EDIT_LOCKED_BY_STYLE)
-        }
-    }
 }

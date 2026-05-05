@@ -61,6 +61,7 @@ class StoryboardGenerationService(
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -70,7 +71,7 @@ class StoryboardGenerationService(
             userId, storyId, !prompt.isNullOrBlank(),
         )
         val story = ownedStory(userId, storyId)
-        assertStoryboardEditable(story)
+        storyboardEditGuard.assertEditable(story)
 
         // [본문 발행 가드 1 — race 차단, plan D7-A]
         // 활성 본문 잡(PENDING/RUNNING) 이 존재하면 즉시 거부 (race 가 더 일찍 cheap 한 fail).
@@ -230,7 +231,7 @@ class StoryboardGenerationService(
      */
     fun editSummary(userId: Long, storyId: Long, newSummaryKo: String): StoryBoardResult {
         val story = ownedStory(userId, storyId)
-        assertStoryboardEditable(story)
+        storyboardEditGuard.assertEditable(story)
 
         // 활성 본문 잡이 있는 동안엔 줄거리 변경 거부 — 진행 중 본문이 stale grounding 으로 가는 것 차단.
         val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
@@ -357,12 +358,6 @@ class StoryboardGenerationService(
      * jobs.requestPayload(JSON, StoryboardImageRegeneratePayload 직렬화 결과) 에서 pageNumber 추출.
      * 파싱 실패 시 null 반환 — 호출자가 분기 (잡 없음으로 처리).
      */
-    private fun assertStoryboardEditable(story: Story) {
-        if (story.stylePresetId != null) {
-            throw BusinessException(StoryErrorCode.STORYBOARD_EDIT_LOCKED_BY_STYLE)
-        }
-    }
-
     private fun parseRegeneratePageNumber(requestPayload: String?): Int? {
         if (requestPayload.isNullOrBlank()) return null
         return try {

@@ -52,6 +52,7 @@ class StoryboardSummaryService(
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
     private val jobStatusRedisRepo: JobStatusRedisRepository,
+    private val storyboardEditGuard: StoryboardEditGuard,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -70,7 +71,7 @@ class StoryboardSummaryService(
             userId, storyId, !prompt.isNullOrBlank(),
         )
         val story = ownedStory(userId, storyId)
-        assertStoryboardEditable(story)
+        storyboardEditGuard.assertEditable(story)
 
         // 활성 본문 잡(STORY) 이 PENDING/RUNNING 이면 줄거리 새로 생성 거부.
         // 진행 중인 본문이 stale grounding 을 받지 않도록 차단 + sessionStorage 비어 락이 풀린
@@ -138,7 +139,7 @@ class StoryboardSummaryService(
             userId, storyId, userPrompt.length,
         )
         val story = ownedStory(userId, storyId)
-        assertStoryboardEditable(story)
+        storyboardEditGuard.assertEditable(story)
 
         // 활성 본문 잡(STORY) 이 PENDING/RUNNING 이면 줄거리 재생성 거부 (generateSummary 와 동일 정책).
         val activeStoryJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
@@ -416,12 +417,6 @@ class StoryboardSummaryService(
      * Step 2 → 3 전환 시점의 BE 가드. FE 다음 버튼 비활성과 함께 이중 방어.
      * `purpose IN (CHARACTER_REF, BOTH)` 인 활성 사진 카운트.
      */
-    private fun assertStoryboardEditable(story: Story) {
-        if (story.stylePresetId != null) {
-            throw BusinessException(StoryErrorCode.STORYBOARD_EDIT_LOCKED_BY_STYLE)
-        }
-    }
-
     private fun requireCharacterRefAtLeastOne(storyId: Long) {
         val refCount = photoRepository.countByStoryIdAndPurposeInAndDeletedAtIsNull(
             storyId,
