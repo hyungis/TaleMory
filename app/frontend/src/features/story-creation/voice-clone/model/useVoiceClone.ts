@@ -285,6 +285,13 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         const url = await blobToDataUrl(blob)
         setRecordedAudioUrl(url)
         setTtsAudioUrl(null)
+        /* 새 녹음을 받으면 직전에 "기존 음성 불러오기" 로 채워졌거나 previewTts 가 auto-commit
+           해 둔 savedProfileId 는 더 이상 이 녹음과 무관하다. 다음 previewTts 호출이 새 녹음을
+           업로드하도록 reset 한다 (안 그러면 FE 가 옛날 profileId 로 TTS 호출 → 사용자가 새로
+           녹음했는데도 이전 음성으로 합성됨). attach 상태도 같이 idle 로 되돌림. */
+        setSavedProfileId(null)
+        setAttachStatus('idle')
+        setAttachError(null)
         setStatus('ready')
         setStatusLabel('새 녹음 준비 완료')
         setTtsStatusText('이 녹음으로 TTS를 미리 들어볼 수 있어요.')
@@ -320,6 +327,11 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   const rerecord = useCallback(() => {
     setRecordedAudioUrl(null)
     setTtsAudioUrl(null)
+    /* 옛 녹음/불러온 프로필과의 연결을 끊는다 — 다음 녹음의 onstop 에서도 어차피 한 번 더 reset
+       되지만, idle 상태에서도 일관되게 비워두기 위해 여기서도 처리. */
+    setSavedProfileId(null)
+    setAttachStatus('idle')
+    setAttachError(null)
     setStatus('idle')
     setStatusLabel('다시 녹음 준비')
     setTtsStatusText('새로 녹음한 뒤 TTS를 들어볼 수 있어요.')

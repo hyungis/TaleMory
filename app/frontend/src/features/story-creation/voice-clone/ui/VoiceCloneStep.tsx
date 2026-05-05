@@ -277,16 +277,21 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
 
             {vc.status === 'ready' && (
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowSaveModal(true)}
-                  disabled={!vc.recordedAudioUrl || vc.isSaving}
-                  className="cr-btn-next"
-                  style={{ justifySelf: 'auto' }}
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{vc.isSaving ? '저장 중...' : '녹음 저장하기'}</span>
-                </button>
+                {/* "녹음 저장하기" 는 새로 녹음한 (= 아직 BE 에 저장 안 된) 클립일 때만 노출.
+                    기존 음성을 불러왔거나 이미 저장된 직후에는 savedProfileId 가 채워져 있어
+                    이미 BE 에 들어간 보이스라 "저장" 행위가 의미 없음. */}
+                {vc.savedProfileId === null && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveModal(true)}
+                    disabled={!vc.recordedAudioUrl || vc.isSaving}
+                    className="cr-btn-next"
+                    style={{ justifySelf: 'auto' }}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{vc.isSaving ? '저장 중...' : '녹음 저장하기'}</span>
+                  </button>
+                )}
                 {vc.savedProfileId && (
                   <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-sage-deep)', fontWeight: 700, margin: 0 }}>
                     {vc.savedVoiceSummary}

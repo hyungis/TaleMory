@@ -836,7 +836,7 @@ export function StoryboardEditorStep({
                 <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
                 <p className="text-[#2d5a27] font-bold mb-2">동화 본문을 만들고 있어요</p>
                 <p className="text-[#8b7a52]">
-                  AI 가 페이지별 글을 쓰고 있어요. 보통 30초 ~ 1분 정도 걸려요.
+                  AI 가 페이지별 글을 쓰고 있어요.
                 </p>
               </div>
             )}
