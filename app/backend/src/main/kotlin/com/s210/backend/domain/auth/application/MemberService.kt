@@ -20,6 +20,8 @@ import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
+import com.s210.backend.domain.terms.exception.TermsErrorCode
+import com.s210.backend.domain.terms.infrastructure.repository.TermsRepository
 import com.s210.backend.domain.user.entity.OauthAccount
 import com.s210.backend.domain.user.entity.User
 import com.s210.backend.domain.user.exception.UserErrorCode
@@ -43,6 +45,7 @@ class MemberService(
     private val kakaoOAuthClient: KakaoOAuthClient,
     private val oauthRedirectUriResolver: OauthRedirectUriResolver,
     private val oauthSignupTokenProvider: OauthSignupTokenProvider,
+    private val termsRepository: TermsRepository,
 ) {
     fun signUp(command: SignupCommand): Long {
         validateSignupCommand(command)
@@ -364,14 +367,22 @@ class MemberService(
     }
 
     private fun requireRequiredTermsAgreed(termAgreements: List<TermAgreementCommand>) {
+        val requiredTermIds = termsRepository.findAllByIsRequiredTrueOrderByIdAsc()
+            .map { it.id }
+            .toSet()
+
+        if (requiredTermIds.isEmpty()) {
+            throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_CONFIGURED)
+        }
+
         val agreedTermIds = termAgreements
             .asSequence()
             .filter { it.agreed }
             .map { it.termId }
             .toSet()
 
-        if (!agreedTermIds.containsAll(REQUIRED_TERM_IDS)) {
-            throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        if (!agreedTermIds.containsAll(requiredTermIds)) {
+            throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED)
         }
     }
 
@@ -489,7 +500,6 @@ class MemberService(
         private const val SUPPORTED_PROVIDER = "kakao"
         private const val MIN_LOGIN_ID_LENGTH = 4
         private const val MIN_PASSWORD_LENGTH = 6
-        private val REQUIRED_TERM_IDS = setOf(1L, 2L)
         private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
         private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
     }

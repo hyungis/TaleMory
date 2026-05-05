@@ -38,6 +38,7 @@ class SecurityConfig(
                     "/api/auth/kakao/signup",
                     "/api/auth/refresh",
                     "/api/auth/logout",
+                    "/api/terms",
                     "/api/public/**",
                     "/api/dictionary/**",
                 ).permitAll()
