@@ -79,7 +79,8 @@ class StoryboardPageService(
         pageNumber: Int,
         koreanText: String,
     ): StoryboardPageResult {
-        ownedStory(userId, storyId)
+        val story = ownedStory(userId, storyId)
+        assertStoryboardEditable(story)
         assertNoActiveTranslationJob(storyId)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -159,5 +160,11 @@ class StoryboardPageService(
         if (story.deletedAt != null) throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
+    }
+
+    private fun assertStoryboardEditable(story: Story) {
+        if (story.stylePresetId != null) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_EDIT_LOCKED_BY_STYLE)
+        }
     }
 }

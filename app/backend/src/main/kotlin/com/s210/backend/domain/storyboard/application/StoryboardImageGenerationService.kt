@@ -64,6 +64,7 @@ class StoryboardImageGenerationService(
 
     fun generate(userId: Long, storyId: Long): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        assertStoryboardEditable(story)
         assertNoActiveTranslationJob(storyId)
         val stylePreset = resolveStylePreset(story)
 
@@ -195,6 +196,7 @@ class StoryboardImageGenerationService(
         userPrompt: String,
     ): StartGenerationResult {
         val story = ownedStory(userId, storyId)
+        assertStoryboardEditable(story)
         assertNoActiveTranslationJob(storyId)
         val stylePreset = resolveStylePreset(story)
 
@@ -386,6 +388,12 @@ class StoryboardImageGenerationService(
         if (story.deletedAt != null) throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
+    }
+
+    private fun assertStoryboardEditable(story: Story) {
+        if (story.stylePresetId != null) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_EDIT_LOCKED_BY_STYLE)
+        }
     }
 
     private fun assertNoActiveTranslationJob(storyId: Long) {
