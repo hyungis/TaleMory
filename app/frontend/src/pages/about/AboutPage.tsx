@@ -127,17 +127,6 @@ export function AboutPage() {
         </div>
       </section>
 
-      {/* CTA 섹션 */}
-      <section className="about-cta">
-        <p className="about-cta__text">지금 우리 가족만의 동화책을 만들어볼까요?</p>
-        <button
-          type="button"
-          className="about-cta__btn"
-          onClick={() => navigate(ROUTES.home)}
-        >
-          시작하기
-        </button>
-      </section>
     </div>
   )
 }

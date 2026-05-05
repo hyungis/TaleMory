@@ -46,20 +46,18 @@
   z-index: 0;
 }
 
-/* 모든 콘텐츠는 배경 위에 */
-.about-page > *:not(.about-doodles-bg) {
+/* 모든 콘텐츠는 배경 위에 (nav 제외 — fixed 유지) */
+.about-page > *:not(.about-doodles-bg):not(.about-nav) {
   position: relative;
   z-index: 1;
 }
 
 /* ===== Navigation ===== */
 .about-nav {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  top: 1rem;
+  left: 1.5rem;
   z-index: 100;
-  padding: 1rem 1.5rem;
-  background: rgba(253, 250, 240, 0.92);
-  backdrop-filter: blur(6px);
 }
 
 .about-back-btn {
@@ -117,7 +115,7 @@
 
 .about-hero__subtitle {
   font-family: 'Gaegu', 'Nanum Pen Script', cursive;
-  font-size: clamp(1.4rem, 2.8vw, 1.9rem);
+  font-size: clamp(1.6rem, 3.2vw, 2.2rem);
   font-weight: 700;
   color: #6b5a3e;
   margin: 0 0 1.5rem;
@@ -136,7 +134,7 @@
 
 .about-hero__desc {
   font-family: 'Gaegu', 'Nanum Pen Script', cursive;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   line-height: 1.8;
   color: #4a3b2a;
   margin: 0;
@@ -145,7 +143,7 @@
 /* ===== Section Title ===== */
 .about-section-title {
   font-family: 'Gaegu', 'Nanum Pen Script', cursive;
-  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  font-size: clamp(2.2rem, 4.5vw, 3rem);
   font-weight: 700;
   color: #5f7d50;
   text-align: center;
@@ -159,7 +157,7 @@
 }
 
 .about-steps__timeline {
-  max-width: 640px;
+  max-width: 800px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -175,11 +173,11 @@
 }
 
 .about-step:nth-child(odd) {
-  background: rgba(122, 153, 104, 0.08);
+  background: rgba(122, 153, 104, 0.25);
 }
 
 .about-step:nth-child(even) {
-  background: rgba(200, 153, 104, 0.06);
+  background: rgba(200, 153, 104, 0.2);
 }
 
 .about-step__number {
@@ -204,7 +202,7 @@
 
 .about-step__title {
   font-family: 'Gaegu', 'Nanum Pen Script', cursive;
-  font-size: 1.5rem;
+  font-size: 1.7rem;
   font-weight: 700;
   color: #4a3b2a;
   margin: 0 0 0.3rem;
@@ -212,7 +210,7 @@
 
 .about-step__desc {
   font-family: 'Gaegu', 'Nanum Pen Script', cursive;
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   line-height: 1.5;
   color: #6b5a3e;
   margin: 0;
