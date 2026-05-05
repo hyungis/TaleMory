@@ -298,13 +298,17 @@ class StoryboardSummaryService(
         return response
     }
 
-    /** Cache hit 시 deserialize. 실패는 swallow + WARN — 캐시 깨졌으면 DB fallback. */
+    /**
+     * Cache hit 시 deserialize. 실패는 swallow + WARN + **invalidate** — 깨진 캐시가 박제되지 않도록.
+     * invalidate 안 하면 다음 polling 도 같은 깨진 JSON 을 읽고 또 실패 → 5분 동안 stale.
+     */
     private fun tryReadCachedSummary(storyId: Long): SummaryResponseData? {
         return try {
             val json = jobStatusRedisRepo.getCachedSummaryResponse(storyId) ?: return null
             objectMapper.readValue(json, SummaryResponseData::class.java)
         } catch (e: Exception) {
-            log.warn("SummaryResponse cache read/parse failed storyId={}: {}", storyId, e.message)
+            log.warn("SummaryResponse cache read/parse failed storyId={}, invalidating: {}", storyId, e.message)
+            runCatching { jobStatusRedisRepo.invalidateSummaryResponse(storyId) }
             null
         }
     }

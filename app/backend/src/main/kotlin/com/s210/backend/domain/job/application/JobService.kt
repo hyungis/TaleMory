@@ -22,14 +22,16 @@ import tools.jackson.databind.ObjectMapper
  * 목록/취소 (#57, #58) 은 후속 이슈.
  *
  * Polling 부담 완화 — Redis cache-aside 패턴:
- *  1) 캐시 hit 면 그대로 응답 (DB 조회 0회).
- *  2) 캐시 miss 면 DB 조회. **status 가 PENDING/RUNNING 일 때만** 캐시 적재.
+ *  1) 캐시 hit → 응답 본체(`story_generation_jobs` 의 무거운 TEXT 컬럼들 포함)는 Redis 에서 바로 읽음.
+ *     소유권 검증을 위해 가벼운 `stories.user_id` 만 DB 1회 (heavy 컬럼 read 회피가 핵심 절약).
+ *  2) 캐시 miss → DB 조회. **status 가 PENDING/RUNNING 일 때만** 캐시 적재.
  *     → 종결 잡은 캐시하지 않음. 어차피 FE 가 종결 응답 받으면 polling 멈추므로 메모리 낭비 없음.
- *  3) listener 가 종결 시 캐시 invalidate — stale RUNNING 응답이 남지 않도록.
+ *  3) listener 가 종결 시 캐시 invalidate (afterCommit 으로) — stale RUNNING 응답이 남지 않도록.
  *
  * 캐시 미동기화 (예: Redis 일시 장애로 invalidate 누락) 안전망:
- *  - TTL 10분 — 그 안에 stale 캐시 자동 만료.
+ *  - TTL 5분 — 그 안에 stale 캐시 자동 만료. FE polling 수명(5분)과 정렬.
  *  - 소유권 검증은 항상 DB 의 stories.user_id 를 보므로 캐시된 응답을 인가 우회로 쓸 수 없음.
+ *  - deserialize 실패 시 invalidate + null 반환 — 깨진 캐시가 박제되지 않도록 self-heal.
  */
 @Service
 @Transactional(readOnly = true)
@@ -74,13 +76,18 @@ class JobService(
         return response
     }
 
-    /** Cache hit 시 deserialize. 실패는 swallow + WARN — 캐시 깨졌으면 DB fallback. */
+    /**
+     * Cache hit 시 deserialize. 실패는 swallow + WARN + **invalidate** — 깨진 캐시가 박제되지 않도록.
+     * invalidate 안 하면 다음 polling 도 같은 깨진 JSON 을 읽고 또 실패 → 5분 동안 매 polling 마다
+     * WARN 로그 + 매번 DB fallback 으로 전락. 한 번 깨끗이 비우고 다음 hit 부터 정상 흐름.
+     */
     private fun tryReadCachedResponse(jobId: Long): JobResponse? {
         return try {
             val json = jobStatusRedisRepo.getCachedJobResponse(jobId) ?: return null
             objectMapper.readValue(json, JobResponse::class.java)
         } catch (e: Exception) {
-            log.warn("JobResponse cache read/parse failed jobId={}: {}", jobId, e.message)
+            log.warn("JobResponse cache read/parse failed jobId={}, invalidating: {}", jobId, e.message)
+            runCatching { jobStatusRedisRepo.invalidateJobResponse(jobId) }
             null
         }
     }

@@ -4,6 +4,7 @@ import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
+import com.s210.backend.common.transaction.afterCommit
 import com.s210.backend.common.s3.S3DeletionEvent
 import com.s210.backend.common.s3.S3Service
 import com.s210.backend.domain.job.entity.StoryGenerationJob
@@ -829,22 +830,30 @@ class StoryboardResultListener(
     }
 
     /**
-     * 잡 종결 시 polling cache 정리 — best-effort.
+     * 잡 종결 시 polling cache 정리 — best-effort + **트랜잭션 commit 후 실행**.
      *
      * 두 종류의 캐시를 한꺼번에 무효화:
      *  1) `/api/generation-jobs/{jobId}` 캐시 — 모든 잡 타입 공통.
      *  2) `/storyboard/summary` 캐시 — SUMMARY 잡 한정 (storyId 단위 캐시).
      *
-     * Redis 일시 장애 시 swallow + WARN. 그래도 TTL 10분이 self-healing 해 줌.
+     * **afterCommit 필수**: 이 메서드는 `@Transactional` 안에서 호출되는데, 그 시점엔
+     * `job.status = SUCCESS` 가 영속성 컨텍스트만 dirty (DB 미반영). 같은 메서드에서 즉시
+     * invalidate 하면 다른 스레드 polling 이 cache miss → DB(아직 RUNNING) 를 보고
+     * RUNNING 을 다시 캐시에 적재 → commit 후엔 DB=SUCCESS, Redis=RUNNING (5분 stale 박제)
+     * 의 race 가 발생. afterCommit 으로 미뤄야 그 race 가 닫힌다.
+     *
+     * Redis 일시 장애 시 swallow + WARN. TTL 5분이 self-healing fallback.
      */
     private fun tryInvalidatePollingCaches(job: StoryGenerationJob) {
-        try {
-            jobStatusRedisRepo.invalidateJobResponse(job.id)
-            if (job.jobType == JobType.STORYBOARD_STORY_SUMMARY) {
-                jobStatusRedisRepo.invalidateSummaryResponse(job.storyId)
+        afterCommit {
+            try {
+                jobStatusRedisRepo.invalidateJobResponse(job.id)
+                if (job.jobType == JobType.STORYBOARD_STORY_SUMMARY) {
+                    jobStatusRedisRepo.invalidateSummaryResponse(job.storyId)
+                }
+            } catch (e: Exception) {
+                log.warn("Redis polling cache invalidate failed for job {} (non-fatal): {}", job.id, e.message)
             }
-        } catch (e: Exception) {
-            log.warn("Redis polling cache invalidate failed for job {} (non-fatal): {}", job.id, e.message)
         }
     }
 }

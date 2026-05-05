@@ -22,7 +22,8 @@ import java.time.Instant
  *    - 용도: cache-aside 패턴. 잡이 PENDING/RUNNING 일 때만 적재. 종결(SUCCESS/FAILED) 응답은 적재 안 함.
  *    - listener invalidate: 잡 종결 시 키 삭제 → 다음 polling 은 cache miss → DB hit → 종결 응답이라 적재 안 함.
  *
- * TTL: 10분. listener invalidate 가 누락(예: Redis 일시 장애)돼도 10분 안에 stale RUNNING 캐시가 자동 만료된다.
+ * TTL: 5분. listener invalidate 가 누락(예: Redis 일시 장애)돼도 5분 안에 stale RUNNING 캐시가 자동 만료된다.
+ * FE polling timeout(5분) 과 정렬 — TTL 이 polling 수명보다 길면 stale 응답이 의미 없는 시간만 늘어남.
  */
 @Repository
 class JobStatusRedisRepository(
@@ -35,7 +36,7 @@ class JobStatusRedisRepository(
         const val POLLING_JOB_KEY_PREFIX = "storybook:job:cache:job"
         const val POLLING_SUMMARY_KEY_PREFIX = "storybook:job:cache:summary"
 
-        val TTL: Duration = Duration.ofMinutes(10)
+        val TTL: Duration = Duration.ofMinutes(5)
 
         // Hash field — typo 방지.
         private const val F_STAGE = "stage"
