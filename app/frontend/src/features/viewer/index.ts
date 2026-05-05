@@ -4,7 +4,9 @@
  */
 
 export { InvitationCard } from './invitation/ui/InvitationCard'
+export { BookBackCover } from './story-book/ui/BookBackCover'
 export { StoryBookViewer } from './story-book/ui/StoryBookViewer'
 export { useStoryViewQuery } from './model/useStoryViewQuery'
 export { usePublicStoryViewQuery } from './model/usePublicStoryViewQuery'
+export { useSampleStoryViewQuery } from './model/useSampleStoryViewQuery'
 export type { StoryView, SceneView, SentenceView, OutroView } from './model/types'

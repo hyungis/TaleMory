@@ -12,6 +12,12 @@ class PublicStoryController(
     private val storyViewerService: StoryViewerService,
 ) {
 
+    @GetMapping("/sample")
+    fun sampleStoryDetails(): ResponseEntity<ApiResponse<StoryViewResponse>> {
+        val result = storyViewerService.findSampleStoryView()
+        return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
     @GetMapping("/{shareToken}")
     fun storyPublicDetails(@PathVariable shareToken: String): ResponseEntity<ApiResponse<StoryViewResponse>> {
         val result = storyViewerService.findPublicStoryView(shareToken)
