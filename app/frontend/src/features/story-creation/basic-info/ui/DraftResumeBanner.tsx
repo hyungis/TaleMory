@@ -8,17 +8,15 @@ interface DraftResumeBannerProps {
 }
 
 /**
- * 책장 상단의 "진행 중인 동화" 배너 — Claude `.continue-card` 1:1.
+ * 책장 상단의 "진행 중인 동화" 배너.
  *
  * 디자인 요소:
  *  - cream-yellow 그라디언트 + caramel-deep border + 입체 `0 2px 0` shadow
- *  - 좌상단 워시 테이프 (yellow + caramel) — `::before` 가짜 테이프
- *  - 좌측 132x132 흰 테두리 썸네일 + 책 그림자
- *  - 가운데: "✦ 가장 최근 동화 · IN PROGRESS" 태그 + Nanum Myeongjo 30px 제목 + Gaegu 부제
+ *  - 좌상단 워시 테이프 (yellow + caramel)
+ *  - 좌측: "✦ 가장 최근 동화 · IN PROGRESS" 태그 + Nanum Myeongjo 30px 제목 + Gaegu 부제
  *  - 우측: butter `#f0c97a` pill CTA + 손그림 화살표 SVG
  */
 export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
-  const previewCoverUrl = `https://picsum.photos/seed/talemory-${draft.storyId}/200/280`
   const titleText = buildDisplayTitle(draft)
   const subtitleParts = formatSubtitleParts(draft.travelPlace, draft.travelStartDate, draft.travelEndDate)
   const startedAt = formatRelativeTime(draft.createdAt)
@@ -34,7 +32,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
         borderRadius: 20,
         padding: '22px 28px',
         display: 'grid',
-        gridTemplateColumns: '132px 1fr auto',
+        gridTemplateColumns: '1fr auto',
         gap: 22,
         alignItems: 'center',
         marginBottom: 36,
@@ -72,27 +70,7 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
         }}
       />
 
-      {/* 좌측: 정사각 thumbnail */}
-      <div
-        style={{
-          width: 132,
-          height: 132,
-          borderRadius: 12,
-          overflow: 'hidden',
-          border: '3px solid #fff',
-          boxShadow: '0 4px 10px rgba(80, 50, 20, 0.25)',
-          background: '#c8b89a',
-        }}
-      >
-        <img
-          src={previewCoverUrl}
-          alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          draggable={false}
-        />
-      </div>
-
-      {/* 가운데: tag / 제목 / info */}
+      {/* 좌측: tag / 제목 / info */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
         <div
           style={{
@@ -210,9 +188,6 @@ export function DraftResumeBanner({ draft, onResume }: DraftResumeBannerProps) {
 /* ──────────────────── helpers ──────────────────── */
 
 function buildDisplayTitle(draft: StoryDraftResponse): string {
-  const explicit = draft.title?.trim()
-  if (explicit) return explicit
-
   const names = parseChildNames(draft.mainCharacterJson)
   if (names.length === 1) return `${names[0]}의 새 동화`
   if (names.length > 1) return `${names[0]} 외 ${names.length - 1}명의 새 동화`

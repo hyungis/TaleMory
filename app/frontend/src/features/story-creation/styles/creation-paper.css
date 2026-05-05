@@ -469,16 +469,16 @@
   justify-content: center;
 }
 .cr-level-preview-list .en {
-  font-family: var(--cr-font-serif);
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--cr-font-gaegu);
+  font-size: 17px;
+  font-weight: 700;
   color: var(--cr-ink);
   margin: 0 0 3px;
   line-height: 1.5;
 }
 .cr-level-preview-list .ko {
-  font-family: var(--cr-font-serif);
-  font-size: 13px;
+  font-family: var(--cr-font-gaegu);
+  font-size: 15px;
   color: var(--cr-ink-soft);
   margin: 0;
   line-height: 1.5;
