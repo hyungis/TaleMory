@@ -5,6 +5,7 @@ import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.jwt.JwtTokenProvider
 import com.s210.backend.common.jwt.RefreshTokenInfoRepositoryRedis
+import com.s210.backend.domain.auth.application.dto.LoginCommand
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.application.dto.OauthSignupCommand
 import com.s210.backend.domain.auth.application.dto.OauthUserProfile
@@ -211,6 +212,56 @@ class MemberServiceSignupRestoreTest {
         val result = service.findNicknameAvailability(" 새 닉네임 ")
 
         assertTrue(result.available)
+    }
+
+    @Test
+    fun `login throws WITHDRAWN_ACCOUNT when login id belongs to withdrawn user without confirmation`() {
+        val user = withdrawnUser()
+        `when`(memberRepository.findByLoginIdAndDeletedAtIsNull("old-login")).thenReturn(null)
+        `when`(
+            memberRepository.findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc("old-login"),
+        ).thenReturn(user)
+        `when`(passwordEncoder.matches("plain-password", "old-password")).thenReturn(true)
+
+        val ex = assertThrows<BusinessException> {
+            service.login(LoginCommand(loginId = "old-login", password = "plain-password"))
+        }
+
+        assertEquals(AuthErrorCode.WITHDRAWN_ACCOUNT, ex.errorCode)
+        assertTrue(user.deletedAt != null)
+    }
+
+    @Test
+    fun `login restores withdrawn user after confirmation`() {
+        val user = withdrawnUser()
+        val oauthAccount = OauthAccount(
+            id = 11L,
+            user = user,
+            provider = "kakao",
+            providerUserId = "kakao-user",
+            deletedAt = LocalDateTime.now(),
+        )
+        `when`(memberRepository.findByLoginIdAndDeletedAtIsNull("old-login")).thenReturn(null)
+        `when`(
+            memberRepository.findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc("old-login"),
+        ).thenReturn(user)
+        `when`(passwordEncoder.matches("plain-password", "old-password")).thenReturn(true)
+        `when`(oauthAccountRepository.findAllByUser_Id(user.id)).thenReturn(listOf(oauthAccount))
+        `when`(jwtTokenProvider.createToken(any(org.springframework.security.core.Authentication::class.java)))
+            .thenReturn(TokenInfo("old-login", "Bearer", "access-token", "refresh-token"))
+
+        val result = service.login(
+            LoginCommand(
+                loginId = "old-login",
+                password = "plain-password",
+                restoreConfirmed = true,
+            )
+        )
+
+        assertEquals(user.id, result.user.id)
+        assertEquals("access-token", result.accessToken)
+        assertNull(user.deletedAt)
+        assertNull(oauthAccount.deletedAt)
     }
 
     @Test

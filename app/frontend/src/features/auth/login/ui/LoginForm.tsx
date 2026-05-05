@@ -4,6 +4,7 @@ import { isApiError } from '../../../../shared/api'
 import { KakaoOAuthButton } from '../../oauth'
 import { setAuthSession } from '../../model/authSession'
 import { useLoginPost } from '../model/useLoginPost'
+import type { LoginRequest } from '../types'
 
 interface LoginFormValues {
   id: string
@@ -21,6 +22,8 @@ const INITIAL_VALUES: LoginFormValues = {
   id: '',
   password: '',
 }
+
+const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 
 function validate(values: LoginFormValues): string | null {
   if (!values.id.trim()) return '아이디를 입력해주세요.'
@@ -70,6 +73,7 @@ const inputStyle: CSSProperties = {
 export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const [values, setValues] = useState<LoginFormValues>(INITIAL_VALUES)
   const [error, setError] = useState('')
+  const [restoreRequest, setRestoreRequest] = useState<LoginRequest | null>(null)
   const { isPending, login } = useLoginPost()
 
   const handleChange = useCallback(
@@ -91,27 +95,60 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         return
       }
 
-      try {
-        const result = await login({
+      const request: LoginRequest = {
           loginId: values.id.trim(),
           password: values.password,
-        })
+      }
+
+      try {
+        const result = await login(request)
         setAuthSession(result)
         setError('')
         onSuccess()
       } catch (submitError) {
+        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE) {
+          setError('')
+          setRestoreRequest(request)
+          return
+        }
+
         setError(getLoginErrorMessage(submitError))
       }
     },
     [isPending, login, onSuccess, values],
   )
 
+  const handleRestoreCancel = useCallback(() => {
+    if (!isPending) {
+      setRestoreRequest(null)
+    }
+  }, [isPending])
+
+  const handleRestoreConfirm = useCallback(async () => {
+    if (restoreRequest === null || isPending) return
+
+    try {
+      const result = await login({
+        ...restoreRequest,
+        restoreConfirmed: true,
+      })
+      setAuthSession(result)
+      setError('')
+      setRestoreRequest(null)
+      onSuccess()
+    } catch (restoreError) {
+      setRestoreRequest(null)
+      setError(getLoginErrorMessage(restoreError))
+    }
+  }, [isPending, login, onSuccess, restoreRequest])
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      aria-busy={isPending}
-      style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}
-    >
+    <>
+      <form
+        onSubmit={handleSubmit}
+        aria-busy={isPending}
+        style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}
+      >
       <div>
         <label style={labelStyle}>아이디</label>
         <input
@@ -242,6 +279,117 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           회원가입
         </button>
       </p>
-    </form>
+      </form>
+
+      {restoreRequest && (
+        <LoginRestoreConfirmDialog
+          isPending={isPending}
+          onCancel={handleRestoreCancel}
+          onConfirm={handleRestoreConfirm}
+        />
+      )}
+    </>
+  )
+}
+
+function LoginRestoreConfirmDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[10001] flex items-center justify-center p-4"
+      style={{ background: 'rgba(74, 59, 42, 0.55)', backdropFilter: 'blur(4px)' }}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="login-restore-account-title"
+      onClick={() => {
+        if (!isPending) onCancel()
+      }}
+    >
+      <div
+        className="w-full max-w-sm"
+        onClick={event => event.stopPropagation()}
+        style={{
+          background: '#fbf2da',
+          border: '2.5px solid #a37548',
+          borderRadius: 20,
+          boxShadow: '0 4px 0 #a37548, 0 16px 36px rgba(74, 59, 42, 0.32)',
+          padding: '24px',
+        }}
+      >
+        <h3
+          id="login-restore-account-title"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#5f7d50',
+            margin: '0 0 10px',
+          }}
+        >
+          계정 복구
+        </h3>
+        <p
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 17,
+            lineHeight: 1.5,
+            color: '#5c4932',
+            margin: '0 0 20px',
+          }}
+        >
+          탈퇴한 계정입니다. 계정을 복구하고 로그인할까요?
+        </p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            style={{
+              flex: 1,
+              background: '#f7eccd',
+              border: '2px solid #a37548',
+              color: '#6b5638',
+              borderRadius: 999,
+              padding: '11px 16px',
+              fontFamily: 'var(--font-display)',
+              fontSize: 17,
+              fontWeight: 700,
+              cursor: isPending ? 'not-allowed' : 'pointer',
+              opacity: isPending ? 0.6 : 1,
+            }}
+          >
+            아니오
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            style={{
+              flex: 1,
+              background: '#7a9968',
+              border: '2px solid #5f7d50',
+              color: '#fdfaf0',
+              borderRadius: 999,
+              padding: '11px 16px',
+              fontFamily: 'var(--font-display)',
+              fontSize: 17,
+              fontWeight: 700,
+              cursor: isPending ? 'not-allowed' : 'pointer',
+              opacity: isPending ? 0.6 : 1,
+              boxShadow: '0 3px 0 #5f7d50',
+            }}
+          >
+            {isPending ? '복구 중...' : '예'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

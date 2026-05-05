@@ -121,6 +121,20 @@ class MemberService(
     }
 
     fun login(command: LoginCommand): AuthResult {
+        val activeLoginUser = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
+        if (activeLoginUser == null) {
+            val withdrawnLoginUser = memberRepository
+                .findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.loginId)
+            if (withdrawnLoginUser != null) {
+                requireMatchingPassword(withdrawnLoginUser, command.password)
+                if (!command.restoreConfirmed) {
+                    throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
+                }
+                restoreUser(withdrawnLoginUser)
+                return createPasswordLoginResult(withdrawnLoginUser)
+            }
+        }
+
         val authenticationToken = UsernamePasswordAuthenticationToken(command.loginId, command.password)
         val authentication = authenticationManager.authenticate(authenticationToken)
         val tokenInfo: TokenInfo = jwtTokenProvider.createToken(authentication)
@@ -312,6 +326,21 @@ class MemberService(
         )
     }
 
+    private fun createPasswordLoginResult(user: User): AuthResult {
+        val principal = createPasswordPrincipal(user)
+        val authentication = UsernamePasswordAuthenticationToken(principal, "", principal.authorities)
+        val tokenInfo = jwtTokenProvider.createToken(authentication)
+
+        refreshTokenInfoRepositoryRedis.save(principal.username, tokenInfo.refreshToken)
+
+        return AuthResult(
+            grantType = tokenInfo.grantType,
+            accessToken = tokenInfo.accessToken,
+            refreshToken = tokenInfo.refreshToken,
+            user = user,
+        )
+    }
+
     private fun validateOauthSignupCommand(command: OauthSignupCommand) {
         requireValidOauthSignupRequiredFields(command)
         requireValidEmail(command.email)
@@ -356,6 +385,13 @@ class MemberService(
     private fun requireMatchingPassword(command: SignupCommand) {
         if (command.passwordCheck != null && command.password != command.passwordCheck) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+    }
+
+    private fun requireMatchingPassword(user: User, password: String) {
+        val passwordHash = user.passwordHash
+        if (passwordHash.isNullOrBlank() || !passwordEncoder.matches(password, passwordHash)) {
+            throw BusinessException(AuthErrorCode.INVALID_CREDENTIALS)
         }
     }
 
@@ -501,6 +537,14 @@ class MemberService(
             authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
         )
     }
+
+    private fun createPasswordPrincipal(user: User): CustomUser =
+        CustomUser(
+            userId = user.id,
+            loginId = user.loginId ?: "",
+            password = user.passwordHash ?: "",
+            authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
+        )
 
     private fun requireSupportedProvider(provider: String) {
         if (provider != SUPPORTED_PROVIDER) {

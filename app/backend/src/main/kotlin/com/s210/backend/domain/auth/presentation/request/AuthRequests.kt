@@ -33,11 +33,13 @@ data class SignupRequest(
 data class LoginRequest(
     val loginId: String,
     val password: String,
+    val restoreConfirmed: Boolean = false,
 ) {
     fun toCommand(): LoginCommand =
         LoginCommand(
-            loginId = loginId,
+            loginId = loginId.trim(),
             password = password,
+            restoreConfirmed = restoreConfirmed,
         )
 }
 
