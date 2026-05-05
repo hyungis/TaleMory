@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface SceneHighlightVoiceRepository : JpaRepository<SceneHighlightVoice, Long> {
     fun findBySentenceIdAndDeletedAtIsNull(sentenceId: Long): SceneHighlightVoice?
+    fun findBySentenceIdInAndDeletedAtIsNull(sentenceIds: List<Long>): List<SceneHighlightVoice>
 }
