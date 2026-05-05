@@ -22,4 +22,12 @@ interface SceneHighlightVoiceRepository : JpaRepository<SceneHighlightVoice, Lon
      * COUNT > 0 보다 가벼운 EXISTS 쿼리를 발행해, 단순 boolean 체크에 적합.
      */
     fun existsBySentenceIdInAndDeletedAtIsNull(sentenceIds: Collection<Long>): Boolean
+
+    /**
+     * 뷰어용 — 활성 강조 녹음 일괄 조회 (StoryViewerService 가 사용).
+     *
+     * 위 `findAllBySentenceIdInAndDeletedAtIsNull(Collection)` 와 SQL 은 동일하지만
+     * 이미 자리잡은 caller signature 호환을 위해 List 입력 메서드도 함께 둠.
+     */
+    fun findBySentenceIdInAndDeletedAtIsNull(sentenceIds: List<Long>): List<SceneHighlightVoice>
 }

@@ -11,9 +11,9 @@ export async function postKakaoSignup(body: KakaoSignupRequest): Promise<LoginRe
       name: body.name,
       nickname: body.nickname,
       phone: body.phone,
-      agreeSms: body.agreeSms,
-      agreeMarketing: body.agreeMarketing,
+      termAgreements: body.termAgreements ?? [],
       restoreConfirmed: body.restoreConfirmed ?? false,
+      linkConfirmed: body.linkConfirmed ?? false,
     },
     {
       skipAuth: true,

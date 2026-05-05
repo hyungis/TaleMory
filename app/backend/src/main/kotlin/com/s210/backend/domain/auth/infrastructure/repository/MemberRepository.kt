@@ -18,5 +18,6 @@ interface MemberRepository : JpaRepository<User, Long> {
     fun existsByEmailAndDeletedAtIsNull(email: String): Boolean
     fun existsByNickname(nickname: String): Boolean
     fun existsByNicknameAndDeletedAtIsNull(nickname: String): Boolean
+    fun existsByNicknameAndDeletedAtIsNullAndIdNot(nickname: String, id: Long): Boolean
     fun deleteByEmail(email: String)
 }

@@ -2,6 +2,7 @@ package com.s210.backend.domain.storyboard.application.dto
 
 import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.storyboard.application.pageTexts
+import com.s210.backend.domain.storyboard.application.parseSentencesList
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -18,10 +19,12 @@ data class StoryboardPageResult(
     val sceneSummary: String?,
     val imagePrompt: String?,
     val imageUrl: String?,
+    val sentences: List<StorySentenceDto>?,
 ) {
     companion object {
         fun from(entity: StoryboardPage, objectMapper: ObjectMapper): StoryboardPageResult {
             val texts = entity.pageTexts(objectMapper)
+            val parsedSentences = entity.parseSentencesList(objectMapper)
             return StoryboardPageResult(
                 pageNumber = entity.pageNumber,
                 koreanText = texts.koreanText,
@@ -29,6 +32,7 @@ data class StoryboardPageResult(
                 sceneSummary = entity.sceneSummary,
                 imagePrompt = entity.imagePrompt,
                 imageUrl = entity.imageUrl,
+                sentences = parsedSentences.ifEmpty { null },
             )
         }
     }

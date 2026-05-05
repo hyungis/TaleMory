@@ -84,6 +84,7 @@ export function HighlightOutroStep({
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [scenes, setScenes] = useState<SceneDto[] | null>(null)
   const [storyboardImageUrls, setStoryboardImageUrls] = useState<Map<number, string | null>>(new Map())
+  const [storyboardPages, setStoryboardPages] = useState<Awaited<ReturnType<typeof getStoryboardPages>> | null>(null)
   const [loadingScenes, setLoadingScenes] = useState(false)
 
   useEffect(() => {
@@ -110,6 +111,7 @@ export function HighlightOutroStep({
 
         if (scenesData.length > 0) setScenes(scenesData)
         if (storyboardData) {
+          setStoryboardPages(storyboardData)
           const imageMap = new Map<number, string | null>()
           storyboardData.pages.forEach((p, idx) => imageMap.set(idx, p.imageUrl))
           setStoryboardImageUrls(imageMap)
@@ -137,6 +139,22 @@ export function HighlightOutroStep({
           en: s.englishText,
           ko: s.koreanText,
         })),
+      }))
+    : storyboardPages
+    ? storyboardPages.pages.map((page, idx) => ({
+        pageIndex: idx,
+        imageUrl: page.imageUrl,
+        sentences: page.sentences
+          ? page.sentences.map(s => ({
+              sentenceId: null,
+              en: s.englishText,
+              ko: s.koreanText || null,
+            }))
+          : splitSentences(page.englishText || '').map((en, sIdx) => ({
+              sentenceId: null,
+              en,
+              ko: page.koreanText ? (splitSentences(page.koreanText)[sIdx] ?? null) : null,
+            })),
       }))
     : projectData.step4.pages.map((page, idx) => {
         const enSentences = splitSentences(page.en)

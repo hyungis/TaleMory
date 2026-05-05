@@ -259,7 +259,6 @@ class TtsResultHandlerTest {
             ),
         ),
         summary = TtsSummary(sentenceCount = 1),
-        fullBookAudio = null,
         usage = UsageInfo(
             model = "cosy-voice",
             inputTokens = 0,

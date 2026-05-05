@@ -3,6 +3,7 @@ import { ROUTES } from '../../../../shared/constants'
 
 const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize'
 const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID ?? ''
+const KAKAO_SCOPE = 'account_email profile_nickname'
 
 /**
  * 카카오 로그인 진입 버튼.
@@ -16,6 +17,7 @@ export function KakaoOAuthButton() {
     kakaoUrl.searchParams.set('client_id', KAKAO_CLIENT_ID)
     kakaoUrl.searchParams.set('redirect_uri', redirectUri)
     kakaoUrl.searchParams.set('response_type', 'code')
+    kakaoUrl.searchParams.set('scope', KAKAO_SCOPE)
 
     window.location.assign(kakaoUrl.toString())
   }, [])

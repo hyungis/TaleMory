@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, Share2, CheckCircle2, PartyPopper, Loader2, Library, Maximize } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Copy, Share2, CheckCircle2, PartyPopper, Loader2, Library, Maximize, Home } from 'lucide-react'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { publishStory, getShareLink } from '../../../bookshelf'
+import { ROUTES } from '../../../../shared/constants'
 import '../../styles/creation-paper.css'
 
 interface PublishStoryStepProps {
@@ -19,6 +21,7 @@ interface PublishStoryStepProps {
  * STEP 09 — paper-craft 톤. 동화책 발행 + 공유 링크.
  */
 export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenViewer }: PublishStoryStepProps) {
+  const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
@@ -34,16 +37,54 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
     return shareUrl.startsWith('http') ? shareUrl : `${window.location.origin}${shareUrl}`
   }, [shareUrl])
 
+  /* Step 8 → Step 9 진입 시 사용자가 따로 "발행하기" 버튼을 누르지 않아도 바로 발행이
+     시작되도록 자동 트리거. 흐름:
+       1) getShareLink → 이미 발행된 동화면 기존 링크 그대로 사용 (멱등 진입)
+       2) getShareLink 실패 = 미발행 → 즉시 publishStory 호출
+       3) 둘 다 실패 → error state → 사용자가 재시도 버튼 클릭 가능
+     BE `publishStory` 도 PUBLISHED 상태에 멱등(StoryService:183~188) 이라 race 상황에서
+     이중 호출이 되어도 안전. publishing 상태는 두 단계 모두를 커버해 사용자에게 "발행 중"
+     스피너를 끊김없이 보여줌. */
   useEffect(() => {
-    if (!storyId) return
-    getShareLink(storyId)
-      .then(data => {
-        setShareUrl(data.shareUrl)
+    if (!storyId) {
+      // 정상 플로우에선 발생 안 함 — 비정상 진입(직접 URL/state 잃음) 시 명확한 안내.
+      setError('동화 정보를 찾을 수 없어요. 처음부터 다시 시작해주세요.')
+      setPublishing(false)
+      return
+    }
+    let cancelled = false
+    setPublishing(true)
+    setError(null)
+
+    const run = async () => {
+      try {
+        const existing = await getShareLink(storyId)
+        if (cancelled) return
+        setShareUrl(existing.shareUrl)
         setPublished(true)
-      })
-      .catch(() => {})
+      } catch {
+        if (cancelled) return
+        try {
+          const data = await publishStory(storyId)
+          if (cancelled) return
+          setShareUrl(data.shareUrl)
+          setPublished(true)
+        } catch {
+          if (cancelled) return
+          setError('발행에 실패했어요. 다시 시도해주세요.')
+        }
+      } finally {
+        if (!cancelled) setPublishing(false)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
   }, [storyId])
 
+  /** 자동 발행 실패 시 수동 재시도 핸들러. */
   const handlePublish = useCallback(async () => {
     if (!storyId || publishing) return
     setPublishing(true)
@@ -231,59 +272,128 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
               </>
             ) : (
               <>
-                <h2
-                  style={{
-                    fontFamily: 'var(--cr-font-serif)',
-                    fontWeight: 800,
-                    fontSize: 32,
-                    color: 'var(--cr-ink)',
-                    margin: '0 0 8px',
-                    letterSpacing: '-0.5px',
-                  }}
-                >
-                  동화책을 발행할까요?
-                </h2>
-                <p
-                  style={{
-                    fontFamily: 'var(--cr-font-gaegu)',
-                    fontSize: 17,
-                    color: 'var(--cr-ink-soft)',
-                    margin: '0 0 28px',
-                  }}
-                >
-                  발행하면 공유 링크가 생성되어 가족에게 보낼 수 있어요.
-                </p>
+                {/* 비정상 진입 (storyId 유실) → "메인으로" 명확한 액션 제공.
+                    정상 플로우엔 발생 안 하지만 직접 URL/state 잃은 경우 사용자가 막히지 않도록. */}
+                {!storyId ? (
+                  <>
+                    <h2
+                      style={{
+                        fontFamily: 'var(--cr-font-serif)',
+                        fontWeight: 800,
+                        fontSize: 28,
+                        color: 'var(--cr-ink)',
+                        margin: '0 0 8px',
+                        letterSpacing: '-0.5px',
+                      }}
+                    >
+                      동화 정보를 찾을 수 없어요
+                    </h2>
+                    <p
+                      style={{
+                        fontFamily: 'var(--cr-font-gaegu)',
+                        fontSize: 17,
+                        color: 'var(--cr-ink-soft)',
+                        margin: '0 0 28px',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      처음부터 다시 시작해주세요.
+                      <br />
+                      메인 페이지에서 새 동화책 만들기를 눌러주세요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigate(ROUTES.main)}
+                      className="cr-big-cta"
+                      style={{ width: 'auto', display: 'inline-flex', minWidth: 200 }}
+                    >
+                      <Home className="w-5 h-5" />
+                      <span>메인으로 돌아가기</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h2
+                      style={{
+                        fontFamily: 'var(--cr-font-serif)',
+                        fontWeight: 800,
+                        fontSize: 32,
+                        color: 'var(--cr-ink)',
+                        margin: '0 0 8px',
+                        letterSpacing: '-0.5px',
+                      }}
+                    >
+                      {publishing ? '동화책을 발행하는 중...' : '발행을 다시 시도해주세요'}
+                    </h2>
+                    <p
+                      style={{
+                        fontFamily: 'var(--cr-font-gaegu)',
+                        fontSize: 17,
+                        color: 'var(--cr-ink-soft)',
+                        margin: '0 0 28px',
+                      }}
+                    >
+                      {publishing
+                        ? '잠시만 기다려주세요. 발행이 끝나면 공유 링크가 자동으로 나타나요.'
+                        : '아래 버튼을 눌러 다시 발행해주세요.'}
+                    </p>
 
-                {error && (
-                  <p
-                    style={{
-                      fontFamily: 'var(--cr-font-gaegu)',
-                      fontSize: 14,
-                      color: 'var(--cr-rust)',
-                      marginBottom: 14,
-                    }}
-                  >
-                    {error}
-                  </p>
+                    {error && (
+                      <p
+                        style={{
+                          fontFamily: 'var(--cr-font-gaegu)',
+                          fontSize: 14,
+                          color: 'var(--cr-rust)',
+                          marginBottom: 14,
+                        }}
+                      >
+                        {error}
+                      </p>
+                    )}
+
+                    {/* 진행 중엔 스피너만, 실패 후엔 재시도 버튼 노출 */}
+                    {publishing ? (
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '14px 28px',
+                          background: 'var(--cr-paper)',
+                          border: '2px solid var(--cr-caramel-deep)',
+                          borderRadius: 999,
+                          color: 'var(--cr-ink-soft)',
+                          fontFamily: 'var(--cr-font-gaegu)',
+                          fontWeight: 700,
+                          fontSize: 16,
+                          boxShadow: '0 2px 0 var(--cr-caramel-deep)',
+                        }}
+                      >
+                        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
+                        <span>발행 중...</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePublish}
+                        className="cr-big-cta"
+                        style={{ width: 'auto', display: 'inline-flex', minWidth: 240 }}
+                      >
+                        <PartyPopper className="w-5 h-5" />
+                        <span>다시 발행하기</span>
+                      </button>
+                    )}
+                  </>
                 )}
-
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={publishing || !storyId}
-                  className="cr-big-cta"
-                  style={{ width: 'auto', display: 'inline-flex', minWidth: 240 }}
-                >
-                  {publishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <PartyPopper className="w-5 h-5" />}
-                  <span>{publishing ? '발행 중...' : '발행하기'}</span>
-                </button>
               </>
             )}
           </div>
         </main>
       </div>
 
-      <CreationFooter currentStep={9} onBack={onBack} />
+      {/* 발행을 트리거한 시점부터 이전 단계로 돌아갈 수 없도록 backDisabled.
+          이전 단계(편집/재생성) 는 DRAFT 상태 전제라 PUBLISHED 가 된 동화는 다시 갈 이유 없음. */}
+      <CreationFooter currentStep={9} onBack={onBack} backDisabled />
     </div>
   )
 }

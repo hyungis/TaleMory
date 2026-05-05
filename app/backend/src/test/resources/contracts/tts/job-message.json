@@ -10,8 +10,7 @@
     "language": "en-US",
     "format": "wav",
     "options": {
-      "defaultEmotion": "neutral",
-      "generateFullBookAudio": false
+      "defaultEmotion": "neutral"
     },
     "sentences": [
       { "sentenceId": 1001, "text": "Once upon a time.", "emotion": null, "stylePrompt": null },
