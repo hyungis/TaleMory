@@ -29,7 +29,7 @@ interface ViewerPage {
   kind: PageKind
   /** story.scenes 배열 내 인덱스 (scene 페이지일 때만). */
   sceneIndex?: number
-  /** "Page N" 라벨용 0-based 표시 인덱스. preview 모드에선 scene 0 가 빠지므로 sceneIndex 와 1 차이. */
+  /** "Page N" 라벨용 0-based 표시 인덱스. scene 0(표지) 가 본문에서 제외돼 sceneIndex 와 1 차이. */
   displayIndex?: number
 }
 
@@ -71,29 +71,21 @@ const storageKeyBookmark = (storyId: number) => `viewer-bookmark-${storyId}`
 export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewerProps) {
   const isPreview = mode === 'preview'
   const pages: ViewerPage[] = useMemo(() => {
+    /* BE 는 page_number=0(표지) + page_number=1..N(본문) scene 을 모두 내려준다.
+       표지 일러스트는 `story.coverIllustrationUrl` 로 별도 제공되므로 책 펼침 흐름에선
+       scene 0 를 본문 페이지로 또 보여주면 안 됨 (앞표지 ↔ 첫 본문이 같은 컷으로 중복 노출).
+       두 모드 모두 scene 0 를 본문 rotation 에서 제외하고 sceneIndex 는 원본 배열 좌표로 유지. */
+    const contentScenes = story.scenes.slice(1).map((_, i) => ({
+      kind: 'scene' as const,
+      sceneIndex: i + 1,
+      displayIndex: i,
+    }))
     if (isPreview) {
-      /* About 페이지 미리보기:
-         - scene 0 는 표지와 동일 컷이므로 책 펼친 상태에선 생략.
-         - 뒷표지(편지지)는 About 하단의 별도 섹션이 이미 보여주고 있으므로 미포함 → 마지막 scene 에서
-           Next 가 자연스레 disabled 되며 중복 표시를 차단. */
-      return [
-        { kind: 'cover' as const },
-        ...story.scenes.slice(1).map((_, i) => ({
-          kind: 'scene' as const,
-          sceneIndex: i + 1,
-          displayIndex: i,
-        })),
-      ]
+      /* preview 는 뒷표지(편지지) 미포함 — About 하단의 별도 섹션이 이미 보여주고 있어
+         마지막 scene 에서 Next 가 자연스레 disabled 되며 중복 표시 차단. */
+      return [{ kind: 'cover' as const }, ...contentScenes]
     }
-    return [
-      { kind: 'cover' as const },
-      ...story.scenes.map((_, i) => ({
-        kind: 'scene' as const,
-        sceneIndex: i,
-        displayIndex: i,
-      })),
-      { kind: 'backCover' as const },
-    ]
+    return [{ kind: 'cover' as const }, ...contentScenes, { kind: 'backCover' as const }]
   }, [story.scenes, isPreview])
 
   /* 책갈피 — 한 동화당 1개 (pageIndex 단일값).
@@ -280,14 +272,16 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
 
   // 전체 책 자동 재생
   const playFullBook = () => {
+    /* scene 0(표지) 은 본문 rotation 에서 제외했으므로 sceneIndex 와 pageIndex 가 1:1 정렬.
+       즉 sceneIndex k(>=1) ↔ pageIndex k. 표지에서 시작하면 첫 본문 scene 1 부터 재생. */
     const startSceneIndex = current.kind === 'scene' && current.sceneIndex !== undefined
       ? current.sceneIndex
-      : 0
-    const targetPageIndex = startSceneIndex + 1
+      : 1
+    const targetPageIndex = startSceneIndex
 
     const startPlayback = () => {
       tts.speakFullBook(story.scenes, startSceneIndex, sceneIdx => {
-        setPageIndex(sceneIdx + 1)
+        setPageIndex(sceneIdx)
       })
     }
 
@@ -338,8 +332,8 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
     if (bookmark === null) return null
     if (bookmark < 0 || bookmark >= pages.length) return null
     const page = pages[bookmark]
-    if (page.kind !== 'scene' || page.sceneIndex === undefined) return null
-    return `Page ${page.sceneIndex + 1}`
+    if (page.kind !== 'scene' || page.displayIndex === undefined) return null
+    return `Page ${page.displayIndex + 1}`
   }, [bookmark, pages])
   const canJumpToBookmark = bookmark !== null && bookmark !== pageIndex
 
@@ -406,8 +400,6 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
           {current.kind === 'cover' && (
             <BookCover
               title={story.title ?? '제목 없는 동화'}
-              subtitle="TaleMory"
-              authorLabel={story.mainCharacter?.name ? `${story.mainCharacter.name}의 가족 드림` : '우리 가족 드림'}
               illustrationUrl={story.coverIllustrationUrl}
             />
           )}
@@ -427,7 +419,11 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
           )}
 
           {current.kind === 'backCover' && (
-            <BookBackCover outro={story.outro} onRestart={() => goTo(0)} />
+            <BookBackCover
+              outro={story.outro}
+              onRestart={() => goTo(0)}
+              illustrationUrl={story.coverIllustrationUrl}
+            />
           )}
         </div>
 
@@ -451,12 +447,18 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
             {coverFlip.kind === 'cover' ? (
               <BookCover
                 title={story.title ?? '제목 없는 동화'}
-                subtitle="TaleMory"
-                authorLabel={story.mainCharacter?.name ? `${story.mainCharacter.name}의 가족 드림` : '우리 가족 드림'}
                 illustrationUrl={story.coverIllustrationUrl}
               />
             ) : (
-              <div className="sb-back-cover sb-back-cover-static" />
+              <div className="sb-back-cover sb-back-cover-static">
+                {story.coverIllustrationUrl && (
+                  <img
+                    src={story.coverIllustrationUrl}
+                    alt=""
+                    className="sb-back-cover-illust"
+                  />
+                )}
+              </div>
             )}
           </div>
         )}

@@ -122,6 +122,7 @@ export function AboutPage() {
               signature: OUTRO_SIGNATURE,
             }}
             onRestart={() => {}}
+            illustrationUrl={null}
           />
         </div>
       </section>
