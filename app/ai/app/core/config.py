@@ -59,6 +59,12 @@ class Settings(BaseModel):
         "high",
     )
     STORYBOARD_IMAGE_MODEL: str = getenv("STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
+    STORYBOARD_IMAGE_INPUT_COST_PER_1M: float = float(
+        getenv("STORYBOARD_IMAGE_INPUT_COST_PER_1M", "0.30")
+    )
+    STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE: float = float(
+        getenv("STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE", "0.039")
+    )
     FINAL_ILLUSTRATION_MODEL: str = getenv("FINAL_ILLUSTRATION_MODEL", "black-forest-labs/flux-2-klein-9b")
     STORYBOARD_IMAGE_S3_BUCKET: str | None = getenv("STORYBOARD_IMAGE_S3_BUCKET", getenv("AWS_S3_BUCKET"))
     STORYBOARD_IMAGE_S3_REGION: str | None = getenv("STORYBOARD_IMAGE_S3_REGION", getenv("AWS_REGION"))
@@ -89,6 +95,10 @@ class Settings(BaseModel):
     RABBITMQ_USER: str = getenv("RABBITMQ_USERNAME", getenv("RABBITMQ_USER", "guest"))
     RABBITMQ_PASSWORD: str = getenv("RABBITMQ_PASSWORD", "guest")
     RABBITMQ_VHOST: str = getenv("RABBITMQ_VHOST", "/")
+    AI_WORKER_CONCURRENCY: int = int(getenv("AI_WORKER_CONCURRENCY", "3"))
+    AI_STORY_API_CONCURRENCY: int = int(getenv("AI_STORY_API_CONCURRENCY", "3"))
+    AI_IMAGE_API_CONCURRENCY: int = int(getenv("AI_IMAGE_API_CONCURRENCY", "10"))
+    RABBITMQ_PREFETCH_COUNT: int = int(getenv("RABBITMQ_PREFETCH_COUNT", "13"))
     RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "ai.request")
     RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
     RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.story.generate.request.queue")
@@ -99,6 +109,10 @@ class Settings(BaseModel):
     RABBITMQ_SUMMARY_REGENERATE_QUEUE: str = getenv(
         "RABBITMQ_SUMMARY_REGENERATE_QUEUE",
         "ai.cpu.story.summary.regenerate.request.queue",
+    )
+    RABBITMQ_SENTENCE_TRANSLATE_QUEUE: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_QUEUE",
+        "ai.cpu.story.sentences.translate.request.queue",
     )
     RABBITMQ_REGENERATE_QUEUE: str = getenv("RABBITMQ_REGENERATE_QUEUE", "ai.cpu.story.regenerate.request.queue")
     RABBITMQ_TTS_GENERATE_QUEUE: str = getenv("RABBITMQ_TTS_GENERATE_QUEUE", "ai.gpu.request.queue")
@@ -112,6 +126,10 @@ class Settings(BaseModel):
     RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY",
         "ai.cpu.story.summary.regenerate",
+    )
+    RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY",
+        "ai.cpu.story.sentences.translate",
     )
     RABBITMQ_REGENERATE_ROUTING_KEY: str = getenv("RABBITMQ_REGENERATE_ROUTING_KEY", "ai.cpu.story.regenerate")
     RABBITMQ_TTS_GENERATE_ROUTING_KEY: str = getenv("RABBITMQ_TTS_GENERATE_ROUTING_KEY", "ai.gpu.tts.generate")
@@ -177,6 +195,10 @@ class Settings(BaseModel):
         "RABBITMQ_SUMMARY_REGENERATE_COMPLETED_ROUTING_KEY",
         "ai.result.story.summary.regenerate.completed",
     )
+    RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY",
+        "ai.result.story.sentences.translate.completed",
+    )
     RABBITMQ_GENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.generate.failed",
@@ -188,6 +210,10 @@ class Settings(BaseModel):
     RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_SUMMARY_REGENERATE_FAILED_ROUTING_KEY",
         "ai.result.story.summary.regenerate.failed",
+    )
+    RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY",
+        "ai.result.story.sentences.translate.failed",
     )
     RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY",

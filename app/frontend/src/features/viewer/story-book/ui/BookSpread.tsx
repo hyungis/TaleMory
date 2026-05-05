@@ -9,7 +9,7 @@ interface LeftPageProps {
 
 /** 왼쪽 페이지 — 삽화 + 캡션. 플립 시트의 face 로도 재사용. */
 export function BookSpreadLeft({ scene, pageIndex, onIllustrationClick }: LeftPageProps) {
-  const illustStyle = { '--illust-a': '#c4e3b4', '--illust-b': '#f7c59f' } as React.CSSProperties
+  const illustStyle = { '--illust-a': '#c9d8b2', '--illust-b': '#e8c79b' } as React.CSSProperties
   const clickable = Boolean(onIllustrationClick)
   return (
     <div className="sb-page left">
@@ -25,7 +25,7 @@ export function BookSpreadLeft({ scene, pageIndex, onIllustrationClick }: LeftPa
           {scene.illustrationUrl ? (
             <img src={scene.illustrationUrl} alt={`Page ${scene.pageNumber} 삽화`} />
           ) : (
-            <ImageIcon className="w-32 h-32 md:w-40 md:h-40 text-white/95 drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]" strokeWidth={1.5} />
+            <ImageIcon className="sb-illust-empty-icon" strokeWidth={1.5} />
           )}
         </button>
         <p className="sb-illust-caption">Page {scene.pageNumber} 장면</p>

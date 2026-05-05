@@ -445,8 +445,7 @@ class FinalIllustrationGenerationServiceTest {
         storyBoardId = storyBoardId,
         pageNumber = pageNumber,
         sceneSummary = "scene summary",
-        englishText = "english text",
-        koreanText = "한국어 텍스트",
+        sentences = """[{"sentenceOrder":1,"englishText":"english text","koreanText":"korean text","emotion":"NEUTRAL"}]""",
         imagePrompt = "image prompt",
         imageUrl = imageUrl,
     )

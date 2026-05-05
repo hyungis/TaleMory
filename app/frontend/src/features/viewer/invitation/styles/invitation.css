@@ -1,0 +1,653 @@
+/* ==========================================================================
+   ViewerPage 진입 화면 (Invitation) — 읽기 모드 선택 + 동화 정보 카드.
+   톤: 다른 페이지와 동일한 paper-craft cream/caramel/sage/rust 팔레트.
+   모든 클래스는 `.iv-shell` 스코프.
+   ========================================================================== */
+
+.iv-shell {
+  --iv-paper: #f6ecd4;
+  --iv-paper-2: #efe1c2;
+  --iv-paper-warm: #fdf6dc;
+  --iv-ink: #4a3b2a;
+  --iv-ink-soft: #6b5638;
+  --iv-ink-mute: #8a7558;
+  --iv-sage: #7a9968;
+  --iv-sage-deep: #5f7d50;
+  --iv-sage-darker: #3f5c30;
+  --iv-caramel: #c89968;
+  --iv-caramel-deep: #a37548;
+  --iv-rust: #c47254;
+  --iv-rust-deep: #823e26;
+  --iv-butter: #f0c97a;
+  --iv-gold: #d4a73d;
+
+  --iv-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
+  --iv-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
+  --iv-font-serif: 'Nanum Myeongjo', serif;
+  --iv-font-script: 'Caveat', cursive;
+
+  position: relative;
+  /* 한 viewport 안에 정확히 들어가도록 height 고정 + 내부 overflow hidden */
+  height: 100vh;
+  min-height: 100vh;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  font-family: var(--iv-font-display);
+  color: var(--iv-ink);
+  background: var(--iv-paper);
+  overflow: hidden;
+}
+
+/* paper background system — bg-base / bg-grain / bg-crayon 3 layer */
+.iv-bg-base,
+.iv-bg-grain,
+.iv-bg-crayon {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+.iv-bg-base {
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 30% 20%, #fbf3dc 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, #ead7ad 0%, transparent 65%),
+    linear-gradient(180deg, #f7ecd0 0%, #f0e2bc 100%);
+}
+.iv-bg-grain {
+  z-index: 1;
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.25  0 0 0 0.13 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.iv-bg-crayon {
+  z-index: 2;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='c'><feTurbulence type='turbulence' baseFrequency='0.012 0.04' numOctaves='3' seed='7'/><feColorMatrix values='0 0 0 0 0.78  0 0 0 0 0.62  0 0 0 0 0.36  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+}
+
+.iv-doodles {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+.iv-doodles svg { position: absolute; opacity: 0.28; filter: url(#iv-crayon-rough); }
+.iv-d-cloud  { top: 8%;  left: 4%;  width: 78px; }
+.iv-d-star   { top: 20%; right: 6%; width: 22px; opacity: 0.32 !important; }
+.iv-d-leaf   { bottom: 10%; right: 6%; width: 60px; transform: rotate(20deg); }
+.iv-d-flower { bottom: 14%; left: 5%;  width: 42px; opacity: 0.3 !important; }
+
+/* topbar — viewport 상단 고정, 짧게 */
+.iv-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(247, 236, 208, 0.85) 0%, rgba(247, 236, 208, 0) 100%);
+}
+/* mypage(.mp-back-btn) 와 동일 톤 — Gaegu 18px paper + caramel-deep border */
+.iv-back-btn {
+  background: var(--iv-paper);
+  border: 2px solid var(--iv-caramel-deep);
+  border-radius: 999px;
+  padding: 8px 18px 8px 14px;
+  font-family: var(--iv-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--iv-ink);
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--iv-caramel-deep);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.iv-back-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 var(--iv-caramel-deep);
+}
+.iv-back-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--iv-caramel-deep);
+}
+
+/* mypage(.mp-logo) 와 동일 톤 — Gaegu 32px sage-deep 손글씨 + rust accent */
+.iv-brand {
+  font-family: var(--iv-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--iv-sage-deep);
+  letter-spacing: 0.04em;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.iv-brand .iv-brand-accent { color: var(--iv-rust); }
+
+/* shell — 한 viewport 안에 모두 fit */
+.iv-shell-inner {
+  position: relative;
+  z-index: 4;
+  width: min(900px, calc(100vw - 32px));
+  max-height: calc(100vh - 16px);
+  margin: 0 auto;
+  padding: 56px 0 16px;
+}
+
+/* ===== Hero cover card ===== */
+.iv-cover {
+  position: relative;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--iv-caramel-deep);
+  border-radius: 22px;
+  padding: 28px 28px 22px;
+  text-align: center;
+  box-shadow: 0 3px 0 var(--iv-caramel-deep), 0 10px 22px rgba(140, 100, 60, 0.16);
+  /* 워시 테이프가 카드 위로 살짝 솟아나오는 디자인 — overflow: hidden 이면 잘림 */
+  overflow: visible;
+  margin-bottom: 14px;
+}
+
+.iv-cover .iv-tape-l,
+.iv-cover .iv-tape-r {
+  position: absolute;
+  top: -14px;
+  width: 110px;
+  height: 26px;
+  background: rgba(255, 230, 140, 0.7);
+  border-left: 1px dashed rgba(150, 110, 50, 0.3);
+  border-right: 1px dashed rgba(150, 110, 50, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.iv-cover .iv-tape-l { left: 40px; transform: rotate(-5deg); }
+.iv-cover .iv-tape-r { right: 40px; transform: rotate(4deg); }
+
+.iv-cover-doodle {
+  position: absolute;
+  opacity: 0.35;
+  filter: url(#iv-crayon-rough);
+}
+.iv-cover-doodle.iv-d1 { top: 16px; right: 30px; width: 26px; }
+.iv-cover-doodle.iv-d2 { bottom: 16px; left: 26px; width: 36px; }
+.iv-cover-doodle.iv-d3 { bottom: 30px; right: 22px; width: 22px; }
+
+.iv-cover .iv-tape-l,
+.iv-cover .iv-tape-r {
+  width: 90px;
+  height: 22px;
+}
+.iv-cover .iv-tape-l { left: 24px; }
+.iv-cover .iv-tape-r { right: 24px; }
+
+.iv-cover-eyebrow {
+  font-family: var(--iv-font-display);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--iv-sage-deep);
+  letter-spacing: 4px;
+  margin-bottom: 6px;
+}
+
+.iv-book-mark {
+  width: 76px;
+  height: 76px;
+  margin: 4px auto 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--iv-sage) 0%, var(--iv-sage-deep) 100%);
+  border: 2.5px solid var(--iv-sage-darker);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 0 var(--iv-sage-darker), 0 8px 18px rgba(63, 92, 48, 0.3);
+  color: var(--iv-paper-warm);
+  overflow: hidden;
+}
+.iv-book-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.iv-book-mark > svg { width: 38px; height: 38px; }
+
+.iv-cover-title {
+  font-family: var(--iv-font-serif);
+  font-weight: 800;
+  font-size: 30px;
+  color: var(--iv-ink);
+  margin: 4px 0 4px;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+.iv-cover-title-underline {
+  width: 160px;
+  height: 6px;
+  margin: 2px auto 8px;
+  background: var(--iv-rust);
+  opacity: 0.55;
+  filter: url(#iv-crayon-rough);
+  border-radius: 4px;
+}
+
+.iv-cover-author {
+  font-family: var(--iv-font-script);
+  font-size: 20px;
+  color: var(--iv-ink-soft);
+  margin-bottom: 4px;
+}
+.iv-cover-author .iv-by { color: var(--iv-caramel-deep); }
+.iv-cover-author .iv-name { color: var(--iv-sage-deep); font-weight: 700; }
+
+.iv-meta-row {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.iv-meta-pill {
+  background: var(--iv-paper-warm);
+  border: 1.5px solid var(--iv-caramel);
+  color: var(--iv-ink);
+  font-family: var(--iv-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.iv-meta-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--iv-sage);
+}
+.iv-meta-dot.iv-rust { background: var(--iv-rust); }
+.iv-meta-dot.iv-gold { background: var(--iv-gold); }
+
+/* prompt above choices */
+.iv-choose-eyebrow {
+  text-align: center;
+  margin: 4px 0 10px;
+}
+.iv-choose-eyebrow .iv-choose-label {
+  font-family: var(--iv-font-pen);
+  font-size: 22px;
+  color: var(--iv-ink);
+  letter-spacing: 1px;
+}
+.iv-choose-eyebrow .iv-choose-sub {
+  font-family: var(--iv-font-display);
+  font-size: 13px;
+  color: var(--iv-ink-soft);
+  margin-top: 2px;
+}
+
+/* ===== mode cards ===== */
+.iv-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.iv-mode {
+  position: relative;
+  background: linear-gradient(135deg, #fbf2da 0%, #f1e1ba 100%);
+  border: 2.5px solid var(--iv-caramel-deep);
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--iv-caramel-deep), 0 8px 18px rgba(140, 100, 60, 0.14);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  overflow: hidden;
+  font-family: var(--iv-font-display);
+  color: var(--iv-ink);
+}
+.iv-mode:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 0 var(--iv-caramel-deep), 0 16px 30px rgba(140, 100, 60, 0.22);
+}
+.iv-mode:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--iv-caramel-deep);
+}
+
+/* 준비중 카드 — 카드 위에 어두운 오버레이 + 안내 텍스트 */
+.iv-mode:disabled {
+  cursor: not-allowed;
+}
+.iv-mode-disabled-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: inherit;
+  background: rgba(40, 30, 20, 0.62);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #fdf6dc;
+  font-family: var(--iv-font-display);
+  pointer-events: none;
+  letter-spacing: 0.05em;
+}
+.iv-mode-disabled-title {
+  font-family: var(--iv-font-serif);
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.iv-mode-disabled-sub {
+  font-size: 12px;
+  opacity: 0.85;
+  margin: 0;
+}
+.iv-mode-corner {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.iv-mode.iv-mode-book .iv-mode-corner { background: rgba(122, 153, 104, 0.35); }
+.iv-mode.iv-mode-web .iv-mode-corner { background: rgba(196, 114, 84, 0.3); }
+
+.iv-mode-icon-circle {
+  width: 54px;
+  height: 54px;
+  margin: 2px auto 10px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+.iv-mode-icon-circle > svg { width: 26px; height: 26px; }
+.iv-mode.iv-mode-book .iv-mode-icon-circle {
+  background: var(--iv-sage);
+  box-shadow: 0 3px 0 var(--iv-sage-darker) inset, 0 3px 0 var(--iv-sage-darker);
+  color: var(--iv-paper-warm);
+}
+.iv-mode.iv-mode-web .iv-mode-icon-circle {
+  background: var(--iv-rust);
+  box-shadow: 0 3px 0 var(--iv-rust-deep) inset, 0 3px 0 var(--iv-rust-deep);
+  color: var(--iv-paper-warm);
+}
+
+.iv-mode-title {
+  font-family: var(--iv-font-serif);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--iv-ink);
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+.iv-mode-sub {
+  font-family: var(--iv-font-display);
+  font-size: 13px;
+  color: var(--iv-ink-soft);
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.iv-open-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--iv-sage-darker);
+  color: var(--iv-paper-warm);
+  border: 2px solid #2a3f1f;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-family: var(--iv-font-serif);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #2a3f1f, 0 4px 8px rgba(40, 60, 30, 0.18);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  pointer-events: none; /* 카드 전체가 클릭되므로 버튼 hover 막아 그림자 점프 방지 */
+}
+.iv-mode.iv-mode-web .iv-open-cta {
+  background: var(--iv-rust);
+  border-color: var(--iv-rust-deep);
+  box-shadow: 0 2px 0 var(--iv-rust-deep), 0 4px 8px rgba(130, 60, 40, 0.2);
+}
+
+.iv-preview-strip {
+  margin-top: 10px;
+  border-top: 1px dashed var(--iv-caramel);
+  padding-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+.iv-preview-strip .iv-pg {
+  width: 32px;
+  height: 22px;
+  background: var(--iv-paper-warm);
+  border: 1.2px solid var(--iv-caramel);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--iv-caramel);
+  position: relative;
+}
+.iv-preview-strip .iv-pg::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 4px;
+  right: 4px;
+  height: 1.5px;
+  background: rgba(150, 110, 50, 0.3);
+  box-shadow: 0 4px 0 rgba(150, 110, 50, 0.3), 0 8px 0 rgba(150, 110, 50, 0.3);
+}
+/* 웹툰 미리보기 — 세로 누적 */
+.iv-preview-strip.iv-web {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.iv-preview-strip.iv-web .iv-pg {
+  width: 70px;
+  height: 11px;
+}
+.iv-preview-strip.iv-web .iv-pg::after {
+  top: 3px;
+  height: 1px;
+  box-shadow: 0 2px 0 rgba(150, 110, 50, 0.3);
+}
+
+@media (max-width: 700px) {
+  .iv-modes { grid-template-columns: 1fr; gap: 10px; }
+  .iv-cover-title { font-size: 24px; }
+  .iv-shell-inner { padding-top: 50px; padding-bottom: 12px; }
+  .iv-cover { padding: 22px 20px 18px; margin-bottom: 10px; }
+  .iv-book-mark { width: 60px; height: 60px; }
+  .iv-book-mark > svg { width: 30px; height: 30px; }
+  .iv-cover-author { font-size: 17px; }
+  .iv-meta-pill { font-size: 12px; padding: 3px 10px; }
+  .iv-mode { padding: 14px 12px 12px; }
+  .iv-preview-strip { display: none; } /* 모바일에선 preview 생략 */
+}
+
+/* ===== Loading / Error states ===== */
+.iv-status {
+  position: relative;
+  z-index: 4;
+  text-align: center;
+  max-width: 360px;
+  padding: 32px;
+}
+.iv-status-spinner {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border: 5px solid rgba(122, 153, 104, 0.25);
+  border-top-color: var(--iv-sage-deep);
+  border-radius: 999px;
+  animation: iv-spin 0.9s linear infinite;
+}
+@keyframes iv-spin {
+  to { transform: rotate(360deg); }
+}
+.iv-status-text {
+  font-family: var(--iv-font-display);
+  font-size: 1.2rem;
+  color: var(--iv-ink-soft);
+  margin: 0;
+}
+.iv-status-error-icon {
+  display: inline-flex;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(196, 114, 84, 0.15);
+  border: 2.5px solid var(--iv-rust);
+  color: var(--iv-rust);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: var(--iv-font-serif);
+}
+.iv-status-error-msg {
+  font-family: var(--iv-font-display);
+  font-size: 1.25rem;
+  color: var(--iv-ink);
+  margin: 0 0 18px;
+  font-weight: 700;
+}
+.iv-status-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  background: var(--iv-sage);
+  color: var(--iv-paper-warm);
+  border: 2px solid var(--iv-sage-deep);
+  border-radius: 999px;
+  font-family: var(--iv-font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--iv-sage-deep);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.iv-status-back-btn:hover {
+  background: var(--iv-sage-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--iv-sage-deep);
+}
+.iv-status-back-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--iv-sage-deep);
+}
+
+/* ===== WebtoonNotice 모달 ===== */
+.iv-notice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(74, 59, 42, 0.55);
+  backdrop-filter: blur(6px);
+  animation: iv-notice-fade 0.2s ease-out;
+}
+@keyframes iv-notice-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.iv-notice-card {
+  position: relative;
+  max-width: 380px;
+  width: 100%;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--iv-caramel-deep);
+  border-radius: 24px;
+  padding: 28px 24px 22px;
+  text-align: center;
+  box-shadow: 0 6px 0 var(--iv-caramel-deep), 0 16px 40px rgba(140, 100, 60, 0.35);
+  animation: iv-notice-pop 0.28s cubic-bezier(0.34, 1.2, 0.5, 1);
+  font-family: var(--iv-font-display);
+  color: var(--iv-ink);
+}
+@keyframes iv-notice-pop {
+  0% { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.iv-notice-card::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  width: 84px;
+  height: 22px;
+  background: rgba(255, 230, 140, 0.7);
+  border: 1px dashed rgba(150, 110, 50, 0.35);
+  pointer-events: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.iv-notice-emoji {
+  font-size: 2rem;
+  margin-bottom: 6px;
+}
+.iv-notice-title {
+  font-family: var(--iv-font-serif);
+  font-size: 1.5rem;
+  margin: 0 0 8px;
+  color: var(--iv-sage-deep);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.iv-notice-desc {
+  font-family: var(--iv-font-display);
+  font-size: 1.05rem;
+  color: var(--iv-ink-soft);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+.iv-notice-btn {
+  padding: 10px 22px;
+  background: var(--iv-sage);
+  color: var(--iv-paper-warm);
+  border: 2px solid var(--iv-sage-deep);
+  border-radius: 999px;
+  font-family: var(--iv-font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--iv-sage-deep);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.iv-notice-btn:hover {
+  background: var(--iv-sage-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--iv-sage-deep);
+}
+.iv-notice-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--iv-sage-deep);
+}

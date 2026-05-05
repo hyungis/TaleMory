@@ -659,8 +659,22 @@ def _extract_gemini_usage(response_json: dict) -> StoryboardImageUsage:
         candidateTokens=candidate_tokens,
         totalTokens=total_tokens,
         imageCount=1,
-        costUsd=None,
+        costUsd=_estimate_gemini_image_cost_usd(
+            prompt_tokens=prompt_tokens,
+            image_count=1,
+        ),
     )
+
+
+def _estimate_gemini_image_cost_usd(
+    prompt_tokens: int | None,
+    image_count: int,
+) -> float | None:
+    if prompt_tokens is None:
+        return None
+    input_cost = prompt_tokens * settings.STORYBOARD_IMAGE_INPUT_COST_PER_1M / 1_000_000
+    output_cost = image_count * settings.STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE
+    return round(input_cost + output_cost, 6)
 
 
 def _upload_and_resolve_url(

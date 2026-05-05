@@ -20,7 +20,7 @@ def create_connection() -> Any:
 
 def create_channel(connection: Any) -> Any:
     channel = connection.channel()
-    channel.basic_qos(prefetch_count=1)
+    channel.basic_qos(prefetch_count=settings.RABBITMQ_PREFETCH_COUNT)
     return channel
 
 
@@ -55,6 +55,13 @@ def declare_ai_topology(channel: Any) -> None:
         queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE,
         exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
         routing_key=settings.RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY,
     )
 
     channel.queue_declare(queue=settings.RABBITMQ_REGENERATE_QUEUE, durable=True)
