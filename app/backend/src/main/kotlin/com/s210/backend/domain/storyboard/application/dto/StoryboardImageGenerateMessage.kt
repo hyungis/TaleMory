@@ -50,6 +50,8 @@ data class StoryboardImageItem(
     val page: StoryboardImagePagePayload,
     val children: List<ChildInfo>,
     val companions: List<String>,
+    val characterReferenceImageS3Keys: List<String> = emptyList(),
+    val characterReferenceImageUrls: List<String> = emptyList(),
     val referenceImageS3Keys: List<String>,
     val referenceImageUrls: List<String> = emptyList(),
     val stylePreset: String? = null,
@@ -62,13 +64,13 @@ data class StoryboardImageContext(
     val synopsis: String,
 )
 
-/** 페이지별 텍스트 묶음. 각 필드는 AI 측 min_length=1 이라 빈 문자열 차단. */
+/** 페이지별 텍스트 묶음. 표지(page 0)는 텍스트 없이 pageNumber 만 전달. */
 data class StoryboardImagePagePayload(
     val pageNumber: Int,
-    val sceneSummary: String,
-    val englishText: String,
-    val koreanText: String,
-    val imagePrompt: String,
+    val sceneSummary: String? = null,
+    val englishText: String? = null,
+    val koreanText: String? = null,
+    val imagePrompt: String? = null,
 )
 
 /**

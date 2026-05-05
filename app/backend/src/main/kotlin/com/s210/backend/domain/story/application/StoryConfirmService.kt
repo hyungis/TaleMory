@@ -163,11 +163,9 @@ class StoryConfirmService(
         var totalSentences = 0
         val existingScenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(storyId)
         val createdScenes = if (existingScenes.isNotEmpty()) {
-            // 기존 scene illustrationUrl 보강 — 비어있으면 최신 final 결과로 채움.
+            // 기존 scene illustrationUrl 보강 — final 결과가 있으면 항상 최신으로 덮어씀.
             existingScenes.forEach { scene ->
-                if (scene.illustrationUrl.isNullOrBlank()) {
-                    finalUrlsByPage[scene.pageNumber]?.let { scene.illustrationUrl = it }
-                }
+                finalUrlsByPage[scene.pageNumber]?.let { scene.illustrationUrl = it }
             }
             totalSentences = sceneSentenceRepository.findAllBySceneIdIn(existingScenes.map { it.id }).size
             existingScenes

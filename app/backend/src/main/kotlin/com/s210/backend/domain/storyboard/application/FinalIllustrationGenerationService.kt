@@ -79,39 +79,58 @@ class FinalIllustrationGenerationService(
         if (children.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
         val companions = storyParticipantParser.parseCompanions(story.companionsJson)
 
-        // 5) 페이지별 item 조립.
+        // 5) 페이지별 item 조립 (page 0 = 표지는 별도 처리).
         val items = pages.map { page ->
-            val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
-                ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-            val texts = page.pageTexts(objectMapper)
-            val englishText = texts.englishText?.takeIf { it.isNotBlank() }
-                ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-            val koreanText = texts.koreanText?.takeIf { it.isNotBlank() }
-                ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-            val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
-                ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-            val nonBlankImageUrl = page.imageUrl?.takeIf { it.isNotBlank() }
-                ?: throw BusinessException(StoryErrorCode.STORYBOARD_IMAGES_NOT_READY)
+            if (page.pageNumber == 0) {
+                // 표지: 텍스트 없이 storyboard 이미지 + 컨텍스트만 전달.
+                val nonBlankImageUrl = page.imageUrl?.takeIf { it.isNotBlank() }
+                    ?: throw BusinessException(StoryErrorCode.STORYBOARD_IMAGES_NOT_READY)
+                FinalIllustrationItem(
+                    pageNumber = 0,
+                    storyboard = FinalIllustrationContext(
+                        title = storyPayload.title,
+                        synopsis = storyPayload.synopsis,
+                    ),
+                    page = FinalIllustrationPagePayload(pageNumber = 0),
+                    children = children,
+                    companions = companions,
+                    roughStoryboardImageUrl = nonBlankImageUrl,
+                    stylePrompt = stylePreset.code,
+                    additionalInstruction = "This is the front cover, not an interior page.",
+                )
+            } else {
+                val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
+                    ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+                val texts = page.pageTexts(objectMapper)
+                val englishText = texts.englishText?.takeIf { it.isNotBlank() }
+                    ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+                val koreanText = texts.koreanText?.takeIf { it.isNotBlank() }
+                    ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+                val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
+                    ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+                val nonBlankImageUrl = page.imageUrl?.takeIf { it.isNotBlank() }
+                    ?: throw BusinessException(StoryErrorCode.STORYBOARD_IMAGES_NOT_READY)
 
-            FinalIllustrationItem(
-                pageNumber = page.pageNumber,
-                storyboard = FinalIllustrationContext(
-                    title = storyPayload.title,
-                    synopsis = storyPayload.synopsis,
-                ),
-                page = FinalIllustrationPagePayload(
+                FinalIllustrationItem(
                     pageNumber = page.pageNumber,
-                    sceneSummary = sceneSummary,
-                    englishText = englishText,
-                    koreanText = koreanText,
-                    imagePrompt = imagePrompt,
-                ),
-                children = children,
-                companions = companions,
-                roughStoryboardImageUrl = nonBlankImageUrl,
-                stylePrompt = stylePreset.code,
-                additionalInstruction = null,
-            )
+                    storyboard = FinalIllustrationContext(
+                        title = storyPayload.title,
+                        synopsis = storyPayload.synopsis,
+                    ),
+                    page = FinalIllustrationPagePayload(
+                        pageNumber = page.pageNumber,
+                        sceneSummary = sceneSummary,
+                        englishText = englishText,
+                        koreanText = koreanText,
+                        imagePrompt = imagePrompt,
+                    ),
+                    children = children,
+                    companions = companions,
+                    roughStoryboardImageUrl = nonBlankImageUrl,
+                    stylePrompt = stylePreset.code,
+                    additionalInstruction = null,
+                )
+            }
         }
 
         val seed = deterministicSeed(storyId)
