@@ -296,6 +296,12 @@ class StoryboardGenerationService(
             storyId, JobType.STORYBOARD_IMAGE,
         )?.let { LatestImageJob(jobId = it.id, status = it.status) }
 
+        val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORY_SENTENCE_TRANSLATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+
         // Step 4 IMAGE 재생성 잡 복구 — 진행 중(PENDING/RUNNING) 단일 페이지 재생성 잡 1건.
         // BE 동시성 가드로 한 스토리당 활성 1개만 보장되므로 first 가 유일.
         // pageNumber 는 jobs.requestPayload(JSON) 의 `item.pageNumber` 를 파싱해 내려준다.
@@ -322,6 +328,9 @@ class StoryboardGenerationService(
             latestFinalStatus = latestFinalStatus,
             failedCountSinceLastSuccess = failedCount,
             latestImageJob = latestImageJob,
+            activeTranslationJob = activeTranslationJob?.let {
+                ActiveStoryJob(jobId = it.id, status = it.status, createdAt = it.createdAt)
+            },
             activeImageRegenerateJob = activeImageRegenerateJob,
         )
     }

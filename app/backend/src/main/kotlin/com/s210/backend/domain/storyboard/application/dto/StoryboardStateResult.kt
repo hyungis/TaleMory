@@ -39,6 +39,7 @@ data class StoryboardStateResult(
      *  - null                   → 한 번도 발행 안 한 신규 → idle
      */
     val latestImageJob: LatestImageJob?,
+    val activeTranslationJob: ActiveStoryJob?,
     /**
      * 진행 중인 STORYBOARD_IMAGE_REGENERATE 잡 1건 — 단일 페이지 재생성 polling 복구용.
      *

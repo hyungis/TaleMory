@@ -69,6 +69,7 @@ class StoryConfirmService(
         if (story.status != StoryStatus.DRAFT) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
+        assertNoActiveTranslationJob(storyId)
         if (story.voiceProfileId == null) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
@@ -319,6 +320,17 @@ class StoryConfirmService(
     private fun looksLikeS3Key(value: String): Boolean {
         if (value.startsWith("http://") || value.startsWith("https://")) return false
         return S3_KEY_PATTERN.containsMatchIn(value)
+    }
+
+    private fun assertNoActiveTranslationJob(storyId: Long) {
+        val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId,
+            JobType.STORY_SENTENCE_TRANSLATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )
+        if (activeTranslationJob != null) {
+            throw BusinessException(StoryErrorCode.STORYBOARD_TRANSLATION_IN_PROGRESS)
+        }
     }
 
     companion object {
