@@ -5,6 +5,7 @@ import { MainShell } from '../../pages/main'
 import { CreationPage } from '../../pages/creation'
 import { ViewerPage, SharedViewerPage } from '../../pages/viewer'
 import { MypagePage, VoiceCloneAddPage } from '../../pages/mypage'
+import { AboutPage } from '../../pages/about'
 import { ROUTES } from '../../shared/constants'
 
 /** 앱 라우팅 루트. */
@@ -23,6 +24,7 @@ export function AppRouter() {
       <Route path={ROUTES.kakaoCallback} element={<OAuthCallbackPage />} />
       <Route path={ROUTES.oauthCallback} element={<OAuthCallbackPage />} />
       <Route path={ROUTES.logoutCallback} element={<LogoutCallbackPage />} />
+      <Route path={ROUTES.about} element={<AboutPage />} />
       <Route path={ROUTES.mypage} element={<MypagePage />} />
       <Route path={ROUTES.mypageVoiceClone} element={<VoiceCloneAddPage />} />
     </Routes>

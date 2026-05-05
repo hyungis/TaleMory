@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Menu, User } from 'lucide-react'
+import { Menu, User, Info } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from '../../../features/auth'
 import { ROUTES } from '../../../shared/constants'
@@ -71,6 +71,18 @@ export function TopRightMenu({ standalone = false, mypageFrom = 'main' }: TopRig
 
       {isOpen && (
         <div className="top-right-menu__panel" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="top-right-menu__item"
+            onClick={() => {
+              setIsOpen(false)
+              navigate(ROUTES.about)
+            }}
+          >
+            <Info className="w-5 h-5" aria-hidden="true" />
+            <span>서비스 소개</span>
+          </button>
           <button
             type="button"
             role="menuitem"

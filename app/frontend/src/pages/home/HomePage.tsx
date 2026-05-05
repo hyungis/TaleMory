@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AuthModal, useAuthModal, useAuthSession } from '../../features/auth'
 import { ROUTES } from '../../shared/constants'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
@@ -105,6 +105,9 @@ export function HomePage() {
             >
               시작하기
             </button>
+            <Link to={ROUTES.about} className="landing-about-link">
+              서비스 소개
+            </Link>
           </div>
         </div>
       )}
