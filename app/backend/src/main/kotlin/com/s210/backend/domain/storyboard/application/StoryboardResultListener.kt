@@ -238,13 +238,19 @@ class StoryboardResultListener(
             )
         }
 
-        // 3) Story.synopsis (TEXT) 에 한글 줄거리 저장 — 본문 grounding 의 단일 source.
-        //    옵션 ② 디자인:
+        // 3) Story.synopsis (한글 줄거리) + Story.title (영문 제목) 저장 — Step 3 SUMMARY 잡이 둘의 SOT.
+        //    한글 줄거리(synopsis):
         //     - 사용자가 Step 3 에서 편집하면 PATCH 로 이 컬럼 갱신.
         //     - StoryboardGenerationService.generate 가 본문 발행 시 이 컬럼을 우선 읽음.
         //     - STORY 잡 SUCCESS 가 더 이상 이 컬럼을 덮어쓰지 않음 (handleSuccess 참고).
+        //    영문 제목(title):
+        //     - AI 가 strict JSON 으로 매번 반환. 재생성 시 사용자가 명시적으로 제목 변경을 요청
+        //       하지 않으면 LLM 이 previous title 그대로 보존하도록 prompt 가 구성됨.
+        //     - 사용자가 직접 입력하는 UI 없음 — AI 결과를 그대로 SOT 로 사용.
+        //     - 책장/뷰어/공유 메타에서 노출. null 이면 FE 가 한글 fallback ("OO이의 새 동화") 처리.
         storyRepository.findById(job.storyId).ifPresent { story ->
             story.synopsis = payload.summaryKo
+            story.title = payload.title
         }
 
         log.info(
@@ -572,12 +578,11 @@ class StoryboardResultListener(
             },
         )
 
-        // 5) Story.title 은 더 이상 AI 가 만든 영문 title 로 덮어쓰지 않는다.
-        //    - AI 의 영문 title 은 이미지 생성 grounding (StoryboardImageGenerationService) 용 컨텍스트로만
-        //      쓰이며, job.result_payload(JSON) 안에 그대로 남아있어 다운스트림은 영향 없음.
-        //    - Story.title 은 사용자가 명시적으로 입력한 값(없으면 null)으로 두어, 책장/배너에서
-        //      한글 fallback ("OO이의 새 동화" 등) 이 자연스럽게 동작하도록 한다.
-        //    synopsis 는 Step 3 에서 사용자가 편집 가능한 한글 줄거리이며 본문 grounding 의 한글 source.
+        // 5) Story.title / Story.synopsis 는 STORY (본문) 잡 SUCCESS 시 건드리지 않는다.
+        //    - 본문 생성은 직전 SUMMARY 잡 결과를 grounding 으로 받았을 뿐, title/synopsis 의 SOT 가 아님.
+        //    - title    SOT: SUMMARY 잡 SUCCESS (handleSummarySuccess step 3) — AI 영문 title 저장.
+        //    - synopsis SOT: SUMMARY 잡 SUCCESS + 사용자 PATCH 편집.
+        //    - 본문 페이로드의 title 은 이미지 생성 grounding (StoryboardImageGenerationService) 컨텍스트로만 사용.
         //    본문 합본 텍스트가 필요하면 storyboard_pages.korean_text 를 join 해서 산출.
 
         log.info(
