@@ -16,12 +16,14 @@ import com.s210.backend.domain.story.presentation.request.ProgressRequest
 import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
 import com.s210.backend.domain.story.presentation.request.VoiceProfileModifyRequest
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
+import com.s210.backend.domain.story.presentation.response.HighlightVoicesExistsResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRegenerateResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRollbackResponse
 import com.s210.backend.domain.story.presentation.response.OutroResponse
 import com.s210.backend.domain.story.presentation.response.PresignedUrlResponse
 import com.s210.backend.domain.story.presentation.response.ProgressResponse
 import com.s210.backend.domain.story.presentation.response.SceneResponse
+import com.s210.backend.domain.story.presentation.response.ScenesPrepareResponse
 import com.s210.backend.domain.story.presentation.response.StyleModifyResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -42,6 +44,25 @@ class SceneController(
     fun sceneList(@PathVariable storyId: Long): ResponseEntity<ApiResponse<List<SceneResponse>>> {
         val result = highlightOutroService.findScenes(storyId)
         return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    // Step 7 진입 — storyboard_pages.sentences JSON → scenes/scene_sentences 평탄화 (멱등).
+    // FE 는 이 호출을 await 한 뒤 GET /scenes 로 정규화된 데이터를 받아온다.
+    @PostMapping("/scenes/prepare")
+    fun scenesPrepare(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<ScenesPrepareResponse>> {
+        val result = highlightOutroService.prepareScenes(storyId = storyId, userId = user.userId)
+        return ResponseEntity.ok(
+            ApiResponse(
+                data = ScenesPrepareResponse(
+                    sceneCount = result.sceneCount,
+                    sentenceCount = result.sentenceCount,
+                    alreadyPrepared = result.alreadyPrepared,
+                ),
+            )
+        )
     }
 
     @PostMapping("/scenes/{sceneId}/illustration/regenerate")
@@ -126,6 +147,16 @@ class SceneController(
     ): ResponseEntity<Unit> {
         highlightOutroService.removeHighlightVoice(storyId, sentenceId)
         return ResponseEntity.noContent().build()
+    }
+
+    // Step 4 본문 재생성 경고 모달 — 활성 강조 녹음 존재 여부.
+    // FE 는 본문 재생성 버튼 클릭 시 호출 → exists=true 면 "강조녹음 삭제됨" 경고 모달 노출.
+    @GetMapping("/highlight-voices/exists")
+    fun highlightVoicesExists(
+        @PathVariable storyId: Long,
+    ): ResponseEntity<ApiResponse<HighlightVoicesExistsResponse>> {
+        val exists = highlightOutroService.existsActiveHighlightVoice(storyId)
+        return ResponseEntity.ok(ApiResponse(data = HighlightVoicesExistsResponse(exists = exists)))
     }
 
     // 스타일 미리보기 생성

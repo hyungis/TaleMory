@@ -19,8 +19,6 @@ export interface UpdateMeRequest {
   name: string
   nickname: string
   phone: string | null
-  agreeSms: boolean
-  agreeMarketing: boolean
 }
 
 const VALID_OAUTH_PROVIDERS: readonly OauthProvider[] = ['kakao', 'google', 'naver']

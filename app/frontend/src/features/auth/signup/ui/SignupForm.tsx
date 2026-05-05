@@ -1,54 +1,106 @@
 import { useCallback, useState, type CSSProperties, type FormEvent } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
-import { TermsCheckboxes } from '../../terms'
+import { formatPhoneNumber } from '../../../../shared/lib'
+import { getLoginIdAvailability, getNicknameAvailability } from '../../api/getAuthAvailability'
+import {
+  buildRequiredTermAgreements,
+  getTerms,
+  isRequiredTermsNotFoundError,
+  TermsCheckboxes,
+} from '../../terms'
 import { useSignupPost } from '../model/useSignupPost'
 import type { SignupRequest } from '../types'
 
 interface SignupFormValues {
   id: string
   password: string
+  passwordCheck: string
   email: string
   name: string
   nickname: string
   phone: string
-  smsAgree: boolean
-  marketingAgree: boolean
+  serviceTermsAgree: boolean
+  privacyAgree: boolean
 }
 
 const INITIAL_VALUES: SignupFormValues = {
   id: '',
   password: '',
+  passwordCheck: '',
   email: '',
   name: '',
   nickname: '',
   phone: '',
-  smsAgree: false,
-  marketingAgree: false,
+  serviceTermsAgree: false,
+  privacyAgree: false,
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
 const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 
+type AvailabilityCheckStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
+
+interface AvailabilityCheckState {
+  status: AvailabilityCheckStatus
+  value: string
+}
+
+const INITIAL_AVAILABILITY_CHECK: AvailabilityCheckState = {
+  status: 'idle',
+  value: '',
+}
+
+function isAvailabilityConfirmed(state: AvailabilityCheckState, value: string): boolean {
+  return state.status === 'available' && state.value === value.trim()
+}
+
+function getAvailabilityMessage(
+  label: '아이디' | '닉네임',
+  state: AvailabilityCheckState,
+  currentValue: string,
+): string | null {
+  if (state.status === 'idle' || state.value !== currentValue.trim()) return null
+  if (state.status === 'checking') return `${label} 중복 여부를 확인하고 있어요.`
+  if (state.status === 'available') return `사용 가능한 ${label}입니다.`
+  if (state.status === 'unavailable') return `이미 사용 중인 ${label}입니다.`
+  return `${label} 중복 확인에 실패했어요. 잠시 후 다시 시도해주세요.`
+}
+
+function getAvailabilityMessageColor(status: AvailabilityCheckStatus): string {
+  if (status === 'available') return '#5f7d50'
+  if (status === 'unavailable' || status === 'error') return '#8c3a1f'
+  return '#8a7558'
+}
+
 function validate(values: SignupFormValues): string | null {
   if (!values.id.trim()) return '아이디를 입력해주세요.'
   if (values.id.trim().length < 4) return '아이디는 4자 이상이어야 해요.'
   if (!values.password) return '비밀번호를 입력해주세요.'
   if (values.password.length < 6) return '비밀번호는 6자 이상이어야 해요.'
-  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email)) return '올바른 이메일 형식을 입력해주세요.'
+  if (!values.passwordCheck) return '비밀번호 확인을 입력해주세요.'
+  if (values.password !== values.passwordCheck) return '비밀번호가 서로 일치하지 않아요.'
+  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email.trim())) return '올바른 이메일 형식을 입력해주세요.'
   if (!values.name.trim()) return '실명을 입력해주세요.'
   if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
   if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
+  if (!values.serviceTermsAgree) return '서비스 이용약관에 동의해주세요.'
+  if (!values.privacyAgree) return '개인정보 수집 및 이용에 동의해주세요.'
   return null
 }
 
 function getSignupErrorMessage(error: unknown): string {
+  if (isRequiredTermsNotFoundError(error)) {
+    return '약관 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.'
+  }
+
   if (!isApiError(error)) {
     return '회원가입 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.'
   }
   if (error.code === 'AUTH_001') return '이미 사용 중인 아이디입니다.'
   if (error.code === 'AUTH_002') return '이미 사용 중인 이메일입니다.'
+  if (error.code === 'USER_002') return '이미 사용 중인 닉네임입니다.'
   if (error.code === 'NETWORK_ERROR') return '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.'
   if (error.code === 'REQUEST_TIMEOUT') return '응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.'
   return error.message
@@ -82,12 +134,35 @@ const inputStyle: CSSProperties = {
   boxShadow: 'inset 0 1px 2px rgba(140, 100, 60, 0.08)',
 }
 
+const fieldActionRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 8,
+  alignItems: 'center',
+}
+
+const checkButtonStyle: CSSProperties = {
+  height: 48,
+  padding: '0 14px',
+  borderRadius: 12,
+  border: '2px solid #5f7d50',
+  background: '#eef5df',
+  color: '#4f7140',
+  fontFamily: 'var(--font-display)',
+  fontSize: 15,
+  fontWeight: 700,
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+}
+
 /**
  * 회원가입 폼 — paper-craft 톤.
  */
 export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
   const [values, setValues] = useState<SignupFormValues>(INITIAL_VALUES)
   const [error, setError] = useState('')
+  const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
+  const [nicknameCheck, setNicknameCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
   const [restoreRequest, setRestoreRequest] = useState<SignupRequest | null>(null)
   const { isPending, signup } = useSignupPost()
 
@@ -98,6 +173,48 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
     },
     [],
   )
+
+  const handleLoginIdCheck = useCallback(async () => {
+    const loginId = values.id.trim()
+    if (!loginId) {
+      setError('아이디를 입력해주세요.')
+      return
+    }
+    if (loginId.length < 4) {
+      setError('아이디는 4자 이상이어야 해요.')
+      return
+    }
+
+    setError('')
+    setLoginIdCheck({ status: 'checking', value: loginId })
+
+    try {
+      const result = await getLoginIdAvailability(loginId)
+      setLoginIdCheck({ status: result.available ? 'available' : 'unavailable', value: loginId })
+    } catch (checkError) {
+      setLoginIdCheck({ status: 'error', value: loginId })
+      setError(getSignupErrorMessage(checkError))
+    }
+  }, [values.id])
+
+  const handleNicknameCheck = useCallback(async () => {
+    const nickname = values.nickname.trim()
+    if (!nickname) {
+      setError('닉네임을 입력해주세요.')
+      return
+    }
+
+    setError('')
+    setNicknameCheck({ status: 'checking', value: nickname })
+
+    try {
+      const result = await getNicknameAvailability(nickname)
+      setNicknameCheck({ status: result.available ? 'available' : 'unavailable', value: nickname })
+    } catch (checkError) {
+      setNicknameCheck({ status: 'error', value: nickname })
+      setError(getSignupErrorMessage(checkError))
+    }
+  }, [values.nickname])
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -110,25 +227,46 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         return
       }
 
-      const request: SignupRequest = {
-        loginId: values.id.trim(),
-        password: values.password,
-        email: values.email.trim(),
-        name: values.name.trim(),
-        nickname: values.nickname.trim(),
-        phone: values.phone.trim() || undefined,
-        agreeSms: values.smsAgree,
-        agreeMarketing: values.marketingAgree,
+      if (!isAvailabilityConfirmed(loginIdCheck, values.id)) {
+        setError(
+          loginIdCheck.status === 'unavailable' && loginIdCheck.value === values.id.trim()
+            ? '이미 사용 중인 아이디입니다.'
+            : '아이디 중복 확인을 완료해주세요.',
+        )
+        return
       }
 
+      if (!isAvailabilityConfirmed(nicknameCheck, values.nickname)) {
+        setError(
+          nicknameCheck.status === 'unavailable' && nicknameCheck.value === values.nickname.trim()
+            ? '이미 사용 중인 닉네임입니다.'
+            : '닉네임 중복 확인을 완료해주세요.',
+        )
+        return
+      }
+
+      let request: SignupRequest | null = null
+
       try {
+        const terms = await getTerms()
+        request = {
+          loginId: values.id.trim(),
+          password: values.password,
+          passwordCheck: values.passwordCheck,
+          email: values.email.trim(),
+          name: values.name.trim(),
+          nickname: values.nickname.trim(),
+          phone: values.phone.trim() || undefined,
+          termAgreements: buildRequiredTermAgreements(values, terms),
+        }
+
         await signup(request)
 
         setError('')
         alert(`"${values.nickname.trim()}" 님 가입이 완료됐어요! 로그인 해주세요.`)
         onSignedUp(values.id.trim())
       } catch (submitError) {
-        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE) {
+        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE && request !== null) {
           setError('')
           setRestoreRequest(request)
           return
@@ -137,7 +275,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         setError(getSignupErrorMessage(submitError))
       }
     },
-    [isPending, onSignedUp, signup, values],
+    [isPending, loginIdCheck, nicknameCheck, onSignedUp, signup, values],
   )
 
   const handleRestoreCancel = useCallback(() => {
@@ -165,6 +303,9 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
     }
   }, [isPending, onSignedUp, restoreRequest, signup])
 
+  const loginIdMessage = getAvailabilityMessage('아이디', loginIdCheck, values.id)
+  const nicknameMessage = getAvailabilityMessage('닉네임', nicknameCheck, values.nickname)
+
   const required = (
     <span style={{ color: '#c47254', fontWeight: 700, marginLeft: 2 }}>*</span>
   )
@@ -178,15 +319,44 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
       >
         <div>
           <label style={labelStyle}>아이디 {required}</label>
-          <input
-            type="text"
-            value={values.id}
-            disabled={isPending}
-            onChange={e => handleChange('id', e.target.value)}
-            autoComplete="username"
-            placeholder="4자 이상"
-            style={inputStyle}
-          />
+          <div style={fieldActionRowStyle}>
+            <input
+              type="text"
+              value={values.id}
+              disabled={isPending}
+              onChange={e => {
+                setLoginIdCheck(INITIAL_AVAILABILITY_CHECK)
+                handleChange('id', e.target.value)
+              }}
+              autoComplete="username"
+              placeholder="4자 이상"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              disabled={isPending || loginIdCheck.status === 'checking'}
+              onClick={handleLoginIdCheck}
+              style={{
+                ...checkButtonStyle,
+                cursor: isPending || loginIdCheck.status === 'checking' ? 'not-allowed' : 'pointer',
+                opacity: isPending || loginIdCheck.status === 'checking' ? 0.6 : 1,
+              }}
+            >
+              {loginIdCheck.status === 'checking' ? '확인 중' : '중복 확인'}
+            </button>
+          </div>
+          {loginIdMessage && (
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontFamily: 'var(--font-display)',
+                fontSize: 13,
+                color: getAvailabilityMessageColor(loginIdCheck.status),
+              }}
+            >
+              {loginIdMessage}
+            </p>
+          )}
         </div>
         <div>
           <label style={labelStyle}>비밀번호 {required}</label>
@@ -197,6 +367,18 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             onChange={e => handleChange('password', e.target.value)}
             autoComplete="new-password"
             placeholder="6자 이상"
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>비밀번호 확인 {required}</label>
+          <input
+            type="password"
+            value={values.passwordCheck}
+            disabled={isPending}
+            onChange={e => handleChange('passwordCheck', e.target.value)}
+            autoComplete="new-password"
+            placeholder="비밀번호 재입력"
             style={inputStyle}
           />
         </div>
@@ -212,7 +394,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             style={inputStyle}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label style={labelStyle}>실명 {required}</label>
             <input
@@ -227,14 +409,43 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
           </div>
           <div>
             <label style={labelStyle}>닉네임 {required}</label>
-            <input
-              type="text"
-              value={values.nickname}
-              disabled={isPending}
-              onChange={e => handleChange('nickname', e.target.value)}
-              placeholder="해솔맘"
-              style={inputStyle}
-            />
+            <div style={fieldActionRowStyle}>
+              <input
+                type="text"
+                value={values.nickname}
+                disabled={isPending}
+                onChange={e => {
+                  setNicknameCheck(INITIAL_AVAILABILITY_CHECK)
+                  handleChange('nickname', e.target.value)
+                }}
+                placeholder="해솔맘"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                disabled={isPending || nicknameCheck.status === 'checking'}
+                onClick={handleNicknameCheck}
+                style={{
+                  ...checkButtonStyle,
+                  cursor: isPending || nicknameCheck.status === 'checking' ? 'not-allowed' : 'pointer',
+                  opacity: isPending || nicknameCheck.status === 'checking' ? 0.6 : 1,
+                }}
+              >
+                {nicknameCheck.status === 'checking' ? '확인 중' : '중복 확인'}
+              </button>
+            </div>
+            {nicknameMessage && (
+              <p
+                style={{
+                  margin: '6px 0 0',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 13,
+                  color: getAvailabilityMessageColor(nicknameCheck.status),
+                }}
+              >
+                {nicknameMessage}
+              </p>
+            )}
           </div>
         </div>
         <div>
@@ -245,7 +456,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             type="tel"
             value={values.phone}
             disabled={isPending}
-            onChange={e => handleChange('phone', e.target.value)}
+            onChange={e => handleChange('phone', formatPhoneNumber(e.target.value))}
             autoComplete="tel"
             placeholder="010-1234-5678"
             style={inputStyle}
@@ -253,8 +464,8 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         </div>
 
         <TermsCheckboxes
-          smsAgree={values.smsAgree}
-          marketingAgree={values.marketingAgree}
+          serviceTermsAgree={values.serviceTermsAgree}
+          privacyAgree={values.privacyAgree}
           onChange={(key, value) => handleChange(key, value)}
         />
 

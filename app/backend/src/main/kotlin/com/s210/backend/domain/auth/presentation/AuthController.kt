@@ -11,19 +11,23 @@ import com.s210.backend.domain.auth.presentation.request.KakaoSignupRequest
 import com.s210.backend.domain.auth.presentation.request.LoginRequest
 import com.s210.backend.domain.auth.presentation.request.SignupRequest
 import com.s210.backend.domain.auth.presentation.response.AuthResponse
+import com.s210.backend.domain.auth.presentation.response.AvailabilityResponse
 import com.s210.backend.domain.auth.presentation.response.KakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.response.RefreshTokenResponse
 import com.s210.backend.domain.auth.presentation.response.SignupResponse
 import com.s210.backend.domain.auth.presentation.response.toAuthResponse
+import com.s210.backend.domain.auth.presentation.response.toAvailabilityResponse
 import com.s210.backend.domain.auth.presentation.response.toKakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.support.RefreshTokenCookieManager
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -37,6 +41,18 @@ class AuthController(
     fun authSignup(@RequestBody request: SignupRequest): ResponseEntity<ApiResponse<SignupResponse>> =
         ResponseEntity.ok(
             ApiResponse(data = SignupResponse(userId = memberService.signUp(request.toCommand()))),
+        )
+
+    @GetMapping("/login-id/check")
+    fun authLoginIdCheck(@RequestParam loginId: String): ResponseEntity<ApiResponse<AvailabilityResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(data = memberService.findLoginIdAvailability(loginId).toAvailabilityResponse()),
+        )
+
+    @GetMapping("/nickname/check")
+    fun authNicknameCheck(@RequestParam nickname: String): ResponseEntity<ApiResponse<AvailabilityResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(data = memberService.findNicknameAvailability(nickname).toAvailabilityResponse()),
         )
 
     @PostMapping("/login")

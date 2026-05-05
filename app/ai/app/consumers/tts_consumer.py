@@ -1,5 +1,6 @@
 import json
 import logging
+from time import perf_counter
 from typing import Any
 
 from app.core.config import settings
@@ -38,6 +39,11 @@ def consume_tts_jobs() -> None:
 
 
 def register_tts_consumers(channel: Any) -> None:
+    register_story_tts_consumer(channel)
+    register_preview_tts_consumer(channel)
+
+
+def register_story_tts_consumer(channel: Any) -> None:
     publisher = TtsResultPublisher(channel)
     channel.basic_consume(
         queue=settings.RABBITMQ_TTS_GENERATE_QUEUE,
@@ -45,6 +51,10 @@ def register_tts_consumers(channel: Any) -> None:
             ch, method.delivery_tag, body, publisher
         ),
     )
+
+
+def register_preview_tts_consumer(channel: Any) -> None:
+    publisher = TtsResultPublisher(channel)
     channel.basic_consume(
         queue=settings.RABBITMQ_TTS_PREVIEW_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_preview_message(
@@ -90,10 +100,18 @@ def _dispatch_preview_message(
 
 
 def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
+    started = perf_counter()
     message = StoryTtsGenerateJobMessage.model_validate_json(body)
     request = message.payload.model_dump(mode="json")
     if message.storyId is not None:
         request["storyId"] = message.storyId
+    logger.info(
+        "[TTS:WORKER:CONSUME] jobId=%s storyId=%s voiceId=%s sentenceCount=%s",
+        message.jobId,
+        request["storyId"],
+        request["voiceId"],
+        len(request.get("sentences", [])),
+    )
 
     create_pending_manifest(
         message.jobId,
@@ -182,6 +200,12 @@ def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
         story_id=request["storyId"],
         payload=typed_result,
     )
+    logger.info(
+        "[TTS:WORKER:PUBLISH] jobId=%s storyId=%s elapsedMs=%d",
+        message.jobId,
+        request["storyId"],
+        _elapsed_ms(started),
+    )
     update_manifest(
         message.jobId,
         {
@@ -194,8 +218,15 @@ def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
 
 
 def handle_preview_message(body: bytes, publisher: TtsResultPublisher) -> None:
+    started = perf_counter()
     message = PreviewTtsJobMessage.model_validate_json(body)
     request = message.payload
+    logger.info(
+        "[TTS_PREVIEW:WORKER:CONSUME] previewId=%s voiceId=%s textLen=%s",
+        message.jobId,
+        message.voiceId,
+        len(request.text),
+    )
 
     try:
         result = generate_preview(
@@ -257,6 +288,12 @@ def handle_preview_message(body: bytes, publisher: TtsResultPublisher) -> None:
             ),
         ),
     )
+    logger.info(
+        "[TTS_PREVIEW:WORKER:PUBLISH] previewId=%s voiceId=%s elapsedMs=%d",
+        message.jobId,
+        message.voiceId,
+        _elapsed_ms(started),
+    )
 
 
 def _handle_failure(
@@ -304,3 +341,7 @@ def _now() -> str:
     from app.services.dev_tts_service import _now as manifest_now
 
     return manifest_now()
+
+
+def _elapsed_ms(started: float) -> int:
+    return int((perf_counter() - started) * 1000)

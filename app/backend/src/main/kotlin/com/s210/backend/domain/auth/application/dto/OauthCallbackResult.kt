@@ -13,6 +13,12 @@ sealed interface OauthCallbackResult {
     data class RestoreRequired(
         val signupToken: String,
         val profile: OauthSignupProfile,
+        val passwordRequired: Boolean,
+    ) : OauthCallbackResult
+
+    data class LinkRequired(
+        val signupToken: String,
+        val profile: OauthSignupProfile,
     ) : OauthCallbackResult
 }
 

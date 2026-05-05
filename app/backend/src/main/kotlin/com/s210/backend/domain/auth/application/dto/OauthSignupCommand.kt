@@ -6,7 +6,8 @@ data class OauthSignupCommand(
     val name: String,
     val nickname: String,
     val phone: String?,
-    val agreeSms: Boolean,
-    val agreeMarketing: Boolean,
+    val password: String? = null,
+    val termAgreements: List<TermAgreementCommand> = emptyList(),
     val restoreConfirmed: Boolean = false,
+    val linkConfirmed: Boolean = false,
 )

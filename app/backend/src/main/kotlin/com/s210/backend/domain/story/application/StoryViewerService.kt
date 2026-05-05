@@ -10,6 +10,7 @@ import com.s210.backend.domain.story.entity.SceneSentence
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.entity.StoryOutro
 import com.s210.backend.domain.story.exception.StoryErrorCode
+import com.s210.backend.domain.story.infrastructure.repository.SceneHighlightVoiceRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryOutroRepository
@@ -34,10 +35,28 @@ class StoryViewerService(
     private val storyRepository: StoryRepository,
     private val sceneRepository: SceneRepository,
     private val sceneSentenceRepository: SceneSentenceRepository,
+    private val sceneHighlightVoiceRepository: SceneHighlightVoiceRepository,
     private val storyOutroRepository: StoryOutroRepository,
     private val memberRepository: MemberRepository,
     private val objectMapper: ObjectMapper,
 ) {
+    companion object {
+        private const val SAMPLE_STORY_ID = 1L
+    }
+
+    fun findSampleStoryView(): StoryViewResponse {
+        val story = storyRepository.findById(SAMPLE_STORY_ID)
+            .orElseThrow { BusinessException(StoryErrorCode.STORY_NOT_FOUND) }
+
+        verifyPublished(story)
+
+        val scenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(story.id)
+        val sentencesByScene = loadSentencesByScene(scenes)
+        val outro = storyOutroRepository.findByStoryId(story.id)
+
+        return toViewResponse(story, scenes, sentencesByScene, outro)
+    }
+
     fun findPublicStoryView(shareToken: String): StoryViewResponse {
         val story = storyRepository.findByShareTokenAndDeletedAtIsNull(shareToken)
             ?: throw BusinessException(StoryErrorCode.STORY_NOT_FOUND)
@@ -98,6 +117,9 @@ class StoryViewerService(
         sentencesByScene: Map<Long, List<SceneSentence>>,
         outro: StoryOutro?,
     ): StoryViewResponse {
+        val allSentences = sentencesByScene.values.flatten()
+        val highlightAudioMap = loadHighlightAudioMap(allSentences)
+
         return StoryViewResponse(
             storyId = story.id,
             title = story.title,
@@ -110,20 +132,30 @@ class StoryViewerService(
                     pageNumber = scene.pageNumber,
                     illustrationUrl = scene.illustrationUrl,
                     characterAnchors = parseCharacterAnchors(scene.characterAnchors),
-                    sentences = sentencesByScene[scene.id].orEmpty().map(::toSentenceView),
+                    sentences = sentencesByScene[scene.id].orEmpty().map { sentence ->
+                        toSentenceView(sentence, highlightAudioMap)
+                    },
                 )
             },
             outro = outro?.let { toOutroView(it) },
         )
     }
 
-    private fun toSentenceView(sentence: SceneSentence): SentenceViewResponse {
+    private fun loadHighlightAudioMap(sentences: List<SceneSentence>): Map<Long, String> {
+        if (sentences.isEmpty()) return emptyMap()
+        val sentenceIds = sentences.map { it.id }
+        return sceneHighlightVoiceRepository
+            .findBySentenceIdInAndDeletedAtIsNull(sentenceIds)
+            .associate { it.sentenceId to it.audioUrl }
+    }
+
+    private fun toSentenceView(sentence: SceneSentence, highlightAudioMap: Map<Long, String>): SentenceViewResponse {
         return SentenceViewResponse(
             sentenceId = sentence.id,
             sentenceOrder = sentence.sentenceOrder,
             englishText = sentence.englishText,
             koreanText = sentence.koreanText,
-            ttsAudioUrl = sentence.ttsAudioUrl,
+            ttsAudioUrl = highlightAudioMap[sentence.id] ?: sentence.ttsAudioUrl,
             speakerKey = sentence.speakerKey,
             bubbleSlot = sentence.bubbleSlot?.name,
         )

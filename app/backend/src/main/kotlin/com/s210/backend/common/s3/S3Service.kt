@@ -95,6 +95,27 @@ class S3Service(
         "https://$bucket.s3.$region.amazonaws.com/$s3Key"
 
     /**
+     * DB 에 저장된 audio_url / image_url 등에서 S3 객체 키를 추출.
+     *
+     * 입력 형식:
+     *  - 풀 URL: `https://{bucket}.s3.{region}.amazonaws.com/{envPrefix}/path/file.ext`
+     *  - presign GET URL: 위 + `?X-Amz-...` (query 제거 후 path 사용)
+     *  - raw key: URL prefix 없으면 이미 key 로 보고 그대로 반환
+     *
+     * S3 삭제(`deleteObject`) / presign GET 등 key 가 필요한 경로에서 일관되게 사용.
+     * 파싱 실패 시 null 반환 — 호출자는 이를 cleanup 누락으로 받아들이거나 swallow 한다.
+     */
+    fun extractS3Key(storedReference: String): String? {
+        val withoutQuery = storedReference.substringBefore("?")
+        if (!withoutQuery.startsWith("http://") && !withoutQuery.startsWith("https://")) {
+            return withoutQuery.takeIf { it.isNotBlank() }
+        }
+        return runCatching {
+            java.net.URI(withoutQuery).path?.removePrefix("/")?.takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
+
+    /**
      * S3 객체 즉시 hard delete. 사진 삭제 시 DB soft delete 와 함께 호출해
      * 버킷에 orphan 이 쌓이지 않도록 한다.
      * 없는 key 를 지워도 AWS 는 예외 없이 성공 응답 (idempotent).

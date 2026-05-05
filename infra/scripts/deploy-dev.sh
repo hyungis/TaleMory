@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# dev 환경 app 스택 배포. 인자 없으면 전체, 있으면 해당 서비스만.
-# 실패 시 자동 복구는 하지 않음 — pipeline fail로 표면화.
-# 복구 경로: git revert → push → 새 pipeline, 또는 GitLab 변수 override로 이전 SHA 재실행.
+# dev 환경 app 스택 배포. 인자 없으면 compose 정의 전체, 있으면 해당 서비스만.
+# 실패 시 자동 복구는 하지 않음 — pipeline fail 로 표면화.
+# 복구 경로: git revert → push → 새 pipeline, 또는 GitLab 변수 override 로 이전 SHA 재실행.
+#
+# 서비스명은 docker-compose.app-dev.yml 의 services 키와 1:1 매칭. compose 에 새 서비스를
+# 추가하면 스크립트 수정 없이 `all` 에 자동 포함된다.
 #
 # Usage:
-#   bash infra/scripts/deploy-dev.sh                # backend + ai-worker + nginx 전부
-#   bash infra/scripts/deploy-dev.sh backend        # backend만
-#   bash infra/scripts/deploy-dev.sh frontend       # nginx만 (이름 매핑)
-#   bash infra/scripts/deploy-dev.sh ai-worker      # ai-worker만
+#   bash infra/scripts/deploy-dev.sh                       # 전체
+#   bash infra/scripts/deploy-dev.sh backend               # backend 만
+#   bash infra/scripts/deploy-dev.sh frontend              # nginx 별칭
+#   bash infra/scripts/deploy-dev.sh ai-tts-story-worker   # 임의의 단일 서비스
 
 set -euo pipefail
 
@@ -28,21 +31,39 @@ require_file "$ENV_FILE"
 export APP_IMAGE_TAG="$TAG"
 export COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT"
 
-# frontend(별칭) → 실제 compose 서비스명은 nginx
+compose_cmd() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT" "$@"
+}
+
+# compose 가 인식하는 서비스 목록을 single source of truth 로 사용.
+# 새 서비스를 compose 에 추가해도 이 스크립트는 그대로 — 자동 enumerate.
+ALL_SERVICES=$(compose_cmd config --services)
+
 resolve_services() {
   case "$SERVICE" in
-    all)                echo "backend ai-worker nginx" ;;
-    frontend|nginx)     echo "nginx" ;;
-    backend|ai-worker)  echo "$SERVICE" ;;
-    *) echo "unknown service: $SERVICE" >&2; exit 1 ;;
+    all)
+      echo "$ALL_SERVICES"
+      ;;
+    frontend)
+      # UX 별칭 — 사용자가 nginx 라는 compose service name 을 외울 필요 없게.
+      echo "nginx"
+      ;;
+    *)
+      if echo "$ALL_SERVICES" | grep -qx "$SERVICE"; then
+        echo "$SERVICE"
+      else
+        echo "unknown service: $SERVICE" >&2
+        echo "available: $(echo "$ALL_SERVICES" | tr '\n' ' ')" >&2
+        exit 1
+      fi
+      ;;
   esac
 }
 
-for svc in $(resolve_services); do
-  # build 단계에서 이미 로컬 docker daemon에 s210-<svc>:<tag> 태그가 있음.
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT" \
-    up -d --no-build "$svc"
-done
+# 다중 서비스를 한 번의 up 호출로 — depends_on 자동 해석 (nginx 가 backend 보다 늦게 뜸).
+# build 는 build stage 에서 끝났으니 --no-build.
+# shellcheck disable=SC2046
+compose_cmd up -d --no-build $(resolve_services)
 
 bash "$SCRIPT_DIR/health-check-${ENV_NAME}.sh" "$SERVICE"
 

@@ -1,4 +1,5 @@
 import type { LoginResponsePayload } from '../login'
+import type { TermAgreement } from '../terms'
 
 export interface KakaoCallbackRequest {
   code: string
@@ -18,9 +19,10 @@ export interface KakaoSignupRequest {
   name: string
   nickname: string
   phone?: string
-  agreeSms: boolean
-  agreeMarketing: boolean
+  password?: string
+  termAgreements?: TermAgreement[]
   restoreConfirmed?: boolean
+  linkConfirmed?: boolean
 }
 
 export interface KakaoLoginCallbackPayload extends LoginResponsePayload {
@@ -37,9 +39,17 @@ export interface KakaoRestoreRequiredCallbackPayload {
   status: 'RESTORE_REQUIRED'
   signupToken: string
   profile: KakaoSignupProfile
+  passwordRequired?: boolean
+}
+
+export interface KakaoLinkRequiredCallbackPayload {
+  status: 'LINK_REQUIRED'
+  signupToken: string
+  profile: KakaoSignupProfile
 }
 
 export type KakaoCallbackResponsePayload =
   | KakaoLoginCallbackPayload
   | KakaoSignupRequiredCallbackPayload
   | KakaoRestoreRequiredCallbackPayload
+  | KakaoLinkRequiredCallbackPayload

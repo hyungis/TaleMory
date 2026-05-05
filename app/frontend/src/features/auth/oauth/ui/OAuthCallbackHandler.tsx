@@ -19,6 +19,12 @@ interface KakaoSignupDraft {
 interface KakaoRestoreDraft {
   signupToken: string
   profile: KakaoSignupProfile
+  passwordRequired: boolean
+}
+
+interface KakaoLinkDraft {
+  signupToken: string
+  profile: KakaoSignupProfile
 }
 
 export function OAuthCallbackHandler() {
@@ -27,8 +33,12 @@ export function OAuthCallbackHandler() {
   const [error, setError] = useState<string | null>(null)
   const [signupDraft, setSignupDraft] = useState<KakaoSignupDraft | null>(null)
   const [restoreDraft, setRestoreDraft] = useState<KakaoRestoreDraft | null>(null)
+  const [linkDraft, setLinkDraft] = useState<KakaoLinkDraft | null>(null)
   const [isSignupNoticeOpen, setIsSignupNoticeOpen] = useState(false)
   const [isRestorePending, setIsRestorePending] = useState(false)
+  const [isLinkPending, setIsLinkPending] = useState(false)
+  const [restorePassword, setRestorePassword] = useState('')
+  const [restorePasswordError, setRestorePasswordError] = useState('')
 
   useEffect(() => {
     let isActive = true
@@ -57,6 +67,7 @@ export function OAuthCallbackHandler() {
           if (payload.status === 'SIGNUP_REQUIRED') {
             clearAuthSession()
             setRestoreDraft(null)
+            setLinkDraft(null)
             setSignupDraft({
               signupToken: payload.signupToken,
               profile: payload.profile,
@@ -68,8 +79,24 @@ export function OAuthCallbackHandler() {
           if (payload.status === 'RESTORE_REQUIRED') {
             clearAuthSession()
             setSignupDraft(null)
+            setLinkDraft(null)
             setIsSignupNoticeOpen(false)
             setRestoreDraft({
+              signupToken: payload.signupToken,
+              profile: payload.profile,
+              passwordRequired: payload.passwordRequired ?? false,
+            })
+            setRestorePassword('')
+            setRestorePasswordError('')
+            return
+          }
+
+          if (payload.status === 'LINK_REQUIRED') {
+            clearAuthSession()
+            setSignupDraft(null)
+            setRestoreDraft(null)
+            setIsSignupNoticeOpen(false)
+            setLinkDraft({
               signupToken: payload.signupToken,
               profile: payload.profile,
             })
@@ -146,13 +173,20 @@ export function OAuthCallbackHandler() {
 
     clearAuthSession()
     setRestoreDraft(null)
+    setRestorePassword('')
+    setRestorePasswordError('')
     navigate(ROUTES.home, { replace: true })
   }
 
   const handleKakaoRestoreConfirm = async () => {
     if (restoreDraft === null || isRestorePending) return
+    if (restoreDraft.passwordRequired && !restorePassword.trim()) {
+      setRestorePasswordError('비밀번호를 입력해주세요.')
+      return
+    }
 
     setIsRestorePending(true)
+    setRestorePasswordError('')
 
     try {
       const result = await postKakaoSignup({
@@ -161,13 +195,13 @@ export function OAuthCallbackHandler() {
         name: restoreDraft.profile.name,
         nickname: restoreDraft.profile.nickname,
         phone: restoreDraft.profile.phone ?? undefined,
-        agreeSms: false,
-        agreeMarketing: false,
+        password: restorePassword.trim() || undefined,
         restoreConfirmed: true,
       })
 
       setAuthSession(result)
       setRestoreDraft(null)
+      setRestorePassword('')
       navigate(ROUTES.home, {
         replace: true,
         state: {
@@ -175,12 +209,80 @@ export function OAuthCallbackHandler() {
         },
       })
     } catch (restoreError) {
+      if (isApiError(restoreError) && restoreError.code === 'AUTH_001') {
+        setRestorePasswordError('기존 계정 비밀번호를 확인해주세요.')
+        return
+      }
+
       clearAuthSession()
       setRestoreDraft(null)
+      setRestorePassword('')
       setError(isApiError(restoreError) ? restoreError.message : '카카오 계정을 복구하지 못했어요. 다시 시도해주세요.')
     } finally {
       setIsRestorePending(false)
     }
+  }
+
+  const handleKakaoLinkCancel = () => {
+    if (isLinkPending) return
+
+    clearAuthSession()
+    setLinkDraft(null)
+    navigate(ROUTES.home, { replace: true })
+  }
+
+  const handleKakaoLinkConfirm = async () => {
+    if (linkDraft === null || isLinkPending) return
+
+    setIsLinkPending(true)
+
+    try {
+      const result = await postKakaoSignup({
+        signupToken: linkDraft.signupToken,
+        email: linkDraft.profile.email,
+        name: linkDraft.profile.name,
+        nickname: linkDraft.profile.nickname,
+        phone: linkDraft.profile.phone ?? undefined,
+        linkConfirmed: true,
+      })
+
+      setAuthSession(result)
+      setLinkDraft(null)
+      navigate(ROUTES.home, {
+        replace: true,
+        state: {
+          skipLanding: true,
+        },
+      })
+    } catch (linkError) {
+      clearAuthSession()
+      setLinkDraft(null)
+      setError(isApiError(linkError) ? linkError.message : '카카오 계정 연동에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      setIsLinkPending(false)
+    }
+  }
+
+  if (linkDraft) {
+    return (
+      <div className="min-h-screen bg-[#f6f0da] flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] shadow-[0_20px_60px_rgba(0,0,0,0.28)] p-8 text-center space-y-4">
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#2d5a27]/10 text-[#2d5a27] flex items-center justify-center">
+            <LoaderCircle className="w-7 h-7 animate-spin" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-[#2a1b12]">카카오 계정 연동 확인 중</h1>
+            <p className="text-sm text-[#6a5632]">이미 가입된 이메일을 확인했어요.</p>
+          </div>
+        </div>
+        <KakaoLinkConfirmDialog
+          email={linkDraft.profile.email}
+          isPending={isLinkPending}
+          onCancel={handleKakaoLinkCancel}
+          onConfirm={handleKakaoLinkConfirm}
+        />
+      </div>
+    )
   }
 
   if (restoreDraft) {
@@ -196,9 +298,16 @@ export function OAuthCallbackHandler() {
           </div>
         </div>
         <KakaoRestoreConfirmDialog
+          password={restorePassword}
+          passwordError={restorePasswordError}
+          passwordRequired={restoreDraft.passwordRequired}
           isPending={isRestorePending}
           onCancel={handleKakaoRestoreCancel}
           onConfirm={handleKakaoRestoreConfirm}
+          onPasswordChange={value => {
+            setRestorePassword(value)
+            setRestorePasswordError('')
+          }}
         />
       </div>
     )
@@ -284,14 +393,76 @@ export function OAuthCallbackHandler() {
   )
 }
 
-function KakaoRestoreConfirmDialog({
+function KakaoLinkConfirmDialog({
+  email,
   isPending,
   onCancel,
   onConfirm,
 }: {
+  email: string
   isPending: boolean
   onCancel: () => void
   onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[10001] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="kakao-callback-link-title"
+      onClick={() => {
+        if (!isPending) onCancel()
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] shadow-[0_20px_60px_rgba(0,0,0,0.45)] p-6"
+        onClick={event => event.stopPropagation()}
+      >
+        <h2 id="kakao-callback-link-title" className="text-xl text-[#2a1b12] font-bold mb-3">
+          카카오 계정 연동
+        </h2>
+        <p className="text-sm leading-6 text-[#6a5632] mb-5">
+          {email}로 가입된 계정이 있어요. 이 계정에 카카오 로그인을 연동할까요?
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="flex-1 bg-[#e8ddb4] text-[#2a1b12] py-3 rounded-xl border border-[#8b7a52]/60 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 bg-[#2d5a27] text-[#f0e6c0] py-3 rounded-xl border border-[#b4dc8c]/40 font-bold shadow-[0_4px_0_#1a3a14] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isPending ? '연동 중...' : '연동하기'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function KakaoRestoreConfirmDialog({
+  password,
+  passwordError,
+  passwordRequired,
+  isPending,
+  onCancel,
+  onConfirm,
+  onPasswordChange,
+}: {
+  password: string
+  passwordError: string
+  passwordRequired: boolean
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  onPasswordChange: (value: string) => void
 }) {
   return (
     <div
@@ -313,6 +484,25 @@ function KakaoRestoreConfirmDialog({
         <p className="text-sm leading-6 text-[#6a5632] mb-5">
           기존에 가입한 이력이 있습니다. 복구를 진행할까요?
         </p>
+        {passwordRequired && (
+          <div className="mb-5 text-left">
+            <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+              기존 계정 비밀번호
+            </label>
+            <input
+              type="password"
+              value={password}
+              disabled={isPending}
+              onChange={event => onPasswordChange(event.target.value)}
+              autoComplete="current-password"
+              placeholder="비밀번호를 입력하세요"
+              className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            {passwordError && (
+              <p className="mt-1.5 text-xs leading-5 text-[#8b3a2a]">{passwordError}</p>
+            )}
+          </div>
+        )}
         <div className="flex gap-2">
           <button
             type="button"

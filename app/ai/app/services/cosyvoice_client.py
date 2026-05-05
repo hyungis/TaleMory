@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import uuid
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from urllib import error, request
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class CosyVoiceError(RuntimeError):
@@ -99,6 +103,7 @@ def _invoke_cosyvoice(
     content_type: str,
     audio_format: str,
 ) -> tuple[bytes, str]:
+    started = perf_counter()
     req = request.Request(
         endpoint,
         data=body,
@@ -121,6 +126,13 @@ def _invoke_cosyvoice(
         raise CosyVoiceInvocationError(f"CosyVoice request failed: {exc.reason}") from exc
 
     if content_type.startswith("audio/"):
+        logger.info(
+            "[COSYVOICE:HTTP] endpoint=%s contentType=%s bytes=%d elapsedMs=%d",
+            endpoint,
+            content_type,
+            len(response_bytes),
+            _elapsed_ms(started),
+        )
         return response_bytes, _format_from_content_type(content_type, audio_format)
 
     try:
@@ -142,6 +154,13 @@ def _invoke_cosyvoice(
         raise CosyVoiceInvocationError("CosyVoice audioBase64 payload is invalid.") from exc
 
     resolved_format = _find_first(decoded, ("format", "audioFormat", "audio_format")) or audio_format
+    logger.info(
+        "[COSYVOICE:HTTP] endpoint=%s contentType=%s bytes=%d elapsedMs=%d",
+        endpoint,
+        content_type,
+        len(audio_bytes),
+        _elapsed_ms(started),
+    )
     return audio_bytes, str(resolved_format).lower()
 
 
@@ -207,3 +226,7 @@ def _find_first(payload: Any, keys: tuple[str, ...]) -> Any:
             if found is not None:
                 return found
     return None
+
+
+def _elapsed_ms(started: float) -> int:
+    return int((perf_counter() - started) * 1000)

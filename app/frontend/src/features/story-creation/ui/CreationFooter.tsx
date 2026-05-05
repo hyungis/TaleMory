@@ -8,6 +8,11 @@ interface CreationFooterProps {
   /** "← 이전" 클릭. */
   onBack: () => void
   /**
+   * 이전 버튼 비활성 — Step 9(발행 완료) 처럼 더 이상 뒤로 못 돌아가야 하는 단계에서 사용.
+   * disabled 시 클릭 무효화 + 회색/포커스 불가능 표시.
+   */
+  backDisabled?: boolean
+  /**
    * 우측 단순 다음 버튼 케이스 — onClick 핸들러.
    * `rightSlot` 이 제공되면 무시됨.
    */
@@ -38,6 +43,7 @@ interface CreationFooterProps {
 export function CreationFooter({
   currentStep,
   onBack,
+  backDisabled = false,
   onNext,
   nextLabel = '다음으로',
   nextDisabled,
@@ -48,7 +54,15 @@ export function CreationFooter({
 
   return (
     <div className="cr-bottombar">
-      <button type="button" onClick={onBack} className="cr-btn-back" aria-label="이전 단계">
+      <button
+        type="button"
+        onClick={onBack}
+        disabled={backDisabled}
+        className="cr-btn-back"
+        aria-label="이전 단계"
+        aria-disabled={backDisabled}
+        style={backDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+      >
         <ArrowLeft className="w-4 h-4" /> 이전
       </button>
 

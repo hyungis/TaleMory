@@ -208,6 +208,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.story.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | — | `ai.result.story.regenerate.failed` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | — | `1` (AI worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
+| `ENV_DEV_APP_AI_TTS_STORY_WORKER_REPLICAS` | — | `1` (story TTS worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
+| `ENV_DEV_APP_AI_TTS_PREVIEW_WORKER_REPLICAS` | — | `1` (preview TTS worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
 | `ENV_DEV_APP_AI_WORKER_CONCURRENCY` | no | `3` |
 | `ENV_DEV_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
 | `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
@@ -260,6 +262,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `RABBITMQ_PORT` | `5673` | `5672` |
 | `RABBITMQ_MANAGEMENT_PORT` | `15673` | `15672` |
 | `AI_WORKER_REPLICAS` | `1` | `2` (권장 — 병렬 OpenAI 처리량 확보) |
+| `AI_TTS_STORY_WORKER_REPLICAS` | `1` | `1` |
+| `AI_TTS_PREVIEW_WORKER_REPLICAS` | `1` | `1` |
 | `AI_WORKER_CONCURRENCY` | `3` | `3` |
 | `AI_STORY_API_CONCURRENCY` | `5` | `5` |
 | `AI_IMAGE_API_CONCURRENCY` | `20` | `20` |
@@ -382,6 +386,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
+| `ENV_DEV_APP_AI_TTS_STORY_WORKER_REPLICAS` | no | `1` |
+| `ENV_DEV_APP_AI_TTS_PREVIEW_WORKER_REPLICAS` | no | `1` |
 | `ENV_DEV_APP_AI_WORKER_CONCURRENCY` | no | `3` |
 | `ENV_DEV_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
 | `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
@@ -443,6 +449,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |
+| `ENV_MASTER_APP_AI_TTS_STORY_WORKER_REPLICAS` | no | `1` |
+| `ENV_MASTER_APP_AI_TTS_PREVIEW_WORKER_REPLICAS` | no | `1` |
 | `ENV_MASTER_APP_AI_WORKER_CONCURRENCY` | no | `3` |
 | `ENV_MASTER_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
 | `ENV_MASTER_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |

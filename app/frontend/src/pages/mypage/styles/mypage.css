@@ -876,6 +876,42 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+.mp-field-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.mp-inline-check-btn {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2px solid var(--sage-deep);
+  background: #e8efd9;
+  color: var(--sage-deep);
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mp-inline-check-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.mp-field-help {
+  margin: 6px 0 0;
+  font-family: 'Gaegu', cursive;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.mp-field-help--success {
+  color: var(--sage-deep);
+}
+.mp-field-help--error {
+  color: #8c3a1f;
+}
 
 /* ===== seg-radio (성별 등) ===== */
 .mp-seg-radio {

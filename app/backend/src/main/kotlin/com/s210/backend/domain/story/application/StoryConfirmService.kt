@@ -36,7 +36,8 @@ import tools.jackson.databind.ObjectMapper
  *
  * 책임:
  *   - 선행 단계 완료 검증 (DRAFT, voice clone, STORY/IMAGE job SUCCESS, storyboard_pages 존재)
- *   - 멱등성 가드 (이미 confirm 됐는지)
+ *   - 멱등 응답 (이미 confirm 됐으면 기존 결과 그대로 반환 — 네트워크 retry / 사용자 새로고침 /
+ *     뒤로가기 → 다시 미리보기 등 정상 흐름에서 409 가 나지 않도록)
  *   - storyboard_pages → Scene + SceneSentence 변환 (Task 12)
  *   - Redis illust versions 초기화 (Task 13)
  *   - TTS 사전 캐시 + MQ publish (Task 14)
@@ -86,9 +87,22 @@ class StoryConfirmService(
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
-        // 3) 멱등성 가드 — 이미 confirm 됐는지
-        if (sceneRepository.countByStoryId(storyId) > 0) {
-            throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        // 3) 멱등 응답 — 이미 confirm 된 동화는 기존 결과를 그대로 200 으로 돌려준다.
+        //
+        //    "confirm 후" 의 신호는 **TTS 잡 존재** (PENDING/RUNNING/SUCCESS).
+        //    Option B 적용 후 scenes/scene_sentences 는 Step 7 진입 시 prepareScenes 가 미리
+        //    INSERT 하므로, scene-count 만으로는 "이미 confirm 됐는지" 판정할 수 없다.
+        //    TTS 잡 발행 여부가 "confirm 통과해서 TTS 큐잉까지 갔다" 의 진짜 신호.
+        //
+        //    FAILED 상태는 재시도 허용 — 사용자가 Step 8 에서 재confirm 트리거 시 새 TTS 잡 발행.
+        //    Step 7 → 8 진입 후 뒤로갔다가 다시 미리보기, 사용자 새로고침, 더블클릭/네트워크
+        //    재시도 같은 정상 흐름에서 409 가 떨어지지 않도록 read-only 로 응답 (사이드이펙트 없음).
+        val existingTtsJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.TTS)
+        if (existingTtsJob != null && existingTtsJob.status in setOf(
+                JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS,
+            )
+        ) {
+            return assembleExistingResult(storyId)
         }
 
         // 4) STORY job result payload 에서 sentences 추출
@@ -137,34 +151,54 @@ class StoryConfirmService(
             ?.let { runCatching { parseFinalUrlMap(it) }.getOrNull() }
             ?: emptyMap()
 
-        // 7) Scene + SceneSentence INSERT
+        // 7) Scene + SceneSentence 확보.
+        //
+        //    Option B 적용 후엔 Step 7 의 prepareScenes 가 이미 row 를 만들어둔 상태가 정상 흐름이다.
+        //    이 경우엔 INSERT 를 스킵하고 기존 row 를 그대로 사용 (FE 가 강조 녹음한 hasHighlighted 플래그도 보존).
+        //    단, illustrationUrl 은 prepareScenes 시점엔 storyboard_pages.imageUrl(보통 null) 로 채워졌을 수 있으므로
+        //    여기서 최신 FINAL_ILLUSTRATION 잡 결과로 보강(이미 채워져 있으면 덮어쓰지 않음).
+        //
+        //    Legacy fallback: prepareScenes 호출 없이 직접 confirm 이 들어온 경우 — 옛 흐름대로
+        //    STORY job result payload 에서 sentences 를 파싱해 INSERT.
         var totalSentences = 0
-        val createdScenes = pages.map { page ->
-            val scene = sceneRepository.save(
-                Scene(
-                    storyId = storyId,
-                    pageNumber = page.pageNumber,
-                    illustrationUrl = finalUrlsByPage[page.pageNumber] ?: page.imageUrl,
-                    characterAnchors = null,
-                )
-            )
-            val sentences = pageToSentences[page.pageNumber].orEmpty()
-            sentences.forEachIndexed { idx, s ->
-                sceneSentenceRepository.save(
-                    SceneSentence(
-                        sceneId = scene.id,
-                        sentenceOrder = idx + 1,
-                        englishText = s.englishText,
-                        koreanText = s.koreanText,
-                        ttsAudioUrl = null,
-                        speakerKey = null,
-                        bubbleSlot = null,
-                        hasHighlighted = false,
+        val existingScenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(storyId)
+        val createdScenes = if (existingScenes.isNotEmpty()) {
+            // 기존 scene illustrationUrl 보강 — 비어있으면 최신 final 결과로 채움.
+            existingScenes.forEach { scene ->
+                if (scene.illustrationUrl.isNullOrBlank()) {
+                    finalUrlsByPage[scene.pageNumber]?.let { scene.illustrationUrl = it }
+                }
+            }
+            totalSentences = sceneSentenceRepository.findAllBySceneIdIn(existingScenes.map { it.id }).size
+            existingScenes
+        } else {
+            pages.map { page ->
+                val scene = sceneRepository.save(
+                    Scene(
+                        storyId = storyId,
+                        pageNumber = page.pageNumber,
+                        illustrationUrl = finalUrlsByPage[page.pageNumber] ?: page.imageUrl,
+                        characterAnchors = null,
                     )
                 )
-                totalSentences++
+                val sentences = pageToSentences[page.pageNumber].orEmpty()
+                sentences.forEachIndexed { idx, s ->
+                    sceneSentenceRepository.save(
+                        SceneSentence(
+                            sceneId = scene.id,
+                            sentenceOrder = idx + 1,
+                            englishText = s.englishText,
+                            koreanText = s.koreanText,
+                            ttsAudioUrl = null,
+                            speakerKey = null,
+                            bubbleSlot = null,
+                            hasHighlighted = false,
+                        )
+                    )
+                    totalSentences++
+                }
+                scene
             }
-            scene
         }
 
         // 8) StoryOutro 보장
@@ -234,6 +268,10 @@ class StoryConfirmService(
 
         val sentenceCount = allSentences.size
         val cacheMisses = missSentences.size
+        log.info(
+            "[TTS:CONFIRM:CACHE] storyId={}, voiceProfileId={}, sentenceCount={}, cacheHits={}, cacheMisses={}",
+            storyId, voiceProfileId, sentenceCount, cacheHits, cacheMisses,
+        )
 
         // 12) Job status Redis HSET (best-effort)
         try {
@@ -249,6 +287,11 @@ class StoryConfirmService(
 
         // 13) MQ publish (cache miss 있을 때만) 또는 즉시 SUCCESS
         val finalStatus = if (cacheMisses > 0) {
+            val publishStarted = System.nanoTime()
+            log.info(
+                "[TTS:CONFIRM:PUBLISH:START] jobId={}, storyId={}, voiceProfileId={}, sentenceCount={}",
+                ttsJob.id, storyId, voiceProfileId, cacheMisses,
+            )
             ttsService.publish(
                     StoryTtsJobMessage(
                         jobId = ttsJob.id.toString(),
@@ -262,6 +305,10 @@ class StoryConfirmService(
                             sentences = missSentences,
                         ),
                     )
+            )
+            log.info(
+                "[TTS:CONFIRM:PUBLISH:DONE] jobId={}, storyId={}, sentenceCount={}, elapsedMs={}",
+                ttsJob.id, storyId, cacheMisses, (System.nanoTime() - publishStarted) / 1_000_000,
             )
             JobStatus.PENDING
         } else {
@@ -291,6 +338,36 @@ class StoryConfirmService(
             cacheHits = cacheHits,
             cacheMisses = cacheMisses,
             finalIllustrationJobId = latestFinalJob?.id,
+        )
+    }
+
+    /**
+     * 이미 confirm 된 동화의 기존 결과를 그대로 응답에 담아 돌려준다 (멱등 응답 경로).
+     *
+     * - sceneCount/sentenceCount 는 DB 에서 직접 카운트
+     * - jobId 는 가장 최근 TTS 잡 (status 도 그 시점 값 그대로 반영)
+     * - finalIllustrationJobId 는 가장 최근 FINAL_ILLUSTRATION 잡
+     * - cacheHits/Misses 는 첫 confirm 때만 의미가 있어 0 으로 통일 (FE 는 표시용으로만 사용)
+     */
+    private fun assembleExistingResult(storyId: Long): ConfirmStoryboardResult {
+        val ttsJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(storyId, JobType.TTS)
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        val finalJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
+            storyId, JobType.FINAL_ILLUSTRATION,
+        )
+        val scenes = sceneRepository.findAllByStoryId(storyId)
+        val sentenceCount = if (scenes.isEmpty()) 0
+                            else sceneSentenceRepository.findAllBySceneIdIn(scenes.map { it.id }).size
+
+        return ConfirmStoryboardResult(
+            jobId = ttsJob.id,
+            jobType = "TTS",
+            status = ttsJob.status.name,
+            sceneCount = scenes.size,
+            sentenceCount = sentenceCount,
+            cacheHits = 0,
+            cacheMisses = 0,
+            finalIllustrationJobId = finalJob?.id,
         )
     }
 

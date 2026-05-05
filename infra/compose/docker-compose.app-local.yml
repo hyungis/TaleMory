@@ -28,6 +28,30 @@ services:
     env_file:
       - ../env/app.local.env
 
+  ai-tts-story-worker:
+    build:
+      context: ../../app/ai
+      dockerfile: Dockerfile
+    image: s210-ai:local
+    container_name: local-ai-tts-story-worker
+    restart: unless-stopped
+    command: ["python", "worker_tts_story.py"]
+    scale: ${AI_TTS_STORY_WORKER_REPLICAS:-1}
+    env_file:
+      - ../env/app.local.env
+
+  ai-tts-preview-worker:
+    build:
+      context: ../../app/ai
+      dockerfile: Dockerfile
+    image: s210-ai:local
+    container_name: local-ai-tts-preview-worker
+    restart: unless-stopped
+    command: ["python", "worker_tts_preview.py"]
+    scale: ${AI_TTS_PREVIEW_WORKER_REPLICAS:-1}
+    env_file:
+      - ../env/app.local.env
+
   nginx:
     build:
       context: ../..
