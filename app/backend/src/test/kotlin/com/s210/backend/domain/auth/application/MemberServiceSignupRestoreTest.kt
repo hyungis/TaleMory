@@ -290,6 +290,7 @@ class MemberServiceSignupRestoreTest {
         val restoreRequired = result as OauthCallbackResult.RestoreRequired
         assertEquals("restore-token", restoreRequired.signupToken)
         assertEquals("old@example.com", restoreRequired.profile.email)
+        assertTrue(restoreRequired.passwordRequired)
         assertTrue(user.deletedAt != null)
         assertTrue(oauthAccount.deletedAt != null)
     }

@@ -19,6 +19,7 @@ interface KakaoSignupDraft {
 interface KakaoRestoreDraft {
   signupToken: string
   profile: KakaoSignupProfile
+  passwordRequired: boolean
 }
 
 interface KakaoLinkDraft {
@@ -36,6 +37,8 @@ export function OAuthCallbackHandler() {
   const [isSignupNoticeOpen, setIsSignupNoticeOpen] = useState(false)
   const [isRestorePending, setIsRestorePending] = useState(false)
   const [isLinkPending, setIsLinkPending] = useState(false)
+  const [restorePassword, setRestorePassword] = useState('')
+  const [restorePasswordError, setRestorePasswordError] = useState('')
 
   useEffect(() => {
     let isActive = true
@@ -81,7 +84,10 @@ export function OAuthCallbackHandler() {
             setRestoreDraft({
               signupToken: payload.signupToken,
               profile: payload.profile,
+              passwordRequired: payload.passwordRequired ?? false,
             })
+            setRestorePassword('')
+            setRestorePasswordError('')
             return
           }
 
@@ -167,13 +173,20 @@ export function OAuthCallbackHandler() {
 
     clearAuthSession()
     setRestoreDraft(null)
+    setRestorePassword('')
+    setRestorePasswordError('')
     navigate(ROUTES.home, { replace: true })
   }
 
   const handleKakaoRestoreConfirm = async () => {
     if (restoreDraft === null || isRestorePending) return
+    if (restoreDraft.passwordRequired && !restorePassword.trim()) {
+      setRestorePasswordError('비밀번호를 입력해주세요.')
+      return
+    }
 
     setIsRestorePending(true)
+    setRestorePasswordError('')
 
     try {
       const result = await postKakaoSignup({
@@ -182,11 +195,13 @@ export function OAuthCallbackHandler() {
         name: restoreDraft.profile.name,
         nickname: restoreDraft.profile.nickname,
         phone: restoreDraft.profile.phone ?? undefined,
+        password: restorePassword.trim() || undefined,
         restoreConfirmed: true,
       })
 
       setAuthSession(result)
       setRestoreDraft(null)
+      setRestorePassword('')
       navigate(ROUTES.home, {
         replace: true,
         state: {
@@ -194,8 +209,14 @@ export function OAuthCallbackHandler() {
         },
       })
     } catch (restoreError) {
+      if (isApiError(restoreError) && restoreError.code === 'AUTH_001') {
+        setRestorePasswordError('기존 계정 비밀번호를 확인해주세요.')
+        return
+      }
+
       clearAuthSession()
       setRestoreDraft(null)
+      setRestorePassword('')
       setError(isApiError(restoreError) ? restoreError.message : '카카오 계정을 복구하지 못했어요. 다시 시도해주세요.')
     } finally {
       setIsRestorePending(false)
@@ -277,9 +298,16 @@ export function OAuthCallbackHandler() {
           </div>
         </div>
         <KakaoRestoreConfirmDialog
+          password={restorePassword}
+          passwordError={restorePasswordError}
+          passwordRequired={restoreDraft.passwordRequired}
           isPending={isRestorePending}
           onCancel={handleKakaoRestoreCancel}
           onConfirm={handleKakaoRestoreConfirm}
+          onPasswordChange={value => {
+            setRestorePassword(value)
+            setRestorePasswordError('')
+          }}
         />
       </div>
     )
@@ -420,13 +448,21 @@ function KakaoLinkConfirmDialog({
 }
 
 function KakaoRestoreConfirmDialog({
+  password,
+  passwordError,
+  passwordRequired,
   isPending,
   onCancel,
   onConfirm,
+  onPasswordChange,
 }: {
+  password: string
+  passwordError: string
+  passwordRequired: boolean
   isPending: boolean
   onCancel: () => void
   onConfirm: () => void
+  onPasswordChange: (value: string) => void
 }) {
   return (
     <div
@@ -448,6 +484,25 @@ function KakaoRestoreConfirmDialog({
         <p className="text-sm leading-6 text-[#6a5632] mb-5">
           기존에 가입한 이력이 있습니다. 복구를 진행할까요?
         </p>
+        {passwordRequired && (
+          <div className="mb-5 text-left">
+            <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+              기존 계정 비밀번호
+            </label>
+            <input
+              type="password"
+              value={password}
+              disabled={isPending}
+              onChange={event => onPasswordChange(event.target.value)}
+              autoComplete="current-password"
+              placeholder="비밀번호를 입력하세요"
+              className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            {passwordError && (
+              <p className="mt-1.5 text-xs leading-5 text-[#8b3a2a]">{passwordError}</p>
+            )}
+          </div>
+        )}
         <div className="flex gap-2">
           <button
             type="button"

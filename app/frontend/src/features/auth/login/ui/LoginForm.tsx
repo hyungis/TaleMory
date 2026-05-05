@@ -303,8 +303,7 @@ function LoginRestoreConfirmDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[10001] flex items-center justify-center p-4"
-      style={{ background: 'rgba(74, 59, 42, 0.55)', backdropFilter: 'blur(4px)' }}
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="login-restore-account-title"
@@ -313,57 +312,21 @@ function LoginRestoreConfirmDialog({
       }}
     >
       <div
-        className="w-full max-w-sm"
+        className="w-full max-w-sm rounded-[2rem] border-4 border-[#2a1b12] bg-[#f0e6c0] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
         onClick={event => event.stopPropagation()}
-        style={{
-          background: '#fbf2da',
-          border: '2.5px solid #a37548',
-          borderRadius: 20,
-          boxShadow: '0 4px 0 #a37548, 0 16px 36px rgba(74, 59, 42, 0.32)',
-          padding: '24px',
-        }}
       >
-        <h3
-          id="login-restore-account-title"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 22,
-            fontWeight: 700,
-            color: '#5f7d50',
-            margin: '0 0 10px',
-          }}
-        >
+        <h3 id="login-restore-account-title" className="mb-3 text-xl font-bold text-[#2a1b12]">
           계정 복구
         </h3>
-        <p
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 17,
-            lineHeight: 1.5,
-            color: '#5c4932',
-            margin: '0 0 20px',
-          }}
-        >
+        <p className="mb-5 text-sm leading-6 text-[#6a5632]">
           탈퇴한 계정입니다. 계정을 복구하고 로그인할까요?
         </p>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            style={{
-              flex: 1,
-              background: '#f7eccd',
-              border: '2px solid #a37548',
-              color: '#6b5638',
-              borderRadius: 999,
-              padding: '11px 16px',
-              fontFamily: 'var(--font-display)',
-              fontSize: 17,
-              fontWeight: 700,
-              cursor: isPending ? 'not-allowed' : 'pointer',
-              opacity: isPending ? 0.6 : 1,
-            }}
+            className="flex-1 rounded-xl border border-[#8b7a52]/60 bg-[#e8ddb4] py-3 font-bold text-[#2a1b12] disabled:cursor-not-allowed disabled:opacity-60"
           >
             아니오
           </button>
@@ -371,20 +334,7 @@ function LoginRestoreConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={isPending}
-            style={{
-              flex: 1,
-              background: '#7a9968',
-              border: '2px solid #5f7d50',
-              color: '#fdfaf0',
-              borderRadius: 999,
-              padding: '11px 16px',
-              fontFamily: 'var(--font-display)',
-              fontSize: 17,
-              fontWeight: 700,
-              cursor: isPending ? 'not-allowed' : 'pointer',
-              opacity: isPending ? 0.6 : 1,
-              boxShadow: '0 3px 0 #5f7d50',
-            }}
+            className="flex-1 rounded-xl border border-[#b4dc8c]/40 bg-[#2d5a27] py-3 font-bold text-[#f0e6c0] shadow-[0_4px_0_#1a3a14] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? '복구 중...' : '예'}
           </button>

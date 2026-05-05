@@ -125,6 +125,8 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
   const [error, setError] = useState('')
   const [nicknameCheck, setNicknameCheck] = useState<NicknameCheckState>(INITIAL_NICKNAME_CHECK)
   const [restoreRequest, setRestoreRequest] = useState<KakaoSignupRequest | null>(null)
+  const [restorePassword, setRestorePassword] = useState('')
+  const [restorePasswordError, setRestorePasswordError] = useState('')
   const { isPending, signup } = useKakaoSignupPost()
   const kakaoEmail = getKakaoEmail(profile)
 
@@ -196,6 +198,8 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
         if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE && request !== null) {
           setError('')
           setRestoreRequest(request)
+          setRestorePassword('')
+          setRestorePasswordError('')
           return
         }
 
@@ -208,6 +212,8 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
   const handleRestoreCancel = useCallback(() => {
     if (!isPending) {
       setRestoreRequest(null)
+      setRestorePassword('')
+      setRestorePasswordError('')
     }
   }, [isPending])
 
@@ -217,16 +223,26 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
     try {
       const result = await signup({
         ...restoreRequest,
+        password: restorePassword.trim() || undefined,
         restoreConfirmed: true,
       })
       setError('')
       setRestoreRequest(null)
+      setRestorePassword('')
+      setRestorePasswordError('')
       onSuccess(result)
     } catch (restoreError) {
+      if (isApiError(restoreError) && restoreError.code === 'AUTH_001') {
+        setRestorePasswordError('기존 계정 비밀번호를 확인해주세요.')
+        return
+      }
+
       setRestoreRequest(null)
+      setRestorePassword('')
+      setRestorePasswordError('')
       setError(getKakaoSignupErrorMessage(restoreError))
     }
-  }, [isPending, onSuccess, restoreRequest, signup])
+  }, [isPending, onSuccess, restorePassword, restoreRequest, signup])
 
   const nicknameCheckMessage = getNicknameCheckMessage(nicknameCheck, values.nickname)
 
@@ -357,9 +373,15 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
       </div>
       {restoreRequest && (
         <KakaoRestoreConfirmDialog
+          password={restorePassword}
+          passwordError={restorePasswordError}
           isPending={isPending}
           onCancel={handleRestoreCancel}
           onConfirm={handleRestoreConfirm}
+          onPasswordChange={value => {
+            setRestorePassword(value)
+            setRestorePasswordError('')
+          }}
         />
       )}
     </div>
@@ -367,13 +389,19 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
 }
 
 function KakaoRestoreConfirmDialog({
+  password,
+  passwordError,
   isPending,
   onCancel,
   onConfirm,
+  onPasswordChange,
 }: {
+  password: string
+  passwordError: string
   isPending: boolean
   onCancel: () => void
   onConfirm: () => void
+  onPasswordChange: (value: string) => void
 }) {
   return (
     <div
@@ -395,6 +423,23 @@ function KakaoRestoreConfirmDialog({
         <p className="text-sm leading-6 text-[#6a5632] mb-5">
           기존에 가입한 이력이 있습니다. 복구를 진행할까요?
         </p>
+        <div className="mb-5 text-left">
+          <label className="block text-sm text-[#8b7a52] mb-1.5 font-bold">
+            기존 계정 비밀번호 <span className="text-xs text-[#8b7a52]/70">(필요 시)</span>
+          </label>
+          <input
+            type="password"
+            value={password}
+            disabled={isPending}
+            onChange={event => onPasswordChange(event.target.value)}
+            autoComplete="current-password"
+            placeholder="비밀번호가 있던 계정이면 입력하세요"
+            className="w-full p-3 rounded-xl bg-[#e8ddb4] border-2 border-[#8b7a52]/60 text-[#2d5a27] focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/30 placeholder-[#8b7a52]/60 disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+          {passwordError && (
+            <p className="mt-1.5 text-xs leading-5 text-[#8b3a2a]">{passwordError}</p>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
