@@ -527,6 +527,7 @@ export function StoryboardEditorStep({
 
   const handleDraftBlur = useCallback(
     (pageNumber: number, original: string | null) => {
+      if (isTranslationInProgress) return
       const value = drafts[pageNumber] ?? ''
       const trimmed = value.trim()
       if (trimmed.length === 0) return
@@ -544,7 +545,7 @@ export function StoryboardEditorStep({
         },
       )
     },
-    [drafts, patchMut, queryClient, storyId],
+    [drafts, isTranslationInProgress, patchMut, queryClient, storyId],
   )
 
   const handleGenerateAllImages = useCallback(() => {
@@ -906,6 +907,7 @@ export function StoryboardEditorStep({
                     onRegenerateImage={() => handleRegenerateImage(currentPage.pageNumber)}
 	                    regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending || isTranslationInProgress}
 	                    patchPending={patchMut.isPending}
+	                    translationLocked={isTranslationInProgress}
 	                    translationPending={
 	                      isTranslationInProgress &&
 	                      effectiveTranslationPageNumber === currentPage.pageNumber
@@ -1001,6 +1003,7 @@ function PageCard(props: {
   onRegenerateImage: () => void
   regenerateDisabled: boolean
   patchPending: boolean
+  translationLocked: boolean
   translationPending: boolean
   /** 동화 단위 남은 재생성 횟수. 0 이면 모든 페이지 input/button disabled. */
   regenRemaining: number
@@ -1028,6 +1031,7 @@ function PageCard(props: {
     onRegenerateImage,
     regenerateDisabled,
     patchPending,
+    translationLocked,
     translationPending,
     regenRemaining,
     regenLimit,
@@ -1052,9 +1056,17 @@ function PageCard(props: {
   // 한글 해석 — 기본은 read-only 표시. "직접 편집" 클릭 시 textarea 로 전환.
   // blur 시 onDraftBlur (PATCH) + 표시 모드 복귀.
   const [editingKorean, setEditingKorean] = useState(false)
+  const wasTranslationPendingRef = useRef(false)
   // 그림 다시 그리기 패널 토글 — 이미지 위 hover 아이콘 클릭 시 input 영역이 펼쳐짐.
   const [regenOpen, setRegenOpen] = useState(false)
   const koreanText = draft.trim()
+
+  useEffect(() => {
+    if (wasTranslationPendingRef.current && !translationPending) {
+      setEditingKorean(false)
+    }
+    wasTranslationPendingRef.current = translationPending
+  }, [translationPending])
 
   return (
     <div className="cr-card" style={{ padding: 0 }}>
@@ -1229,10 +1241,11 @@ function PageCard(props: {
                 한글 해석
               </span>
               {!editingKorean && (
-                <button
-                  type="button"
-                  onClick={() => setEditingKorean(true)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors"
+	                <button
+	                  type="button"
+	                  disabled={translationLocked}
+	                  onClick={() => setEditingKorean(true)}
+	                  className="inline-flex items-center gap-1 text-xs font-bold text-[#3F6B2E] hover:text-[#4F7B3E] bg-[#B9D38F]/30 hover:bg-[#B9D38F]/50 border border-[#3F6B2E]/30 px-2.5 py-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Pencil className="w-3 h-3" /> 직접 편집
                 </button>
@@ -1244,14 +1257,15 @@ function PageCard(props: {
                 value={draft}
 	                onChange={e => onDraftChange(e.target.value)}
 	                onKeyDown={e => {
-	                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+		                  if (!translationLocked && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
 	                    e.preventDefault()
 	                    onDraftBlur()
 	                    setEditingKorean(false)
 	                  }
 	                }}
-	                autoFocus
-                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5"
+		                disabled={translationLocked}
+		                autoFocus
+	                className="w-full min-h-[5rem] bg-[#FFF8E0] text-[#6B4A28] text-base md:text-lg leading-relaxed font-bold focus:outline-none resize-none placeholder-[#9A7548]/60 border-2 border-[#3F6B2E]/40 rounded-lg p-2.5 disabled:cursor-not-allowed disabled:opacity-60"
 	                maxLength={4000}
 		                placeholder="한글 번역을 입력해주세요."
 	              />
@@ -1268,12 +1282,13 @@ function PageCard(props: {
 	                  취소
 	                </button>
 	                <button
-	                  type="button"
-	                  onClick={() => {
-	                    onDraftBlur()
-	                    setEditingKorean(false)
-	                  }}
-	                  disabled={patchPending || draft.trim().length === 0}
+		                  type="button"
+		                  onClick={() => {
+		                    if (translationLocked) return
+		                    onDraftBlur()
+		                    setEditingKorean(false)
+		                  }}
+		                  disabled={patchPending || translationLocked || draft.trim().length === 0}
 	                  className="inline-flex items-center justify-center rounded-lg border border-[#3F6B2E]/35 bg-[#3F6B2E] px-3 py-1.5 text-xs font-bold text-[#FFF8E0] transition-colors hover:bg-[#4F7B3E] disabled:cursor-not-allowed disabled:opacity-50"
 	                >
 	                  {patchPending ? (
