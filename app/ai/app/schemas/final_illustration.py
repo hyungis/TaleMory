@@ -9,11 +9,26 @@ class FinalIllustrationContext(BaseModel):
 
 
 class FinalIllustrationPageInput(BaseModel):
-    pageNumber: int = Field(..., ge=1)
-    sceneSummary: str = Field(..., min_length=1, max_length=1000)
-    englishText: str = Field(..., min_length=1, max_length=4000)
-    koreanText: str = Field(..., min_length=1, max_length=4000)
-    imagePrompt: str = Field(..., min_length=1, max_length=2000)
+    pageNumber: int = Field(..., ge=0)
+    sceneSummary: str | None = Field(default=None, max_length=1000)
+    englishText: str | None = Field(default=None, max_length=4000)
+    koreanText: str | None = Field(default=None, max_length=4000)
+    imagePrompt: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_body_page_text_fields(self) -> "FinalIllustrationPageInput":
+        if self.pageNumber == 0:
+            return self
+        required_fields = {
+            "sceneSummary": self.sceneSummary,
+            "englishText": self.englishText,
+            "koreanText": self.koreanText,
+            "imagePrompt": self.imagePrompt,
+        }
+        missing = [name for name, value in required_fields.items() if value is None or not value.strip()]
+        if missing:
+            raise ValueError(f"{', '.join(missing)} must not be blank for body pages")
+        return self
 
 
 class FinalIllustrationRenderOptions(BaseModel):
@@ -28,7 +43,7 @@ class FinalIllustrationRenderOptions(BaseModel):
 
 
 class FinalIllustrationGenerateItemRequest(BaseModel):
-    pageNumber: int = Field(..., ge=1)
+    pageNumber: int = Field(..., ge=0)
     storyboard: FinalIllustrationContext
     page: FinalIllustrationPageInput
     children: list[ChildInfo] = Field(..., min_length=1)
@@ -57,7 +72,7 @@ class FinalIllustrationGenerateRequest(BaseModel):
     storyId: int = Field(..., ge=1)
     seed: int = Field(..., ge=0)
     renderOptions: FinalIllustrationRenderOptions = Field(default_factory=FinalIllustrationRenderOptions)
-    items: list[FinalIllustrationGenerateItemRequest] = Field(..., min_length=1, max_length=20)
+    items: list[FinalIllustrationGenerateItemRequest] = Field(..., min_length=1, max_length=21)
 
 
 class FinalIllustrationReviseRequest(BaseModel):
@@ -87,7 +102,7 @@ class FinalIllustrationUsage(BaseModel):
 
 
 class FinalIllustrationGenerateResult(BaseModel):
-    pageNumber: int
+    pageNumber: int = Field(..., ge=0)
     imageUrl: str
     usage: FinalIllustrationUsage
 
