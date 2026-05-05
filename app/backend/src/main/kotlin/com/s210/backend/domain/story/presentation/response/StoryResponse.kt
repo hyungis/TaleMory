@@ -134,6 +134,8 @@ data class ShareLinkResponse(
 data class StoryViewResponse(
     val storyId: Long,
     val title: String?,
+    /** Story.difficulty.name — "BEGINNER" / "INTERMEDIATE" / "ADVANCED". 뷰어 InvitationCard 의 난이도 pill 에 사용. */
+    val difficulty: String,
     val mainCharacter: MainCharacterView?,
     val coverIllustrationUrl: String?,
     val publishedAt: LocalDateTime?,

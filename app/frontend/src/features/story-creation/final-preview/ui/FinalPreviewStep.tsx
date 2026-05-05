@@ -36,18 +36,19 @@ interface FinalPreviewStepProps {
 }
 
 /**
- * 페이지마다 최종 삽화를 다시 그릴 수 있는 횟수. 백엔드의 SCENE_REGEN_LIMIT 와 동일.
+ * 동화 한 권당 최종 삽화 재생성 가능 총 횟수. 페이지별이 아니라 전체 합산 — 사용자가
+ * 어떤 페이지를 몇 번 다시 그리든 합쳐서 이 횟수까지. 백엔드의 STORY_REGEN_LIMIT 와 동일.
  * 실제 BE 가 진실의 원천이고, FE 는 안내+가드 용으로만 사용. BE 가 limit 초과 시 409.
  */
-const REGEN_LIMIT_PER_SCENE = 3
+const REGEN_LIMIT_TOTAL = 3
 
 /**
- * STEP 08 — 최종 미리보기 + 페이지별 삽화 재생성 (paper-craft 톤).
+ * STEP 08 — 최종 미리보기 + 삽화 재생성 (paper-craft 톤).
  *
  * 책임:
  *   - 동화 데이터 fetch (scenes/outro) 와 잡 폴링(TTS + FINAL_ILLUSTRATION)
  *   - 펼친 책 형태로 페이지 미리보기
- *   - 페이지마다 최대 {@link REGEN_LIMIT_PER_SCENE} 번까지 삽화 재생성 — 프롬프트 입력 후
+ *   - 동화 전체에서 최대 {@link REGEN_LIMIT_TOTAL} 번까지 삽화 재생성 — 프롬프트 입력 후
  *     `POST /scenes/{sceneId}/illustration/regenerate` 트리거 → 잡 폴링 → 성공 시 scenes 재조회
  *
  * 발행/책장보관/뷰어/공유 같은 실제 액션은 Step 9 (PublishStoryStep) 로 위임.
@@ -66,14 +67,14 @@ export function FinalPreviewStep({
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
-  /* 페이지별 삽화 재생성 상태 — 동시에 1개 잡만 진행 (다른 페이지 regen 버튼 disabled).
+  /* 삽화 재생성 상태 — 동시에 1개 잡만 진행 (다른 페이지 regen 버튼 disabled).
      - activeRegen: 진행 중인 잡 sceneId/jobId
-     - regenCounts: 페이지별 재생성 횟수 (FE 안내용; BE 가 진짜 limit 진실)
+     - regenCount: 동화 전체 합산 재생성 횟수 (FE 안내용; BE 가 진짜 limit 진실)
      - openPromptScene: 프롬프트 입력 패널이 열린 sceneId (한 번에 1곳만)
      - regenError: 인라인 에러 메시지 (limit 초과 / 네트워크 등) */
   const [activeRegen, setActiveRegen] = useState<{ sceneId: number; jobId: number } | null>(null)
   const regenJobQuery = useGenerationJobQuery(activeRegen?.jobId ?? null)
-  const [regenCounts, setRegenCounts] = useState<Record<number, number>>({})
+  const [regenCount, setRegenCount] = useState(0)
   const [openPromptScene, setOpenPromptScene] = useState<number | null>(null)
   const [promptText, setPromptText] = useState('')
   const [regenError, setRegenError] = useState<string | null>(null)
@@ -101,7 +102,9 @@ export function FinalPreviewStep({
     getScenes(storyId)
       .then(scenesData => {
         if (cancelled) return
-        setScenes(scenesData)
+        /* BE 가 page_number=0(표지) scene 도 함께 내려주는데 미리보기는 본문(page 1+) 만 보여줘야 함.
+           표지는 책 표지 위치에 별도로 표시되고 step 8 미리보기 페이지 rotation 에 들어가면 안 됨. */
+        setScenes(scenesData.filter(s => s.pageNumber !== 0))
         setError(null)
       })
       .catch(() => {
@@ -125,7 +128,7 @@ export function FinalPreviewStep({
     if (status === 'SUCCESS') {
       if (storyId) {
         getScenes(storyId)
-          .then(updated => setScenes(updated))
+          .then(updated => setScenes(updated.filter(s => s.pageNumber !== 0)))
           .catch(() => {
             /* 재조회 실패는 silent — 다음 마운트 시 다시 시도 */
           })
@@ -174,18 +177,15 @@ export function FinalPreviewStep({
     setRegenError(null)
     try {
       const result = await postIllustrationRegenerate(storyId, openPromptScene, trimmed)
-      setRegenCounts(prev => ({
-        ...prev,
-        [openPromptScene]: (prev[openPromptScene] ?? 0) + 1,
-      }))
+      setRegenCount(c => c + 1)
       setActiveRegen({ sceneId: openPromptScene, jobId: result.jobId })
       setOpenPromptScene(null)
       setPromptText('')
     } catch (err) {
       if (isApiError(err) && err.code === 'REGENERATION_LIMIT_EXCEEDED') {
-        setRegenError('이 페이지의 다시 그리기 횟수를 다 썼어요.')
+        setRegenError('이 동화의 다시 그리기 횟수를 다 썼어요.')
         // FE 카운터를 limit 까지 동기화
-        setRegenCounts(prev => ({ ...prev, [openPromptScene]: REGEN_LIMIT_PER_SCENE }))
+        setRegenCount(REGEN_LIMIT_TOTAL)
       } else if (isApiError(err)) {
         setRegenError(err.message ?? '재생성 요청에 실패했어요.')
       } else {
@@ -280,8 +280,7 @@ export function FinalPreviewStep({
 
   // ===== 정상 화면 =====
   const currentSceneId = currentScene.id
-  const currentRegenCount = regenCounts[currentSceneId] ?? 0
-  const remaining = Math.max(0, REGEN_LIMIT_PER_SCENE - currentRegenCount)
+  const remaining = Math.max(0, REGEN_LIMIT_TOTAL - regenCount)
   const isCurrentRegenPending = activeRegen?.sceneId === currentSceneId
   const isAnyRegenPending = activeRegen !== null
   const canRegen = !isAnyRegenPending && remaining > 0
@@ -297,7 +296,7 @@ export function FinalPreviewStep({
           <StepTitleBlock
             stepNumber={8}
             title="최종 미리보기"
-            subtitle={`마지막으로 펼쳐보세요. 마음에 안 드는 삽화는 페이지마다 ${REGEN_LIMIT_PER_SCENE}번까지 다시 그릴 수 있어요.`}
+            subtitle={`마지막으로 펼쳐보세요. 마음에 안 드는 삽화는 전체 ${REGEN_LIMIT_TOTAL}번까지 다시 그릴 수 있어요.`}
           />
 
           <section className="cr-card">
@@ -354,7 +353,7 @@ export function FinalPreviewStep({
               </span>
             </div>
 
-            {/* ===== 페이지별 삽화 재생성 ===== */}
+            {/* ===== 삽화 재생성 (동화 전체 합산 한도) ===== */}
             <div className="cr-final-regen-bar">
               <button
                 type="button"
@@ -366,7 +365,7 @@ export function FinalPreviewStep({
                 {remaining > 0 ? '이 페이지 삽화 다시 그리기' : '더 이상 다시 그릴 수 없어요'}
               </button>
               <p className="cr-final-regen-meta">
-                이 페이지에서 <strong>{remaining}/{REGEN_LIMIT_PER_SCENE}</strong> 회 더 가능해요.
+                전체 <strong>{remaining}/{REGEN_LIMIT_TOTAL}</strong> 회 더 가능해요.
               </p>
 
               {isPanelOpen && (

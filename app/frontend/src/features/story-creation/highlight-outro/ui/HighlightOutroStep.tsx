@@ -127,41 +127,57 @@ export function HighlightOutroStep({
     }
   }, [storyId])
 
+  /* BE 가 page_number=0(표지) scene/storyboard_page 도 함께 내려주는데 step 7 은 본문에 강조 녹음을
+     붙이는 단계라 표지를 보여주면 안 됨 (사용자가 "Page 1" 으로 첫 본문을 기대). pageNumber===0 은
+     본문 rotation 에서 제외하고, pageIndex(=scenes 원본 배열 idx) 는 highlight 매칭용으로 보존.
+     pageLabel 은 사용자에게 보이는 "Page N" 라벨(BE 의 pageNumber 그대로 사용). */
   const displayPages: Array<{
     pageIndex: number
+    pageLabel: number
     imageUrl: string | null
     sentences: Array<{ sentenceId: number | null; en: string; ko: string | null }>
   }> = scenes
-    ? scenes.map((scene, idx) => ({
-        pageIndex: idx,
-        imageUrl: storyboardImageUrls.get(idx) ?? null,
-        sentences: scene.sentences.map(s => ({
-          sentenceId: s.id,
-          en: s.englishText,
-          ko: s.koreanText,
-        })),
-      }))
+    ? scenes.flatMap((scene, idx) =>
+        scene.pageNumber === 0
+          ? []
+          : [{
+              pageIndex: idx,
+              pageLabel: scene.pageNumber,
+              imageUrl: storyboardImageUrls.get(idx) ?? null,
+              sentences: scene.sentences.map(s => ({
+                sentenceId: s.id,
+                en: s.englishText,
+                ko: s.koreanText,
+              })),
+            }],
+      )
     : storyboardPages
-    ? storyboardPages.pages.map((page, idx) => ({
-        pageIndex: idx,
-        imageUrl: page.imageUrl,
-        sentences: page.sentences
-          ? page.sentences.map(s => ({
-              sentenceId: null,
-              en: s.englishText,
-              ko: s.koreanText || null,
-            }))
-          : splitSentences(page.englishText || '').map((en, sIdx) => ({
-              sentenceId: null,
-              en,
-              ko: page.koreanText ? (splitSentences(page.koreanText)[sIdx] ?? null) : null,
-            })),
-      }))
+    ? storyboardPages.pages.flatMap((page, idx) =>
+        page.pageNumber === 0
+          ? []
+          : [{
+              pageIndex: idx,
+              pageLabel: page.pageNumber,
+              imageUrl: page.imageUrl,
+              sentences: page.sentences
+                ? page.sentences.map(s => ({
+                    sentenceId: null,
+                    en: s.englishText,
+                    ko: s.koreanText || null,
+                  }))
+                : splitSentences(page.englishText || '').map((en, sIdx) => ({
+                    sentenceId: null,
+                    en,
+                    ko: page.koreanText ? (splitSentences(page.koreanText)[sIdx] ?? null) : null,
+                  })),
+            }],
+      )
     : projectData.step4.pages.map((page, idx) => {
         const enSentences = splitSentences(page.en)
         const koSentences = page.ko ? splitSentences(page.ko) : []
         return {
           pageIndex: idx,
+          pageLabel: idx + 1,
           imageUrl: storyboardImageUrls.get(idx) ?? null,
           sentences: enSentences.map((en, sIdx) => ({
             sentenceId: null,
@@ -490,7 +506,7 @@ export function HighlightOutroStep({
 
             {/* Book spread: illustration + sentences */}
             {displayPages.length > 0 && (() => {
-              const { pageIndex, imageUrl, sentences } = displayPages[currentPage] ?? displayPages[0]
+              const { pageIndex, pageLabel, imageUrl, sentences } = displayPages[currentPage] ?? displayPages[0]
               return (
                 <>
                   <div
@@ -518,7 +534,7 @@ export function HighlightOutroStep({
                       {imageUrl ? (
                         <img
                           src={imageUrl}
-                          alt={`Page ${pageIndex + 1} 삽화`}
+                          alt={`Page ${pageLabel} 삽화`}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
                         />
                       ) : (
