@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   AlignJustify,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle,
   History,
   ImageIcon,
@@ -428,25 +430,30 @@ export function StoryboardEditorStep({
   // 보기 모드 — 'grid' (한 줄 3장 갤러리) / 'individual' (페이지마다 글+이미지+재생성).
   // 그리드에서 사진 클릭 시 individual 모드로 전환 + 해당 페이지로 스크롤.
   const [viewMode, setViewMode] = useState<'grid' | 'individual'>('individual')
-  const [pendingScrollPage, setPendingScrollPage] = useState<number | null>(null)
+  const [currentPageIndex, setCurrentPageIndex] = useState(0)
 
   const handleSelectPageFromGrid = useCallback((pageNumber: number) => {
+    setCurrentPageIndex(Math.max(0, pages.findIndex(page => page.pageNumber === pageNumber)))
     setViewMode('individual')
-    setPendingScrollPage(pageNumber)
-  }, [])
+  }, [pages])
 
   // viewMode 가 individual 로 바뀐 직후 카드가 mount 되면 해당 페이지로 부드럽게 스크롤.
   useEffect(() => {
-    if (viewMode !== 'individual' || pendingScrollPage === null) return
-    const rafId = window.requestAnimationFrame(() => {
-      const el = document.getElementById(`storyboard-page-${pendingScrollPage}`)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      setPendingScrollPage(null)
+    setCurrentPageIndex(prev => {
+      if (pages.length === 0) return 0
+      return Math.min(prev, pages.length - 1)
     })
-    return () => window.cancelAnimationFrame(rafId)
-  }, [viewMode, pendingScrollPage])
+  }, [pages.length])
+
+  const currentPage = pages[currentPageIndex] ?? null
+
+  const handlePrevPage = useCallback(() => {
+    setCurrentPageIndex(prev => Math.max(0, prev - 1))
+  }, [])
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPageIndex(prev => Math.min(pages.length - 1, prev + 1))
+  }, [pages.length])
 
   const handleDraftChange = useCallback((pageNumber: number, value: string) => {
     setDrafts(prev => ({ ...prev, [pageNumber]: value }))
@@ -771,36 +778,76 @@ export function StoryboardEditorStep({
               />
             )}
 
-            {pages.length > 0 && viewMode === 'individual' && (
-              <div className="space-y-4">
-                {pages.map(page => (
-                  <div
-                    key={page.pageNumber}
-                    id={`storyboard-page-${page.pageNumber}`}
-                    style={{ scrollMarginTop: '24px' }}
+            {currentPage && viewMode === 'individual' && (
+              <div className="flex items-center gap-3 md:gap-5">
+                <div className="hidden md:flex shrink-0">
+                  <button
+                    type="button"
+                    onClick={handlePrevPage}
+                    disabled={currentPageIndex === 0}
+                    aria-label="이전 페이지"
+                    className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
                   >
-                    <PageCard
-                      storyId={storyId}
-                      page={page}
-                      draft={drafts[page.pageNumber] ?? ''}
-                      onDraftChange={value => handleDraftChange(page.pageNumber, value)}
-                      onDraftBlur={() => handleDraftBlur(page.pageNumber, page.koreanText)}
-                      regeneratePrompt={regeneratePrompts[page.pageNumber] ?? ''}
-                      onRegeneratePromptChange={value =>
-                        setRegeneratePrompts(prev => ({ ...prev, [page.pageNumber]: value }))
-                      }
-                      onRegenerateImage={() => handleRegenerateImage(page.pageNumber)}
-                      regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending}
-                      patchPending={patchMut.isPending}
-                      regenRemaining={regenRemaining}
-                      regenLimit={regenLimit}
-                      isRegeneratingThis={regeneratingPageNumber === page.pageNumber}
-                      regenerateError={regenerateErrors[page.pageNumber] ?? null}
-                      onSelectVersion={handleSelectVersion}
-                      isSelectingVersion={selectVersionMut.isPending}
-                    />
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <PageCard
+                    storyId={storyId}
+                    page={currentPage}
+                    pageIndex={currentPageIndex}
+                    pageCount={pages.length}
+                    draft={drafts[currentPage.pageNumber] ?? ''}
+                    onDraftChange={value => handleDraftChange(currentPage.pageNumber, value)}
+                    onDraftBlur={() => handleDraftBlur(currentPage.pageNumber, currentPage.koreanText)}
+                    regeneratePrompt={regeneratePrompts[currentPage.pageNumber] ?? ''}
+                    onRegeneratePromptChange={value =>
+                      setRegeneratePrompts(prev => ({ ...prev, [currentPage.pageNumber]: value }))
+                    }
+                    onRegenerateImage={() => handleRegenerateImage(currentPage.pageNumber)}
+                    regenerateDisabled={isImageJobInProgress || regenerateImageMut.isPending}
+                    patchPending={patchMut.isPending}
+                    regenRemaining={regenRemaining}
+                    regenLimit={regenLimit}
+                    isRegeneratingThis={regeneratingPageNumber === currentPage.pageNumber}
+                    regenerateError={regenerateErrors[currentPage.pageNumber] ?? null}
+                    onSelectVersion={handleSelectVersion}
+                    isSelectingVersion={selectVersionMut.isPending}
+                  />
+                  <div className="mt-3 flex items-center justify-center gap-3 md:hidden">
+                    <button
+                      type="button"
+                      onClick={handlePrevPage}
+                      disabled={currentPageIndex === 0}
+                      aria-label="이전 페이지"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextPage}
+                      disabled={currentPageIndex === pages.length - 1}
+                      aria-label="다음 페이지"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
                   </div>
-                ))}
+                </div>
+
+                <div className="hidden md:flex shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleNextPage}
+                    disabled={currentPageIndex === pages.length - 1}
+                    aria-label="다음 페이지"
+                    className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#3F6B2E]/35 bg-[#E9DBBE] text-[#2d5a27] shadow-sm transition-colors hover:bg-[#B9D38F]/45 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -841,6 +888,8 @@ export function StoryboardEditorStep({
 function PageCard(props: {
   storyId: number | null
   page: StoryboardPageItem
+  pageIndex: number
+  pageCount: number
   draft: string
   onDraftChange: (value: string) => void
   onDraftBlur: () => void
@@ -865,6 +914,8 @@ function PageCard(props: {
   const {
     storyId,
     page,
+    pageIndex,
+    pageCount,
     draft,
     onDraftChange,
     onDraftBlur,
@@ -904,10 +955,14 @@ function PageCard(props: {
     <div className="cr-card" style={{ padding: 0 }}>
       <span className="cr-tape" aria-hidden="true" />
       {/* Header — Page 배지 + 저장 중 인디케이터 */}
-      <div className="flex items-center justify-between px-5 pt-3 pb-2">
-        <span className="cr-page-badge">페이지 {page.pageNumber}</span>
+      <div className="relative flex items-center justify-center px-5 pt-3 pb-2">
+        <div className="inline-flex min-w-[7.5rem] items-center justify-center rounded-lg border-2 border-[#9A7548]/35 bg-[#F4E4BC] px-4 py-1.5 text-sm font-bold text-[#3E2A18] shadow-sm">
+          <span>페이지 {pageIndex + 1}</span>
+          <span className="mx-2 text-[#9A7548]">/</span>
+          <span>{pageCount}</span>
+        </div>
         {patchPending && (
-          <span className="text-[#9A7548] text-xs inline-flex items-center gap-1.5">
+          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9A7548] text-xs inline-flex items-center gap-1.5">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> 저장 중
           </span>
         )}
@@ -918,13 +973,13 @@ function PageCard(props: {
         <div className="flex flex-col gap-2.5">
           {/* 이미지 영역 — hover 시 흑백 + 어둡게 + 중앙에 새로고침 버튼 노출. */}
           <div
-            className={`cr-sketch-image-wrap aspect-[4/3] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
+            className={`cr-sketch-image-wrap min-h-[240px] rounded-xl bg-[#B9D38F]/25 border border-[#B9D38F]/40 flex items-center justify-center overflow-hidden${regenOpen ? ' open' : ''}`}
           >
             {imageSrc ? (
               <img
                 src={imageSrc}
                 alt={`페이지 ${page.pageNumber} 그림`}
-                className="w-full h-full object-cover"
+                className="w-full h-auto object-contain"
                 draggable={false}
               />
             ) : (
