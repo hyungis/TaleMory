@@ -1,5 +1,9 @@
 export { getTerms } from './api/getTerms'
-export { buildRequiredTermAgreements, REQUIRED_TERM_IDS } from './model/termAgreements'
+export {
+  buildRequiredTermAgreements,
+  isRequiredTermsNotFoundError,
+  RequiredTermsNotFoundError,
+} from './model/termAgreements'
 export { mapTermResponseToDetail } from './model/termDetails'
 export { useTermsQuery } from './model/useTermsQuery'
 export { TermsDetailModal } from './ui/TermsDetailModal'

@@ -313,8 +313,22 @@ class MemberService(
     }
 
     private fun validateOauthSignupCommand(command: OauthSignupCommand) {
-        val phone = command.phone?.trim()
+        requireValidOauthSignupRequiredFields(command)
+        requireValidEmail(command.email)
+        requireValidPhone(command.phone)
+    }
 
+    private fun validateSignupCommand(command: SignupCommand) {
+        requireValidSignupRequiredFields(command)
+        requireMatchingPassword(command)
+        requireValidEmail(command.email)
+        requireValidPhone(command.phone)
+        if (!command.restoreConfirmed) {
+            requireRequiredTermsAgreed(command.termAgreements)
+        }
+    }
+
+    private fun requireValidOauthSignupRequiredFields(command: OauthSignupCommand) {
         if (
             command.signupToken.isBlank() ||
             command.email.isBlank() ||
@@ -323,20 +337,9 @@ class MemberService(
         ) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
-
-        if (!EMAIL_PATTERN.matches(command.email.trim())) {
-            throw BusinessException(CommonErrorCode.INVALID_INPUT)
-        }
-
-        if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
-            throw BusinessException(CommonErrorCode.INVALID_INPUT)
-        }
-
     }
 
-    private fun validateSignupCommand(command: SignupCommand) {
-        val phone = command.phone?.trim()
-
+    private fun requireValidSignupRequiredFields(command: SignupCommand) {
         if (
             command.loginId.isBlank() ||
             command.loginId.length < MIN_LOGIN_ID_LENGTH ||
@@ -348,32 +351,29 @@ class MemberService(
         ) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+    }
 
+    private fun requireMatchingPassword(command: SignupCommand) {
         if (command.passwordCheck != null && command.password != command.passwordCheck) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+    }
 
-        if (!EMAIL_PATTERN.matches(command.email.trim())) {
+    private fun requireValidEmail(email: String) {
+        if (!EMAIL_PATTERN.matches(email.trim())) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
         }
+    }
 
-        if (!phone.isNullOrEmpty() && !PHONE_PATTERN.matches(phone)) {
+    private fun requireValidPhone(phone: String?) {
+        val normalizedPhone = phone?.trim()
+        if (!normalizedPhone.isNullOrEmpty() && !PHONE_PATTERN.matches(normalizedPhone)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
-        }
-
-        if (!command.restoreConfirmed) {
-            requireRequiredTermsAgreed(command.termAgreements)
         }
     }
 
     private fun requireRequiredTermsAgreed(termAgreements: List<TermAgreementCommand>) {
-        val requiredTermIds = termsRepository.findAllByIsRequiredTrueOrderByIdAsc()
-            .map { it.id }
-            .toSet()
-
-        if (requiredTermIds.isEmpty()) {
-            throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_CONFIGURED)
-        }
+        val requiredTermIds = findConfiguredRequiredTermIds()
 
         val agreedTermIds = termAgreements
             .asSequence()
@@ -384,6 +384,18 @@ class MemberService(
         if (!agreedTermIds.containsAll(requiredTermIds)) {
             throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED)
         }
+    }
+
+    private fun findConfiguredRequiredTermIds(): Set<Long> {
+        val requiredTermIds = termsRepository.findAllByIsRequiredTrueOrderByIdAsc()
+            .map { it.id }
+            .toSet()
+
+        if (requiredTermIds.isEmpty()) {
+            throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_CONFIGURED)
+        }
+
+        return requiredTermIds
     }
 
     private fun requireAvailableNickname(nickname: String, excludedUserId: Long? = null) {

@@ -3,7 +3,12 @@ import { AlertCircle } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { formatPhoneNumber } from '../../../../shared/lib'
 import { getLoginIdAvailability, getNicknameAvailability } from '../../api/getAuthAvailability'
-import { buildRequiredTermAgreements, TermsCheckboxes } from '../../terms'
+import {
+  buildRequiredTermAgreements,
+  getTerms,
+  isRequiredTermsNotFoundError,
+  TermsCheckboxes,
+} from '../../terms'
 import { useSignupPost } from '../model/useSignupPost'
 import type { SignupRequest } from '../types'
 
@@ -86,6 +91,10 @@ function validate(values: SignupFormValues): string | null {
 }
 
 function getSignupErrorMessage(error: unknown): string {
+  if (isRequiredTermsNotFoundError(error)) {
+    return '약관 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.'
+  }
+
   if (!isApiError(error)) {
     return '회원가입 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.'
   }
@@ -236,25 +245,28 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         return
       }
 
-      const request: SignupRequest = {
-        loginId: values.id.trim(),
-        password: values.password,
-        passwordCheck: values.passwordCheck,
-        email: values.email.trim(),
-        name: values.name.trim(),
-        nickname: values.nickname.trim(),
-        phone: values.phone.trim() || undefined,
-        termAgreements: buildRequiredTermAgreements(values),
-      }
+      let request: SignupRequest | null = null
 
       try {
+        const terms = await getTerms()
+        request = {
+          loginId: values.id.trim(),
+          password: values.password,
+          passwordCheck: values.passwordCheck,
+          email: values.email.trim(),
+          name: values.name.trim(),
+          nickname: values.nickname.trim(),
+          phone: values.phone.trim() || undefined,
+          termAgreements: buildRequiredTermAgreements(values, terms),
+        }
+
         await signup(request)
 
         setError('')
         alert(`"${values.nickname.trim()}" 님 가입이 완료됐어요! 로그인 해주세요.`)
         onSignedUp(values.id.trim())
       } catch (submitError) {
-        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE) {
+        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE && request !== null) {
           setError('')
           setRestoreRequest(request)
           return

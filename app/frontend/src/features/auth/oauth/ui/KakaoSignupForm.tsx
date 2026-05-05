@@ -3,7 +3,12 @@ import { AlertCircle, UserPlus } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { formatPhoneNumber } from '../../../../shared/lib'
 import { getNicknameAvailability } from '../../api/getAuthAvailability'
-import { buildRequiredTermAgreements, TermsCheckboxes } from '../../terms'
+import {
+  buildRequiredTermAgreements,
+  getTerms,
+  isRequiredTermsNotFoundError,
+  TermsCheckboxes,
+} from '../../terms'
 import { useKakaoSignupPost } from '../model/useKakaoSignupPost'
 import type { KakaoSignupProfile, KakaoSignupRequest } from '../types'
 import type { LoginResponse } from '../../login'
@@ -84,6 +89,10 @@ function validate(values: KakaoSignupFormValues): string | null {
 }
 
 function getKakaoSignupErrorMessage(error: unknown): string {
+  if (isRequiredTermsNotFoundError(error)) {
+    return '약관 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.'
+  }
+
   if (!isApiError(error)) {
     return '카카오 회원가입 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.'
   }
@@ -166,22 +175,25 @@ export function KakaoSignupForm({ signupToken, profile, onSuccess, onCancel }: K
         return
       }
 
-      const request: KakaoSignupRequest = {
-        signupToken,
-        email: kakaoEmail,
-        name: values.name.trim(),
-        nickname: values.nickname.trim(),
-        phone: values.phone.trim() || undefined,
-        termAgreements: buildRequiredTermAgreements(values),
-      }
+      let request: KakaoSignupRequest | null = null
 
       try {
+        const terms = await getTerms()
+        request = {
+          signupToken,
+          email: kakaoEmail,
+          name: values.name.trim(),
+          nickname: values.nickname.trim(),
+          phone: values.phone.trim() || undefined,
+          termAgreements: buildRequiredTermAgreements(values, terms),
+        }
+
         const result = await signup(request)
 
         setError('')
         onSuccess(result)
       } catch (submitError) {
-        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE) {
+        if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE && request !== null) {
           setError('')
           setRestoreRequest(request)
           return

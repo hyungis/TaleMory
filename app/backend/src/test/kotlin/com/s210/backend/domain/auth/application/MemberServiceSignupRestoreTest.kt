@@ -16,6 +16,9 @@ import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolve
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupToken
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
+import com.s210.backend.domain.terms.entity.Terms
+import com.s210.backend.domain.terms.exception.TermsErrorCode
+import com.s210.backend.domain.terms.infrastructure.repository.TermsRepository
 import com.s210.backend.domain.user.entity.OauthAccount
 import com.s210.backend.domain.user.entity.User
 import com.s210.backend.domain.user.exception.UserErrorCode
@@ -49,6 +52,7 @@ class MemberServiceSignupRestoreTest {
     private val kakaoOAuthClient: KakaoOAuthClient = mock(KakaoOAuthClient::class.java)
     private val oauthRedirectUriResolver: OauthRedirectUriResolver = mock(OauthRedirectUriResolver::class.java)
     private val oauthSignupTokenProvider: OauthSignupTokenProvider = mock(OauthSignupTokenProvider::class.java)
+    private val termsRepository: TermsRepository = mock(TermsRepository::class.java)
 
     private val service = MemberService(
         memberRepository = memberRepository,
@@ -60,11 +64,13 @@ class MemberServiceSignupRestoreTest {
         kakaoOAuthClient = kakaoOAuthClient,
         oauthRedirectUriResolver = oauthRedirectUriResolver,
         oauthSignupTokenProvider = oauthSignupTokenProvider,
+        termsRepository = termsRepository,
     )
 
     @Test
     fun `signUp throws WITHDRAWN_ACCOUNT when loginId belongs to withdrawn user without confirmation`() {
         val user = withdrawnUser()
+        stubRequiredTerms()
         `when`(memberRepository.findByLoginIdAndDeletedAtIsNull("old-login")).thenReturn(null)
         `when`(
             memberRepository.findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc("old-login"),
@@ -140,7 +146,9 @@ class MemberServiceSignupRestoreTest {
     }
 
     @Test
-    fun `signUp throws INVALID_INPUT when required terms are not agreed`() {
+    fun `signUp throws REQUIRED_TERMS_NOT_AGREED when required terms are not agreed`() {
+        stubRequiredTerms()
+
         val ex = assertThrows<BusinessException> {
             service.signUp(
                 signupCommand(
@@ -153,11 +161,23 @@ class MemberServiceSignupRestoreTest {
             )
         }
 
-        assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
+        assertEquals(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED, ex.errorCode)
+    }
+
+    @Test
+    fun `signUp throws REQUIRED_TERMS_NOT_CONFIGURED when required terms are not configured`() {
+        `when`(termsRepository.findAllByIsRequiredTrueOrderByIdAsc()).thenReturn(emptyList())
+
+        val ex = assertThrows<BusinessException> {
+            service.signUp(signupCommand(restoreConfirmed = false))
+        }
+
+        assertEquals(TermsErrorCode.REQUIRED_TERMS_NOT_CONFIGURED, ex.errorCode)
     }
 
     @Test
     fun `signUp throws NICKNAME_DUPLICATED when active nickname already exists`() {
+        stubRequiredTerms()
         `when`(memberRepository.findByLoginIdAndDeletedAtIsNull("old-login")).thenReturn(null)
         `when`(memberRepository.findByEmailAndDeletedAtIsNull("new@example.com")).thenReturn(null)
         `when`(
@@ -281,6 +301,7 @@ class MemberServiceSignupRestoreTest {
 
     @Test
     fun `signUpWithKakao still requires terms when link confirmation has no active email user`() {
+        stubRequiredTerms()
         `when`(oauthSignupTokenProvider.parseToken("signup-token")).thenReturn(
             OauthSignupToken(
                 provider = "kakao",
@@ -305,7 +326,7 @@ class MemberServiceSignupRestoreTest {
             )
         }
 
-        assertEquals(CommonErrorCode.INVALID_INPUT, ex.errorCode)
+        assertEquals(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED, ex.errorCode)
     }
 
     @Test
@@ -381,6 +402,31 @@ class MemberServiceSignupRestoreTest {
             TermAgreementCommand(termId = 1L, agreed = true),
             TermAgreementCommand(termId = 2L, agreed = true),
         )
+
+    private fun stubRequiredTerms() {
+        `when`(termsRepository.findAllByIsRequiredTrueOrderByIdAsc()).thenReturn(
+            listOf(
+                Terms(
+                    id = 1L,
+                    type = "SERVICE",
+                    version = 1,
+                    title = "서비스 이용약관",
+                    content = "서비스 이용약관 내용",
+                    isRequired = true,
+                    effectiveAt = LocalDateTime.of(2026, 5, 4, 0, 0),
+                ),
+                Terms(
+                    id = 2L,
+                    type = "PRIVACY",
+                    version = 1,
+                    title = "개인정보 수집 및 이용",
+                    content = "개인정보 수집 및 이용 내용",
+                    isRequired = true,
+                    effectiveAt = LocalDateTime.of(2026, 5, 4, 0, 0),
+                ),
+            )
+        )
+    }
 
     private fun oauthProfile(): OauthUserProfile =
         OauthUserProfile(
