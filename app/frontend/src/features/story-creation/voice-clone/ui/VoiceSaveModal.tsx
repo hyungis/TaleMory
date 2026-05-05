@@ -105,7 +105,7 @@ export function VoiceSaveModal({ isSaving, onSubmit, onClose }: VoiceSaveModalPr
               style={{
                 fontFamily: 'var(--cr-font-serif)',
                 fontWeight: 800,
-                fontSize: 20,
+                fontSize: 22,
                 color: 'var(--cr-ink)',
                 margin: 0,
                 letterSpacing: '-0.5px',
@@ -137,7 +137,7 @@ export function VoiceSaveModal({ isSaving, onSubmit, onClose }: VoiceSaveModalPr
         <p
           style={{
             margin: '0 0 12px',
-            fontSize: 14,
+            fontSize: 16,
             color: 'var(--cr-ink-soft)',
           }}
         >
@@ -148,7 +148,7 @@ export function VoiceSaveModal({ isSaving, onSubmit, onClose }: VoiceSaveModalPr
         <label
           className="cr-label"
           htmlFor="voice-save-modal-input"
-          style={{ fontSize: 15 }}
+          style={{ fontSize: 17 }}
         >
           제목
         </label>

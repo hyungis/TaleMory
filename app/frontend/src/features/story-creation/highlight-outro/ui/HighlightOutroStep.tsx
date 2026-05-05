@@ -449,7 +449,7 @@ export function HighlightOutroStep({
     padding: '8px 18px',
     fontFamily: 'var(--cr-font-gaegu)',
     fontWeight: 700,
-    fontSize: 14,
+    fontSize: 16,
     cursor: 'pointer',
     display: 'inline-flex',
     alignItems: 'center',
@@ -498,7 +498,7 @@ export function HighlightOutroStep({
                 <div className="cr-step-label" style={{ marginBottom: 2 }}>
                   강조 문장
                 </div>
-                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 24, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
                   페이지별 강조 문장 선택 & 녹음
                 </h3>
               </div>
@@ -540,7 +540,7 @@ export function HighlightOutroStep({
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
                           <ImageOff className="w-12 h-12" style={{ color: '#8b7a52', opacity: 0.5 }} />
-                          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: '#8b7a52', margin: 0 }}>
+                          <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: '#8b7a52', margin: 0 }}>
                             삽화 준비 중...
                           </p>
                         </div>
@@ -549,7 +549,7 @@ export function HighlightOutroStep({
 
                     {/* Right: Sentences */}
                     <div style={{ flex: 1, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
-                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
+                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
                         문장을 탭하여 강조 선택 후 녹음하세요
                       </p>
 
@@ -572,7 +572,7 @@ export function HighlightOutroStep({
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-                              <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 12, fontWeight: 700, color: 'var(--cr-ink-soft)' }}>
+                              <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, fontWeight: 700, color: 'var(--cr-ink-soft)' }}>
                                 {sIdx + 1}/{sentences.length}
                               </span>
                               <span
@@ -581,7 +581,7 @@ export function HighlightOutroStep({
                                   borderRadius: 999,
                                   fontFamily: 'var(--cr-font-gaegu)',
                                   fontWeight: 700,
-                                  fontSize: 11,
+                                  fontSize: 13,
                                   background: isSelected ? 'var(--cr-rust)' : 'var(--cr-sage-darker)',
                                   color: '#fdf6dc',
                                   border: `1.5px solid ${isSelected ? '#8a4a32' : '#2a3f1f'}`,
@@ -591,11 +591,11 @@ export function HighlightOutroStep({
                               </span>
                             </div>
 
-                            <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, fontWeight: 600, color: 'var(--cr-ink)', margin: 0, lineHeight: 1.5 }}>
+                            <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, fontWeight: 600, color: 'var(--cr-ink)', margin: 0, lineHeight: 1.5 }}>
                               {sentence.en}
                             </p>
                             {sentence.ko && (
-                              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)', margin: '4px 0 0', fontStyle: 'italic' }}>
+                              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-ink-soft)', margin: '4px 0 0', fontStyle: 'italic' }}>
                                 {sentence.ko}
                               </p>
                             )}
@@ -642,7 +642,7 @@ export function HighlightOutroStep({
                                         padding: '6px 14px',
                                         fontFamily: 'var(--cr-font-gaegu)',
                                         fontWeight: 700,
-                                        fontSize: 13,
+                                        fontSize: 15,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -674,7 +674,7 @@ export function HighlightOutroStep({
                                         padding: '6px 14px',
                                         fontFamily: 'var(--cr-font-gaegu)',
                                         fontWeight: 700,
-                                        fontSize: 13,
+                                        fontSize: 15,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -683,7 +683,7 @@ export function HighlightOutroStep({
                                     >
                                       <Trash2 className="w-3.5 h-3.5" /> 삭제
                                     </button>
-                                    <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontWeight: 700, fontSize: 12, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
+                                    <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontWeight: 700, fontSize: 14, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
                                       녹음 완료
                                     </span>
                                   </>
@@ -719,7 +719,7 @@ export function HighlightOutroStep({
                       <ChevronLeft className="w-5 h-5" />
                     </button>
 
-                    <span style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 14, fontWeight: 700, color: 'var(--cr-ink-soft)', background: '#fbf2da', padding: '5px 16px', borderRadius: 999, border: '1.5px solid var(--cr-caramel)' }}>
+                    <span style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 16, fontWeight: 700, color: 'var(--cr-ink-soft)', background: '#fbf2da', padding: '5px 16px', borderRadius: 999, border: '1.5px solid var(--cr-caramel)' }}>
                       Page {currentPage + 1} / {displayPages.length}
                     </span>
 
@@ -749,7 +749,7 @@ export function HighlightOutroStep({
             })()}
 
             {highlights.length > 0 && (
-              <p style={{ marginTop: 14, textAlign: 'center', fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-sage-deep)', fontWeight: 700 }}>
+              <p style={{ marginTop: 14, textAlign: 'center', fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: 'var(--cr-sage-deep)', fontWeight: 700 }}>
                 {highlights.length}개 문장 선택됨 · {highlights.filter(h => h.audioUrl).length}개 녹음 완료
               </p>
             )}
@@ -777,14 +777,14 @@ export function HighlightOutroStep({
                 <div className="cr-step-label" style={{ marginBottom: 2 }}>
                   아웃트로
                 </div>
-                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 24, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
                   마무리 인사를 남겨주세요
                 </h3>
               </div>
             </div>
 
             <div className="cr-field">
-              <label className="cr-label" style={{ fontSize: 16 }}>마무리 멘트</label>
+              <label className="cr-label" style={{ fontSize: 18 }}>마무리 멘트</label>
               <textarea
                 value={outroText}
                 onChange={e => setOutroText(e.target.value)}
@@ -796,7 +796,7 @@ export function HighlightOutroStep({
             </div>
 
             <div className="cr-field">
-              <label className="cr-label" style={{ fontSize: 16 }}>서명 (선택)</label>
+              <label className="cr-label" style={{ fontSize: 18 }}>서명 (선택)</label>
               <input
                 type="text"
                 value={outroSignature}
@@ -808,7 +808,7 @@ export function HighlightOutroStep({
             </div>
 
             {outroSaving && (
-              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-ink-soft)', display: 'inline-flex', alignItems: 'center', gap: 4, margin: 0 }}>
+              <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-ink-soft)', display: 'inline-flex', alignItems: 'center', gap: 4, margin: 0 }}>
                 <Loader2 className="w-3 h-3 animate-spin" /> 저장 중...
               </p>
             )}
@@ -851,7 +851,7 @@ export function HighlightOutroStep({
                       padding: '8px 18px',
                       fontFamily: 'var(--cr-font-gaegu)',
                       fontWeight: 700,
-                      fontSize: 14,
+                      fontSize: 16,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -873,7 +873,7 @@ export function HighlightOutroStep({
                   >
                     <RotateCcw className="w-4 h-4" /> 삭제
                   </button>
-                  <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, fontWeight: 700, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
+                  <span style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, fontWeight: 700, color: 'var(--cr-sage-deep)', alignSelf: 'center' }}>
                     녹음 완료
                   </span>
                 </>
@@ -890,14 +890,14 @@ export function HighlightOutroStep({
                   borderRadius: 14,
                 }}
               >
-                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 13, color: 'var(--cr-caramel-deep)', fontWeight: 700, margin: '0 0 6px' }}>
+                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-caramel-deep)', fontWeight: 700, margin: '0 0 6px' }}>
                   미리보기
                 </p>
-                <p style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 17, color: 'var(--cr-ink)', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 19, color: 'var(--cr-ink)', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 }}>
                   {outroText}
                 </p>
                 {outroSignature && (
-                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-ink-soft)', fontStyle: 'italic', margin: '8px 0 0' }}>
+                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 17, color: 'var(--cr-ink-soft)', fontStyle: 'italic', margin: '8px 0 0' }}>
                     {outroSignature}
                   </p>
                 )}

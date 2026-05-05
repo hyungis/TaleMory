@@ -26,10 +26,10 @@ export function StepHeader({ stepNumber, stepTitle, onBack }: StepHeaderProps) {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <span className="text-[#b4c4a4] text-sm font-bold tracking-wider">
+        <span className="text-[#b4c4a4] text-base font-bold tracking-wider">
           STEP {padded} / {total}
         </span>
-        <span className="bookshelf-title-display text-2xl text-[#f0e6c0] font-bold">{stepTitle}</span>
+        <span className="bookshelf-title-display text-3xl text-[#f0e6c0] font-bold">{stepTitle}</span>
       </div>
     </div>
   )

@@ -45,16 +45,16 @@ export function GlobalRefineModal({ isOpen, remaining, onClose, onSubmit }: Glob
           <div className="bg-[#2d5a27] p-3 rounded-full border border-[#b4dc8c]/50">
             <Wand2 className="w-6 h-6 text-[#f0e6c0]" />
           </div>
-          <h2 className="text-2xl md:text-3xl text-[#2d5a27] font-bold">AI에게 전체 수정 요청</h2>
+          <h2 className="text-3xl md:text-4xl text-[#2d5a27] font-bold">AI에게 전체 수정 요청</h2>
         </div>
 
-        <p className="text-[#8b7a52] text-lg mb-3">
+        <p className="text-[#8b7a52] text-xl mb-3">
           전체 스토리보드에 대해 어떻게 수정하고 싶은지 알려주세요.
           <br />
           AI가 모든 페이지를 한번에 다듬어 드려요.
         </p>
 
-        <div className="flex items-center gap-2 bg-[#e8ddb4] border border-[#8b7a52]/40 px-4 py-2 rounded-full text-sm mb-5 w-fit">
+        <div className="flex items-center gap-2 bg-[#e8ddb4] border border-[#8b7a52]/40 px-4 py-2 rounded-full text-base mb-5 w-fit">
           <RefreshCcw className="w-4 h-4 text-[#2d5a27]" />
           <span className="text-[#8b7a52]">전체 수정 가능 횟수</span>
           <span className="text-[#2d5a27] font-bold">
@@ -67,14 +67,14 @@ export function GlobalRefineModal({ isOpen, remaining, onClose, onSubmit }: Glob
           onChange={e => setPrompt(e.target.value)}
           rows={5}
           placeholder="예) 조금 더 따뜻하고 감성적인 말투로 바꿔주세요. 아이의 시점에서 이야기해 주세요."
-          className="w-full p-5 rounded-2xl border-2 border-[#8b7a52]/60 bg-[#e8ddb4] text-[#2d5a27] text-lg font-sans focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/40 resize-none placeholder-[#8b7a52]/60"
+          className="w-full p-5 rounded-2xl border-2 border-[#8b7a52]/60 bg-[#e8ddb4] text-[#2d5a27] text-xl font-sans focus:outline-none focus:border-[#2d5a27] focus:ring-4 focus:ring-[#b4dc8c]/40 resize-none placeholder-[#8b7a52]/60"
         />
 
         <div className="flex justify-end gap-3 mt-6">
           <button
             type="button"
             onClick={onClose}
-            className="text-[#8b7a52] hover:text-[#2d5a27] bg-[#f0e6c0] border-2 border-[#8b7a52]/40 px-6 py-3 rounded-full font-bold text-lg"
+            className="text-[#8b7a52] hover:text-[#2d5a27] bg-[#f0e6c0] border-2 border-[#8b7a52]/40 px-6 py-3 rounded-full font-bold text-xl"
           >
             취소
           </button>
@@ -82,7 +82,7 @@ export function GlobalRefineModal({ isOpen, remaining, onClose, onSubmit }: Glob
             type="button"
             onClick={handleSubmit}
             disabled={remaining <= 0}
-            className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all font-bold text-lg flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all font-bold text-xl flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             <Sparkles className="w-5 h-5" /> 수정 요청하기
           </button>

@@ -104,7 +104,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                 <div className="cr-step-label" style={{ marginBottom: 2 }}>
                   STEP 1 · 녹음하기
                 </div>
-                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 24, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
                   보이스 클론용 샘플 문장
                 </h3>
               </div>
@@ -152,7 +152,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                   aria-live="polite"
                   style={{
                     fontFamily: 'var(--cr-font-mono, var(--cr-font-gaegu))',
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: 800,
                     color: 'var(--cr-rust)',
                     letterSpacing: '0.5px',
@@ -165,7 +165,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <p
                 style={{
                   fontFamily: 'var(--cr-font-gaegu)',
-                  fontSize: 17,
+                  fontSize: 19,
                   color: 'var(--cr-rust)',
                   fontWeight: 700,
                   margin: 0,
@@ -265,7 +265,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                     display: 'flex',
                     justifyContent: 'space-between',
                     fontFamily: 'var(--cr-font-gaegu)',
-                    fontSize: 13,
+                    fontSize: 15,
                     color: 'var(--cr-ink-soft)',
                   }}
                 >
@@ -293,7 +293,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                   </button>
                 )}
                 {vc.savedProfileId && (
-                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 14, color: 'var(--cr-sage-deep)', fontWeight: 700, margin: 0 }}>
+                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: 'var(--cr-sage-deep)', fontWeight: 700, margin: 0 }}>
                     {vc.savedVoiceSummary}
                   </p>
                 )}
@@ -331,14 +331,14 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                 <div className="cr-step-label" style={{ marginBottom: 2 }}>
                   STEP 2 · 변환된 음성 듣기
                 </div>
-                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 20, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
                   보이스 클론으로 변환된 음성 듣기
                 </h3>
               </div>
             </div>
 
             <div className="cr-field">
-              <label className="cr-label" style={{ fontSize: 16 }}>
+              <label className="cr-label" style={{ fontSize: 18 }}>
                 TTS 로 들어볼 문장
               </label>
               <textarea
@@ -364,7 +364,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <p
                 style={{
                   fontFamily: 'var(--cr-font-gaegu)',
-                  fontSize: 14,
+                  fontSize: 16,
                   color: 'var(--cr-ink-soft)',
                   margin: 0,
                   flex: 1,
@@ -412,7 +412,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
         >
           <span>
             음성을 동화에 연결하지 못했어요. 잠시 후 "다시 연결" 을 눌러주세요.
-            {vc.attachError && <span style={{ display: 'block', fontSize: 12, marginTop: 4, opacity: 0.8 }}>{vc.attachError}</span>}
+            {vc.attachError && <span style={{ display: 'block', fontSize: 14, marginTop: 4, opacity: 0.8 }}>{vc.attachError}</span>}
           </span>
           <button
             type="button"
@@ -427,7 +427,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               padding: '6px 16px',
               fontFamily: 'var(--cr-font-gaegu)',
               fontWeight: 700,
-              fontSize: 14,
+              fontSize: 16,
               cursor: 'pointer',
             }}
           >

@@ -213,7 +213,7 @@
   bottom: 14px;
   color: var(--sb-ink-mute);
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
+  font-size: 1.15rem;
   z-index: 6;
 }
 .sb-page-num.left { left: 28px; }
@@ -269,20 +269,20 @@
 }
 /* 삽화 없는 페이지의 placeholder 아이콘 */
 .sb-illust-empty-icon {
-  width: 9rem;
-  height: 9rem;
+  width: 9.15rem;
+  height: 9.15rem;
   color: rgba(255, 250, 230, 0.92);
   filter: drop-shadow(0 8px 16px rgba(74, 59, 42, 0.15));
 }
 @media (min-width: 768px) {
-  .sb-illust-empty-icon { width: 12rem; height: 12rem; }
+  .sb-illust-empty-icon { width: 12.15rem; height: 12.15rem; }
 }
 .sb-illust-caption {
   flex-shrink: 0;
   margin-top: 4px;
   color: var(--sb-ink-mute);
   font-family: var(--sb-font-pen);
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   text-align: center;
   max-width: 100%;
 }
@@ -291,7 +291,7 @@
 .sb-body-label {
   color: var(--sb-sage-deep);
   font-family: var(--sb-font-pen);
-  font-size: 1.9rem;
+  font-size: 2.05rem;
   margin: 0 0 10px 0;
   display: flex;
   align-items: center;
@@ -311,14 +311,14 @@
   font-family: var(--sb-font-serif);
   line-height: 2;
   color: var(--sb-ink);
-  font-size: 1.1rem;
+  font-size: 1.25rem;
 }
 .sb-body-translation {
   margin-top: 24px;
   padding-top: 18px;
   border-top: 1px dashed var(--sb-caramel);
   font-family: var(--sb-font-pen);
-  font-size: 1.3rem;
+  font-size: 1.45rem;
   color: var(--sb-ink-soft);
   line-height: 1.8;
 }
@@ -454,13 +454,13 @@
   object-fit: contain;
 }
 .sb-illust-modal-empty-icon {
-  width: 8rem;
-  height: 8rem;
+  width: 8.15rem;
+  height: 8.15rem;
   color: rgba(255, 250, 230, 0.95);
   filter: drop-shadow(0 6px 12px rgba(74, 59, 42, 0.18));
 }
 @media (min-width: 768px) {
-  .sb-illust-modal-empty-icon { width: 12rem; height: 12rem; }
+  .sb-illust-modal-empty-icon { width: 12.15rem; height: 12.15rem; }
 }
 .sb-illust-modal-caption {
   text-align: center;
@@ -468,7 +468,7 @@
 .sb-illust-modal-label {
   margin: 0 0 4px;
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
+  font-size: 1.15rem;
   color: var(--sb-sage-deep);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -477,7 +477,7 @@
 .sb-illust-modal-title {
   margin: 0;
   font-family: var(--sb-font-display);
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 700;
   color: var(--sb-sage-deep);
   letter-spacing: 0.02em;
@@ -485,7 +485,7 @@
 
 @media (max-width: 1023px) {
   .sb-illust-modal-body { border-radius: 20px; padding: 16px 16px 14px; gap: 14px; }
-  .sb-illust-modal-title { font-size: 1.2rem; }
+  .sb-illust-modal-title { font-size: 1.35rem; }
 }
 
 /* ===== 페이지 inline 재생 + 문장 하이라이트 ===== */
@@ -617,14 +617,14 @@
   color: var(--sb-sage-deep);
   font-family: var(--sb-font-display);
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   letter-spacing: 0.02em;
 }
 .sb-word-card-meaning {
   margin: 0;
   color: var(--sb-ink);
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
+  font-size: 1.15rem;
   line-height: 1.5;
 }
 .sb-word-card-meaning.is-loading,
@@ -634,7 +634,7 @@
 }
 .sb-word-card-ipa {
   font-weight: 400;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: var(--sb-ink-mute);
   margin-left: 6px;
   font-family: var(--sb-font-serif);
@@ -647,12 +647,12 @@
 .sb-word-card-entry {
   color: var(--sb-ink);
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
+  font-size: 1.15rem;
   line-height: 1.6;
 }
 .sb-word-card-pos {
   display: inline-block;
-  font-size: 0.78rem;
+  font-size: 0.93rem;
   font-weight: 700;
   color: var(--sb-sage-deep);
   background: var(--sb-sage-tint);
@@ -740,7 +740,7 @@
   position: relative;
   z-index: 3;
   font-family: var(--sb-font-display);
-  font-size: 3.2rem;
+  font-size: 3.35rem;
   line-height: 1.2;
   color: var(--sb-paper-warm);
   margin: 0;
@@ -836,7 +836,7 @@
 .sb-letter-text {
   font-family: var(--sb-font-display);
   font-weight: 700;
-  font-size: 1.45rem;
+  font-size: 1.6rem;
   line-height: 34px;
   color: var(--sb-ink);
   margin: 0 0 18px;
@@ -861,7 +861,7 @@
 .sb-letter-signature {
   font-family: var(--sb-font-pen);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   color: var(--sb-rust);
   text-align: right;
   margin: 8px 40px 12px 0;
@@ -883,9 +883,22 @@
   opacity: 1;
   transform: translateY(0);
 }
+/* 편지지 없는 뒷표지에서 "다시 듣기 / 처음부터 읽기" 버튼만 단독 노출되는 경우 —
+   뒷표지 일러스트 위 하단 중앙에 떠 있어야 함 (편지지 안에 있을 땐 종이 흐름에 따라 배치). */
+.sb-letter-controls-standalone {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  margin-top: 0;
+}
+.sb-letter-controls-standalone.is-visible {
+  transform: translateX(-50%);
+}
 .sb-letter-btn {
   font-family: var(--sb-font-pen);
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   padding: 7px 16px;
   background: var(--sb-paper-warm);
   border: 2px solid var(--sb-rust);
@@ -1128,7 +1141,7 @@
 }
 .sb-toolbar-title {
   font-family: var(--sb-font-display);
-  font-size: 1.3rem;
+  font-size: 1.45rem;
   font-weight: 700;
   margin: 0 0 14px;
   color: var(--sb-sage-deep);
@@ -1139,7 +1152,7 @@
 }
 .sb-toolbar-section-label {
   font-family: var(--sb-font-pen);
-  font-size: 0.92rem;
+  font-size: 1.07rem;
   color: var(--sb-ink-soft);
   margin-bottom: 8px;
   font-weight: 700;
@@ -1156,7 +1169,7 @@
   justify-content: center;
   gap: 6px;
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
+  font-size: 1.15rem;
   color: var(--sb-ink-soft);
   font-weight: 700;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
@@ -1197,7 +1210,7 @@
 }
 .sb-toolbar-row .sb-toolbar-btn {
   padding: 8px 4px;
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 .sb-toolbar-range {
   width: 100%;
@@ -1205,7 +1218,7 @@
 }
 .sb-toolbar-fontsize-value {
   font-family: var(--sb-font-pen);
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: var(--sb-ink-mute);
   font-weight: 700;
 }
@@ -1227,7 +1240,7 @@
   align-items: center;
   gap: 6px;
   font-family: var(--sb-font-pen);
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: var(--sb-ink-soft);
   font-weight: 700;
   transition: border-color 0.15s ease, transform 0.1s ease, background 0.15s ease;
@@ -1259,7 +1272,7 @@
 }
 .sb-bookmark-status-text {
   font-family: var(--sb-font-pen);
-  font-size: 0.92rem;
+  font-size: 1.07rem;
 }
 .sb-bookmark-status-text strong {
   font-weight: 700;
@@ -1276,7 +1289,7 @@
   border-radius: 999px;
   color: var(--sb-paper-warm);
   font-family: var(--sb-font-pen);
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
@@ -1286,7 +1299,7 @@
 .sb-bookmark-jump:disabled { opacity: 0.5; cursor: default; }
 .sb-bookmark-empty {
   font-family: var(--sb-font-pen);
-  font-size: 0.92rem;
+  font-size: 1.07rem;
   color: var(--sb-ink-mute);
   margin: 8px 0 0;
 }
@@ -1384,12 +1397,12 @@
   .sb-page.left { padding-bottom: 50px; padding-right: 36px; }
   .sb-page.right { padding-top: 50px; padding-left: 36px; }
   .sb-illust-art { width: 65%; }
-  .sb-body-label { font-size: 1.5rem; }
+  .sb-body-label { font-size: 1.65rem; }
   .sb-nav-arrow.prev { left: 8px; }
   .sb-nav-arrow.next { right: 8px; }
   .sb-page-num.left { left: 36px; }
   .sb-page-num.right { right: 36px; }
-  .sb-cover-title { font-size: 2.4rem; }
+  .sb-cover-title { font-size: 2.55rem; }
   .sb-letter { width: min(85%, 380px); padding: 38px 28px 24px; }
-  .sb-letter-text { font-size: 1.2rem; line-height: 30px; }
+  .sb-letter-text { font-size: 1.35rem; line-height: 30px; }
 }
