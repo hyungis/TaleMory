@@ -9,6 +9,6 @@ data class StorySentenceTranslationJobMessage(
 )
 
 data class StorySentenceTranslationRequestPayload(
+    val pageNumber: Int? = null,
     val koreanText: String,
 )
-

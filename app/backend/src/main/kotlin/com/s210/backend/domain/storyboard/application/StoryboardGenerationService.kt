@@ -15,7 +15,9 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.storyboard.application.dto.ActiveImageRegenerateJob
 import com.s210.backend.domain.storyboard.application.dto.ActiveStoryJob
+import com.s210.backend.domain.storyboard.application.dto.ActiveTranslationJob
 import com.s210.backend.domain.storyboard.application.dto.LatestImageJob
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegeneratePayload
 import com.s210.backend.domain.storyboard.application.dto.ChildInfo
 import com.s210.backend.domain.storyboard.application.dto.PhotoInput
@@ -329,10 +331,24 @@ class StoryboardGenerationService(
             failedCountSinceLastSuccess = failedCount,
             latestImageJob = latestImageJob,
             activeTranslationJob = activeTranslationJob?.let {
-                ActiveStoryJob(jobId = it.id, status = it.status, createdAt = it.createdAt)
+                ActiveTranslationJob(
+                    jobId = it.id,
+                    pageNumber = parseTranslationPageNumber(it.requestPayload),
+                    status = it.status,
+                    createdAt = it.createdAt,
+                )
             },
             activeImageRegenerateJob = activeImageRegenerateJob,
         )
+    }
+
+    private fun parseTranslationPageNumber(requestPayload: String?): Int? {
+        if (requestPayload.isNullOrBlank()) return null
+        return try {
+            objectMapper.readValue(requestPayload, StorySentenceTranslationRequestPayload::class.java).pageNumber
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**

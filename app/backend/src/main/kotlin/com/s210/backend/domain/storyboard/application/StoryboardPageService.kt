@@ -102,7 +102,10 @@ class StoryboardPageService(
         pageNumber: Int,
         koreanText: String,
     ): StoryGenerationJob {
-        val payload = StorySentenceTranslationRequestPayload(koreanText = koreanText)
+        val payload = StorySentenceTranslationRequestPayload(
+            pageNumber = pageNumber,
+            koreanText = koreanText,
+        )
         val job = jobRepository.save(
             StoryGenerationJob(
                 storyId = storyId,
