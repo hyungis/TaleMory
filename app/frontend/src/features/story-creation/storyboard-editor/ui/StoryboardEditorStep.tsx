@@ -465,7 +465,10 @@ export function StoryboardEditorStep({
 
   const pages: StoryboardPageItem[] = useMemo(
     () =>
-      (pagesQuery.data?.pages ?? []).slice().sort((a, b) => a.pageNumber - b.pageNumber),
+      (pagesQuery.data?.pages ?? [])
+        .filter(p => p.pageNumber !== 0)
+        .slice()
+        .sort((a, b) => a.pageNumber - b.pageNumber),
     [pagesQuery.data],
   )
 
