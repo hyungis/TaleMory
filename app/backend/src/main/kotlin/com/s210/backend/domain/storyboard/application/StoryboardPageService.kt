@@ -2,13 +2,23 @@ package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.mq.RabbitMQConfig
+import com.s210.backend.common.mq.RoutingKeys
+import com.s210.backend.domain.job.entity.StoryGenerationJob
+import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
+import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationJobMessage
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPageResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPagesResult
+import org.slf4j.LoggerFactory
+import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -27,8 +37,11 @@ class StoryboardPageService(
     private val storyRepository: StoryRepository,
     private val storyBoardRepository: StoryBoardRepository,
     private val storyboardPageRepository: StoryboardPageRepository,
+    private val jobRepository: StoryGenerationJobRepository,
+    private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * `GET /api/stories/{storyId}/storyboard/pages`
@@ -78,9 +91,46 @@ class StoryboardPageService(
         if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
         page.replaceKoreanText(objectMapper, trimmed)
+        val translationJob = publishTranslationJob(storyId, pageNumber, trimmed)
         // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
 
-        return StoryboardPageResult.from(page, objectMapper)
+        return StoryboardPageResult.from(page, objectMapper, translationJobId = translationJob.id)
+    }
+
+    private fun publishTranslationJob(
+        storyId: Long,
+        pageNumber: Int,
+        koreanText: String,
+    ): StoryGenerationJob {
+        val payload = StorySentenceTranslationRequestPayload(koreanText = koreanText)
+        val job = jobRepository.save(
+            StoryGenerationJob(
+                storyId = storyId,
+                jobType = JobType.STORY_SENTENCE_TRANSLATION,
+                status = JobStatus.PENDING,
+                requestPayload = objectMapper.writeValueAsString(payload),
+            ),
+        )
+
+        val envelope = StorySentenceTranslationJobMessage(
+            jobId = job.id.toString(),
+            storyId = storyId,
+            pageNumber = pageNumber,
+            payload = payload,
+        )
+        rabbitTemplate.convertAndSend(
+            RabbitMQConfig.REQUEST_EXCHANGE,
+            RoutingKeys.STORY_SENTENCE_TRANSLATE,
+            envelope,
+        )
+        log.info(
+            "[SENTENCE:TRANSLATE] published jobId={}, storyId={}, pageNumber={}, koreanLen={}",
+            job.id,
+            storyId,
+            pageNumber,
+            koreanText.length,
+        )
+        return job
     }
 
     /**

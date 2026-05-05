@@ -33,6 +33,7 @@ object RoutingKeys {
     // ---------- 스토리(동화) 줄거리(요약) 생성 ----------
     const val STORY_SUMMARY_GENERATE = "ai.cpu.story.summary.generate"
     const val STORY_SUMMARY_REGENERATE = "ai.cpu.story.summary.regenerate"
+    const val STORY_SENTENCE_TRANSLATE = "ai.cpu.story.sentences.translate"
 
     // ---------- TTS 생성 ----------
     // 워커가 자체적으로 큐(`ai.gpu.request.queue` 또는 `ai.gpu.tts.generate.request.queue`)를

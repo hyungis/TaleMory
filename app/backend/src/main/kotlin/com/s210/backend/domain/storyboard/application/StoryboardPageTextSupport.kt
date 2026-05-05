@@ -34,6 +34,24 @@ fun StoryboardPage.replaceKoreanText(objectMapper: ObjectMapper, koreanText: Str
     )
 }
 
+fun StoryboardPage.replaceTranslatedSentences(
+    objectMapper: ObjectMapper,
+    sentences: List<StorySentenceDto>,
+) {
+    this.sentences = objectMapper.writeValueAsString(
+        sentences
+            .sortedBy { it.sentenceOrder }
+            .mapIndexed { index, sentence ->
+                StorySentenceDto(
+                    sentenceOrder = index + 1,
+                    englishText = sentence.englishText.trim(),
+                    koreanText = sentence.koreanText.trim(),
+                    emotion = sentence.emotion.ifBlank { "NEUTRAL" },
+                )
+            },
+    )
+}
+
 private fun StoryboardPage.parseSentences(objectMapper: ObjectMapper): List<StorySentenceDto> {
     val raw = sentences?.takeIf { it.isNotBlank() } ?: return emptyList()
     return runCatching {

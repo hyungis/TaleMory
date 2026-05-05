@@ -18,9 +18,14 @@ data class StoryboardPageResult(
     val sceneSummary: String?,
     val imagePrompt: String?,
     val imageUrl: String?,
+    val translationJobId: Long? = null,
 ) {
     companion object {
-        fun from(entity: StoryboardPage, objectMapper: ObjectMapper): StoryboardPageResult {
+        fun from(
+            entity: StoryboardPage,
+            objectMapper: ObjectMapper,
+            translationJobId: Long? = null,
+        ): StoryboardPageResult {
             val texts = entity.pageTexts(objectMapper)
             return StoryboardPageResult(
                 pageNumber = entity.pageNumber,
@@ -29,6 +34,7 @@ data class StoryboardPageResult(
                 sceneSummary = entity.sceneSummary,
                 imagePrompt = entity.imagePrompt,
                 imageUrl = entity.imageUrl,
+                translationJobId = translationJobId,
             )
         }
     }

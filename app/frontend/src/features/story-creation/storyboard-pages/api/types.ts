@@ -15,6 +15,7 @@ export interface StoryboardPageItem {
   sceneSummary: string | null
   imagePrompt: string | null
   imageUrl: string | null
+  translationJobId?: number | null
 }
 
 /** GET 응답. 줄거리 미생성 상태에서도 200 으로 빈 배열 응답. */

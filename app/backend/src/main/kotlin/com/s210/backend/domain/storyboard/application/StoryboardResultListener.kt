@@ -14,6 +14,9 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationResultEnvelope
+import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationResultPayload
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryPayload
 import com.s210.backend.domain.storyboard.application.dto.StorySummaryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegeneratePayload
@@ -74,6 +77,9 @@ class StoryboardResultListener(
                 "GENERATE_STORY_SUMMARY_COMPLETED", "GENERATE_STORY_SUMMARY_FAILED",
                 "REGENERATE_STORY_SUMMARY_COMPLETED", "REGENERATE_STORY_SUMMARY_FAILED",
             )
+            val STORY_SENTENCE_TRANSLATION = setOf(
+                "TRANSLATE_STORY_SENTENCES_COMPLETED", "TRANSLATE_STORY_SENTENCES_FAILED",
+            )
             val STORYBOARD_IMAGE = setOf(
                 "GENERATE_STORYBOARD_IMAGE_COMPLETED", "GENERATE_STORYBOARD_IMAGE_FAILED",
                 "REGENERATE_STORYBOARD_IMAGE_COMPLETED", "REGENERATE_STORYBOARD_IMAGE_FAILED",
@@ -118,6 +124,14 @@ class StoryboardResultListener(
                     type, envelope.jobId, envelope.status,
                 )
                 handleStorySummaryResult(envelope)
+            }
+            in EnvelopeTypes.STORY_SENTENCE_TRANSLATION -> {
+                val envelope = objectMapper.treeToValue(tree, StorySentenceTranslationResultEnvelope::class.java)
+                log.info(
+                    "[SENTENCE:TRANSLATE] received type={}, jobId={}, storyId={}, pageNumber={}, status={}",
+                    type, envelope.jobId, envelope.storyId, envelope.pageNumber, envelope.status,
+                )
+                handleSentenceTranslationResult(envelope)
             }
             in EnvelopeTypes.STORYBOARD_IMAGE -> {
                 val envelope = objectMapper.treeToValue(tree, StoryboardImageResultEnvelope::class.java)
@@ -174,6 +188,98 @@ class StoryboardResultListener(
      * FAILED:
      *  - Job UPDATE (status=FAILED, errorMessage). resultPayload 는 직전 SUCCESS 보존을 위해 갱신 안 함.
      */
+    private fun handleSentenceTranslationResult(envelope: StorySentenceTranslationResultEnvelope) {
+        val jobIdLong = envelope.jobId.toLongOrNull()
+        if (jobIdLong == null) {
+            log.warn("Invalid sentence translation jobId from AI: {}", envelope.jobId)
+            return
+        }
+
+        val job = jobRepository.findById(jobIdLong).orElse(null)
+        if (job == null) {
+            log.warn("Unknown sentence translation jobId from AI: {}", envelope.jobId)
+            return
+        }
+
+        if (job.status == JobStatus.SUCCESS || job.status == JobStatus.FAILED) {
+            log.info("Sentence translation job {} already finalized ({}), skip duplicate", job.id, job.status)
+            return
+        }
+
+        when (envelope.status.uppercase()) {
+            "COMPLETED" -> {
+                val payload = envelope.payload
+                if (payload == null) {
+                    markFailed(job, "PAYLOAD_MISSING", "AI sentence translation payload is missing.")
+                    return
+                }
+                handleSentenceTranslationSuccess(job, envelope, payload)
+            }
+            "FAILED" -> {
+                val code = envelope.error?.code ?: "UNKNOWN"
+                val message = envelope.error?.message ?: envelope.error?.code ?: "(unknown)"
+                markFailed(job, code, message)
+            }
+            else -> log.warn(
+                "Unknown sentence translation envelope status '{}' for jobId {}",
+                envelope.status,
+                envelope.jobId,
+            )
+        }
+    }
+
+    private fun handleSentenceTranslationSuccess(
+        job: StoryGenerationJob,
+        envelope: StorySentenceTranslationResultEnvelope,
+        payload: StorySentenceTranslationResultPayload,
+    ) {
+        val pageNumber = envelope.pageNumber
+        if (pageNumber == null) {
+            markFailed(job, "PAGE_NUMBER_MISSING", "Sentence translation result has no pageNumber.")
+            return
+        }
+
+        val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId)
+            ?: run {
+                markFailed(job, "STORY_BOARD_NOT_FOUND", "Cannot apply sentence translation. storyBoard not found.")
+                return
+            }
+        val page = storyboardPageRepository.findByStoryBoardIdAndPageNumber(storyBoard.id, pageNumber)
+            ?: run {
+                markFailed(job, "PAGE_NOT_FOUND", "Cannot apply sentence translation. page not found.")
+                return
+            }
+
+        job.status = JobStatus.SUCCESS
+        job.resultPayload = objectMapper.writeValueAsString(payload)
+        job.costUsd = payload.usage.costUsd?.let { BigDecimal.valueOf(it) }
+        job.finishedAt = LocalDateTime.now()
+
+        val requestedKoreanText = job.requestPayload
+            ?.let { runCatching { objectMapper.readValue(it, StorySentenceTranslationRequestPayload::class.java) }.getOrNull() }
+            ?.koreanText
+        val currentKoreanText = page.pageTexts(objectMapper).koreanText
+        if (requestedKoreanText != null && currentKoreanText != requestedKoreanText) {
+            log.info(
+                "Skip stale sentence translation jobId={}, storyId={}, pageNumber={}",
+                job.id,
+                job.storyId,
+                pageNumber,
+            )
+            return
+        }
+
+        page.replaceTranslatedSentences(objectMapper, payload.sentences)
+        log.info(
+            "Sentence translation job {} SUCCESS storyId={}, pageNumber={}, sentenceCount={}, costUsd={}",
+            job.id,
+            job.storyId,
+            pageNumber,
+            payload.sentenceCount,
+            payload.usage.costUsd,
+        )
+    }
+
     private fun handleStorySummaryResult(envelope: StorySummaryResultEnvelope) {
         val jobIdLong = envelope.jobId.toLongOrNull()
         if (jobIdLong == null) {

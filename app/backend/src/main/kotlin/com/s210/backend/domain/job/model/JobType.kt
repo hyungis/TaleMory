@@ -29,4 +29,7 @@ enum class JobType {
 
     /** Step 5 스타일 선택 직후 백그라운드로 시작되는 최종(컬러) 일러스트 잡. */
     FINAL_ILLUSTRATION,
+
+    /** Storyboard page Korean text edit -> AI English sentence translation. */
+    STORY_SENTENCE_TRANSLATION,
 }
