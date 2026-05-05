@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, Share2, CheckCircle2, PartyPopper, Loader2, Library, Maximize } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Copy, Share2, CheckCircle2, PartyPopper, Loader2, Library, Maximize, Home } from 'lucide-react'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { publishStory, getShareLink } from '../../../bookshelf'
+import { ROUTES } from '../../../../shared/constants'
 import '../../styles/creation-paper.css'
 
 interface PublishStoryStepProps {
@@ -19,6 +21,7 @@ interface PublishStoryStepProps {
  * STEP 09 — paper-craft 톤. 동화책 발행 + 공유 링크.
  */
 export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenViewer }: PublishStoryStepProps) {
+  const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
@@ -269,76 +272,118 @@ export function PublishStoryStep({ storyId, onBack, onSaveToBookshelf, onOpenVie
               </>
             ) : (
               <>
-                <h2
-                  style={{
-                    fontFamily: 'var(--cr-font-serif)',
-                    fontWeight: 800,
-                    fontSize: 32,
-                    color: 'var(--cr-ink)',
-                    margin: '0 0 8px',
-                    letterSpacing: '-0.5px',
-                  }}
-                >
-                  {publishing ? '동화책을 발행하는 중...' : '발행을 다시 시도해주세요'}
-                </h2>
-                <p
-                  style={{
-                    fontFamily: 'var(--cr-font-gaegu)',
-                    fontSize: 17,
-                    color: 'var(--cr-ink-soft)',
-                    margin: '0 0 28px',
-                  }}
-                >
-                  {publishing
-                    ? '잠시만 기다려주세요. 발행이 끝나면 공유 링크가 자동으로 나타나요.'
-                    : '아래 버튼을 눌러 다시 발행해주세요.'}
-                </p>
-
-                {error && (
-                  <p
-                    style={{
-                      fontFamily: 'var(--cr-font-gaegu)',
-                      fontSize: 14,
-                      color: 'var(--cr-rust)',
-                      marginBottom: 14,
-                    }}
-                  >
-                    {error}
-                  </p>
-                )}
-
-                {/* 진행 중엔 스피너만, 실패 후엔 재시도 버튼 노출 */}
-                {publishing ? (
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '14px 28px',
-                      background: 'var(--cr-paper)',
-                      border: '2px solid var(--cr-caramel-deep)',
-                      borderRadius: 999,
-                      color: 'var(--cr-ink-soft)',
-                      fontFamily: 'var(--cr-font-gaegu)',
-                      fontWeight: 700,
-                      fontSize: 16,
-                      boxShadow: '0 2px 0 var(--cr-caramel-deep)',
-                    }}
-                  >
-                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
-                    <span>발행 중...</span>
-                  </div>
+                {/* 비정상 진입 (storyId 유실) → "메인으로" 명확한 액션 제공.
+                    정상 플로우엔 발생 안 하지만 직접 URL/state 잃은 경우 사용자가 막히지 않도록. */}
+                {!storyId ? (
+                  <>
+                    <h2
+                      style={{
+                        fontFamily: 'var(--cr-font-serif)',
+                        fontWeight: 800,
+                        fontSize: 28,
+                        color: 'var(--cr-ink)',
+                        margin: '0 0 8px',
+                        letterSpacing: '-0.5px',
+                      }}
+                    >
+                      동화 정보를 찾을 수 없어요
+                    </h2>
+                    <p
+                      style={{
+                        fontFamily: 'var(--cr-font-gaegu)',
+                        fontSize: 17,
+                        color: 'var(--cr-ink-soft)',
+                        margin: '0 0 28px',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      처음부터 다시 시작해주세요.
+                      <br />
+                      메인 페이지에서 새 동화책 만들기를 눌러주세요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigate(ROUTES.main)}
+                      className="cr-big-cta"
+                      style={{ width: 'auto', display: 'inline-flex', minWidth: 200 }}
+                    >
+                      <Home className="w-5 h-5" />
+                      <span>메인으로 돌아가기</span>
+                    </button>
+                  </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handlePublish}
-                    disabled={!storyId}
-                    className="cr-big-cta"
-                    style={{ width: 'auto', display: 'inline-flex', minWidth: 240 }}
-                  >
-                    <PartyPopper className="w-5 h-5" />
-                    <span>다시 발행하기</span>
-                  </button>
+                  <>
+                    <h2
+                      style={{
+                        fontFamily: 'var(--cr-font-serif)',
+                        fontWeight: 800,
+                        fontSize: 32,
+                        color: 'var(--cr-ink)',
+                        margin: '0 0 8px',
+                        letterSpacing: '-0.5px',
+                      }}
+                    >
+                      {publishing ? '동화책을 발행하는 중...' : '발행을 다시 시도해주세요'}
+                    </h2>
+                    <p
+                      style={{
+                        fontFamily: 'var(--cr-font-gaegu)',
+                        fontSize: 17,
+                        color: 'var(--cr-ink-soft)',
+                        margin: '0 0 28px',
+                      }}
+                    >
+                      {publishing
+                        ? '잠시만 기다려주세요. 발행이 끝나면 공유 링크가 자동으로 나타나요.'
+                        : '아래 버튼을 눌러 다시 발행해주세요.'}
+                    </p>
+
+                    {error && (
+                      <p
+                        style={{
+                          fontFamily: 'var(--cr-font-gaegu)',
+                          fontSize: 14,
+                          color: 'var(--cr-rust)',
+                          marginBottom: 14,
+                        }}
+                      >
+                        {error}
+                      </p>
+                    )}
+
+                    {/* 진행 중엔 스피너만, 실패 후엔 재시도 버튼 노출 */}
+                    {publishing ? (
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '14px 28px',
+                          background: 'var(--cr-paper)',
+                          border: '2px solid var(--cr-caramel-deep)',
+                          borderRadius: 999,
+                          color: 'var(--cr-ink-soft)',
+                          fontFamily: 'var(--cr-font-gaegu)',
+                          fontWeight: 700,
+                          fontSize: 16,
+                          boxShadow: '0 2px 0 var(--cr-caramel-deep)',
+                        }}
+                      >
+                        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
+                        <span>발행 중...</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePublish}
+                        className="cr-big-cta"
+                        style={{ width: 'auto', display: 'inline-flex', minWidth: 240 }}
+                      >
+                        <PartyPopper className="w-5 h-5" />
+                        <span>다시 발행하기</span>
+                      </button>
+                    )}
+                  </>
                 )}
               </>
             )}
