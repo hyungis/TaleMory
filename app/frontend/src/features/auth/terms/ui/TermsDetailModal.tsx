@@ -51,16 +51,6 @@ export function TermsDetailModal({ term, onClose }: TermsDetailModalProps) {
             >
               {term.title}
             </h2>
-            <p
-              style={{
-                margin: '8px 0 0',
-                fontSize: 13,
-                color: '#9b8467',
-                lineHeight: 1.5,
-              }}
-            >
-              시행일 {term.effectiveDate}
-            </p>
           </div>
           <button
             type="button"
