@@ -1374,19 +1374,22 @@
   letter-spacing: -0.5px;
 }
 .cr-spread-english {
-  font-family: var(--cr-font-serif);
-  font-size: 17px;
+  /* 우리 서비스 메인 손글씨(Gaegu) — 한글/영어 모두 손글씨 톤으로 렌더링되어
+     다른 step 들과 일관된 paper-craft 분위기 유지. */
+  font-family: var(--cr-font-gaegu);
+  font-size: 24px;
   color: var(--cr-ink);
-  line-height: 1.7;
+  line-height: 1.65;
   margin: 0;
+  letter-spacing: 0.01em;
 }
 .cr-spread-korean {
   font-family: var(--cr-font-pen);
-  font-size: 16px;
+  font-size: 22px;
   color: var(--cr-ink-soft);
-  line-height: 1.65;
+  line-height: 1.6;
   margin: 0;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px dashed var(--cr-caramel);
 }
 
@@ -1547,4 +1550,281 @@
   .cr-spread-page-right { padding: 16px 22px 32px; }
   .cr-spread-illust { aspect-ratio: 4 / 3; }
   .cr-final-nav-arrow { width: 40px; height: 40px; }
+}
+
+/* ===== Step 8 — 페이지별 최종 삽화 재생성 (최대 3번/씬) ===== */
+
+/* 책 펼침 아래의 재생성 컨트롤 영역 */
+.cr-final-regen-bar {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* "삽화 다시 그리기" 트리거 버튼 — rust accent + 입체 */
+.cr-final-regen-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 22px;
+  background: var(--cr-rust);
+  color: #fdf6dc;
+  border: 2px solid #8a4a32;
+  border-radius: 999px;
+  font-family: var(--cr-font-serif);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #8a4a32, 0 6px 14px rgba(196, 114, 84, 0.25);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+.cr-final-regen-trigger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #b6634b;
+  box-shadow: 0 4px 0 #8a4a32, 0 8px 16px rgba(196, 114, 84, 0.3);
+}
+.cr-final-regen-trigger:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #8a4a32;
+}
+.cr-final-regen-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: 0 1px 0 #8a4a32;
+}
+
+/* "이 페이지 X/3 회 가능" 안내 */
+.cr-final-regen-meta {
+  font-family: var(--cr-font-pen);
+  font-size: 14px;
+  color: var(--cr-ink-soft);
+  margin: 0;
+}
+.cr-final-regen-meta strong {
+  color: var(--cr-rust);
+  font-weight: 700;
+}
+
+/* 프롬프트 입력 패널 — paper-craft mini card */
+.cr-final-regen-panel {
+  margin-top: 12px;
+  width: 100%;
+  max-width: 720px;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--cr-caramel-deep);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 3px 0 var(--cr-caramel-deep), 0 10px 22px rgba(140, 100, 60, 0.16);
+}
+.cr-final-regen-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cr-final-regen-panel-title {
+  font-family: var(--cr-font-serif);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--cr-ink);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.cr-final-regen-textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 14px;
+  background: #fdf6dc;
+  border: 2px solid var(--cr-caramel);
+  border-radius: 12px;
+  font-family: var(--cr-font-pen);
+  font-size: 15px;
+  color: var(--cr-ink);
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+.cr-final-regen-textarea:focus {
+  border-color: var(--cr-sage-deep);
+}
+.cr-final-regen-textarea::placeholder {
+  color: var(--cr-ink-soft);
+  opacity: 0.6;
+}
+
+.cr-final-regen-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cr-final-regen-cancel {
+  padding: 8px 16px;
+  background: var(--cr-paper);
+  color: var(--cr-ink-soft);
+  border: 2px solid var(--cr-caramel);
+  border-radius: 999px;
+  font-family: var(--cr-font-pen);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.cr-final-regen-cancel:hover { background: #fbf2da; }
+.cr-final-regen-submit {
+  padding: 8px 18px;
+  background: var(--cr-sage-deep);
+  color: #fdf6dc;
+  border: 2px solid var(--cr-sage-darker);
+  border-radius: 999px;
+  font-family: var(--cr-font-serif);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--cr-sage-darker);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.cr-final-regen-submit:hover:not(:disabled) { background: var(--cr-sage); transform: translateY(-1px); }
+.cr-final-regen-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 일러스트 영역에 덮이는 progress 오버레이 (재생성 진행 중) */
+.cr-final-regen-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(74, 59, 42, 0.55);
+  backdrop-filter: blur(2px);
+  border-radius: 14px;
+  z-index: 8;
+  pointer-events: none;
+}
+.cr-final-regen-overlay-text {
+  font-family: var(--cr-font-gaegu);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fdf6dc;
+  margin: 0;
+}
+
+/* 재생성 실패/한도 초과 등 인라인 에러 */
+.cr-final-regen-error {
+  margin-top: 8px;
+  padding: 8px 14px;
+  background: rgba(196, 114, 84, 0.12);
+  border: 1.5px solid var(--cr-rust);
+  border-radius: 10px;
+  color: var(--cr-rust);
+  font-family: var(--cr-font-pen);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ===== Step 8 → Step 9 발행 확인 모달 ===== */
+.cr-publish-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(74, 59, 42, 0.55);
+  backdrop-filter: blur(4px);
+  animation: cr-publish-confirm-fade 0.18s ease-out;
+}
+@keyframes cr-publish-confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cr-publish-confirm-card {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--cr-caramel-deep);
+  border-radius: 22px;
+  padding: 32px 28px 24px;
+  text-align: center;
+  box-shadow: 0 4px 0 var(--cr-caramel-deep), 0 16px 40px rgba(140, 100, 60, 0.32);
+  animation: cr-publish-confirm-pop 0.22s cubic-bezier(0.34, 1.2, 0.5, 1);
+}
+@keyframes cr-publish-confirm-pop {
+  from { transform: scale(0.94); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.cr-publish-confirm-title {
+  font-family: var(--cr-font-serif);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--cr-ink);
+  margin: 0 0 10px;
+  letter-spacing: -0.5px;
+}
+.cr-publish-confirm-desc {
+  font-family: var(--cr-font-gaegu);
+  font-size: 17px;
+  color: var(--cr-ink-soft);
+  line-height: 1.55;
+  margin: 0 0 22px;
+}
+
+.cr-publish-confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.cr-publish-confirm-cancel {
+  padding: 10px 20px;
+  background: var(--cr-paper);
+  color: var(--cr-ink-soft);
+  border: 2px solid var(--cr-caramel);
+  border-radius: 999px;
+  font-family: var(--cr-font-gaegu);
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--cr-caramel);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.cr-publish-confirm-cancel:hover { background: #fbf2da; }
+.cr-publish-confirm-cancel:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--cr-caramel); }
+
+.cr-publish-confirm-submit {
+  padding: 10px 24px;
+  background: var(--cr-sage);
+  color: #fdf6dc;
+  border: 2px solid var(--cr-sage-deep);
+  border-radius: 999px;
+  font-family: var(--cr-font-serif);
+  font-weight: 800;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--cr-sage-deep), 0 6px 14px rgba(95, 125, 80, 0.25);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cr-publish-confirm-submit:hover {
+  background: var(--cr-sage-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--cr-sage-deep), 0 8px 16px rgba(95, 125, 80, 0.3);
+}
+.cr-publish-confirm-submit:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--cr-sage-deep);
 }
