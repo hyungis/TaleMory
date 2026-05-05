@@ -165,6 +165,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | — | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | — | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | — | `gemini-2.5-flash-image` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | — | `ai.image.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | — | `ai.image.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | — | `ai.image.regenerate.request.queue` |
@@ -192,6 +194,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_STORYBOARD_MODEL` | — | `gpt-4o-mini` |
 | `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` | — | `0.15` |
 | `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` | — | `0.60` |
+| `ENV_DEV_APP_STORYBOARD_SUMMARY_INPUT_COST_PER_1M` | no | `0.05` |
+| `ENV_DEV_APP_STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M` | no | `0.40` |
 | `ENV_DEV_APP_RABBITMQ_VHOST` | — | `/` |
 | `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` | — | `ai.request` |
 | `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` | — | `ai.result` |
@@ -204,6 +208,10 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.story.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | — | `ai.result.story.regenerate.failed` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | — | `1` (AI worker 컨테이너 복제본 수. compose `scale:` 키로 적용) |
+| `ENV_DEV_APP_AI_WORKER_CONCURRENCY` | no | `3` |
+| `ENV_DEV_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
+| `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
+| `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
 
 > Vite는 `VITE_` prefix만 클라이언트 번들에 주입. 새 frontend 변수 이름은 반드시 `VITE_`로 시작해야 함.
 
@@ -248,6 +256,10 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `RABBITMQ_PORT` | `5673` | `5672` |
 | `RABBITMQ_MANAGEMENT_PORT` | `15673` | `15672` |
 | `AI_WORKER_REPLICAS` | `1` | `2` (권장 — 병렬 OpenAI 처리량 확보) |
+| `AI_WORKER_CONCURRENCY` | `3` | `3` |
+| `AI_STORY_API_CONCURRENCY` | `5` | `5` |
+| `AI_IMAGE_API_CONCURRENCY` | `20` | `20` |
+| `RABBITMQ_PREFETCH_COUNT` | `10` | `10` |
 | `AWS_S3_ENV_PREFIX` | `dev` | `prod` |
 
 Kakao Developers console registration guide:
@@ -320,6 +332,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
 | `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
 | `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
+| `ENV_DEV_APP_STORYBOARD_SUMMARY_INPUT_COST_PER_1M` | no | `0.05` |
+| `ENV_DEV_APP_STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M` | no | `0.40` |
 | `ENV_DEV_APP_RABBITMQ_VHOST` | no | `/` |
 | `ENV_DEV_APP_RABBITMQ_REQUEST_EXCHANGE` | no | `ai.request` |
 | `ENV_DEV_APP_RABBITMQ_RESULT_EXCHANGE` | no | `ai.result` |
@@ -333,6 +347,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.regenerate.failed` |
 | `ENV_DEV_APP_GEMINI_API_KEY` | yes | (Gemini API 키 — storyboard 이미지 생성) |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | no | `ai.image.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | no | `ai.image.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | no | `ai.image.regenerate.request.queue` |
@@ -358,6 +374,10 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
+| `ENV_DEV_APP_AI_WORKER_CONCURRENCY` | no | `3` |
+| `ENV_DEV_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
+| `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
+| `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
 
 ### MASTER APP (AI 출처)
 
@@ -369,6 +389,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
 | `ENV_MASTER_APP_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
 | `ENV_MASTER_APP_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
+| `ENV_MASTER_APP_STORYBOARD_SUMMARY_INPUT_COST_PER_1M` | no | `0.05` |
+| `ENV_MASTER_APP_STORYBOARD_SUMMARY_OUTPUT_COST_PER_1M` | no | `0.40` |
 | `ENV_MASTER_APP_RABBITMQ_VHOST` | no | `/` |
 | `ENV_MASTER_APP_RABBITMQ_REQUEST_EXCHANGE` | no | `ai.request` |
 | `ENV_MASTER_APP_RABBITMQ_RESULT_EXCHANGE` | no | `ai.result` |
@@ -382,6 +404,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.story.regenerate.failed` |
 | `ENV_MASTER_APP_GEMINI_API_KEY` | yes | (prod Gemini API 키 — storyboard 이미지 생성) |
 | `ENV_MASTER_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
+| `ENV_MASTER_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
+| `ENV_MASTER_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | no | `ai.image.generate.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | no | `ai.image.generate.item.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | no | `ai.image.regenerate.request.queue` |
@@ -407,3 +431,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |
+| `ENV_MASTER_APP_AI_WORKER_CONCURRENCY` | no | `3` |
+| `ENV_MASTER_APP_AI_STORY_API_CONCURRENCY` | no | `5` |
+| `ENV_MASTER_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
+| `ENV_MASTER_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
