@@ -17,7 +17,7 @@ import './styles/mypage.css'
  *  - vc-hero — sage 78x78 mic + Nanum Pen Script 52px 타이틀
  *  - 녹음 카드 — 손그림 인용구 카드 + recorder (3-state: idle/recording/recorded)
  *      pulse-ring + waveform (28 bar) + Nanum Myeongjo 시간
- *  - 저장 카드 — 보이스 이름 + 저장 + save-stats info pill
+ *  - 저장 카드 — 보이스 이름 + 저장
  *  - vc-foot-mark — Nanum Pen Script 손글씨 푸터
  *
  * 단계 (stepper / TTS 미리듣기) 는 제거하고 한 페이지에서 녹음 → 저장만 처리한다.
@@ -131,28 +131,11 @@ export function VoiceCloneAddPage() {
           <span className="mp-tape" aria-hidden="true" />
           <div
             className="mp-card-header"
-            style={{ marginBottom: 6, alignItems: 'center', flexWrap: 'wrap', gap: 10 }}
+            style={{ marginBottom: 6, alignItems: 'center' }}
           >
-            <h2 className="mp-card-title" style={{ margin: 0, minWidth: 0 }}>
+            <h2 className="mp-card-title" style={{ margin: 0 }}>
               오늘의 문장
             </h2>
-            <button
-              type="button"
-              className="mp-btn mp-btn-cream"
-              style={{ fontSize: 14, padding: '6px 14px' }}
-              onClick={vc.loadExistingVoice}
-            >
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M2,8 Q2,3 8,3 Q12,3 14,5 M14,3 L14,6 L11,6 M14,8 Q14,13 8,13 Q4,13 2,11 M2,13 L2,10 L5,10"
-                  stroke="#5b3a18"
-                  strokeWidth="1.8"
-                  fill="none"
-                  strokeLinecap="round"
-                />
-              </svg>
-              기존 음성 불러오기
-            </button>
           </div>
 
           <div className="vc-sample-block">
@@ -273,11 +256,6 @@ export function VoiceCloneAddPage() {
               </svg>
               {vc.isSaving ? '저장 중...' : '저장하고 돌아가기'}
             </button>
-          </div>
-
-          <div className="vc-save-stats">
-            <div className="vc-save-stat-icon">♪</div>
-            <div className="vc-save-stat-text">{vc.savedVoiceSummary}</div>
           </div>
         </div>
 

@@ -108,7 +108,7 @@
   border-radius: 999px;
   padding: 8px 18px 8px 14px;
   font-family: 'Gaegu', cursive;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--ink);
   cursor: pointer;
@@ -121,7 +121,7 @@
 .mp-back-btn:hover { transform: translateY(-1px); }
 .mp-logo {
   font-family: 'Gaegu', 'Nanum Pen Script', cursive;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
   color: var(--sage-deep);
   letter-spacing: 0.04em;
@@ -207,7 +207,7 @@
 }
 .mp-card-title {
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--ink);
   margin: 0;
@@ -215,7 +215,7 @@
 }
 .mp-card-sub {
   font-family: 'Gaegu', cursive;
-  font-size: 17px;
+  font-size: 19px;
   color: var(--ink-soft);
   margin-top: 2px;
 }
@@ -246,7 +246,7 @@
   color: #fdfaf0;
   border: 2px solid var(--sage-deep);
   padding: 10px 20px;
-  font-size: 18px;
+  font-size: 20px;
   box-shadow: 0 3px 0 var(--sage-deep), 0 6px 12px rgba(95, 125, 80, 0.2);
 }
 .mp-btn-sage:hover { background: #88a875; }
@@ -258,7 +258,7 @@
   color: var(--ink);
   border: 2px solid var(--caramel-deep);
   padding: 10px 20px;
-  font-size: 18px;
+  font-size: 20px;
   box-shadow: 0 3px 0 var(--caramel-deep);
 }
 .mp-btn-cream:hover { background: #f1e1b8; }
@@ -267,7 +267,7 @@
   color: var(--ink-soft);
   border: 2px solid var(--caramel-deep);
   padding: 8px 16px;
-  font-size: 16px;
+  font-size: 18px;
 }
 .mp-btn-ghost:hover { background: rgba(247, 236, 205, 0.5); }
 .mp-btn-rust {
@@ -275,7 +275,7 @@
   color: var(--rust);
   border: 2px solid var(--rust);
   padding: 8px 16px;
-  font-size: 16px;
+  font-size: 18px;
 }
 .mp-btn-rust:hover { background: #f8dccf; }
 
@@ -301,7 +301,7 @@
   display: grid;
   place-items: center;
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 44px;
+  font-size: 48px;
   font-weight: 800;
   box-shadow:
     inset 0 -4px 0 rgba(0, 0, 0, 0.15),
@@ -313,7 +313,7 @@
 }
 .mp-profile-info {
   font-family: 'Gaegu', cursive;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
   line-height: 1.7;
   display: grid;
@@ -342,7 +342,7 @@
 }
 .mp-tag-chip {
   font-family: 'Gaegu', cursive;
-  font-size: 14px;
+  font-size: 16px;
   background: #e8efd9;
   color: var(--sage-deep);
   border: 1.5px solid var(--sage);
@@ -397,14 +397,14 @@
   display: grid;
   place-items: center;
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   border: 2px solid #fdf6dc;
   box-shadow: 0 2px 4px rgba(60, 90, 50, 0.25);
 }
 .mp-char-name {
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
@@ -413,7 +413,7 @@
 }
 .mp-char-meta {
   font-family: 'Gaegu', cursive;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--ink-soft);
 }
 .mp-char-actions {
@@ -427,7 +427,7 @@
   padding: 4px 10px;
   border-radius: 12px;
   font-family: 'Gaegu', cursive;
-  font-size: 15px;
+  font-size: 17px;
   cursor: pointer;
   font-weight: 700;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
@@ -472,11 +472,11 @@
   box-shadow: 0 2px 4px rgba(60, 90, 50, 0.25);
   font-family: 'Nanum Myeongjo', serif;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 20px;
 }
 .mp-voice-name {
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
@@ -485,7 +485,7 @@
 }
 .mp-voice-sub {
   font-family: 'Gaegu', cursive;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--ink-soft);
 }
 /* Claude HTML 의 .audio-bar 와 1:1 — sage play 버튼 + 손그림 track + Gaegu 시간 */
@@ -516,7 +516,7 @@
 .mp-audio-play:disabled { opacity: 0.45; cursor: not-allowed; }
 .mp-audio-time {
   font-family: 'Gaegu', cursive;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--ink-soft);
   text-align: center;
   font-weight: 700;
@@ -597,14 +597,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--caramel-deep);
   letter-spacing: 0.5px;
 }
 .mp-volume-popover-header strong {
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink);
   font-weight: 800;
 }
@@ -663,7 +663,7 @@
 }
 .mp-volume-mute-toggle {
   font-family: 'Gaegu', cursive;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ink-soft);
   background: transparent;
   border: 1.5px dashed var(--caramel);
@@ -691,7 +691,7 @@
   background: rgba(247, 236, 205, 0.6);
   border: 1.5px dashed var(--caramel);
   font-family: 'Gaegu', cursive;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--caramel-deep);
   font-style: italic;
   text-align: center;
@@ -700,7 +700,7 @@
 /* ===== empty/loading text ===== */
 .mp-muted {
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink-soft);
   padding: 12px 4px;
 }
@@ -728,13 +728,13 @@
 }
 .mp-dz-text strong {
   display: block;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
   font-weight: 700;
 }
 .mp-dz-text .mp-small {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   color: #8a7558;
   margin-top: 4px;
   max-width: 540px;
@@ -818,7 +818,7 @@
 }
 .mp-modal h3 {
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   margin: 0 0 18px;
   color: var(--ink);
@@ -837,7 +837,7 @@
 }
 .mp-modal-text {
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink-soft);
   line-height: 1.6;
 }
@@ -850,7 +850,7 @@
 .mp-field-label {
   display: block;
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink-soft);
   margin-bottom: 6px;
   font-weight: 700;
@@ -862,7 +862,7 @@
   border-radius: 12px;
   padding: 10px 14px;
   font-family: 'Gaegu', cursive;
-  font-size: 17px;
+  font-size: 19px;
   color: var(--ink);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -890,7 +890,7 @@
   background: #e8efd9;
   color: var(--sage-deep);
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -902,7 +902,7 @@
 .mp-field-help {
   margin: 6px 0 0;
   font-family: 'Gaegu', cursive;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--ink-soft);
 }
@@ -925,7 +925,7 @@
   border-radius: 12px;
   padding: 10px;
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink-soft);
   cursor: pointer;
   font-weight: 700;
@@ -949,7 +949,7 @@
   justify-content: space-between;
   padding: 6px 0;
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink);
   font-weight: 700;
 }
@@ -1047,7 +1047,7 @@
   box-shadow: 0 2px 0 var(--caramel-deep);
   font-family: 'Gaegu', cursive;
   color: var(--ink-soft);
-  font-size: 16px;
+  font-size: 18px;
 }
 
 /* ===== auth required state ===== */
@@ -1069,7 +1069,7 @@
 }
 .mp-auth-required-card h1 {
   font-family: 'Nanum Pen Script', cursive;
-  font-size: 40px;
+  font-size: 44px;
   color: var(--sage-deep);
   margin: 0 0 12px;
   letter-spacing: 1px;
@@ -1077,7 +1077,7 @@
 }
 .mp-auth-required-card p {
   font-family: 'Gaegu', cursive;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink-soft);
   margin: 0 0 24px;
 }
@@ -1091,7 +1091,7 @@
   border-radius: 999px;
   padding: 10px 24px;
   font-family: 'Gaegu', cursive;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   text-decoration: none;
   box-shadow: 0 3px 0 var(--sage-deep), 0 6px 12px rgba(95, 125, 80, 0.2);
@@ -1127,7 +1127,7 @@
   cursor: pointer;
   font-family: 'Gaegu', cursive;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 18px;
   box-shadow: 0 2px 0 var(--caramel-deep);
   white-space: nowrap;
   display: inline-flex;
@@ -1138,7 +1138,7 @@
 .vc-back-btn:hover { transform: translateY(-1px); }
 .vc-crumb {
   font-family: 'Nanum Pen Script', 'Gaegu', cursive;
-  font-size: 24px;
+  font-size: 26px;
   color: var(--ink);
   letter-spacing: 1px;
   white-space: nowrap;
@@ -1157,7 +1157,7 @@
 .vc-stepper.vc-stepper--header .vc-step .num {
   width: 28px;
   height: 28px;
-  font-size: 14px;
+  font-size: 16px;
   box-shadow: 0 1.5px 0 var(--caramel-deep);
 }
 .vc-stepper.vc-stepper--header .vc-step.active .num,
@@ -1165,7 +1165,7 @@
   box-shadow: 0 1.5px 0 var(--sage-deep);
 }
 .vc-stepper.vc-stepper--header .vc-step .lbl {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0;
 }
 .vc-stepper.vc-stepper--header .vc-step-line {
@@ -1183,10 +1183,10 @@
   .vc-stepper.vc-stepper--header .vc-step .num {
     width: 24px;
     height: 24px;
-    font-size: 12px;
+    font-size: 14px;
   }
   .vc-stepper.vc-stepper--header .vc-step .lbl {
-    font-size: 11px;
+    font-size: 13px;
   }
 }
 
@@ -1210,7 +1210,7 @@
 }
 .vc-hero h1 {
   font-family: 'Nanum Pen Script', 'Gaegu', cursive;
-  font-size: 52px;
+  font-size: 56px;
   color: var(--ink);
   margin: 14px 0 8px;
   letter-spacing: 1px;
@@ -1220,7 +1220,7 @@
 }
 .vc-hero p {
   font-family: 'Gaegu', cursive;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink-soft);
   margin: 0 auto;
   max-width: 480px;
@@ -1253,12 +1253,12 @@
   place-items: center;
   font-family: 'Nanum Myeongjo', serif;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 20px;
   box-shadow: 0 2px 0 var(--caramel-deep);
 }
 .vc-step .lbl {
   font-family: 'Gaegu', cursive;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--ink-soft);
   font-weight: 700;
   white-space: nowrap;
@@ -1295,7 +1295,7 @@
   align-items: center;
   gap: 8px;
   font-family: 'Gaegu', cursive;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--caramel-deep);
   letter-spacing: 1.5px;
@@ -1311,7 +1311,7 @@
   display: grid;
   place-items: center;
   font-family: 'Nanum Myeongjo', serif;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -1336,7 +1336,7 @@
 }
 .vc-sample-block .quote {
   font-family: 'Nanum Myeongjo', 'Caveat', serif;
-  font-size: 24px;
+  font-size: 26px;
   color: var(--sage-deep);
   line-height: 1.45;
   text-align: center;
@@ -1346,7 +1346,7 @@
 }
 .vc-sample-block .ko-hint {
   font-family: 'Gaegu', cursive;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--ink-soft);
   text-align: center;
   margin-top: 6px;
@@ -1372,14 +1372,14 @@
   padding: 4px 14px;
   border-radius: 999px;
   font-family: 'Gaegu', cursive;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--ink);
   font-weight: 700;
   cursor: pointer;
 }
 .vc-tip {
   font-family: 'Gaegu', cursive;
-  font-size: 13px;
+  font-size: 15px;
   color: #8a7558;
   font-style: italic;
 }
@@ -1413,7 +1413,7 @@
   padding: 3px 12px;
   border-radius: 999px;
   font-family: 'Gaegu', cursive;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   margin-bottom: 14px;
 }
@@ -1492,7 +1492,7 @@
 .vc-rec-time {
   font-family: 'Nanum Myeongjo', serif;
   font-weight: 700;
-  font-size: 32px;
+  font-size: 36px;
   color: var(--ink);
   letter-spacing: 2px;
   margin: 4px 0 14px;
@@ -1532,7 +1532,7 @@
 }
 .vc-rec-hint {
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink-soft);
   margin-top: 8px;
 }
@@ -1562,7 +1562,7 @@
   font-family: 'Gaegu', cursive;
   font-weight: 700;
   color: var(--ink);
-  font-size: 16px;
+  font-size: 18px;
 }
 
 /* tts card */
@@ -1573,7 +1573,7 @@
   border-radius: 14px;
   padding: 14px 18px;
   font-family: 'Gaegu', cursive;
-  font-size: 17px;
+  font-size: 19px;
   color: var(--ink);
   outline: none;
   resize: vertical;
@@ -1593,7 +1593,7 @@
   align-items: center;
   margin-top: 8px;
   font-family: 'Gaegu', cursive;
-  font-size: 13px;
+  font-size: 15px;
   color: #8a7558;
 }
 .vc-tts-bottom {
@@ -1627,7 +1627,7 @@
   border-radius: 12px;
   padding: 12px 16px;
   font-family: 'Gaegu', cursive;
-  font-size: 17px;
+  font-size: 19px;
   color: var(--ink);
   outline: none;
   width: 100%;
@@ -1667,18 +1667,18 @@
 .vc-save-stat-text {
   flex: 1;
   font-family: 'Gaegu', cursive;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--ink-soft);
   line-height: 1.4;
 }
-.vc-save-stat-text strong { color: var(--ink); font-size: 17px; font-weight: 700; }
+.vc-save-stat-text strong { color: var(--ink); font-size: 19px; font-weight: 700; }
 
 .vc-foot-mark {
   text-align: center;
   margin-top: 36px;
   font-family: 'Nanum Pen Script', 'Gaegu', cursive;
   color: #8a7558;
-  font-size: 18px;
+  font-size: 20px;
   opacity: 0.85;
   letter-spacing: 0.5px;
 }
@@ -1699,7 +1699,7 @@
   border: 1.5px solid rgba(196, 114, 84, 0.45);
   color: #8c3a1f;
   font-family: 'Gaegu', cursive;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   padding: 10px 14px;
   border-radius: 12px;
