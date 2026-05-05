@@ -563,10 +563,9 @@ class StoryboardResultListener(
                 StoryboardPage(
                     storyBoardId = storyBoard.id,
                     pageNumber = p.pageNumber,
-                    englishText = p.englishText,
-                    koreanText = p.koreanText,
                     sceneSummary = p.sceneSummary,
                     imagePrompt = p.imagePrompt,
+                    sentences = objectMapper.writeValueAsString(p.sentences),
                     imageUrl = null,
                 )
             },

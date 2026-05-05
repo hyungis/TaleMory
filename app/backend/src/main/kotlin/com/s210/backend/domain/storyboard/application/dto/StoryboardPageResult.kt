@@ -1,6 +1,8 @@
 package com.s210.backend.domain.storyboard.application.dto
 
 import com.s210.backend.domain.story.entity.StoryboardPage
+import com.s210.backend.domain.storyboard.application.pageTexts
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 단일 페이지 응답 DTO.
@@ -18,14 +20,17 @@ data class StoryboardPageResult(
     val imageUrl: String?,
 ) {
     companion object {
-        fun from(entity: StoryboardPage): StoryboardPageResult = StoryboardPageResult(
-            pageNumber = entity.pageNumber,
-            koreanText = entity.koreanText,
-            englishText = entity.englishText,
-            sceneSummary = entity.sceneSummary,
-            imagePrompt = entity.imagePrompt,
-            imageUrl = entity.imageUrl,
-        )
+        fun from(entity: StoryboardPage, objectMapper: ObjectMapper): StoryboardPageResult {
+            val texts = entity.pageTexts(objectMapper)
+            return StoryboardPageResult(
+                pageNumber = entity.pageNumber,
+                koreanText = texts.koreanText,
+                englishText = texts.englishText,
+                sceneSummary = entity.sceneSummary,
+                imagePrompt = entity.imagePrompt,
+                imageUrl = entity.imageUrl,
+            )
+        }
     }
 }
 
