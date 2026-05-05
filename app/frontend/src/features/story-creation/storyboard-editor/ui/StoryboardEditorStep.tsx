@@ -47,6 +47,28 @@ const FAILED_LIMIT = 3
 /** 한도 초과 시 자동 메인 이동까지의 카운트다운(ms). 사용자가 메시지를 읽을 시간 + "지금 이동" 으로 단축 가능. */
 const LIMIT_EXCEEDED_REDIRECT_MS = 5_000
 
+const PROHIBITED_IMAGE_MESSAGE =
+  '저작권이 보호된 사진이라 이미지 생성이 불가능합니다. 다른 사진을 다시 제출해주세요. 예) 디즈니 관련 사진'
+
+function getStoryboardImageFailureMessage(errorMessage?: string | null): string {
+  if (!errorMessage) {
+    return '이미지 생성에 실패했어요. 내용을 조금 바꿔 다시 시도해주세요.'
+  }
+
+  const cleanMessage = errorMessage.replace(/^pageNumber=\d+;\s*/i, '')
+  const normalized = cleanMessage.toUpperCase()
+  if (
+    normalized.includes('PROHIBITED_CONTENT') ||
+    normalized.includes('PROHIBITED CONTENT') ||
+    normalized.includes('COPYRIGHT') ||
+    normalized.includes('COPYRIGHTED')
+  ) {
+    return PROHIBITED_IMAGE_MESSAGE
+  }
+
+  return cleanMessage
+}
+
 interface StoryboardEditorStepProps {
   storyId: number | null
   /**
@@ -339,6 +361,7 @@ export function StoryboardEditorStep({
   // 폴링이 끝날 때까지 유지되어 mutate inflight 뿐 아니라 server 폴링 동안에도 스피너 노출.
   const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null)
   const [regenerateErrors, setRegenerateErrors] = useState<Record<number, string>>({})
+  const [imageGenerationError, setImageGenerationError] = useState<string | null>(null)
 
   // ────────────────────────────────────────────────────────────
   // 페이지 재생성 잡 새로고침 복구 — 단일 페이지 재생성 polling 도 동일 패턴으로 자동 재개.
@@ -386,20 +409,27 @@ export function StoryboardEditorStep({
       // 종결 표식 — recovery effect 가 stale state cache 로 같은 잡을 다시 살리는 것을 차단.
       finishedImageJobIdsRef.current.add(currentImageJobId)
       setCurrentImageJobId(null)
+      const failureMessage =
+        status === 'FAILED'
+          ? getStoryboardImageFailureMessage(imageJobQuery.data?.errorMessage)
+          : status === 'CANCELLED'
+            ? '이미지 생성이 취소되었습니다.'
+            : imageJobQuery.isTimedOut
+              ? '이미지 생성 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+              : null
       // 단일 페이지 재생성 폴링 종료 — 페이지별 스피너 해제 + 실패 시 메시지 / 성공 시 캐시버스터.
       if (regeneratingPageNumber !== null) {
-        if (status === 'FAILED' || status === 'CANCELLED' || imageJobQuery.isTimedOut) {
+        if (failureMessage) {
           const failedPage = regeneratingPageNumber
           setRegenerateErrors(prev => ({
             ...prev,
-            [failedPage]:
-              status === 'FAILED'
-                ? '그림 재생성에 실패했어요. 잠시 후 다시 시도해 주세요.'
-                : status === 'CANCELLED'
-                  ? '그림 재생성이 취소됐어요.'
-                  : '그림 재생성이 너무 오래 걸려 중단됐어요.',
+            [failedPage]: failureMessage,
           }))
         }
+      } else if (failureMessage) {
+        setImageGenerationError(failureMessage)
+      } else {
+        setImageGenerationError(null)
       }
       if (storyId !== null) {
         // 단순 invalidate 가 아닌 refetch — staleTime/observer 상태와 무관하게 반드시 새로 받도록.
@@ -425,6 +455,7 @@ export function StoryboardEditorStep({
     }
   }, [
     imageJobQuery.data?.status,
+    imageJobQuery.data?.errorMessage,
     imageJobQuery.isTimedOut,
     currentImageJobId,
     regeneratingPageNumber,
@@ -518,6 +549,7 @@ export function StoryboardEditorStep({
 
   const handleGenerateAllImages = useCallback(() => {
     if (isTranslationInProgress) return
+    setImageGenerationError(null)
     generateImagesMut.mutate(undefined, {
       onSuccess: res => setCurrentImageJobId(res.jobId),
     })
@@ -557,7 +589,7 @@ export function StoryboardEditorStep({
             // 한도 초과를 BE 에서 거부한 케이스 (`STORY_018`) 메시지 그대로 노출.
             setRegenerateErrors(prev => ({
               ...prev,
-              [pageNumber]: err.message || '그림 재생성 요청에 실패했어요.',
+              [pageNumber]: getStoryboardImageFailureMessage(err.message),
             }))
             setRegeneratingPageNumber(null)
             // 한도 거부였을 가능성에 대비해 카운터 동기화.
@@ -720,9 +752,22 @@ export function StoryboardEditorStep({
                 </div>
                 {generateImagesMut.error && (
                   <p className="mt-3 text-[#a3413f] text-sm">
-                    그림 생성 시작에 실패했어요: {generateImagesMut.error.message}
+                    그림 생성 시작에 실패했어요: {getStoryboardImageFailureMessage(generateImagesMut.error.message)}
                   </p>
                 )}
+              </div>
+            )}
+
+            {imageGenerationError && (
+              <div
+                className="cr-card"
+                style={{ padding: '14px 18px', marginBottom: 24 }}
+              >
+                <span className="cr-tape" aria-hidden="true" />
+                <p className="font-bold inline-flex items-start gap-2 text-[#a3413f]">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{imageGenerationError}</span>
+                </p>
               </div>
             )}
 
