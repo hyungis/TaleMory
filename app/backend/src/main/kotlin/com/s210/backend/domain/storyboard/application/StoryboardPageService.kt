@@ -11,6 +11,7 @@ import com.s210.backend.domain.storyboard.application.dto.StoryboardPageResult
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPagesResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 스토리보드 페이지 단위 조회 / 편집 유스케이스.
@@ -26,6 +27,7 @@ class StoryboardPageService(
     private val storyRepository: StoryRepository,
     private val storyBoardRepository: StoryBoardRepository,
     private val storyboardPageRepository: StoryboardPageRepository,
+    private val objectMapper: ObjectMapper,
 ) {
 
     /**
@@ -44,7 +46,7 @@ class StoryboardPageService(
 
         val pages = storyboardPageRepository
             .findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
-            .map(StoryboardPageResult::from)
+            .map { StoryboardPageResult.from(it, objectMapper) }
 
         return StoryboardPagesResult(storyId = storyId, pages = pages)
     }
@@ -75,10 +77,10 @@ class StoryboardPageService(
         val trimmed = koreanText.trim()
         if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
-        page.koreanText = trimmed
+        page.replaceKoreanText(objectMapper, trimmed)
         // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
 
-        return StoryboardPageResult.from(page)
+        return StoryboardPageResult.from(page, objectMapper)
     }
 
     /**

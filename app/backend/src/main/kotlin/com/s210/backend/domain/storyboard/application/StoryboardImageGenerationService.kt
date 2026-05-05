@@ -288,9 +288,10 @@ class StoryboardImageGenerationService(
         // AI 측 min_length=1 — 빈 문자열로 보내면 422. listener 가 정상 채웠다면 null/blank 가 아니어야 함.
         val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        val englishText = page.englishText?.takeIf { it.isNotBlank() }
+        val texts = page.pageTexts(objectMapper)
+        val englishText = texts.englishText?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
-        val koreanText = page.koreanText?.takeIf { it.isNotBlank() }
+        val koreanText = texts.koreanText?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
         val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)

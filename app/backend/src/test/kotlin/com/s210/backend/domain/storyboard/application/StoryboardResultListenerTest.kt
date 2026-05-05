@@ -11,6 +11,7 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.story.entity.StoryBoard
+import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.storyboard.application.StoryboardResultListener.Companion.EnvelopeTypes
 import com.s210.backend.domain.tts.application.TtsResultHandler
 import org.junit.jupiter.api.Assertions.*
@@ -191,6 +192,30 @@ class StoryboardResultListenerTest {
     }
 
     @Test
+    fun `GENERATE_STORY_COMPLETED stores page sentences json`() {
+        val jobId = 46L
+        val job = buildJob(jobId, JobType.STORYBOARD_STORY, JobStatus.PENDING)
+        `when`(jobRepository.findById(jobId)).thenReturn(Optional.of(job))
+        `when`(storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(job.storyId))
+            .thenReturn(buildStoryBoard(10L))
+
+        listener.onResult(buildMessage(storyCompletedJson(jobId.toString())))
+
+        @Suppress("UNCHECKED_CAST")
+        val captor = ArgumentCaptor.forClass(Iterable::class.java) as ArgumentCaptor<Iterable<StoryboardPage>>
+        verify(storyboardPageRepository).saveAll(captor.capture())
+
+        val saved = captor.value.toList()
+        assertEquals(1, saved.size)
+        val sentences = objectMapper.readTree(saved.first().sentences)
+        assertTrue(sentences.isArray)
+        assertEquals(1, sentences.size())
+        assertEquals(1, sentences[0].get("sentenceOrder").asInt())
+        assertEquals("Haesol found a shell.", sentences[0].get("englishText").asText())
+        assertEquals("CURIOUS", sentences[0].get("emotion").asText())
+    }
+
+    @Test
     fun `unknown envelope type logs warn and does not query jobRepository`() {
         val body = """{"jobId":"99","type":"UNKNOWN_TYPE","status":"COMPLETED"}"""
         listener.onResult(buildMessage(body))
@@ -253,6 +278,58 @@ class StoryboardResultListenerTest {
                     "totalTokens": 300,
                     "costUsd": 0.01,
                     "promptTemplateVersion": "v1"
+                }
+            }
+        }"""
+
+    private fun storyCompletedJson(jobId: String): String =
+        """{
+            "jobId": "$jobId",
+            "type": "GENERATE_STORY_COMPLETED",
+            "storyId": 1,
+            "status": "COMPLETED",
+            "payload": {
+                "title": "Test Story",
+                "synopsis": "A short synopsis",
+                "moralTheme": "Curiosity",
+                "storyQuest": "Find a shell",
+                "recurringMotif": "A small shell",
+                "pageCount": 1,
+                "pageCountReason": "One test page",
+                "readingLevel": {
+                    "basedOnAge": 7,
+                    "sentencesPerPage": "1",
+                    "wordsPerSentence": "4",
+                    "reason": "test"
+                },
+                "totalWordCount": 5,
+                "pages": [
+                    {
+                        "pageNumber": 1,
+                        "sourcePhotoIds": [101],
+                        "sceneSummary": "Opening beach moment",
+                        "englishText": "Haesol found a shell.",
+                        "koreanText": "Haesol found a shell.",
+                        "imagePrompt": "rough sketch",
+                        "sentences": [
+                            {
+                                "sentenceOrder": 1,
+                                "englishText": "Haesol found a shell.",
+                                "koreanText": "Haesol found a shell.",
+                                "emotion": "CURIOUS"
+                            }
+                        ],
+                        "sentenceCount": 1,
+                        "wordCount": 5
+                    }
+                ],
+                "usage": {
+                    "model": "gpt-5-nano",
+                    "inputTokens": 10,
+                    "outputTokens": 20,
+                    "totalTokens": 30,
+                    "costUsd": 0.01,
+                    "promptTemplateVersion": "storyboard_v3"
                 }
             }
         }"""
