@@ -3,12 +3,16 @@ package com.s210.backend.domain.storyboard.application
 import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
+import com.s210.backend.common.s3.S3DeletionEvent
+import com.s210.backend.common.s3.S3Service
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
 import com.s210.backend.domain.story.entity.StoryBoard
 import com.s210.backend.domain.story.entity.StoryboardPage
+import com.s210.backend.domain.story.infrastructure.repository.SceneHighlightVoiceRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
+import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
@@ -25,6 +29,7 @@ import com.s210.backend.domain.tts.application.dto.StoryTtsResultEnvelope
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
 import org.springframework.amqp.rabbit.annotation.RabbitListener
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -56,9 +61,13 @@ class StoryboardResultListener(
     private val objectMapper: ObjectMapper,
     private val ttsResultHandler: TtsResultHandler,
     private val sceneRepository: SceneRepository,
+    private val sceneSentenceRepository: SceneSentenceRepository,
+    private val sceneHighlightVoiceRepository: SceneHighlightVoiceRepository,
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
     private val finalIllustrationResultHandler: FinalIllustrationResultHandler,
+    private val s3Service: S3Service,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -238,13 +247,19 @@ class StoryboardResultListener(
             )
         }
 
-        // 3) Story.synopsis (TEXT) 에 한글 줄거리 저장 — 본문 grounding 의 단일 source.
-        //    옵션 ② 디자인:
+        // 3) Story.synopsis (한글 줄거리) + Story.title (영문 제목) 저장 — Step 3 SUMMARY 잡이 둘의 SOT.
+        //    한글 줄거리(synopsis):
         //     - 사용자가 Step 3 에서 편집하면 PATCH 로 이 컬럼 갱신.
         //     - StoryboardGenerationService.generate 가 본문 발행 시 이 컬럼을 우선 읽음.
         //     - STORY 잡 SUCCESS 가 더 이상 이 컬럼을 덮어쓰지 않음 (handleSuccess 참고).
+        //    영문 제목(title):
+        //     - AI 가 strict JSON 으로 매번 반환. 재생성 시 사용자가 명시적으로 제목 변경을 요청
+        //       하지 않으면 LLM 이 previous title 그대로 보존하도록 prompt 가 구성됨.
+        //     - 사용자가 직접 입력하는 UI 없음 — AI 결과를 그대로 SOT 로 사용.
+        //     - 책장/뷰어/공유 메타에서 노출. null 이면 FE 가 한글 fallback ("OO이의 새 동화") 처리.
         storyRepository.findById(job.storyId).ifPresent { story ->
             story.synopsis = payload.summaryKo
+            story.title = payload.title
         }
 
         log.info(
@@ -552,7 +567,12 @@ class StoryboardResultListener(
         storyBoard.updateAt = LocalDate.now()
         // storyBoard.story 는 SUMMARY 시점에 들어간 한글 줄거리를 그대로 유지 (옵션 ②).
 
-        // 4) 페이지 단위 진실 테이블(storyboard_pages) 갈아끼우기.
+        // 4) 본문 재생성 cascade — Step 7 진입 시 prepareScenes 가 storyboard_pages.sentences 로
+        //    scenes/scene_sentences 를 다시 만든다. 옛 데이터(+사용자가 녹음한 강조 녹음)는 stale 이므로 모두 정리.
+        //    신규 동화 첫 생성 시엔 옛 데이터가 없어 no-op.
+        cascadeDeleteOldScenes(job.storyId)
+
+        // 5) 페이지 단위 진실 테이블(storyboard_pages) 갈아끼우기.
         //    - 줄거리 재생성 시 페이지 수가 바뀔 수 있으므로 delete-then-insert.
         //    - sceneSummary / imagePrompt 까지 함께 보존해야 이후 이미지 생성 단계에서
         //      storyboard_pages 단일 소스로 페이로드를 조립할 수 있다 (옵션 D').
@@ -571,17 +591,71 @@ class StoryboardResultListener(
             },
         )
 
-        // 5) Story.title 은 더 이상 AI 가 만든 영문 title 로 덮어쓰지 않는다.
-        //    - AI 의 영문 title 은 이미지 생성 grounding (StoryboardImageGenerationService) 용 컨텍스트로만
-        //      쓰이며, job.result_payload(JSON) 안에 그대로 남아있어 다운스트림은 영향 없음.
-        //    - Story.title 은 사용자가 명시적으로 입력한 값(없으면 null)으로 두어, 책장/배너에서
-        //      한글 fallback ("OO이의 새 동화" 등) 이 자연스럽게 동작하도록 한다.
-        //    synopsis 는 Step 3 에서 사용자가 편집 가능한 한글 줄거리이며 본문 grounding 의 한글 source.
+        // 5) Story.title / Story.synopsis 는 STORY (본문) 잡 SUCCESS 시 건드리지 않는다.
+        //    - 본문 생성은 직전 SUMMARY 잡 결과를 grounding 으로 받았을 뿐, title/synopsis 의 SOT 가 아님.
+        //    - title    SOT: SUMMARY 잡 SUCCESS (handleSummarySuccess step 3) — AI 영문 title 저장.
+        //    - synopsis SOT: SUMMARY 잡 SUCCESS + 사용자 PATCH 편집.
+        //    - 본문 페이로드의 title 은 이미지 생성 grounding (StoryboardImageGenerationService) 컨텍스트로만 사용.
         //    본문 합본 텍스트가 필요하면 storyboard_pages.korean_text 를 join 해서 산출.
 
         log.info(
             "Job {} SUCCESS — storyId={}, storyLen={}, pages={}, costUsd={}",
             job.id, job.storyId, koreanBody.length, payload.pages.size, payload.usage.costUsd,
+        )
+    }
+
+    /**
+     * 본문 (STORY) 잡 SUCCESS 시 옛 scene/scene_sentence/scene_highlight_voice 를 cascade hard delete.
+     *
+     * 호출 시점: handleSuccess 가 storyboard_pages 를 다시 쓰기 직전.
+     * 본문이 갈리면 그로부터 파생된 scenes/sentences (+ 사용자가 녹음한 강조녹음) 모두 stale 이라
+     * Step 7 의 prepareScenes 가 깨끗한 상태에서 새로 만들 수 있도록 정리한다.
+     *
+     * 정책 (사용자 지시):
+     *  - SceneHighlightVoice 도 hard delete (`SoftDeletableEntity` 의 deletedAt 갱신 X).
+     *    JPA `deleteAll(...)` 은 entity 에 `@SQLDelete` 가 없으므로 실제 DELETE FROM 발행.
+     *  - **강조녹음** 의 S3 객체만 orphan 방지로 cleanup. `S3DeletionEvent` 를 publish 하면
+     *    `S3CleanupEventListener` 가 AFTER_COMMIT 단계에서 실제 S3 DELETE 수행 — 트랜잭션 롤백
+     *    시 broken image / DB ↔ S3 불일치를 피할 수 있다.
+     *  - TTS 오디오(scene_sentence.tts_audio_url) 는 S3 삭제 대상에서 **제외** (사용자 지시).
+     *    재confirm 시 cache hit 가능성 + TTS 정리는 별도 lane.
+     *
+     * 멱등: 옛 데이터가 없으면 모든 query 가 empty → deleteAll(empty) 는 no-op.
+     */
+    private fun cascadeDeleteOldScenes(storyId: Long) {
+        val oldScenes = sceneRepository.findAllByStoryId(storyId)
+        if (oldScenes.isEmpty()) return
+
+        val sceneIds = oldScenes.map { it.id }
+        val oldSentences = sceneSentenceRepository.findAllBySceneIdIn(sceneIds)
+        val sentenceIds = oldSentences.map { it.id }
+
+        val oldVoices = if (sentenceIds.isNotEmpty()) {
+            sceneHighlightVoiceRepository.findAllBySentenceIdInAndDeletedAtIsNull(sentenceIds)
+        } else emptyList()
+
+        // 강조녹음 S3 cleanup 만 수행 — AFTER_COMMIT 시점에 실제 DELETE.
+        // TTS 오디오는 사용자 지시로 S3 에 남겨둠.
+        oldVoices.forEach { v ->
+            s3Service.extractS3Key(v.audioUrl)?.let { key ->
+                applicationEventPublisher.publishEvent(S3DeletionEvent(key))
+            }
+        }
+
+        // HARD delete — child → parent 순. SoftDeletableEntity 라도 @SQLDelete 가 없어 실제 DELETE 발행.
+        if (oldVoices.isNotEmpty()) sceneHighlightVoiceRepository.deleteAll(oldVoices)
+        if (oldSentences.isNotEmpty()) sceneSentenceRepository.deleteAll(oldSentences)
+        sceneRepository.deleteAll(oldScenes)
+
+        // Redis illustration version cleanup — 본 cascade 와 무관한 best-effort. 실패해도 트랜잭션 영향 X.
+        sceneIds.forEach { sceneId ->
+            runCatching { illustrationVersionRedisRepository.deleteAll(sceneId) }
+                .onFailure { log.warn("Redis illust version cleanup failed for sceneId={}: {}", sceneId, it.message) }
+        }
+
+        log.info(
+            "Cascade-deleted old scenes on body regen — storyId={}, scenes={}, sentences={}, highlightVoices={}",
+            storyId, oldScenes.size, oldSentences.size, oldVoices.size,
         )
     }
 

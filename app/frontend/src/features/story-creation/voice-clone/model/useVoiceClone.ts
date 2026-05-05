@@ -5,7 +5,17 @@ import {
   VOICE_SAMPLE_SCRIPT,
   VOICE_STORAGE_KEY,
 } from '../lib/defaults'
-import { presignVoiceUpload, uploadAudioToS3, commitVoiceProfile, getVoiceProfiles, getRecordingScript, postVoicePreview, getVoicePreview, attachVoiceProfileToStory } from '../api/voiceProfileApi'
+import {
+  presignVoiceUpload,
+  uploadAudioToS3,
+  commitVoiceProfile,
+  getVoiceProfiles,
+  getRecordingScript,
+  postVoicePreview,
+  getVoicePreview,
+  attachVoiceProfileToStory,
+  type VoiceProfileDto,
+} from '../api/voiceProfileApi'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -73,13 +83,36 @@ export interface UseVoiceCloneResult {
   toggleAudioPlayback: () => void
   seekAudio: (percent: number) => void
 
+  /**
+   * 현재 녹음 중인 경과 시간 (초). status === 'recording' 동안 1 초 간격 tick.
+   * 녹음 중이 아닐 때(idle / ready)는 0 으로 초기화돼 UI 가 표시 안 함.
+   */
+  recordingElapsed: number
+
   // 액션
   startRecording: () => Promise<void>
   stopRecording: () => void
   rerecord: () => void
-  loadExistingVoice: () => Promise<void>
+  /**
+   * 저장된 보이스 프로필 목록 조회 — "기존 음성 불러오기" 모달이 사용.
+   * BE `/voice-profiles` GET 결과를 그대로 반환. 모달이 list 표시 + 선택 UI 담당.
+   */
+  fetchVoiceProfiles: () => Promise<VoiceProfileDto[]>
+  /**
+   * 모달에서 사용자가 선택한 보이스 프로필 한 건을 active 상태로 로드 + 현재 story 에 attach.
+   * - audioUrl 이 있으면 player 에 세팅
+   * - savedProfileId 갱신
+   * - statusLabel/savedVoiceSummary 동기화
+   * - 진행 중 녹음 타이머가 남아있으면 정리 (방어)
+   */
+  loadVoiceProfile: (profile: VoiceProfileDto) => Promise<void>
   previewTts: () => Promise<void>
-  saveVoiceRecording: () => Promise<string | null>
+  /**
+   * 사용자가 입력한 제목으로 녹음을 BE 에 commit.
+   * - 빈/공백 제목은 거부 (UI 모달에서 1차 검증, 여기서 2차 방어).
+   * - 성공 시 commit 한 title 을 반환 → 호출부가 onVoiceSaved 콜백에 사용.
+   */
+  saveVoiceRecording: (title: string) => Promise<string | null>
 }
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -139,6 +172,20 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
+
+  // 녹음 경과 시간 — 녹음 중에만 1 초 간격 tick. start 시점을 ref 로 보관해
+  // setInterval 의 closure stale state 문제를 우회 (Date.now() 기반 정확한 누적).
+  const [recordingElapsed, setRecordingElapsed] = useState(0)
+  const recordingStartedAtRef = useRef<number | null>(null)
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopRecordingTimer = useCallback(() => {
+    if (recordingTimerRef.current !== null) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    recordingStartedAtRef.current = null
+  }, [])
 
   const updateSavedVoiceSummary = useCallback(() => {
     try {
@@ -233,6 +280,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
       rec.onstop = async () => {
+        stopRecordingTimer()
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         const url = await blobToDataUrl(blob)
         setRecordedAudioUrl(url)
@@ -246,12 +294,23 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
       rec.start()
       setStatus('recording')
       setStatusLabel('녹음 중')
+
+      // 녹음 시작 시점 — onstop 에서 정리. 1 초마다 경과 시간 update.
+      recordingStartedAtRef.current = Date.now()
+      setRecordingElapsed(0)
+      recordingTimerRef.current = setInterval(() => {
+        const startedAt = recordingStartedAtRef.current
+        if (startedAt === null) return
+        setRecordingElapsed(Math.floor((Date.now() - startedAt) / 1000))
+      }, 1000)
     } catch {
       setStatus('idle')
       setStatusLabel('마이크 권한 필요')
+      stopRecordingTimer()
+      setRecordingElapsed(0)
       cleanupStream()
     }
-  }, [cleanupStream])
+  }, [cleanupStream, stopRecordingTimer])
 
   const stopRecording = useCallback(() => {
     const rec = recorderRef.current
@@ -267,32 +326,38 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     setIsAudioPlaying(false)
     setAudioCurrentTime(0)
     setAudioDuration(0)
+    stopRecordingTimer()
+    setRecordingElapsed(0)
+  }, [stopRecordingTimer])
+
+  /**
+   * 모달용 — 저장된 보이스 프로필 목록 조회. 단순 fetch, 결과를 호출부가 표시.
+   * 실패 시 에러를 throw 해 호출부(모달)가 인라인 에러를 표시할 수 있도록.
+   */
+  const fetchVoiceProfiles = useCallback(async (): Promise<VoiceProfileDto[]> => {
+    return getVoiceProfiles()
   }, [])
 
-  const loadExistingVoice = useCallback(async () => {
-    try {
-      const profiles = await getVoiceProfiles()
-      if (profiles.length > 0) {
-        const latest = profiles[0]
-        if (latest.audioUrl) {
-          setRecordedAudioUrl(latest.audioUrl)
-        }
-        setVoiceTitle(latest.title || '')
-        setSavedProfileId(latest.voiceProfileId)
-        await tryAttachToStory(latest.voiceProfileId)
-        setStatus('ready')
-        setStatusLabel('기존 음성 불러옴')
-        setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
-        setSavedVoiceSummary(`저장된 보이스: ${latest.title}`)
-      } else {
-        setStatus('idle')
-        setStatusLabel('저장된 음성 없음')
-        setTtsStatusText('녹음하거나 기존 음성을 불러오면 TTS를 만들 수 있어요.')
-      }
-    } catch {
-      alert('저장된 음성을 불러오지 못했습니다.')
+  /**
+   * 사용자가 모달에서 선택한 프로필을 로드 — 기존 자동 "최신 1개 로드" 동작을
+   * 명시적인 1건 선택으로 대체.
+   */
+  const loadVoiceProfile = useCallback(async (profile: VoiceProfileDto): Promise<void> => {
+    // 진행 중이던 녹음 타이머가 있다면 정리 (방어 — 보통 ready 상태에서 호출되지만 idle 도 가능).
+    stopRecordingTimer()
+    setRecordingElapsed(0)
+
+    if (profile.audioUrl) {
+      setRecordedAudioUrl(profile.audioUrl)
     }
-  }, [tryAttachToStory])
+    setVoiceTitle(profile.title || '')
+    setSavedProfileId(profile.voiceProfileId)
+    await tryAttachToStory(profile.voiceProfileId)
+    setStatus('ready')
+    setStatusLabel('기존 음성 불러옴')
+    setTtsStatusText('기존 음성으로 TTS를 만들 수 있어요.')
+    setSavedVoiceSummary(`불러온 보이스: ${profile.title}`)
+  }, [stopRecordingTimer, tryAttachToStory])
 
   const previewTts = useCallback(async () => {
     if (!recordedAudioUrl) {
@@ -379,31 +444,39 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
    * Phase 1: POST /api/voice-profiles/presigned-url → presigned URL + s3Key 발급
    * Phase 2: presigned URL 로 S3 에 직접 PUT
    * Phase 3: POST /api/voice-profiles → s3Key 로 DB commit
+   *
+   * 제목은 사용자가 모달에서 입력 — 빈/공백 검증은 모달에서 disabled 로 1차 차단,
+   * 여기서 trim 후 빈 문자열이면 null 반환으로 2차 방어.
    */
-  const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
+  const saveVoiceRecording = useCallback(async (title: string): Promise<string | null> => {
     if (!recordedAudioUrl) {
       setStatusLabel('녹음이 없습니다')
+      return null
+    }
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle) {
+      setStatusLabel('제목을 입력해 주세요')
       return null
     }
 
     setIsSaving(true)
     try {
       const audioBlob = dataUrlToBlob(recordedAudioUrl)
-      const autoTitle = `녹음_${new Date().toISOString().slice(0, 19).replace('T', '_')}`
 
       // Phase 1: presign
       const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
       // Phase 2: S3 PUT
       await uploadAudioToS3(presigned.uploadUrl, audioBlob)
-      // Phase 3: DB commit
-      const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
+      // Phase 3: DB commit (사용자 지정 제목)
+      const profile = await commitVoiceProfile(trimmedTitle, presigned.s3Key)
 
       setSavedProfileId(profile.voiceProfileId)
+      setVoiceTitle(trimmedTitle)
       await tryAttachToStory(profile.voiceProfileId)
       setStatus('ready')
       setStatusLabel('서버에 저장 완료')
-      setSavedVoiceSummary(`녹음이 저장되었습니다. (ID: ${profile.voiceProfileId})`)
-      return autoTitle
+      setSavedVoiceSummary(`녹음이 저장되었습니다: ${trimmedTitle}`)
+      return trimmedTitle
     } catch {
       setStatusLabel('저장 실패')
       alert('음성 저장에 실패했습니다. 다시 시도해 주세요.')
@@ -427,8 +500,14 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     setAudioCurrentTime(el.currentTime)
   }, [])
 
-  // 언마운트 시 stream 정리
-  useEffect(() => () => cleanupStream(), [cleanupStream])
+  // 언마운트 시 stream + 녹음 타이머 정리 — leak 방지.
+  useEffect(
+    () => () => {
+      cleanupStream()
+      stopRecordingTimer()
+    },
+    [cleanupStream, stopRecordingTimer],
+  )
 
   return {
     sampleScript,
@@ -457,10 +536,12 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     setIsAudioPlaying,
     toggleAudioPlayback,
     seekAudio,
+    recordingElapsed,
     startRecording,
     stopRecording,
     rerecord,
-    loadExistingVoice,
+    fetchVoiceProfiles,
+    loadVoiceProfile,
     previewTts,
     saveVoiceRecording,
   }

@@ -18,6 +18,11 @@ export interface SentenceDto {
   speakerKey: string | null
   bubbleSlot: string | null
   hasHighlighted: boolean
+  /**
+   * 사용자가 녹음한 강조 audio URL. 활성 row 가 없으면 null.
+   * Step 7 재진입 시 기존 녹음 복원에 사용.
+   */
+  highlightVoiceUrl: string | null
 }
 
 export interface PresignedUrlDto {
@@ -44,6 +49,37 @@ export interface OutroDto {
 /** GET /api/stories/{storyId}/scenes */
 export async function getScenes(storyId: number): Promise<SceneDto[]> {
   return get<SceneDto[]>(`/stories/${storyId}/scenes`)
+}
+
+export interface ScenesPrepareDto {
+  sceneCount: number
+  sentenceCount: number
+  alreadyPrepared: boolean
+}
+
+/**
+ * POST /api/stories/{storyId}/scenes/prepare
+ *
+ * Step 7 진입 시점에 `storyboard_pages.sentences` JSON 으로부터 scene/scene_sentence 를
+ * 평탄화 INSERT (멱등). 이후 getScenes 로 정규화된 데이터 조회.
+ */
+export async function prepareScenes(storyId: number): Promise<ScenesPrepareDto> {
+  return post<ScenesPrepareDto>(`/stories/${storyId}/scenes/prepare`, {})
+}
+
+export interface HighlightVoicesExistsDto {
+  exists: boolean
+}
+
+/**
+ * GET /api/stories/{storyId}/highlight-voices/exists
+ *
+ * Step 4 본문 재생성 경고 모달 트리거용 — 활성 강조 녹음이 하나라도 있으면 true.
+ */
+export async function checkHighlightVoicesExists(
+  storyId: number,
+): Promise<HighlightVoicesExistsDto> {
+  return get<HighlightVoicesExistsDto>(`/stories/${storyId}/highlight-voices/exists`)
 }
 
 /** GET /api/stories/{storyId}/outro */

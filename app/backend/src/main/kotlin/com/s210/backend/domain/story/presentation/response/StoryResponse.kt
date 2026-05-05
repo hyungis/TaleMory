@@ -89,7 +89,13 @@ data class SentenceResponse(
     val ttsAudioUrl: String?,
     val speakerKey: String?,
     val bubbleSlot: String?,
-    val hasHighlighted: Boolean
+    val hasHighlighted: Boolean,
+    /**
+     * 사용자가 녹음한 강조 문장 audio URL (활성 row 기준).
+     * `hasHighlighted=true` 라도 voice row 가 soft-delete 되어있으면 null.
+     * Step 7 재진입 시 FE 가 이 값으로 기존 녹음을 복원해 듣기/재녹음 가능 상태로 표시.
+     */
+    val highlightVoiceUrl: String?,
 )
 
 data class OutroResponse(
@@ -194,4 +200,24 @@ data class ConfirmStoryboardResponse(
     val cacheHits: Int,
     val cacheMisses: Int,
     val finalIllustrationJobId: Long? = null,
+)
+
+/**
+ * Step 7 진입 시점의 `POST /api/stories/{storyId}/scenes/prepare` 응답.
+ *
+ * `storyboard_pages.sentences` JSON 으로부터 scene/scene_sentence 를 평탄화한 결과 요약.
+ * 이미 prepared 된 상태라면 `alreadyPrepared = true` (멱등) — FE 는 그대로 GET /scenes 로 진행.
+ */
+data class ScenesPrepareResponse(
+    val sceneCount: Int,
+    val sentenceCount: Int,
+    val alreadyPrepared: Boolean,
+)
+
+/**
+ * Step 4 본문 재생성 경고 모달 트리거용 — 활성 강조 녹음이 하나라도 있으면 `exists = true`.
+ * 응답이 true 면 FE 는 "본문 재생성 시 강조 녹음 삭제됨" 경고 모달을 띄운다.
+ */
+data class HighlightVoicesExistsResponse(
+    val exists: Boolean,
 )

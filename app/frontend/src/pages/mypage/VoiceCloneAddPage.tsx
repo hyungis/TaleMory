@@ -12,27 +12,25 @@ import './styles/mypage.css'
 /**
  * 마이페이지 → "+ 목소리 추가" 전용 페이지 (`/mypage/voice-clone`).
  *
- * Claude HTML voice clone page (rebuilt) 디자인을 1:1 적용:
- *  - 페이지 상단 sticky vc-page-bar (gradient cream)
+ * 디자인:
+ *  - 페이지 상단 sticky vc-page-bar (마이페이지 back 버튼)
  *  - vc-hero — sage 78x78 mic + Nanum Pen Script 52px 타이틀
- *  - 3-step Stepper (녹음 → 음성 변환 → 저장) — active/done 상태 + 점선 connector
- *  - Step 1: vc-sample-block 손그림 인용구 카드 + recorder (3-state: idle/recording/recorded)
+ *  - 녹음 카드 — 손그림 인용구 카드 + recorder (3-state: idle/recording/recorded)
  *      pulse-ring + waveform (28 bar) + Nanum Myeongjo 시간
- *  - Step 2: TTS textarea + 변환 결과 audio bar
- *  - Step 3: 보이스 이름 + 저장 + save-stats info pill
+ *  - 저장 카드 — 보이스 이름 + 저장 + save-stats info pill
  *  - vc-foot-mark — Nanum Pen Script 손글씨 푸터
  *
+ * 단계 (stepper / TTS 미리듣기) 는 제거하고 한 페이지에서 녹음 → 저장만 처리한다.
  * 백엔드 로직(useVoiceClone)은 그대로 유지하며 UI 만 reskin.
  */
 export function VoiceCloneAddPage() {
   const navigate = useNavigate()
   const vc = useVoiceClone()
 
-  // Claude 디자인의 sentenceIdx — 여러 샘플 문장 로테이션 대신 기본 한 문장만
-  // (백엔드는 VOICE_SAMPLE_SCRIPT 한 줄 기준이라 유지). 다른 문장 보기 버튼은 데코.
+  // 샘플 문장 — 한 문장 기준.
   const sample = useMemo(() => buildSample(VOICE_SAMPLE_SCRIPT), [])
 
-  // 녹음 단계 phase 계산 — useVoiceClone 의 status 를 Claude 의 idle/recording/recorded 로 매핑.
+  // 녹음 단계 phase 계산 — useVoiceClone 의 status 를 idle/recording/recorded 로 매핑.
   const phase: Phase =
     vc.status === 'recording'
       ? 'recording'
@@ -55,12 +53,6 @@ export function VoiceCloneAddPage() {
     }, 1000)
     return () => window.clearInterval(interval)
   }, [phase])
-
-  // 변환된 TTS 가 한 번이라도 들렸는지 (= step 3 활성 여부)
-  const ttsPlayed = !!vc.ttsAudioUrl
-
-  // Stepper step index — 0: 녹음, 1: 음성 변환, 2: 저장
-  const stepIdx = phase !== 'recorded' ? 0 : ttsPlayed ? 2 : 1
 
   const goBack = () => navigate(ROUTES.mypage)
 
@@ -86,7 +78,7 @@ export function VoiceCloneAddPage() {
         <BookshelfDoodles />
       </div>
 
-      {/* ── 상단 바 — back 버튼 + 컴팩트 Stepper ─────────── */}
+      {/* ── 상단 바 — back 버튼만 ─────────── */}
       <div className="vc-page-bar">
         <button type="button" onClick={goBack} className="vc-back-btn" aria-label="마이페이지로">
           <svg width="12" height="10" viewBox="0 0 14 10" aria-hidden="true">
@@ -101,7 +93,6 @@ export function VoiceCloneAddPage() {
           </svg>
           마이페이지
         </button>
-        <Stepper step={stepIdx} variant="header" />
         <div style={{ width: 100 }} aria-hidden="true" />
       </div>
 
@@ -135,14 +126,9 @@ export function VoiceCloneAddPage() {
           </p>
         </div>
 
-        {/* Stepper 는 vc-page-bar 안으로 이동 */}
-
-        {/* ── Step 1: Sample + Record ─────────────────── */}
+        {/* ── 녹음 카드 ─────────────────────────────────── */}
         <div className="mp-card" style={{ marginTop: 18 }}>
           <span className="mp-tape" aria-hidden="true" />
-          <div className="vc-step-badge">
-            <span className="pip">1</span> 샘플 문장 따라 읽기
-          </div>
           <div
             className="mp-card-header"
             style={{ marginBottom: 6, alignItems: 'center', flexWrap: 'wrap', gap: 10 }}
@@ -241,87 +227,27 @@ export function VoiceCloneAddPage() {
           )}
         </div>
 
-        {/* ── Step 2: TTS Preview ─────────────────────── */}
+        {/* ── 저장 카드 ─────────────────────────────── */}
         <div className={`mp-card${phase !== 'recorded' ? ' vc-card-dim has-actions' : ''}`}>
-          <span className="mp-tape mp-tape--alt" aria-hidden="true" />
-          <div className="vc-step-badge">
-            <span className="pip">2</span> 변환된 목소리 미리듣기
-          </div>
-          <h2 className="mp-card-title" style={{ marginTop: 2, marginBottom: 12 }}>
-            이 목소리로 어떤 동화를 들려줄까요?
-          </h2>
-
-          <div style={ttsHelperLabelStyle}>들어볼 문장 (한 문장)</div>
-          <textarea
-            className="vc-tts-input"
-            value={vc.ttsText}
-            onChange={e => vc.setTtsText(e.target.value)}
-            disabled={phase !== 'recorded'}
-            placeholder="여기에 문장을 입력하면, 방금 녹음한 목소리로 읽어드려요"
-            rows={3}
-          />
-          <div className="vc-tts-helper">
-            <span>💡 짧은 문장일수록 더 자연스럽게 들려요</span>
-            <span>{vc.ttsText.length} / 120</span>
-          </div>
-
-          <div className="vc-tts-bottom">
-            <button
-              type="button"
-              className="mp-btn mp-btn-sage"
-              disabled={phase !== 'recorded' || vc.isTtsLoading}
-              onClick={() => void vc.previewTts()}
-            >
-              <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true">
-                <path d="M3,2 L3,10 L10,6 Z" fill="#fdf6dc" />
-              </svg>
-              {vc.isTtsLoading ? '변환 중...' : '내 목소리로 들어보기'}
-            </button>
-            {phase !== 'recorded' && (
-              <span style={{ fontFamily: 'Gaegu, cursive', fontSize: 14, color: '#8a7558' }}>
-                먼저 1단계에서 녹음을 완료해 주세요
-              </span>
-            )}
-            {phase === 'recorded' && !ttsPlayed && (
-              <span style={{ fontFamily: 'Gaegu, cursive', fontSize: 14, color: '#8a7558' }}>
-                {vc.ttsStatusText}
-              </span>
-            )}
-          </div>
-
-          {ttsPlayed && vc.ttsAudioUrl && (
-            <div className="vc-tts-result">
-              <audio
-                src={vc.ttsAudioUrl}
-                controls
-                style={{ width: '100%', borderRadius: 999 }}
-              />
-              <div
-                style={{
-                  fontFamily: 'Gaegu, cursive',
-                  fontSize: 13,
-                  color: 'var(--mp-sage-deep)',
-                  marginTop: 8,
-                  fontWeight: 700,
-                }}
-              >
-                ✓ 변환 완료 · 마음에 들면 아래에서 저장해 주세요
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Step 3: Save ─────────────────────────────── */}
-        <div className={`mp-card${!ttsPlayed ? ' vc-card-dim has-actions' : ''}`}>
           <span className="mp-tape mp-tape--alt2" aria-hidden="true" />
-          <div className="vc-step-badge">
-            <span className="pip">3</span> 이 목소리에 이름 지어주기
-          </div>
           <h2 className="mp-card-title" style={{ marginTop: 2, marginBottom: 14 }}>
             이 목소리를 뭐라고 부를까요?
           </h2>
 
-          <div style={ttsHelperLabelStyle}>보이스 이름</div>
+          <p
+            style={{
+              fontFamily: 'Gaegu, cursive',
+              fontSize: 15,
+              color: 'var(--mp-ink-soft)',
+              margin: '0 0 12px',
+            }}
+          >
+            {phase === 'recorded'
+              ? '녹음이 완료되었어요. 보이스에 이름을 지어 저장해 주세요.'
+              : '먼저 위에서 녹음을 완료해 주세요.'}
+          </p>
+
+          <div style={inputLabelStyle}>보이스 이름</div>
           <div className="vc-save-row">
             <input
               type="text"
@@ -329,12 +255,12 @@ export function VoiceCloneAddPage() {
               placeholder="예) 엄마 따뜻한 목소리, 아빠 잠자리 보이스"
               value={vc.voiceTitle}
               onChange={e => vc.setVoiceTitle(e.target.value)}
-              disabled={!ttsPlayed}
+              disabled={phase !== 'recorded'}
             />
             <button
               type="button"
               className="mp-btn mp-btn-sage"
-              disabled={!ttsPlayed || !vc.voiceTitle.trim() || vc.isSaving}
+              disabled={phase !== 'recorded' || !vc.voiceTitle.trim() || vc.isSaving}
               onClick={() => void handleSave()}
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -360,48 +286,6 @@ export function VoiceCloneAddPage() {
         </div>
       </div>
     </div>
-  )
-}
-
-/* ============================================================================
- * Stepper — 3 단계 (녹음 → 음성 변환 → 저장)
- * variant="header" 면 vc-page-bar 안에 들어가는 컴팩트 버전.
- * ========================================================================= */
-function Stepper({ step, variant }: { step: number; variant?: 'header' }) {
-  const steps = ['녹음하기', '음성 변환', '저장']
-  const cls = `vc-stepper${variant === 'header' ? ' vc-stepper--header' : ''}`
-  return (
-    <div className={cls} role="list" aria-label="진행 단계">
-      {steps.map((label, i) => (
-        <StepperFragment key={i} index={i} label={label} step={step} isLast={i === steps.length - 1} />
-      ))}
-    </div>
-  )
-}
-
-function StepperFragment({
-  index,
-  label,
-  step,
-  isLast,
-}: {
-  index: number
-  label: string
-  step: number
-  isLast: boolean
-}) {
-  const stateClass =
-    step === index ? ' active' : step > index ? ' done' : ''
-  return (
-    <>
-      <div className={`vc-step${stateClass}`} role="listitem" aria-current={step === index}>
-        <div className="num">
-          <span>{index + 1}</span>
-        </div>
-        <div className="lbl">{label}</div>
-      </div>
-      {!isLast && <div className={`vc-step-line${step > index ? ' done' : ''}`} aria-hidden="true" />}
-    </>
   )
 }
 
@@ -465,7 +349,7 @@ function Recorder({
           </>
         )}
         {phase === 'idle' && (statusLabel || '대기 중')}
-        {phase === 'recorded' && '✓ 녹음 완료'}
+        {phase === 'recorded' && '✓ 녹음이 완료되었어요'}
       </div>
 
       <div className="vc-rec-mic-shell">
@@ -557,7 +441,7 @@ function Recorder({
 }
 
 /* ============================================================================
- * Waveform — Claude HTML 의 28 bar 모션 placeholder
+ * Waveform — 28 bar 모션 placeholder
  * ========================================================================= */
 const WAVEFORM_HEIGHTS = [
   14, 22, 32, 18, 28, 40, 22, 36, 44, 28, 18, 30, 40, 24, 36, 28, 42, 20, 30, 38, 22, 34, 28, 44, 18, 26, 32, 20,
@@ -808,7 +692,7 @@ function VolumePopover({
  * Helpers
  * ========================================================================= */
 
-const ttsHelperLabelStyle: CSSProperties = {
+const inputLabelStyle: CSSProperties = {
   fontFamily: 'Gaegu, cursive',
   fontSize: 14,
   color: 'var(--mp-ink-soft)',

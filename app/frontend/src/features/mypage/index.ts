@@ -21,7 +21,6 @@ export {
   useVoiceClone,
   formatAudioTime,
   VOICE_SAMPLE_SCRIPT,
-  DEFAULT_TTS_TEXT,
   mockVoiceProfiles,
   useVoiceProfileQuery,
   useVoiceProfilesQuery,
