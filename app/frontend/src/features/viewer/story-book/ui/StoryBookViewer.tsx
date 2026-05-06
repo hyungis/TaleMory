@@ -272,16 +272,17 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
 
   // 전체 책 자동 재생
   const playFullBook = () => {
-    /* scene 0(표지) 은 본문 rotation 에서 제외했으므로 sceneIndex 와 pageIndex 가 1:1 정렬.
-       즉 sceneIndex k(>=1) ↔ pageIndex k. 표지에서 시작하면 첫 본문 scene 1 부터 재생. */
+    /* BE 는 표지(page_number=0) 를 제외한 본문 scene 만 내려주므로
+       story.scenes[0] = 첫 본문, story.scenes[1] = 두번째 본문, ...
+       pages 배열은 [cover, scene0, scene1, ...] 이므로 pageIndex = sceneIndex + 1. */
     const startSceneIndex = current.kind === 'scene' && current.sceneIndex !== undefined
       ? current.sceneIndex
-      : 1
-    const targetPageIndex = startSceneIndex
+      : 0
+    const targetPageIndex = startSceneIndex + 1
 
     const startPlayback = () => {
       tts.speakFullBook(story.scenes, startSceneIndex, sceneIdx => {
-        setPageIndex(sceneIdx)
+        setPageIndex(sceneIdx + 1)
       })
     }
 
