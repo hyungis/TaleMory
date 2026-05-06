@@ -32,9 +32,9 @@ cp infra/env/infra.local.env.example infra/env/infra.local.env
 - 포트 override / `VITE_API_BASE_URL` override는 실행 시점 shell env로 주입: `BACKEND_PORT=18081 docker compose -f ... up`.
 - Kakao 로그인은 frontend가 `window.location.origin` 기준으로 redirect URI를 동적으로 만들고, `POST /api/auth/kakao/callback` body의 `{ code, redirectUri }`를 backend에 전달한다. backend는 `redirectUri`를 `OAUTH_ALLOWED_REDIRECT_URIS` 화이트리스트와 비교한다.
 - Kakao Developers 콘솔 Redirect URI에는 접근 가능한 각 frontend callback URI를 모두 등록.
-  - `http://k14s210.p.ssafy.io:3001/auth/kakao/callback`
-  - `https://k14s210.p.ssafy.io:3443/auth/kakao/callback`
-  - `https://k14s210.p.ssafy.io/auth/kakao/callback`
+  - `http://talemory.site:3001/auth/kakao/callback`
+  - `https://talemory.site:3443/auth/kakao/callback`
+  - `https://talemory.site/auth/kakao/callback`
 
 ### 1-3. 기존 `dev-*` 스택 청소 (있다면)
 

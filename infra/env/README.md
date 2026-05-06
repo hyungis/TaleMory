@@ -147,7 +147,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_PASSWORD` | ✅ | INFRA_RABBITMQ_DEFAULT_PASS와 동일값 |
 | `ENV_DEV_APP_JWT_ACCESS_SECRET` | ✅ | JWT access token 서명 키. `openssl rand -base64 48`로 생성 권장 |
 | `ENV_DEV_APP_JWT_REFRESH_SECRET` | ✅ | JWT refresh token 서명 키. access와 **다른 값** 사용 |
-| `ENV_DEV_APP_OAUTH_ALLOWED_REDIRECT_URIS` | — | comma-separated allowed Kakao frontend callback URIs (`http://k14s210.p.ssafy.io:3001/auth/kakao/callback,https://k14s210.p.ssafy.io:3443/auth/kakao/callback`) |
+| `ENV_DEV_APP_OAUTH_ALLOWED_REDIRECT_URIS` | — | comma-separated allowed Kakao frontend callback URIs (`http://talemory.site:3001/auth/kakao/callback,https://talemory.site:3443/auth/kakao/callback`) |
 | `ENV_DEV_APP_KAKAO_CLIENT_ID` | — | dev Kakao REST API key |
 | `ENV_DEV_APP_VITE_KAKAO_CLIENT_ID` | — | dev Kakao REST API key (Vite build-time 주입) |
 | `ENV_DEV_APP_KAKAO_CLIENT_SECRET` | ✅ | dev Kakao client secret |
@@ -253,7 +253,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `RABBITMQ_HOST` | `dev-rabbitmq` | `prod-rabbitmq` |
 | `JWT_ACCESS_SECRET` | (dev 전용 값) | (master 전용 값, **절대 dev와 공유 금지**) |
 | `JWT_REFRESH_SECRET` | (dev 전용 값) | (master 전용 값, **access와도 다르게**) |
-| `OAUTH_ALLOWED_REDIRECT_URIS` | `http://k14s210.p.ssafy.io:3001/auth/kakao/callback,https://k14s210.p.ssafy.io:3443/auth/kakao/callback` | `https://k14s210.p.ssafy.io/auth/kakao/callback` |
+| `OAUTH_ALLOWED_REDIRECT_URIS` | `http://talemory.site:3001/auth/kakao/callback,https://talemory.site:3443/auth/kakao/callback` | `https://talemory.site/auth/kakao/callback` |
 | `KAKAO_CLIENT_ID` | (dev Kakao REST API key) | (prod Kakao REST API key) |
 | `VITE_KAKAO_CLIENT_ID` | (dev Kakao REST API key) | (prod Kakao REST API key) |
 | `KAKAO_CLIENT_SECRET` | (dev Kakao client secret) | (prod Kakao client secret) |
@@ -274,7 +274,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `AWS_S3_ENV_PREFIX` | `dev` | `prod` |
 
 Kakao Developers console registration guide:
-- Redirect URI: `http://k14s210.p.ssafy.io:3001/auth/kakao/callback`, `https://k14s210.p.ssafy.io:3443/auth/kakao/callback`, `https://k14s210.p.ssafy.io/auth/kakao/callback`
+- Redirect URI: `http://talemory.site:3001/auth/kakao/callback`, `https://talemory.site:3443/auth/kakao/callback`, `https://talemory.site/auth/kakao/callback`
 - Frontend callback exchanges `{ code, redirectUri }` through `POST /api/auth/kakao/callback`; backend only accepts redirect URIs listed in `OAUTH_ALLOWED_REDIRECT_URIS`.
 
 JWT secret 생성 (로컬에서, 4개 전부 각자):
