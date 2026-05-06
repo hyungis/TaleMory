@@ -245,11 +245,13 @@ class SceneIllustrationService(
     @Transactional(readOnly = true)
     fun listVersions(userId: Long, storyId: Long, sceneId: Long): VersionsResult {
         ownedStory(userId, storyId)
-        sceneRepository.findByIdAndStoryId(sceneId, storyId)
+        val scene = sceneRepository.findByIdAndStoryId(sceneId, storyId)
             ?: throw BusinessException(StoryErrorCode.SCENE_NOT_FOUND)
+        val finalV1Url = findLatestFinalIllustrationUrl(storyId, scene.pageNumber)
 
         val versions = illustrationVersionRedisRepository.listVersions(sceneId)
             .mapNotNull(::parseVersionEntry)
+            .map { repairInitialFinalVersion(it, finalV1Url) }
             .distinctBy { it.version }
             .sortedByDescending { it.version }
 
@@ -266,9 +268,11 @@ class SceneIllustrationService(
         val scene = sceneRepository.findByIdAndStoryId(sceneId, storyId)
             ?: throw BusinessException(StoryErrorCode.SCENE_NOT_FOUND)
         if (version < 1) throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        val finalV1Url = findLatestFinalIllustrationUrl(storyId, scene.pageNumber)
 
         val selected = illustrationVersionRedisRepository.listVersions(sceneId)
             .mapNotNull(::parseVersionEntry)
+            .map { repairInitialFinalVersion(it, finalV1Url) }
             .firstOrNull { it.version == version }
             ?: throw BusinessException(StoryErrorCode.NOTHING_TO_ROLLBACK)
 
@@ -335,6 +339,24 @@ class SceneIllustrationService(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun repairInitialFinalVersion(entry: VersionEntry, finalV1Url: String?): VersionEntry {
+        if (entry.version != 1 || finalV1Url.isNullOrBlank()) return entry
+        if (entry.url.contains("final-illustration")) return entry
+        return entry.copy(url = finalV1Url)
+    }
+
+    private fun findLatestFinalIllustrationUrl(storyId: Long, pageNumber: Int): String? {
+        val job = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
+            storyId = storyId,
+            jobType = JobType.FINAL_ILLUSTRATION,
+            status = JobStatus.SUCCESS,
+        ) ?: return null
+        return runCatching {
+            val node = objectMapper.readTree(job.resultPayload ?: return null)
+            node.get(pageNumber.toString())?.asString()?.takeIf { it.isNotBlank() }
+        }.getOrNull()
     }
 
 }

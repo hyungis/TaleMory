@@ -77,8 +77,12 @@ class FinalIllustrationResultHandler(
         // 2) scenes 가 이미 있으면 즉시 update (confirm 이 먼저 발생한 케이스).
         sceneRepository.findByStoryIdAndPageNumber(job.storyId, pageNumber)?.let { scene ->
             scene.illustrationUrl = imageUrl
-            if (job.sceneId != null && job.sceneId == scene.id) {
-                val versionMeta = readReviseVersionMeta(job)
+            if (job.sceneId == null || job.sceneId == scene.id) {
+                val versionMeta = if (job.sceneId == null) {
+                    ReviseVersionMeta(version = 1, prompt = null)
+                } else {
+                    readReviseVersionMeta(job)
+                }
                 illustrationVersionRedisRepository.pushVersion(
                     sceneId = scene.id,
                     version = versionMeta.version ?: (illustrationVersionRedisRepository.getCurrent(scene.id) ?: 1),
