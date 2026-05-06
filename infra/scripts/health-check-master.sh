@@ -86,7 +86,7 @@ SERVICE="${1:-all}"
 # HTTPS 적용 이후 공인 도메인으로 체크. 서버 자기 자신으로 hairpin NAT 되는지
 # AWS 보안그룹/SSAFY 설정에 따라 다름 — 실패 시 MASTER_DOMAIN 대신 127.0.0.1 로 교체
 # 하고 --resolve 옵션으로 SNI 를 맞추면 됨.
-DOMAIN="${MASTER_DOMAIN:-k14s210.p.ssafy.io}"
+DOMAIN="${MASTER_DOMAIN:-talemory.site}"
 BASE="https://${DOMAIN}"
 
 check() {

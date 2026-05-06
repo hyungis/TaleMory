@@ -91,7 +91,7 @@ check_worker_running() {
 
 # ── HTTP probe ─────────────────────────────────────────────────
 SERVICE="${1:-all}"
-DOMAIN="${DEV_DOMAIN:-k14s210.p.ssafy.io}"
+DOMAIN="${DEV_DOMAIN:-talemory.site}"
 HTTPS_PORT="${DEV_HTTPS_PORT:-3443}"
 BASE="https://${DOMAIN}:${HTTPS_PORT}"
 
