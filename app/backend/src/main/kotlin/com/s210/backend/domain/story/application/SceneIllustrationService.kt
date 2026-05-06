@@ -12,18 +12,17 @@ import com.s210.backend.domain.job.model.JobType
 import com.s210.backend.domain.preset.infrastructure.repository.StylePresetRepository
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.exception.StoryErrorCode
-import com.s210.backend.domain.story.infrastructure.repository.PhotoAlbumItemRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
 import com.s210.backend.domain.storyboard.application.StoryParticipantParser
 import com.s210.backend.domain.storyboard.application.pageTexts
-import com.s210.backend.domain.storyboard.application.dto.StoryboardImageContext
-import com.s210.backend.domain.storyboard.application.dto.StoryboardImageItem
-import com.s210.backend.domain.storyboard.application.dto.StoryboardImagePagePayload
-import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegenerateMessage
-import com.s210.backend.domain.storyboard.application.dto.StoryboardImageRegeneratePayload
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationContext
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationItem
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationPagePayload
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationReviseMessage
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationRevisePayload
 import com.s210.backend.domain.storyboard.application.dto.StoryboardPayload
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.core.RabbitTemplate
@@ -39,7 +38,6 @@ class SceneIllustrationService(
     private val jobRepository: StoryGenerationJobRepository,
     private val storyBoardRepository: StoryBoardRepository,
     private val storyboardPageRepository: StoryboardPageRepository,
-    private val photoAlbumItemRepository: PhotoAlbumItemRepository,
     private val stylePresetRepository: StylePresetRepository,
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val rabbitTemplate: RabbitTemplate,
@@ -52,7 +50,7 @@ class SceneIllustrationService(
         // Step 8 (FinalPreviewStep) 에서 동화 한 권당 최종 삽화 재생성 총합 한도.
         // 페이지별이 아니라 동화 전체 합산 — 사용자가 어떤 페이지를 몇 번 재생성하든 총 3회까지.
         private const val STORY_REGEN_LIMIT = 3
-        private const val MAX_REFERENCE_IMAGES = 3
+        private val S3_KEY_PATTERN = Regex("^([a-z][a-z0-9-]*/)?stories/")
     }
 
     data class RegenerateResult(val jobId: Long, val status: String = "PENDING")
@@ -87,22 +85,13 @@ class SceneIllustrationService(
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
         val storyPayload = loadLastSuccessStoryPayload(storyId)
-        val origPage = storyPayload.pages.firstOrNull { it.pageNumber == scene.pageNumber }
-        val sourcePhotoIds = origPage?.sourcePhotoIds ?: emptyList()
-
         val children = storyParticipantParser.parseChildren(story.mainCharacterJson)
         val companions = storyParticipantParser.parseCompanions(story.companionsJson)
 
-        val photoMap = photoAlbumItemRepository
-            .findAllByStoryIdAndDeletedAtIsNullOrderByDisplayOrderAsc(storyId)
-            .associateBy { it.id }
-        val s3Keys = sourcePhotoIds
-            .mapNotNull { photoMap[it.toLong()]?.imageUrl }
-            .take(MAX_REFERENCE_IMAGES)
-
         val styleInfo = story.stylePresetId?.let { id ->
             stylePresetRepository.findById(id).orElse(null)
-        }
+        } ?: throw BusinessException(StoryErrorCode.STYLE_PRESET_NOT_FOUND)
+        val stylePrompt = styleInfo.stylePrompt.trim().takeIf { it.isNotEmpty() } ?: styleInfo.code
 
         val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
@@ -114,13 +103,17 @@ class SceneIllustrationService(
         val imagePrompt = page.imagePrompt?.takeIf { it.isNotBlank() }
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
 
-        val item = StoryboardImageItem(
+        val currentIllustration = scene.illustrationUrl?.takeIf { it.isNotBlank() }
+        val roughStoryboard = page.imageUrl?.takeIf { it.isNotBlank() }
+        val referenceImage = currentIllustration ?: roughStoryboard
+            ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        val item = FinalIllustrationItem(
             pageNumber = scene.pageNumber,
-            storyboard = StoryboardImageContext(
+            storyboard = FinalIllustrationContext(
                 title = story.title ?: storyPayload.title,
                 synopsis = story.synopsis ?: storyPayload.synopsis,
             ),
-            page = StoryboardImagePagePayload(
+            page = FinalIllustrationPagePayload(
                 pageNumber = scene.pageNumber,
                 sceneSummary = sceneSummary,
                 englishText = englishText,
@@ -129,21 +122,20 @@ class SceneIllustrationService(
             ),
             children = children,
             companions = companions,
-            referenceImageS3Keys = s3Keys,
-            referenceImageUrls = listOfNotNull(styleInfo?.previewUrl),
-            stylePreset = styleInfo?.code,
+            roughStoryboardImageUrl = referenceImage.takeUnless(::looksLikeS3Key),
+            roughStoryboardImageS3Key = roughStoryboard?.takeIf(::looksLikeS3Key),
+            currentIllustrationImageS3Key = currentIllustration?.takeIf(::looksLikeS3Key),
+            stylePrompt = stylePrompt,
         )
 
         val seed = ((storyId * 2654435761L) and 0x7FFFFFFFL).toInt()
         // 씬 일러스트 재생성용 outputVersion — AI 워커가 새 versioned S3 키 (`v{N}.png`) 로 저장하도록.
         // 기존 confirm 시점 v1 을 보존하기 위해 항상 (current ?: 1) + 1 로 부여.
         // listener 의 handleSceneImageSuccess 에서 같은 newVersion 으로 Redis push → URL 일관성 유지.
-        val nextSceneVersion = (illustrationVersionRedisRepository.getCurrent(sceneId) ?: 1) + 1
-        val payload = StoryboardImageRegeneratePayload(
+        val payload = FinalIllustrationRevisePayload(
             storyId = storyId,
             seed = seed,
             userPrompt = trimmedPrompt,
-            outputVersion = nextSceneVersion,
             item = item,
         )
 
@@ -153,20 +145,19 @@ class SceneIllustrationService(
                 sceneId = sceneId,
                 jobType = JobType.ILLUSTRATION,
                 status = JobStatus.PENDING,
-                requestPayload = objectMapper.writeValueAsString(payload),
             ),
         )
 
-        val envelope = StoryboardImageRegenerateMessage(
+        val publishEnvelope = FinalIllustrationReviseMessage(
             jobId = job.id.toString(),
-            jobType = "ILLUSTRATION",
             storyId = storyId,
             payload = payload,
         )
+        job.requestPayload = objectMapper.writeValueAsString(publishEnvelope)
         rabbitTemplate.convertAndSend(
             RabbitMQConfig.REQUEST_EXCHANGE,
-            RoutingKeys.IMAGE_REGENERATE,
-            envelope,
+            RoutingKeys.FINAL_ILLUSTRATION_REVISE,
+            publishEnvelope,
         )
 
         log.info(
@@ -234,4 +225,10 @@ class SceneIllustrationService(
         if (story.userId != userId) throw BusinessException(CommonErrorCode.FORBIDDEN)
         return story
     }
+
+    private fun looksLikeS3Key(value: String): Boolean {
+        if (value.startsWith("http://") || value.startsWith("https://")) return false
+        return S3_KEY_PATTERN.containsMatchIn(value)
+    }
+
 }

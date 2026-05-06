@@ -140,7 +140,12 @@ class FinalIllustrationResultHandler(
     private fun expectedPageCount(job: StoryGenerationJob): Int {
         return try {
             val req = objectMapper.readTree(job.requestPayload)
-            req.path("payload").path("items").size()
+            val payload = req.path("payload")
+            when {
+                payload.path("items").isArray -> payload.path("items").size()
+                !payload.path("item").isMissingNode -> 1
+                else -> Int.MAX_VALUE
+            }
         } catch (e: Exception) {
             log.warn("[FINAL_ILLUST:RES] cannot parse expectedPageCount for jobId={}", job.id, e)
             Int.MAX_VALUE
