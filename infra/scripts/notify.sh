@@ -3,10 +3,11 @@
 # Called from .gitlab-ci.yml .post stage (notify_success / notify_failure).
 #
 # Required env:
-#   DISCORD_WEBHOOK_URL  (masked GitLab Variable)
+#   DISCORD_WEBHOOK_URL      (masked GitLab Variable)
 #   CI_JOB_STATUS, CI_JOB_NAME, CI_JOB_STAGE, CI_COMMIT_BRANCH, etc. (GitLab auto)
 # Optional:
-#   FAILURE_LOG_DIR      (set by deploy-service.sh trap)
+#   MATTERMOST_WEBHOOK_URL   (masked GitLab Variable; omit to skip Mattermost)
+#   FAILURE_LOG_DIR          (set by deploy-service.sh trap)
 
 set -euo pipefail
 
@@ -76,3 +77,46 @@ curl -fsS -X POST \
   -H 'Content-Type: application/json; charset=utf-8' \
   --data-binary "@$TMPFILE" \
   "$WEBHOOK_URL" >/dev/null
+
+# ─── Mattermost (optional) ───────────────────────────────────────
+if [[ -n "${MATTERMOST_WEBHOOK_URL:-}" ]]; then
+  case "$STATUS" in
+    success)  MM_COLOR="#2eb886" ;;
+    failed)   MM_COLOR="#e40303" ;;
+    canceled) MM_COLOR="#e87722" ;;
+    *)        MM_COLOR="#3498db" ;;
+  esac
+
+  MM_PAYLOAD=$(jq -n \
+    --arg color    "$MM_COLOR" \
+    --arg title    "$PREFIX · $JOB" \
+    --arg url      "$JOB_URL" \
+    --arg text     "**$PROJECT** / \`$BRANCH\` @ \`$COMMIT_SHORT\`
+$COMMIT_TITLE" \
+    --arg stage    "$STAGE" \
+    --arg author   "$AUTHOR" \
+    --arg pipeline "$PIPELINE_URL" \
+    --arg footer   "$FOOTER_TEXT" \
+    --argjson ts   "$(date -u +%s)" \
+    '{
+      attachments: [{
+        color: $color,
+        title: $title,
+        title_link: (if $url == "" then null else $url end),
+        text: $text,
+        fields: [
+          { title: "stage",        value: $stage,  short: true },
+          { title: "triggered by", value: $author, short: true },
+          { title: "pipeline",     value: (if $pipeline == "" then "-" else $pipeline end), short: false }
+        ],
+        footer: (if $footer == "" then null else $footer end),
+        ts: $ts
+      }]
+    }')
+
+  printf '%s' "$MM_PAYLOAD" > "$TMPFILE"
+  curl -fsS -X POST \
+    -H 'Content-Type: application/json; charset=utf-8' \
+    --data-binary "@$TMPFILE" \
+    "$MATTERMOST_WEBHOOK_URL" >/dev/null
+fi

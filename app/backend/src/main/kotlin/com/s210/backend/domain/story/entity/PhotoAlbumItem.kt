@@ -20,7 +20,7 @@ class PhotoAlbumItem(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var purpose: PhotoPurpose = PhotoPurpose.BOTH,
+    var purpose: PhotoPurpose = PhotoPurpose.STORYBOARD,
 
     @Column(length = 500)
     var description: String? = null,

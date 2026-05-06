@@ -3,4 +3,14 @@ package com.s210.backend.domain.story.infrastructure.repository
 import com.s210.backend.domain.story.entity.Scene
 import org.springframework.data.jpa.repository.JpaRepository
 
-interface SceneRepository : JpaRepository<Scene, Long>
+interface SceneRepository : JpaRepository<Scene, Long> {
+    fun findByStoryIdOrderByPageNumberAsc(storyId: Long): List<Scene>
+    fun findByStoryIdInOrderByStoryIdAscPageNumberAsc(storyIds: List<Long>): List<Scene>
+    fun findAllByStoryId(storyId: Long): List<Scene>
+
+    fun countByStoryId(storyId: Long): Long
+
+    fun findByIdAndStoryId(id: Long, storyId: Long): Scene?
+
+    fun findByStoryIdAndPageNumber(storyId: Long, pageNumber: Int): Scene?
+}

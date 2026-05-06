@@ -1,20 +1,26 @@
 import { useCallback } from 'react'
+import { ROUTES } from '../../../../shared/constants'
 
-interface KakaoOAuthButtonProps {
-  onSuccess: () => void
-}
+const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize'
+const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID ?? ''
+const KAKAO_SCOPE = 'account_email profile_nickname'
 
 /**
  * 카카오 로그인 진입 버튼.
- * 현재는 alert 후 onSuccess 호출 (UI 검증용 stub).
- * TODO(S14P31S210-75): 백엔드 OAuth 엔드포인트(`/api/auth/oauth/kakao`) 연동.
+ * 현재 origin을 기준으로 Kakao authorize URL을 만들어 프론트 콜백으로 돌아오게 한다.
  */
-export function KakaoOAuthButton({ onSuccess }: KakaoOAuthButtonProps) {
+export function KakaoOAuthButton() {
   const handleClick = useCallback(() => {
-    // TODO(S14P31S210-75): 실제 카카오 OAuth 연동 (redirect or SDK)
-    alert('카카오 로그인은 서버 연동 후 사용 가능합니다. 지금은 테스트로 통과시킬게요!')
-    onSuccess()
-  }, [onSuccess])
+    const redirectUri = `${window.location.origin}${ROUTES.kakaoCallback}`
+    const kakaoUrl = new URL(KAKAO_AUTHORIZE_URL)
+
+    kakaoUrl.searchParams.set('client_id', KAKAO_CLIENT_ID)
+    kakaoUrl.searchParams.set('redirect_uri', redirectUri)
+    kakaoUrl.searchParams.set('response_type', 'code')
+    kakaoUrl.searchParams.set('scope', KAKAO_SCOPE)
+
+    window.location.assign(kakaoUrl.toString())
+  }, [])
 
   return (
     <button

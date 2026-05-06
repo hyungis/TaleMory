@@ -1,3 +1,5 @@
 export { AuthModal } from './ui/AuthModal'
 export { useAuthModal } from './model/useAuthModal'
+export { initializeAuthSession, useAuthSession, setAuthSession, clearAuthSession } from './model/authSession'
+export { LogoutButton, buildOauthLogoutUrl, useLogout } from './logout'
 export type { AuthMode, UseAuthModalResult } from './model/useAuthModal'

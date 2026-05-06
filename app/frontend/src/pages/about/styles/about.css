@@ -1,0 +1,468 @@
+/* ==========================================================================
+   AboutPage — paper-craft 스크랩북 스타일 서비스 소개 페이지.
+   기존 landing.css 의 cream/sage/caramel 톤 + Gaegu 폰트 통일.
+   피드백 반영: 글자 크기 키움, 섹션별 배경색/장식 추가.
+   ========================================================================== */
+
+.about-page {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 20%, #fbf3dc 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, #ead7ad 0%, transparent 65%),
+    linear-gradient(180deg, #f7ecd0 0%, #f0e2bc 100%);
+  overflow-x: hidden;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+/* paper grain + crayon texture overlay */
+.about-page::before,
+.about-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  z-index: 0;
+}
+
+.about-page::before {
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.25  0 0 0 0.13 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+.about-page::after {
+  opacity: 0.18;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='c'><feTurbulence type='turbulence' baseFrequency='0.012 0.04' numOctaves='3' seed='7'/><feColorMatrix values='0 0 0 0 0.78  0 0 0 0 0.62  0 0 0 0 0.36  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+}
+
+/* doodles 배경 — 컨텐츠 뒤에 고정 */
+.about-doodles-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* 모든 콘텐츠는 배경 위에 (nav 제외 — fixed 유지) */
+.about-page > *:not(.about-doodles-bg):not(.about-nav) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== Navigation ===== */
+.about-nav {
+  position: fixed;
+  top: 1rem;
+  left: 1.5rem;
+  z-index: 100;
+}
+
+.about-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #5f7d50;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+
+.about-back-btn:hover {
+  background: rgba(95, 125, 80, 0.08);
+}
+
+/* ===== Hero Section ===== */
+.about-hero {
+  text-align: center;
+  padding: 4rem 2rem 3.5rem;
+  position: relative;
+  max-width: 700px;
+  margin: 0 auto;
+  background:
+    radial-gradient(ellipse at 50% 80%, rgba(122, 153, 104, 0.06) 0%, transparent 70%);
+}
+
+.about-hero__tape {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  width: 100px;
+  height: 28px;
+  background: rgba(255, 230, 140, 0.78);
+  border: 1px dashed rgba(160, 120, 60, 0.55);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.about-hero__title {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: clamp(3.2rem, 7vw, 5rem);
+  font-weight: 700;
+  color: #5f7d50;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.03em;
+  text-shadow: 0 3px 0 rgba(95, 125, 80, 0.15);
+}
+
+.about-hero__subtitle {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+  font-weight: 700;
+  color: #6b5a3e;
+  margin: 0 0 1.5rem;
+  letter-spacing: 0.04em;
+}
+
+.about-hero__divider {
+  margin: 0 auto 1.5rem;
+  width: 140px;
+  height: 10px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8' preserveAspectRatio='none'><path d='M0,4 Q 25 0, 50 4 T 100 4 T 150 4 T 200 4' stroke='%23f0c97a' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: 0.85;
+}
+
+.about-hero__desc {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.6rem;
+  line-height: 1.8;
+  color: #4a3b2a;
+  margin: 0;
+}
+
+/* ===== Section Title ===== */
+.about-section-title {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: clamp(2.2rem, 4.5vw, 3rem);
+  font-weight: 700;
+  color: #5f7d50;
+  text-align: center;
+  margin: 0 0 2.5rem;
+  letter-spacing: 0.02em;
+}
+
+/* ===== Steps Section ===== */
+.about-steps {
+  padding: 4rem 2rem;
+}
+
+.about-steps__timeline {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.about-step {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 1.5rem 2rem;
+  border-radius: 14px;
+}
+
+.about-step:nth-child(odd) {
+  background: rgba(122, 153, 104, 0.25);
+}
+
+.about-step:nth-child(even) {
+  background: rgba(200, 153, 104, 0.2);
+}
+
+.about-step__number {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #7a9968;
+  color: #fdfaf0;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 #5f7d50;
+}
+
+.about-step__content {
+  padding-top: 0;
+}
+
+.about-step__title {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #4a3b2a;
+  margin: 0 0 0.3rem;
+}
+
+.about-step__desc {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.45rem;
+  line-height: 1.5;
+  color: #6b5a3e;
+  margin: 0;
+}
+
+/* ===== Sample Viewer Section ===== */
+.about-sample {
+  padding: 4rem 2rem;
+}
+
+.about-sample .about-section-title,
+.about-sample__viewer-wrapper {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+
+.about-sample__viewer-wrapper {
+  position: relative;
+  width: 100%;
+  /* 4/3 — 16/10 보다 세로로 더 여유. 펼친 책에서 영문+한글 번역이 스크롤 없이 한 화면에 들어가도록. */
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  /* border / box-shadow / border-radius 제거 → about 페이지 배경에 자연스럽게 녹아들게. */
+}
+
+/* 뷰어의 전체화면 스타일을 컨테이너에 맞게 오버라이드.
+   배경/노이즈도 제거 → 컨테이너가 about-page 배경 그대로 노출. */
+.about-sample__viewer-wrapper .sb-room {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 20px 40px;
+  background: transparent;
+}
+.about-sample__viewer-wrapper .sb-room::before,
+.about-sample__viewer-wrapper .sb-room::after {
+  display: none;
+}
+
+/* 펼친 책: 폭을 넓혀 본문 + 한글 해석이 한 화면에 들어가고 삽화도 안 짤리게. */
+.about-sample__viewer-wrapper .sb-shell {
+  width: min(1100px, 100%);
+}
+
+/* 표지 단면: 가로로 너무 길어 보이는 문제 → width: auto 로 base aspect-ratio (2/2.7) 가
+   세로 책 비율을 유지하도록. */
+.about-sample__viewer-wrapper .sb-shell.is-cover {
+  width: auto;
+}
+
+/* 표지 일러스트가 작은 동그라미로 박혀있던 걸 → 표지 전체를 덮도록 풀-블리드 이미지로 전환.
+   원래 cover-single 의 sage→caramel 그라데이션 위에 작게 떠있던 형태였음. */
+.about-sample__viewer-wrapper .sb-cover-illust {
+  position: absolute;
+  inset: 0;
+  z-index: 1;            /* 텍스트 (z-index 3) 와 어두운 오버레이 (z-index 2) 보다 아래 */
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: none;
+  border-radius: inherit;
+  box-shadow: none;
+  object-fit: cover;
+}
+/* 풀-블리드 이미지 위 텍스트 가독성 확보용 어두운 그라데이션. */
+.about-sample__viewer-wrapper .sb-cover-single::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.55) 100%);
+  pointer-events: none;
+}
+
+/* 임베드 모드에서는 전체화면/닫기 버튼 숨김 (mode="preview" 가 컴포넌트에서도 숨기지만
+   레거시 호출처 호환을 위해 CSS 단도 유지). */
+.about-sample__viewer-wrapper .sb-float-top {
+  display: none;
+}
+
+/* 한글 번역을 영문 본문에서 더 아래로 띄우고 글자도 키움 — 책 크기가 커진 만큼 시각적 분리를 강조. */
+.about-sample__viewer-wrapper .sb-body-translation {
+  margin-top: 48px;
+  padding-top: 28px;
+  font-size: 1.6rem;
+  line-height: 1.9;
+}
+
+.about-sample__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: #0a1a0a;
+  color: #f0e6c0;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.3rem;
+}
+
+.about-sample__spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(180, 220, 140, 0.3);
+  border-top-color: #b4dc8c;
+  border-radius: 50%;
+  animation: about-spin 0.8s linear infinite;
+}
+
+@keyframes about-spin {
+  to { transform: rotate(360deg); }
+}
+
+.about-sample__error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a1a0a;
+  color: #f0e6c0;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.3rem;
+}
+
+/* ===== Outro Preview Section ===== */
+.about-outro {
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+
+.about-outro__desc {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.3rem;
+  color: #6b5a3e;
+  margin: -1.2rem 0 2.5rem;
+}
+
+.about-outro__wrapper {
+  /* sb-room CSS 변수 재정의 (BookBackCover가 .sb-room 밖에서 동작하도록) */
+  --sb-paper-warm: #fdf6e0;
+  --sb-ink: #4a3b2a;
+  --sb-sage: #7a9968;
+  --sb-sage-deep: #5f7d50;
+  --sb-caramel: #c89968;
+  --sb-rust: #c47254;
+  --sb-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
+  --sb-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
+
+  position: relative;
+  width: 100%;
+  height: 400px;
+}
+
+/* 배경/오버레이 모두 제거 — 메모지만 표시 (About 페이지는 일러스트 배경 안 씀) */
+.about-outro__wrapper .sb-back-cover {
+  background: transparent;
+}
+
+.about-outro__wrapper .sb-back-cover::before {
+  display: none;
+}
+
+/* 메모지 그림자 제거 */
+.about-outro__wrapper .sb-letter {
+  box-shadow: none;
+}
+
+/* 임베드에서 제어 버튼 숨김 */
+.about-outro__wrapper .sb-letter-controls {
+  display: none;
+}
+
+/* ===== CTA Section ===== */
+.about-cta {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+
+.about-cta__text {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #4a3b2a;
+  margin: 0 0 2rem;
+}
+
+.about-cta__btn {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  padding: 1rem 3.2rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fdfaf0;
+  background: #7a9968;
+  border: 2.5px solid #5f7d50;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow:
+    0 4px 0 #5f7d50,
+    0 10px 28px rgba(95, 125, 80, 0.35);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.about-cta__btn:hover {
+  background: #88a875;
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 #5f7d50,
+    0 14px 32px rgba(95, 125, 80, 0.45);
+}
+
+.about-cta__btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 #5f7d50,
+    0 4px 12px rgba(95, 125, 80, 0.3);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  /* aspect-ratio 4/3 은 메인 룰에 이미 동일 — 명시적으로 두지 않음. border-radius 도 메인에서 제거됨. */
+  .about-sample__viewer-wrapper .sb-room {
+    padding: 12px 16px;
+  }
+
+  .about-steps,
+  .about-outro {
+    padding: 3rem 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .about-steps__timeline {
+    padding-left: 2.5rem;
+  }
+
+  .about-sample__viewer-wrapper {
+    aspect-ratio: 3 / 4;
+  }
+
+  .about-outro__wrapper {
+    height: 340px;
+  }
+}

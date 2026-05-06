@@ -1,0 +1,1707 @@
+/* ==========================================================================
+   MyPage — paper-craft 톤 (Claude HTML 기반).
+   책장/로그인 모달과 같은 cream + caramel + sage 팔레트, 손글씨 폰트, washi tape.
+   `.mypage-shell` 하위에서만 활성화되도록 scope.
+   ========================================================================== */
+
+/* mypage 디자인 토큰 — :root 에 두어 .mypage-shell 외부 (modal portal) 에서도 접근 */
+:root {
+  --mp-paper: #f6ecd4;
+  --mp-paper-2: #efe1c2;
+  --mp-paper-deep: #e6d4ad;
+  --mp-ink: #4a3b2a;
+  --mp-ink-soft: #6b5638;
+  --mp-sage: #7a9968;
+  --mp-sage-deep: #5f7d50;
+  --mp-caramel: #c89968;
+  --mp-caramel-deep: #a37548;
+  --mp-rust: #c47254;
+  --mp-butter: #f0c97a;
+}
+
+.mypage-shell {
+  /* legacy alias — 기존 mypage 요소에서 var(--paper) 등으로 참조 가능 */
+  --paper: var(--mp-paper);
+  --paper-2: var(--mp-paper-2);
+  --paper-deep: var(--mp-paper-deep);
+  --ink: var(--mp-ink);
+  --ink-soft: var(--mp-ink-soft);
+  --sage: var(--mp-sage);
+  --sage-deep: var(--mp-sage-deep);
+  --caramel: var(--mp-caramel);
+  --caramel-deep: var(--mp-caramel-deep);
+  --rust: var(--mp-rust);
+  --butter: var(--mp-butter);
+
+  /* 라우트 컨테이너가 고정 높이(h-full)를 강제할 수 있어 자체 스크롤 컨테이너로 동작.
+     overflow-y: auto + height: 100% 로 내부 컨텐츠가 길어지면 mypage-shell 안에서 스크롤. */
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at 30% 20%, #fbf3dc 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, #ead7ad 0%, transparent 65%),
+    linear-gradient(180deg, #f7ecd0 0%, #f0e2bc 100%);
+}
+
+/* paper grain + crayon noise overlays — 책장과 동일한 톤.
+   position: fixed 로 두어 mypage-shell 자체 스크롤과 무관하게 viewport 에 고정. */
+.mypage-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.25  0 0 0 0.13 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  z-index: 0;
+}
+.mypage-shell::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='c'><feTurbulence type='turbulence' baseFrequency='0.012 0.04' numOctaves='3' seed='7'/><feColorMatrix values='0 0 0 0 0.78  0 0 0 0 0.62  0 0 0 0 0.36  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+  z-index: 0;
+}
+
+/* 콘텐츠는 모두 z-index: 1 위로 */
+.mypage-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 손그림 doodle 배경 — 스크롤해도 viewport 에 고정.
+   .mypage-shell > * 보다 더 구체적이라 z-index: 0 으로 컨텐츠보다 뒤로 보냄. */
+.mypage-shell .mp-doodles-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.mypage-shell .mp-doodles-bg > svg + div {
+  /* BookshelfDoodles 내부의 absolute inset-0 컨테이너 — 자체적으로 위치 잡음 */
+  z-index: 0;
+}
+
+/* ===== top bar ===== */
+.mp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 36px;
+  background: rgba(247, 236, 208, 0.7);
+  backdrop-filter: blur(4px);
+  border-bottom: 2px dashed rgba(163, 117, 72, 0.3);
+}
+.mp-back-btn {
+  background: var(--paper);
+  border: 2px solid var(--caramel-deep);
+  border-radius: 999px;
+  padding: 8px 18px 8px 14px;
+  font-family: 'Gaegu', cursive;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--caramel-deep);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.15s ease;
+}
+.mp-back-btn:hover { transform: translateY(-1px); }
+.mp-logo {
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--sage-deep);
+  letter-spacing: 0.04em;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.mp-logo .accent {
+  color: var(--rust);
+}
+
+/* ===== app shell ===== */
+.mp-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 36px 80px;
+}
+
+.mp-page-title {
+  /* "마이페이지" — Gaegu 700 + 0.7px ink stroke 으로 두꺼운 손글씨 톤 (책장 타이틀과 동일).
+     Pen Script 는 너무 얇게 렌더되어 paper-craft 톤에 어울리지 않아 보조 폰트로만 둠. */
+  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
+  font-size: 60px;
+  color: var(--ink);
+  margin: 8px 0 8px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  text-shadow:
+    1px 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 1px rgba(74, 59, 42, 0.3);
+  -webkit-text-stroke: 0.7px var(--ink);
+  line-height: 1.1;
+}
+.mp-page-title-underline {
+  display: block;
+  width: 200px;
+  height: 6px;
+  margin-bottom: 28px;
+}
+
+/* ===== card (paper) ===== */
+.mp-card {
+  position: relative;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--caramel-deep);
+  border-radius: 22px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  box-shadow:
+    0 2px 0 var(--caramel-deep),
+    0 8px 22px rgba(140, 100, 60, 0.16);
+}
+.mp-tape {
+  position: absolute;
+  top: -12px;
+  left: 30px;
+  width: 86px;
+  height: 22px;
+  background: rgba(255, 230, 140, 0.65);
+  border-left: 1px dashed rgba(150, 110, 50, 0.3);
+  border-right: 1px dashed rgba(150, 110, 50, 0.3);
+  transform: rotate(-4deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+.mp-tape--alt {
+  left: 60px;
+  background: rgba(216, 165, 124, 0.55);
+  transform: rotate(3deg);
+}
+.mp-tape--alt2 {
+  left: 50px;
+  background: rgba(247, 199, 122, 0.5);
+  transform: rotate(-3deg);
+}
+
+.mp-card-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.mp-card-title {
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.mp-card-sub {
+  font-family: 'Gaegu', cursive;
+  font-size: 19px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* ===== buttons ===== */
+.mp-btn {
+  font-family: 'Gaegu', cursive;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.mp-btn:hover { transform: translateY(-1px); }
+.mp-btn:active { transform: translateY(1px); }
+.mp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.mp-btn-sage {
+  background: var(--sage);
+  color: #fdfaf0;
+  border: 2px solid var(--sage-deep);
+  padding: 10px 20px;
+  font-size: 20px;
+  box-shadow: 0 3px 0 var(--sage-deep), 0 6px 12px rgba(95, 125, 80, 0.2);
+}
+.mp-btn-sage:hover { background: #88a875; }
+.mp-btn-sage:disabled {
+  box-shadow: 0 3px 0 var(--sage-deep);
+}
+.mp-btn-cream {
+  background: #f7eccd;
+  color: var(--ink);
+  border: 2px solid var(--caramel-deep);
+  padding: 10px 20px;
+  font-size: 20px;
+  box-shadow: 0 3px 0 var(--caramel-deep);
+}
+.mp-btn-cream:hover { background: #f1e1b8; }
+.mp-btn-ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 2px solid var(--caramel-deep);
+  padding: 8px 16px;
+  font-size: 18px;
+}
+.mp-btn-ghost:hover { background: rgba(247, 236, 205, 0.5); }
+.mp-btn-rust {
+  background: #fcefe7;
+  color: var(--rust);
+  border: 2px solid var(--rust);
+  padding: 8px 16px;
+  font-size: 18px;
+}
+.mp-btn-rust:hover { background: #f8dccf; }
+
+/* ===== profile section ===== */
+.mp-profile-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .mp-profile-row {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+}
+.mp-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--sage-deep);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 48px;
+  font-weight: 800;
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.15),
+    0 6px 14px rgba(60, 90, 50, 0.3);
+  border: 3px solid #fdf6dc;
+  outline: 2px dashed rgba(95, 125, 80, 0.4);
+  outline-offset: 2px;
+  margin: 0 auto;
+}
+.mp-profile-info {
+  font-family: 'Gaegu', cursive;
+  font-size: 20px;
+  color: var(--ink);
+  line-height: 1.7;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  column-gap: 16px;
+  row-gap: 4px;
+  min-width: 0;
+}
+.mp-profile-info .mp-lbl {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.mp-profile-info .mp-val {
+  color: var(--ink);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-profile-tags {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.mp-tag-chip {
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  background: #e8efd9;
+  color: var(--sage-deep);
+  border: 1.5px solid var(--sage);
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.mp-tag-chip--off {
+  background: rgba(247, 236, 205, 0.6);
+  color: var(--ink-soft);
+  border-color: rgba(163, 117, 72, 0.45);
+}
+.mp-tag-chip--provider {
+  background: rgba(247, 236, 205, 0.7);
+  color: var(--caramel-deep);
+  border-color: var(--caramel);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ===== character grid ===== */
+.mp-char-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .mp-char-grid { grid-template-columns: 1fr; }
+}
+.mp-char-card {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  background: #fbf2da;
+  border: 2px dashed var(--caramel);
+  border-radius: 16px;
+  padding: 14px 18px;
+  transition: transform 0.15s ease, border-style 0.15s ease;
+}
+.mp-char-card:hover {
+  transform: translateY(-2px);
+  border-style: solid;
+}
+.mp-char-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--sage);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 22px;
+  font-weight: 800;
+  border: 2px solid #fdf6dc;
+  box-shadow: 0 2px 4px rgba(60, 90, 50, 0.25);
+}
+.mp-char-name {
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-char-meta {
+  font-family: 'Gaegu', cursive;
+  font-size: 17px;
+  color: var(--ink-soft);
+}
+.mp-char-actions {
+  display: flex;
+  gap: 6px;
+}
+.mp-icon-action {
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: var(--ink-soft);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-family: 'Gaegu', cursive;
+  font-size: 17px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.mp-icon-action:hover {
+  background: #f3e3b8;
+  border-color: var(--caramel);
+}
+.mp-icon-action.danger { color: var(--rust); }
+.mp-icon-action.danger:hover {
+  background: #fcebe2;
+  border-color: var(--rust);
+}
+.mp-icon-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== voice list ===== */
+.mp-voice-card {
+  background: #fbf2da;
+  border: 2px dashed var(--caramel);
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-top: 12px;
+}
+.mp-voice-head {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+.mp-voice-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--sage);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fdf6dc;
+  box-shadow: 0 2px 4px rgba(60, 90, 50, 0.25);
+  font-family: 'Nanum Myeongjo', serif;
+  font-weight: 800;
+  font-size: 20px;
+}
+.mp-voice-name {
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-voice-sub {
+  font-family: 'Gaegu', cursive;
+  font-size: 17px;
+  color: var(--ink-soft);
+}
+/* Claude HTML 의 .audio-bar 와 1:1 — sage play 버튼 + 손그림 track + Gaegu 시간 */
+.mp-audio-bar {
+  margin-top: 12px;
+  background: #f3e3b8;
+  border: 1.5px solid var(--caramel);
+  border-radius: 999px;
+  padding: 8px 14px;
+  display: grid;
+  grid-template-columns: 36px 56px 1fr 56px 26px;
+  gap: 10px;
+  align-items: center;
+}
+.mp-audio-play {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sage);
+  border: 2px solid var(--sage-deep);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.mp-audio-play:hover:not(:disabled) { transform: translateY(-1px); }
+.mp-audio-play:disabled { opacity: 0.45; cursor: not-allowed; }
+.mp-audio-time {
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  color: var(--ink-soft);
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.mp-audio-track {
+  height: 6px;
+  background: rgba(150, 110, 50, 0.22);
+  border-radius: 999px;
+  position: relative;
+  overflow: visible;
+  cursor: pointer;
+}
+.mp-audio-track-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--sage), var(--caramel));
+  border-radius: 999px;
+}
+.mp-audio-track-knob {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background: var(--sage-deep);
+  border: 2px solid #fdf6dc;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.mp-audio-volume {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  transition: background 0.12s ease, color 0.12s ease;
+  position: relative;
+}
+.mp-audio-volume:hover {
+  background: rgba(163, 117, 72, 0.18);
+  color: var(--ink);
+}
+.mp-audio-volume.muted { color: var(--rust); }
+.mp-audio-volume[aria-expanded='true'] {
+  background: rgba(163, 117, 72, 0.18);
+  color: var(--ink);
+}
+
+/* 볼륨 슬라이더 popover — 볼륨 버튼 위로 떠오름 */
+.mp-volume-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: -8px;
+  z-index: 40;
+  min-width: 180px;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2px solid var(--caramel-deep);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 3px 0 var(--caramel-deep), 0 8px 18px rgba(140, 100, 60, 0.28);
+  font-family: 'Gaegu', cursive;
+  animation: mpFadeIn 0.15s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mp-volume-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--caramel-deep);
+  letter-spacing: 0.5px;
+}
+.mp-volume-popover-header strong {
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 18px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+/* paper-craft 볼륨 슬라이더 */
+.mp-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(150, 110, 50, 0.22);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+.mp-volume-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--sage) 0%,
+    var(--caramel) var(--mp-vol, 70%),
+    rgba(150, 110, 50, 0.22) var(--mp-vol, 70%)
+  );
+}
+.mp-volume-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(150, 110, 50, 0.22);
+}
+.mp-volume-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--sage), var(--caramel));
+}
+.mp-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sage-deep);
+  border: 2px solid #fdf6dc;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  margin-top: -5px;
+}
+.mp-volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sage-deep);
+  border: 2px solid #fdf6dc;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.mp-volume-mute-toggle {
+  font-family: 'Gaegu', cursive;
+  font-size: 15px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1.5px dashed var(--caramel);
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+  align-self: flex-start;
+  font-weight: 700;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.mp-volume-mute-toggle:hover {
+  background: rgba(122, 153, 104, 0.16);
+  color: var(--sage-deep);
+}
+.mp-volume-mute-toggle.muted {
+  background: rgba(196, 114, 84, 0.12);
+  color: var(--rust);
+  border-color: var(--rust);
+}
+
+.mp-voice-card .mp-empty-audio {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(247, 236, 205, 0.6);
+  border: 1.5px dashed var(--caramel);
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  color: var(--caramel-deep);
+  font-style: italic;
+  text-align: center;
+}
+
+/* ===== empty/loading text ===== */
+.mp-muted {
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+  padding: 12px 4px;
+}
+.mp-muted--italic {
+  color: var(--caramel-deep);
+  font-style: italic;
+}
+
+/* ===== footer / danger zone ===== */
+.mp-danger-zone {
+  margin-top: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-top: 2px dashed rgba(150, 110, 50, 0.4);
+  flex-wrap: wrap;
+}
+.mp-dz-text {
+  font-family: 'Gaegu', cursive;
+  color: var(--ink-soft);
+  flex: 1;
+  min-width: 240px;
+}
+.mp-dz-text strong {
+  display: block;
+  font-size: 20px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.mp-dz-text .mp-small {
+  display: block;
+  font-size: 16px;
+  color: #8a7558;
+  margin-top: 4px;
+  max-width: 540px;
+  line-height: 1.5;
+}
+.mp-dz-text .mp-small .mp-emph {
+  color: var(--sage-deep);
+  font-weight: 700;
+}
+.mp-dz-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ===== modal ===== */
+.mp-modal-back {
+  /* modal portal 은 .mypage-shell 외부 (Fragment 의 sibling) 로 렌더되므로
+     디자인 토큰을 다시 alias 해 var(--paper) 등이 끊기지 않도록 한다. */
+  --paper: var(--mp-paper);
+  --paper-2: var(--mp-paper-2);
+  --paper-deep: var(--mp-paper-deep);
+  --ink: var(--mp-ink);
+  --ink-soft: var(--mp-ink-soft);
+  --sage: var(--mp-sage);
+  --sage-deep: var(--mp-sage-deep);
+  --caramel: var(--mp-caramel);
+  --caramel-deep: var(--mp-caramel-deep);
+  --rust: var(--mp-rust);
+  --butter: var(--mp-butter);
+
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 40, 20, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: mpFadeIn 0.2s ease;
+}
+@keyframes mpFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.mp-modal {
+  width: 100%;
+  max-width: 460px;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--caramel-deep);
+  border-radius: 22px;
+  padding: 26px 28px;
+  box-shadow:
+    0 4px 0 var(--caramel-deep),
+    0 16px 36px rgba(60, 40, 20, 0.35);
+  position: relative;
+  animation: mpPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes mpPop {
+  from {
+    transform: scale(0.92) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+.mp-modal::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 30px;
+  width: 80px;
+  height: 22px;
+  background: rgba(255, 230, 140, 0.7);
+  transform: rotate(-3deg);
+  border-left: 1px dashed rgba(150, 110, 50, 0.3);
+  border-right: 1px dashed rgba(150, 110, 50, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.mp-modal h3 {
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 18px;
+  color: var(--ink);
+}
+.mp-modal--danger {
+  border-color: var(--rust);
+  box-shadow:
+    0 4px 0 var(--rust),
+    0 16px 36px rgba(60, 40, 20, 0.35);
+}
+.mp-modal--danger h3 {
+  color: var(--rust);
+}
+.mp-modal--danger::before {
+  background: rgba(216, 133, 124, 0.7);
+}
+.mp-modal-text {
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.mp-modal-text strong { color: var(--rust); font-weight: 700; }
+.mp-modal-text .mp-emph { color: var(--sage-deep); font-weight: 700; }
+
+.mp-field {
+  margin-bottom: 14px;
+}
+.mp-field-label {
+  display: block;
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.mp-input {
+  width: 100%;
+  background: #fbf2da;
+  border: 2px solid var(--caramel);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: 'Gaegu', cursive;
+  font-size: 19px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mp-input::placeholder { color: rgba(163, 117, 72, 0.55); }
+.mp-input:focus {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(122, 153, 104, 0.2);
+}
+.mp-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.mp-field-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.mp-inline-check-btn {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2px solid var(--sage-deep);
+  background: #e8efd9;
+  color: var(--sage-deep);
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mp-inline-check-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.mp-field-help {
+  margin: 6px 0 0;
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.mp-field-help--success {
+  color: var(--sage-deep);
+}
+.mp-field-help--error {
+  color: #8c3a1f;
+}
+
+/* ===== seg-radio (성별 등) ===== */
+.mp-seg-radio {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.mp-seg-radio label {
+  background: #fbf2da;
+  border: 2px solid var(--caramel);
+  border-radius: 12px;
+  padding: 10px;
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-weight: 700;
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.mp-seg-radio label:hover {
+  border-color: var(--sage);
+}
+.mp-seg-radio label.active {
+  background: var(--sage);
+  border-color: var(--sage-deep);
+  color: #fdf6dc;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+/* ===== toggle switch ===== */
+.mp-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.mp-switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  background: #d9c89c;
+  border-radius: 999px;
+  border: 2px solid var(--caramel-deep);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+.mp-switch::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 18px;
+  height: 18px;
+  background: #fefaee;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+.mp-switch.on {
+  background: var(--sage);
+  border-color: var(--sage-deep);
+}
+.mp-switch.on::after { transform: translateX(20px); }
+.mp-switch:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.mp-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ===== age input (number stepper) ===== */
+.mp-age-wrap {
+  position: relative;
+  min-width: 0;
+}
+.mp-age-wrap input[type='number'] {
+  -moz-appearance: textfield;
+  width: 100%;
+  padding-right: 40px;
+}
+.mp-age-wrap input[type='number']::-webkit-inner-spin-button,
+.mp-age-wrap input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.mp-age-steppers {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px dashed rgba(163, 117, 72, 0.45);
+  border-radius: 0 10px 10px 0;
+  overflow: hidden;
+}
+.mp-age-steppers button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--caramel-deep);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.mp-age-steppers button:hover {
+  background: rgba(247, 199, 122, 0.35);
+  color: var(--ink);
+}
+.mp-age-steppers .mp-age-step-divider {
+  height: 1px;
+  background: rgba(163, 117, 72, 0.3);
+}
+
+/* ===== loading skeleton card (paper-craft) ===== */
+.mp-loading-card {
+  position: relative;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--caramel-deep);
+  border-radius: 22px;
+  padding: 22px 26px;
+  box-shadow: 0 2px 0 var(--caramel-deep);
+  font-family: 'Gaegu', cursive;
+  color: var(--ink-soft);
+  font-size: 18px;
+}
+
+/* ===== auth required state ===== */
+.mp-auth-required {
+  max-width: 520px;
+  margin: 80px auto;
+  padding: 0 24px;
+  text-align: center;
+}
+.mp-auth-required-card {
+  position: relative;
+  background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
+  border: 2.5px solid var(--caramel-deep);
+  border-radius: 24px;
+  padding: 36px 32px;
+  box-shadow:
+    0 4px 0 var(--caramel-deep),
+    0 16px 36px rgba(60, 40, 20, 0.18);
+}
+.mp-auth-required-card h1 {
+  font-family: 'Nanum Pen Script', cursive;
+  font-size: 44px;
+  color: var(--sage-deep);
+  margin: 0 0 12px;
+  letter-spacing: 1px;
+  -webkit-text-stroke: 0.4px var(--sage-deep);
+}
+.mp-auth-required-card p {
+  font-family: 'Gaegu', cursive;
+  font-size: 20px;
+  color: var(--ink-soft);
+  margin: 0 0 24px;
+}
+.mp-auth-required-card a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--sage);
+  color: #fdfaf0;
+  border: 2px solid var(--sage-deep);
+  border-radius: 999px;
+  padding: 10px 24px;
+  font-family: 'Gaegu', cursive;
+  font-size: 20px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 3px 0 var(--sage-deep), 0 6px 12px rgba(95, 125, 80, 0.2);
+  transition: transform 0.15s ease;
+}
+.mp-auth-required-card a:hover { transform: translateY(-1px); }
+
+/* ============================================================================
+   Voice Clone Add Page — Claude HTML 1:1 paper-craft 디자인
+   3-step stepper (녹음 → 변환 → 저장) + sample card + recorder + waveform
+   ============================================================================ */
+
+.vc-page-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: linear-gradient(180deg, #fbf2da 0%, #f5e6bd 100%);
+  border-bottom: 2px solid var(--caramel-deep);
+  color: var(--ink);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: 0 2px 0 var(--caramel-deep);
+}
+.vc-back-btn {
+  background: var(--paper);
+  border: 2px solid var(--caramel-deep);
+  color: var(--ink);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Gaegu', cursive;
+  font-weight: 700;
+  font-size: 18px;
+  box-shadow: 0 2px 0 var(--caramel-deep);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.12s ease;
+}
+.vc-back-btn:hover { transform: translateY(-1px); }
+.vc-crumb {
+  font-family: 'Nanum Pen Script', 'Gaegu', cursive;
+  font-size: 26px;
+  color: var(--ink);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* 헤더 안에 들어가는 stepper — 본문용보다 컴팩트 */
+.vc-stepper.vc-stepper--header {
+  margin: 0 auto;
+  max-width: 460px;
+  grid-template-columns: 1fr 22px 1fr 22px 1fr;
+  gap: 8px;
+  flex: 1;
+  padding: 0 12px;
+}
+.vc-stepper.vc-stepper--header .vc-step .num {
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  box-shadow: 0 1.5px 0 var(--caramel-deep);
+}
+.vc-stepper.vc-stepper--header .vc-step.active .num,
+.vc-stepper.vc-stepper--header .vc-step.done .num {
+  box-shadow: 0 1.5px 0 var(--sage-deep);
+}
+.vc-stepper.vc-stepper--header .vc-step .lbl {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.vc-stepper.vc-stepper--header .vc-step-line {
+  height: 3px;
+  background-size: 8px 3px;
+}
+
+@media (max-width: 720px) {
+  .vc-stepper.vc-stepper--header {
+    max-width: 320px;
+    grid-template-columns: 1fr 18px 1fr 18px 1fr;
+    gap: 6px;
+    padding: 0 6px;
+  }
+  .vc-stepper.vc-stepper--header .vc-step .num {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+  .vc-stepper.vc-stepper--header .vc-step .lbl {
+    font-size: 13px;
+  }
+}
+
+.vc-hero {
+  text-align: center;
+  padding: 36px 20px 8px;
+  position: relative;
+}
+.vc-hero-mic {
+  display: inline-grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: var(--sage);
+  border: 3px solid var(--sage-deep);
+  color: #fdf6dc;
+  box-shadow:
+    0 4px 0 var(--sage-deep),
+    0 10px 22px rgba(80, 110, 60, 0.3);
+}
+.vc-hero h1 {
+  font-family: 'Nanum Pen Script', 'Gaegu', cursive;
+  font-size: 56px;
+  color: var(--ink);
+  margin: 14px 0 8px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+  -webkit-text-stroke: 0.3px var(--ink);
+}
+.vc-hero p {
+  font-family: 'Gaegu', cursive;
+  font-size: 20px;
+  color: var(--ink-soft);
+  margin: 0 auto;
+  max-width: 480px;
+  line-height: 1.5;
+}
+
+/* progress steps */
+.vc-stepper {
+  display: grid;
+  grid-template-columns: 1fr 28px 1fr 28px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 28px auto 8px;
+  max-width: 560px;
+}
+.vc-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.vc-step .num {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #fbf2da;
+  border: 2.5px solid var(--caramel);
+  color: var(--caramel-deep);
+  display: grid;
+  place-items: center;
+  font-family: 'Nanum Myeongjo', serif;
+  font-weight: 800;
+  font-size: 20px;
+  box-shadow: 0 2px 0 var(--caramel-deep);
+}
+.vc-step .lbl {
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vc-step.active .num {
+  background: var(--sage);
+  border-color: var(--sage-deep);
+  color: #fdf6dc;
+  box-shadow: 0 2px 0 var(--sage-deep);
+}
+.vc-step.active .lbl { color: var(--sage-deep); }
+.vc-step.done .num {
+  background: #fdf6dc;
+  border-color: var(--sage-deep);
+  color: var(--sage-deep);
+  box-shadow: 0 2px 0 var(--sage-deep);
+}
+.vc-step.done .num::before { content: '✓'; }
+.vc-step.done .num span { display: none; }
+.vc-step-line {
+  height: 4px;
+  background-image: linear-gradient(90deg, var(--caramel) 50%, transparent 50%);
+  background-size: 10px 4px;
+  background-repeat: repeat-x;
+  border-radius: 2px;
+}
+.vc-step-line.done {
+  background-image: linear-gradient(90deg, var(--sage-deep) 50%, transparent 50%);
+}
+
+/* step badge inside cards */
+.vc-step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Gaegu', cursive;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--caramel-deep);
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+.vc-step-badge .pip {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--caramel);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  font-family: 'Nanum Myeongjo', serif;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* sample card */
+.vc-sample-block {
+  background: #fdf6dc;
+  border: 2.5px dashed var(--caramel);
+  border-radius: 18px;
+  padding: 22px 24px;
+  margin: 4px 0 18px;
+  position: relative;
+}
+.vc-sample-block .quote-mark {
+  position: absolute;
+  top: -8px;
+  left: 18px;
+  font-family: 'Nanum Myeongjo', 'Caveat', serif;
+  font-size: 60px;
+  color: var(--caramel);
+  line-height: 1;
+  opacity: 0.6;
+}
+.vc-sample-block .quote {
+  font-family: 'Nanum Myeongjo', 'Caveat', serif;
+  font-size: 26px;
+  color: var(--sage-deep);
+  line-height: 1.45;
+  text-align: center;
+  margin: 4px 0 14px;
+  padding: 0 18px;
+  font-weight: 800;
+}
+.vc-sample-block .ko-hint {
+  font-family: 'Gaegu', cursive;
+  font-size: 17px;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(150, 110, 50, 0.25);
+}
+.vc-sample-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1.5px dashed rgba(150, 110, 50, 0.3);
+  padding-top: 12px;
+  flex-wrap: wrap;
+}
+.vc-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fbf2da;
+  border: 1.5px solid var(--caramel);
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-family: 'Gaegu', cursive;
+  font-size: 16px;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.vc-tip {
+  font-family: 'Gaegu', cursive;
+  font-size: 15px;
+  color: #8a7558;
+  font-style: italic;
+}
+
+/* recorder */
+.vc-recorder {
+  background: #fdf6dc;
+  border: 2px solid var(--caramel);
+  border-radius: 22px;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.vc-recorder.is-recording {
+  border-color: var(--rust);
+  background: linear-gradient(180deg, #fdf6dc 0%, #fcefe7 100%);
+}
+.vc-recorder.is-recorded {
+  border-color: var(--sage);
+  background: linear-gradient(180deg, #fdf6dc 0%, #f0f5e6 100%);
+}
+.vc-rec-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  background: var(--paper);
+  border: 1.5px solid var(--caramel);
+  color: var(--ink-soft);
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-family: 'Gaegu', cursive;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.vc-recorder.is-recording .vc-rec-status-tag {
+  background: #fcefe7;
+  border-color: var(--rust);
+  color: var(--rust);
+}
+.vc-recorder.is-recording .vc-rec-status-tag .live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rust);
+  animation: vcBlink 1s ease-in-out infinite;
+}
+@keyframes vcBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.vc-recorder.is-recorded .vc-rec-status-tag {
+  background: #f0f5e6;
+  border-color: var(--sage);
+  color: var(--sage-deep);
+}
+
+.vc-rec-mic-shell {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 6px auto 8px;
+  width: 84px;
+  height: 84px;
+}
+.vc-rec-mic-shell .pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid var(--rust);
+  opacity: 0;
+  pointer-events: none;
+}
+.vc-recorder.is-recording .vc-rec-mic-shell .pulse-ring {
+  animation: vcRingPulse 1.6s ease-out infinite;
+}
+.vc-recorder.is-recording .vc-rec-mic-shell .pulse-ring.delay {
+  animation-delay: 0.6s;
+}
+@keyframes vcRingPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* 큰 동그란 record 버튼 (원본 .btn-record 그대로) */
+.vc-btn-record {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--rust);
+  border: 3px solid #8a4a32;
+  box-shadow:
+    0 4px 0 #8a4a32,
+    0 8px 18px rgba(140, 60, 40, 0.3);
+  color: #fdf6dc;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.12s ease;
+  position: relative;
+  z-index: 1;
+}
+.vc-btn-record:hover:not(:disabled) { transform: translateY(-2px); }
+.vc-btn-record:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.vc-rec-time {
+  font-family: 'Nanum Myeongjo', serif;
+  font-weight: 700;
+  font-size: 36px;
+  color: var(--ink);
+  letter-spacing: 2px;
+  margin: 4px 0 14px;
+}
+.vc-recorder.is-recording .vc-rec-time { color: var(--rust); }
+
+/* waveform */
+.vc-waveform {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  margin: 8px 0 6px;
+  padding: 0 24px;
+}
+.vc-waveform .bar {
+  width: 4px;
+  background: var(--caramel);
+  border-radius: 2px;
+  height: 8px;
+  transition: height 0.2s ease;
+  opacity: 0.4;
+}
+.vc-recorder.is-recording .vc-waveform .bar {
+  background: var(--rust);
+  opacity: 0.9;
+  animation: vcWaveBeat 1.1s ease-in-out infinite;
+}
+.vc-recorder.is-recorded .vc-waveform .bar {
+  background: var(--sage);
+  opacity: 0.85;
+}
+@keyframes vcWaveBeat {
+  0%, 100% { height: 12px; }
+  50% { height: var(--h, 36px); }
+}
+.vc-rec-hint {
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+.vc-recorder.is-recording .vc-rec-hint { color: var(--rust); }
+
+.vc-rec-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+/* recorded preview audio bar inside step */
+.vc-preview-audio {
+  margin-top: 18px;
+  background: #fbf2da;
+  border: 2px dashed var(--caramel);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+.vc-preview-audio-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-family: 'Gaegu', cursive;
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+/* tts card */
+.vc-tts-input {
+  width: 100%;
+  background: #fdf6dc;
+  border: 2px solid var(--caramel);
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-family: 'Gaegu', cursive;
+  font-size: 19px;
+  color: var(--ink);
+  outline: none;
+  resize: vertical;
+  min-height: 92px;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.vc-tts-input::placeholder { color: rgba(163, 117, 72, 0.55); }
+.vc-tts-input:focus {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(122, 153, 104, 0.2);
+}
+.vc-tts-input:disabled { opacity: 0.65; cursor: not-allowed; }
+.vc-tts-helper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-family: 'Gaegu', cursive;
+  font-size: 15px;
+  color: #8a7558;
+}
+.vc-tts-bottom {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vc-tts-result {
+  margin-top: 14px;
+  background: #fdf6dc;
+  border: 2px dashed var(--sage);
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+
+/* save card */
+.vc-save-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+@media (max-width: 600px) {
+  .vc-save-row { grid-template-columns: 1fr; }
+}
+.vc-save-input {
+  background: #fdf6dc;
+  border: 2px solid var(--caramel);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-family: 'Gaegu', cursive;
+  font-size: 19px;
+  color: var(--ink);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.vc-save-input::placeholder { color: rgba(163, 117, 72, 0.55); }
+.vc-save-input:focus {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(122, 153, 104, 0.2);
+}
+.vc-save-input:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.vc-save-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #fbf2da;
+  border-radius: 12px;
+  border: 1.5px dashed rgba(150, 110, 50, 0.3);
+}
+.vc-save-stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sage);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fdf6dc;
+  box-shadow: 0 2px 4px rgba(60, 90, 50, 0.2);
+  font-family: 'Nanum Myeongjo', serif;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.vc-save-stat-text {
+  flex: 1;
+  font-family: 'Gaegu', cursive;
+  font-size: 17px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.vc-save-stat-text strong { color: var(--ink); font-size: 19px; font-weight: 700; }
+
+.vc-foot-mark {
+  text-align: center;
+  margin-top: 36px;
+  font-family: 'Nanum Pen Script', 'Gaegu', cursive;
+  color: #8a7558;
+  font-size: 20px;
+  opacity: 0.85;
+  letter-spacing: 0.5px;
+}
+.vc-foot-mark .heart { color: var(--rust); }
+
+/* dimmed card when step is locked */
+.vc-card-dim {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.vc-card-dim.has-actions {
+  pointer-events: auto;
+}
+
+/* ===== page error banner ===== */
+.mp-page-error {
+  background: rgba(196, 114, 84, 0.12);
+  border: 1.5px solid rgba(196, 114, 84, 0.45);
+  color: #8c3a1f;
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}

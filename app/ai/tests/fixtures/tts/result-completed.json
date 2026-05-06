@@ -1,0 +1,23 @@
+{
+  "jobId": "12345",
+  "type": "GENERATE_TTS_COMPLETED",
+  "storyId": 100,
+  "status": "COMPLETED",
+  "payload": {
+    "storyId": 100,
+    "voiceId": "42",
+    "items": [
+      {
+        "sentenceId": 1001,
+        "appliedStyle": { "emotion": "neutral", "stylePrompt": null },
+        "audio": { "audioUrl": "https://s3/a.wav", "s3Key": "stories/tts/a.wav", "durationMs": 3500, "format": "wav" }
+      }
+    ],
+    "sceneSentenceUpdates": [
+      { "sentenceId": 1001, "ttsAudioUrl": "https://s3/a.wav", "ttsAudioS3Key": "stories/tts/a.wav" }
+    ],
+    "summary": { "sentenceCount": 2 },
+    "usage": { "model": "cosy-voice", "inputTokens": 0, "outputTokens": 0, "totalTokens": 0, "costUsd": 0.012, "promptTemplateVersion": "1.0" }
+  },
+  "error": null
+}

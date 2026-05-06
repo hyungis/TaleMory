@@ -1,5 +1,101 @@
 # env-sync — Skill History
 
+## v0.11 - 2026-05-01
+
+- Summary: `add-mode.md` 의 `docs/gitlab-variables.md` 갱신 절차 (§3) 에 **신규 env 키 위치 컨벤션** 을 명시적으로 박음. 각 환경 (dev / master) 코드 블록의 맨 마지막 줄 다음에 빈 줄 한 칸 띄우고 append 하라는 규칙 + 잘못된/올바른 diff 예시 + git log 로 선례 검토 가이드 포함.
+- Reason: AWS_S3_KEY_PREFIX 신규 추가 작업 (#d516457) 에서 agent 가 카테고리 옆 (`AWS_S3_BUCKET=` 다음 줄) 에 끼워넣었고, 사용자가 "왜 컨벤션 안 지키냐" 고 정정 요청 → #e409e13 으로 위치 정정. v0.10 의 `gitlab-vars-mode.md` 에는 "신규 비민감 키는 빈 줄 분리" 가 명시돼 있었지만 `add-mode.md` (직접 편집 시 참조) 에는 없어서 agent 가 직관에 의존한 결과. 같은 컨벤션을 두 곳에 모두 박아 재발 방지.
+- Changed files:
+  - `.agents/skills/env-sync/references/add-mode.md` — §3 안에 "위치 컨벤션" 서브섹션 신규 추가 (잘못된/올바른 diff 예시 포함)
+  - `docs/skill-history/env-sync.md` (이 항목)
+- User approval: Approved retroactively (B 옵션 — 변경 유지 + 누락된 절차 사후 채움). 사용자가 직접 편집을 먼저 발견하고 절차 위반을 지적한 후, 변경 자체는 유효하므로 사후 승인하기로 결정.
+- Impact:
+  - `/env-sync add` 또는 `add-mode.md` 만 보고 작업하는 agent 도 "코드 블럭 맨 뒤 + 빈 줄" 룰을 즉시 인지 가능.
+  - dev / master 양쪽 block 에 동일하게 적용한다는 점이 룰에 명시됨.
+  - 의심 시 `git log -p docs/gitlab-variables.md` 로 선례 확인 가이드 — 직관 의존 차단.
+- Process Note (재발 방지):
+  - 이번 변경은 `managing-skill-evolution` 의 Flow B 절차 (사용자 확인 → before/after 비교 → one-off vs permanent → 최종 승인 → history 기록) 를 사전에 거치지 않고 단독 편집했다가 사용자에게 지적받음. 사후에 비교/승인/history 를 채워 정상화.
+  - 앞으로 스킬 파일 편집 전 **항상** managing-skill-evolution 의 Flow A/B 를 먼저 검토할 것.
+
+## v0.10 - 2026-04-27
+
+- Summary: Strengthened `gitlab-vars` output rules so newly added non-sensitive File Variable keys MUST be rendered as a separate append group: existing env lines first, exactly one blank line, then new keys.
+- Reason: The previous skill history described the desired blank-line separation, but the executable reference path did not state it as a mandatory invariant. Agents could still append a new non-secret key directly next to existing keys, making GitLab File Variable updates less obvious.
+- Changed files:
+  - `.agents/skills/env-sync/references/gitlab-vars-mode.md`
+  - `docs/skill-history/env-sync.md`
+- User approval: Approved in conversation on 2026-04-27.
+- Impact:
+  - `/env-sync add` followed by `gitlab-vars` should always produce a visible `existing keys`, blank line, `new keys` shape for newly added non-sensitive values.
+  - GitLab UI work becomes copy-paste friendly: open the existing File Variable, go to the end, paste a blank line plus the new keys, save.
+  - Sensitive keys remain unaffected and continue to appear as individual Masked Variable checklist rows.
+- Validation:
+  - Added a text-level invariant containing `MUST treat newly added non-sensitive File Variable keys`.
+  - Added bad/good env block examples showing adjacency vs blank-line separation.
+
+## v0.9 - 2026-04-25
+
+- Summary: GitLab CI/CD Variables 등록을 **하이브리드(File + 개별 Masked) 운영** 으로 전환. 비밀이 아닌 ~30개 설정값은 GitLab Type=File 변수 한 개에 통째 업로드, 비밀값(PASSWORD/SECRET/API_KEY 류) 만 개별 Masked Variable 로 유지. 등록 클릭 수 40+ → ~13. `generate-env.sh` 가 File 변수를 base 로 cp 한 뒤 개별 변수를 그 위에 append (last-wins). 하이브리드 키 접미사는 명확성을 위해 `_ENV_FILE` 로 결정 (`_FILE` 단독은 `TLS_CERT_FILE` 등 일반 변수와 충돌 위험).
+- Reason: 신규 변수 추가/회전 시 GitLab UI 에서 변수 하나씩 클릭 등록하는 작업이 비효율적이었음. GitLab File 변수 기능을 활용하면 env 파일 통째를 한 변수로 업로드 가능하지만, 그 안에 비밀값을 넣으면 GitLab 자동 마스킹을 잃음 (File 타입은 마스킹 불가). → 비민감만 File 로, 민감만 개별 Masked 로 분리하는 하이브리드. 같은 키가 두 곳에 다 있어도 last-append 가 이기므로 **점진 마이그레이션 안전** (기존 개별 변수 그대로 둔 채 File 만 추가해도 동작 동일).
+- Changed files:
+  - `infra/scripts/generate-env.sh` — File 변수 cp 우선 → prefix-based 개별 변수 append 흐름 추가. awk 필터를 `kv[1] == "ENV_FILE"` 정확 매칭으로 좁힘 (일반 `_FILE` 접미사 변수 통과 보장).
+  - `docs/gitlab-variables.md` — 하이브리드 포맷 재작성 (DEV/MASTER × APP/INFRA = 4 묶음 × 2 환경, 각 묶음에 File 코드 블록 + 개별 Masked 체크리스트).
+  - `infra/env/README.md` — 1번 동작 원리 다이어그램에 File + 개별 합쳐지는 흐름 추가, `1-A. 하이브리드 마이그레이션 가이드` 섹션 신규, 변수 네이밍 규칙 테이블에 File 변수 행 추가.
+  - `.agents/skills/env-sync/references/gitlab-vars-mode.md` — 하이브리드 출력 템플릿으로 전면 갱신. `is_sensitive(key)` 정규식 명시 (`_PASSWORD|_PASS|_TOKEN|_API_KEY|_SECRET_KEY|_ACCESS_KEY_ID|_SECRET|_WEBHOOK_URL|_DSN`). 단순 `_KEY` 단독 매칭은 의도적으로 제외 (`_ROUTING_KEY` 같은 식별자 보호).
+  - `.agents/skills/env-sync/references/service-mapping.md` — `generate-env.sh` 동작 설명을 하이브리드 ①②② 단계 기준으로 갱신. `ENV_FILE` 예약어 명시.
+  - `docs/skill-history/env-sync.md` (이 항목)
+- User approval: Approved
+- Impact:
+  - **하이브리드 키 4개 신규**: `ENV_DEV_APP_ENV_FILE`, `ENV_DEV_INFRA_ENV_FILE`, `ENV_MASTER_APP_ENV_FILE`, `ENV_MASTER_INFRA_ENV_FILE`. GitLab UI 에 직접 등록 (사용자 작업).
+  - **민감값 개별 등록 유지**: GitLab 자동 마스킹 보존 → CI 로그 노출 방지.
+  - **점진 마이그레이션 안전성**: 기존 개별 변수 삭제 강요 X. File 만 추가해도 동작 동일 (개별이 last-wins). 문제 시 File 만 삭제로 즉시 롤백.
+  - **`/env-sync gitlab-vars` 출력**: 앞으로는 자동으로 하이브리드 포맷으로 생성됨. 비민감 키는 File 코드 블록에, 민감 키는 개별 체크리스트에 분류.
+- Validation (단위 테스트):
+  - `bash -n` syntax OK.
+  - 시나리오 1: File 변수 미설정 + 개별 변수만 → 기존 prefix-only 동작과 동일 (backward-compat).
+  - 시나리오 2: File 만 + 개별 없음 → File 내용만 출력.
+  - 시나리오 3: File + 개별 동일 키 충돌 → 개별 값이 최종 이김 (last-wins 보장).
+  - 시나리오 4: `ENV_DEV_APP_TLS_CERT_FILE`, `CONFIG_FILE`, `LOG_FILE` 등 일반 `_FILE` 변수 → 정상 통과 (이전 `/_FILE$/` 정규식 시절엔 잘못 차단됨).
+
+### Design Note — 왜 `_ENV_FILE` 접미사인가
+
+리뷰 피드백: 초기 안의 `_FILE` 접미사 + `/_FILE$/` 정규식 필터는 **의도보다 넓게 걸림**. `TLS_CERT_FILE`, `CONFIG_FILE` 같은 일반 `_FILE` 접미사 변수가 미래에 추가될 때 의도치 않게 차단됨.
+
+3가지 옵션 비교:
+
+| 옵션 | 키 이름 | 필터 | 미래 안전성 | 마이그레이션 |
+|------|---------|------|-----------|------------|
+| 현재 코드 (`/_FILE$/` 정규식) | `ENV_<T>_<S>_FILE` | over-defense | ❌ TLS_CERT_FILE 충돌 | 0 |
+| 1줄 fix (`== "FILE"`) | `ENV_<T>_<S>_FILE` | precise | △ 키 의미 모호 | 0 |
+| **`_ENV_FILE` 접미사** ⭐ | `ENV_<T>_<S>_ENV_FILE` | `== "ENV_FILE"` | ✅ 자기 설명적 | rename 4개 |
+
+선택: 3번. 키 이름 자체가 "env 파일 통째 업로드 변수" 임을 즉시 드러내고, 미래 충돌 0. 마이그레이션 비용은 GitLab UI 에서 변수 4개 재등록 (~5분).
+
+### Design Note — 민감도 정규식에서 `_KEY` 단독을 제외한 이유
+
+처음엔 `_(PASSWORD|TOKEN|KEY|SECRET|WEBHOOK|DSN)(_|$)` 로 단순화하려 했으나, 이 패턴은 `RABBITMQ_GENERATE_ROUTING_KEY` 같은 라우팅 식별자까지 잘못 매칭. 라우팅 키는 비밀이 아니므로 File 묶음에 들어가야 함.
+
+수정된 정규식: `_(PASSWORD|PASS|TOKEN|SECRET|WEBHOOK_URL|DSN|API_KEY|SECRET_KEY|ACCESS_KEY_ID)(_|$)`. 진짜 자격증명만 `*_API_KEY`, `*_SECRET_KEY`, `*_ACCESS_KEY_ID` 형태로 명시. `KAKAO_CLIENT_ID` (OAuth 표준상 평문 노출되는 식별자) 도 자연스럽게 비민감으로 분류됨.
+
+### Design Note — 하이브리드 키는 자동 추가 대상 아님
+
+env-sync `add` 모드는 새 키를 `infra/env/README.md` 에 행으로 추가하지만, **하이브리드 자체 키 (`ENV_<T>_<S>_ENV_FILE`) 는 추가하지 않음**. 이 키들은:
+
+1. 사용자가 GitLab UI 에 직접 등록하는 메커니즘
+2. 4개로 고정 (DEV/MASTER × APP/INFRA), 신규 키 추가 시점이 없음
+3. README 테이블에 등장하면 오히려 혼란 (다른 키들과 의미가 다름)
+
+따라서 README 테이블의 키 카탈로그와 분리해, `1-A. 하이브리드 마이그레이션 가이드` 별도 섹션에서만 다룸.
+
+### Design Note — 신규 키 빈 줄 분리
+
+`gitlab-vars` 재생성 시 File 코드 블록 내에서 **이전 회차에는 없던 신규 비민감 키들은 빈 줄 1줄로 분리해 블록 말미에 모음**. 이유:
+
+1. **Diff 가독성**: 사용자가 git diff 로 "이번에 추가된 키" 를 한눈에 식별 가능
+2. **GitLab UI 작업 명확화**: GitLab 에서 기존 File 변수를 열어 끝에 빈 줄 + 신규 키만 붙여넣으면 됨 (전체 재업로드 불필요)
+3. **체크리스트 동등성**: 개별 Masked 섹션은 체크박스 자체가 등록 여부를 표시하지만, File 안의 키는 체크박스가 없으므로 시각적 구분이 필요
+
+다음 회차 재생성에서는 신규 키도 "기존" 으로 합쳐져 단일 단위로 돌아감. 사용자가 매번 새로 추가된 키만 붙여넣어도 누적 결과가 일관됨.
+
 ## v0.8 - 2026-04-20
 
 - Summary: v0.7에서 도입한 `include:` 지시자를 폐기하고, 두 compose 파일(infra-local, app-local)이 **같은 `name: s210-local` 프로젝트를 공유하되 독립 파일**로 재편. 기동 워크플로는 `dci up -d` → mysql healthy 대기 → `dca up -d --build` 2단계. backend의 cross-file `depends_on` 제거 (compose validation 불가).

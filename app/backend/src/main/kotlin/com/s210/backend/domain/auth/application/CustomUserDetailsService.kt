@@ -14,14 +14,15 @@ class CustomUserDetailsService(
     private val memberRepository: MemberRepository
 ) : UserDetailsService {
     override fun loadUserByUsername(username: String): UserDetails =
-        memberRepository.findByLoginId(username)
+        memberRepository.findByLoginIdAndDeletedAtIsNull(username)
             ?.let { createUserDetails(it) }
             ?: throw UsernameNotFoundException("해당 유저는 없습니다.")
 
     private fun createUserDetails(user: User): UserDetails =
         CustomUser(
-            user.loginId ?: "",
-            user.passwordHash ?: "",
-            listOf(SimpleGrantedAuthority("ROLE_MEMBER"))
+            userId = user.id,
+            loginId = user.loginId ?: "",
+            password = user.passwordHash ?: "",
+            authorities = listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
         )
 }

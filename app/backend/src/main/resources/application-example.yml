@@ -30,3 +30,20 @@ spring:
   jwt:
     access_secret: ${JWT_ACCESS_SECRET}
     refresh_secret: ${JWT_REFRESH_SECRET}
+
+oauth:
+  allowed-redirect-uris: ${OAUTH_ALLOWED_REDIRECT_URIS:}
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+
+# AWS 는 top-level namespace — `aws.s3.bucket` 경로로 참조 (spring.* 은 Spring Boot 전용 영역 유지).
+# env-prefix: 같은 버킷에서 환경(local/dev/prod) 격리를 위해 모든 S3 key 앞에 prepend 되는 prefix.
+# IDE 로컬 실행 시 default `local` 로 떨어지도록 — 사고로 dev/prod prefix 에 쓰는 것 방지.
+aws:
+  s3:
+    region: ${AWS_REGION:ap-northeast-2}
+    bucket: ${AWS_S3_BUCKET:}
+    env-prefix: ${AWS_S3_ENV_PREFIX:local}
+
+

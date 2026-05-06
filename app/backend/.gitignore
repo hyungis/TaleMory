@@ -40,4 +40,7 @@ out/
 .kotlin
 
 application.yml
+application-*.yml
 !application-example.yml
+
+scripts/

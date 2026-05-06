@@ -16,5 +16,8 @@ class StylePreset(
     val name: String,
 
     @Column(name = "preview_url", length = 500)
-    val previewUrl: String? = null
+    val previewUrl: String? = null,
+
+    @Column(name = "style_prompt", nullable = false, columnDefinition = "TEXT")
+    val stylePrompt: String,
 )

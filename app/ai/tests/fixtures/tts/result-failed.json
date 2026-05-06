@@ -1,0 +1,8 @@
+{
+  "jobId": "12345",
+  "type": "GENERATE_TTS_FAILED",
+  "storyId": 100,
+  "status": "FAILED",
+  "payload": null,
+  "error": { "code": "AI_PROVIDER_ERROR", "message": "CosyVoice timeout" }
+}

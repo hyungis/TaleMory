@@ -1,0 +1,128 @@
+from typing import Any
+
+import pika
+
+from app.core.config import settings
+
+
+def create_connection() -> Any:
+    credentials = pika.PlainCredentials(settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD)
+    parameters = pika.ConnectionParameters(
+        host=settings.RABBITMQ_HOST,
+        port=settings.RABBITMQ_PORT,
+        virtual_host=settings.RABBITMQ_VHOST,
+        credentials=credentials,
+        heartbeat=1200,
+        blocked_connection_timeout=300,
+    )
+    return pika.BlockingConnection(parameters)
+
+
+def create_channel(connection: Any) -> Any:
+    channel = connection.channel()
+    channel.basic_qos(prefetch_count=settings.RABBITMQ_PREFETCH_COUNT)
+    return channel
+
+
+def declare_ai_topology(channel: Any) -> None:
+    channel.exchange_declare(
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        exchange_type="topic",
+        durable=True,
+    )
+    channel.exchange_declare(
+        exchange=settings.RABBITMQ_RESULT_EXCHANGE,
+        exchange_type="topic",
+        durable=True,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_GENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_GENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_GENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_SUMMARY_GENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_SUMMARY_GENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_SUMMARY_GENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_SUMMARY_REGENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_SENTENCE_TRANSLATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_REGENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_REGENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_REGENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_TTS_GENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_TTS_GENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_TTS_GENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_TTS_PREVIEW_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_TTS_PREVIEW_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_TTS_PREVIEW_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_IMAGE_GENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_IMAGE_GENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_IMAGE_GENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_IMAGE_GENERATE_ITEM_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_IMAGE_REGENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_IMAGE_REGENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_IMAGE_REGENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY,
+    )

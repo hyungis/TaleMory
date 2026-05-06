@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "data": {
+    "jobId": "story_tts_test_001",
+    "jobType": "TTS",
+    "status": "FAILED",
+    "createdAt": "2026-04-30T05:48:51.285625+00:00",
+    "storyId": 101,
+    "voiceId": "42",
+    "startedAt": "2026-04-30T05:48:51.288285+00:00",
+    "progress": 5,
+    "finishedAt": "2026-04-30T05:48:52.541137+00:00",
+    "error": {
+      "message": "Failed to download stories/voice/42/reference.wav from S3: An error occurred (AccessDenied) when calling the GetObject operation: User: arn:aws:iam::713502468921:user/s210-backend-s3 is not authorized to perform: s3:ListBucket on resource: \"arn:aws:s3:::s210-iportfolio-dev\" because no identity-based policy allows the s3:ListBucket action"
+    }
+  },
+  "message": null
+}
