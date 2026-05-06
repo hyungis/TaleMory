@@ -3,6 +3,7 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  History,
   Loader2,
   PartyPopper,
   Wand2,
@@ -15,6 +16,7 @@ import {
 import {
   getIllustrationVersions,
   postSelectIllustrationVersion,
+  type IllustrationVersionEntry,
   type IllustrationVersionsResponse,
 } from '../api/illustrationVersions'
 import { postIllustrationRegenerate } from '../../storyboard-editor/api/postIllustrationRegenerate'
@@ -441,31 +443,11 @@ export function FinalPreviewStep({
                 전체 <strong>{remaining}/{REGEN_LIMIT_TOTAL}</strong> 회 더 가능해요.
               </p>
 
-              {versionInfo && versionInfo.versions.length > 0 && (
-                <label className="cr-final-regen-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <span>Version</span>
-                  <select
-                    value={versionInfo.current ?? ''}
-                    disabled={isAnyRegenPending || versionLoading}
-                    onChange={event => handleSelectVersion(Number(event.target.value))}
-                    style={{
-                      height: 34,
-                      borderRadius: 8,
-                      border: '1px solid rgba(69, 53, 31, 0.22)',
-                      padding: '0 10px',
-                      background: '#fffaf0',
-                      color: '#45351f',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {versionInfo.versions.map(version => (
-                      <option key={version.version} value={version.version}>
-                        v{version.version}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              <FinalIllustrationVersionPicker
+                data={versionInfo}
+                disabled={isAnyRegenPending || versionLoading}
+                onChange={handleSelectVersion}
+              />
 
               {isPanelOpen && (
                 <div className="cr-final-regen-panel">
@@ -558,6 +540,62 @@ export function FinalPreviewStep({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function FinalIllustrationVersionPicker({
+  data,
+  disabled,
+  onChange,
+}: {
+  data: IllustrationVersionsResponse | null
+  disabled: boolean
+  onChange: (version: number) => void
+}) {
+  if (!data || data.versions.length <= 1) return null
+
+  const sorted: IllustrationVersionEntry[] = [...data.versions].sort(
+    (a, b) => b.version - a.version,
+  )
+  const currentValue = data.current ?? sorted[0].version
+
+  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = parseInt(event.target.value, 10)
+    if (!Number.isFinite(next) || next === currentValue) return
+    onChange(next)
+  }
+
+  const formatLabel = (entry: IllustrationVersionEntry): string => {
+    if (entry.version === 1) return 'v1 초기 생성'
+    const trimmed = entry.prompt?.trim()
+    if (!trimmed) return `v${entry.version}`
+    const head = trimmed.length > 18 ? `${trimmed.slice(0, 18)}...` : trimmed
+    return `v${entry.version} 수정 ${head}`
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <label
+        className="text-[#3F6B2E] font-bold text-sm inline-flex items-center gap-1.5"
+        htmlFor={`final-illustration-version-picker-${data.sceneId}`}
+      >
+        <History className="w-3.5 h-3.5" /> 이전 버전
+      </label>
+      <select
+        id={`final-illustration-version-picker-${data.sceneId}`}
+        value={currentValue}
+        onChange={handleChange}
+        disabled={disabled}
+        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        aria-label={`최종 삽화 ${data.sceneId} 버전 선택`}
+      >
+        {sorted.map(entry => (
+          <option key={entry.version} value={entry.version}>
+            {formatLabel(entry)}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }
