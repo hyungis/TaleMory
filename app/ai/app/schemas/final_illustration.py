@@ -53,6 +53,7 @@ class FinalIllustrationGenerateItemRequest(BaseModel):
     currentIllustrationImageS3Key: str | None = Field(default=None, max_length=1000)
     stylePrompt: str = Field(..., min_length=1, max_length=2000)
     additionalInstruction: str | None = Field(default=None, max_length=2000)
+    outputVersion: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_rough_storyboard_reference(self) -> "FinalIllustrationGenerateItemRequest":

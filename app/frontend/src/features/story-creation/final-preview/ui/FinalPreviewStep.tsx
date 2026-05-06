@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
 import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  History,
   Loader2,
   PartyPopper,
   Wand2,
@@ -12,6 +13,14 @@ import {
   getScenes,
   type SceneDto,
 } from '../../highlight-outro/api/highlightOutroApi'
+import {
+  getIllustrationRegenStatus,
+  getIllustrationVersions,
+  postSelectIllustrationVersion,
+  type IllustrationRegenStatusResponse,
+  type IllustrationVersionEntry,
+  type IllustrationVersionsResponse,
+} from '../api/illustrationVersions'
 import { postIllustrationRegenerate } from '../../storyboard-editor/api/postIllustrationRegenerate'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -24,35 +33,13 @@ import '../../styles/creation-paper.css'
 interface FinalPreviewStepProps {
   storyId: number | null
   storyGenerationJobId: number | null
-  /**
-   * Step 5 PATCH /style 시점에 enqueue 된 FINAL_ILLUSTRATION 잡 id.
-   * null 이면 폴링 없이 (구버전 흐름 호환).
-   * non-null 이면 TTS 와 함께 둘 다 SUCCESS 일 때까지 대기.
-   */
   finalIllustrationJobId: number | null
   onBack: () => void
-  /** Step 9 (PublishStoryStep) 로 이동 — 실제 발행/공유/책장보관/뷰어는 거기서. */
   onNext: () => void
 }
 
-/**
- * 동화 한 권당 최종 삽화 재생성 가능 총 횟수. 페이지별이 아니라 전체 합산 — 사용자가
- * 어떤 페이지를 몇 번 다시 그리든 합쳐서 이 횟수까지. 백엔드의 STORY_REGEN_LIMIT 와 동일.
- * 실제 BE 가 진실의 원천이고, FE 는 안내+가드 용으로만 사용. BE 가 limit 초과 시 409.
- */
 const REGEN_LIMIT_TOTAL = 3
 
-/**
- * STEP 08 — 최종 미리보기 + 삽화 재생성 (paper-craft 톤).
- *
- * 책임:
- *   - 동화 데이터 fetch (scenes/outro) 와 잡 폴링(TTS + FINAL_ILLUSTRATION)
- *   - 펼친 책 형태로 페이지 미리보기
- *   - 동화 전체에서 최대 {@link REGEN_LIMIT_TOTAL} 번까지 삽화 재생성 — 프롬프트 입력 후
- *     `POST /scenes/{sceneId}/illustration/regenerate` 트리거 → 잡 폴링 → 성공 시 scenes 재조회
- *
- * 발행/책장보관/뷰어/공유 같은 실제 액션은 Step 9 (PublishStoryStep) 로 위임.
- */
 export function FinalPreviewStep({
   storyId,
   storyGenerationJobId,
@@ -67,43 +54,35 @@ export function FinalPreviewStep({
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
-  /* 삽화 재생성 상태 — 동시에 1개 잡만 진행 (다른 페이지 regen 버튼 disabled).
-     - activeRegen: 진행 중인 잡 sceneId/jobId
-     - regenCount: 동화 전체 합산 재생성 횟수 (FE 안내용; BE 가 진짜 limit 진실)
-     - openPromptScene: 프롬프트 입력 패널이 열린 sceneId (한 번에 1곳만)
-     - regenError: 인라인 에러 메시지 (limit 초과 / 네트워크 등) */
   const [activeRegen, setActiveRegen] = useState<{ sceneId: number; jobId: number } | null>(null)
   const regenJobQuery = useGenerationJobQuery(activeRegen?.jobId ?? null)
-  const [regenCount, setRegenCount] = useState(0)
+  const [regenStatus, setRegenStatus] = useState<IllustrationRegenStatusResponse | null>(null)
   const [openPromptScene, setOpenPromptScene] = useState<number | null>(null)
   const [promptText, setPromptText] = useState('')
   const [regenError, setRegenError] = useState<string | null>(null)
-
-  /* 발행 확인 모달 — "발행하기" 클릭 시 즉시 onNext 호출하지 않고 사용자 확인 받음.
-     Step 9 진입 = 자동 발행이라 클릭 한 번이 곧 발행 트리거이기 때문. */
+  const [versionInfo, setVersionInfo] = useState<IllustrationVersionsResponse | null>(null)
+  const [versionLoading, setVersionLoading] = useState(false)
+  const [versionReloadKey, setVersionReloadKey] = useState(0)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
 
-  // 두 잡 모두 (있다면) SUCCESS 여야 fetch.
   const ttsReady = !storyGenerationJobId || ttsJobQuery.data?.status === 'SUCCESS'
   const finalReady = !finalIllustrationJobId || finalJobQuery.data?.status === 'SUCCESS'
   const shouldFetch = ttsReady && finalReady
 
   useEffect(() => {
     if (!storyId) {
-      setLoadingScenes(false)
-      setError('스토리 ID가 없습니다.')
       return
     }
 
     if (!shouldFetch) return
 
     let cancelled = false
-    setLoadingScenes(true)
+    queueMicrotask(() => {
+      if (!cancelled) setLoadingScenes(true)
+    })
     getScenes(storyId)
       .then(scenesData => {
         if (cancelled) return
-        /* BE 가 page_number=0(표지) scene 도 함께 내려주는데 미리보기는 본문(page 1+) 만 보여줘야 함.
-           표지는 책 표지 위치에 별도로 표시되고 step 8 미리보기 페이지 rotation 에 들어가면 안 됨. */
         setScenes(scenesData)
         setError(null)
       })
@@ -114,14 +93,25 @@ export function FinalPreviewStep({
       .finally(() => {
         if (!cancelled) setLoadingScenes(false)
       })
+
     return () => {
       cancelled = true
     }
   }, [storyId, shouldFetch])
 
-  /* regen 잡 폴링 — SUCCESS/FAILED 시 후처리.
-     SUCCESS: scenes 재조회로 새 illustrationUrl 반영, 진행상태 초기화
-     FAILED/CANCELLED: 인라인 에러 표시, 진행상태만 초기화 (count 는 유지 — BE 가 row 만들었으니) */
+  const refreshRegenStatus = useCallback(() => {
+    if (!storyId) return
+    getIllustrationRegenStatus(storyId)
+      .then(setRegenStatus)
+      .catch(() => {
+        // 횟수 조회 실패가 미리보기 렌더링을 막지는 않게 둔다.
+      })
+  }, [storyId])
+
+  useEffect(() => {
+    refreshRegenStatus()
+  }, [refreshRegenStatus])
+
   useEffect(() => {
     if (!activeRegen) return
     const status = regenJobQuery.data?.status
@@ -130,15 +120,22 @@ export function FinalPreviewStep({
         getScenes(storyId)
           .then(updated => setScenes(updated))
           .catch(() => {
-            /* 재조회 실패는 silent — 다음 마운트 시 다시 시도 */
-          })
+              // 다음 진입 때 다시 조회된다.
+            })
       }
-      setActiveRegen(null)
+      refreshRegenStatus()
+      queueMicrotask(() => {
+        setVersionReloadKey(key => key + 1)
+        setActiveRegen(null)
+      })
     } else if (status === 'FAILED' || status === 'CANCELLED') {
-      setRegenError('재생성에 실패했어요. 잠시 후 다시 시도해주세요.')
-      setActiveRegen(null)
+      refreshRegenStatus()
+      queueMicrotask(() => {
+        setRegenError('재생성에 실패했습니다. 잠시 후 다시 시도해주세요.')
+        setActiveRegen(null)
+      })
     }
-  }, [regenJobQuery.data?.status, activeRegen, storyId])
+  }, [regenJobQuery.data?.status, activeRegen, storyId, refreshRegenStatus])
 
   const coverScene = scenes.find(scene => scene.pageNumber === 0) ?? null
   const bodyScenes = coverScene ? scenes.filter(scene => scene.pageNumber !== 0) : scenes
@@ -149,6 +146,32 @@ export function FinalPreviewStep({
   const bodyPageCount = bodyScenes.length
   const currentPreviewPage = previewPages[resultPageIndex] ?? null
   const currentScene = currentPreviewPage?.kind === 'scene' ? currentPreviewPage.scene : null
+  const currentSceneId = currentScene?.id ?? null
+
+  useEffect(() => {
+    if (!storyId || currentSceneId === null) {
+      return
+    }
+
+    let cancelled = false
+    queueMicrotask(() => {
+      if (!cancelled) setVersionLoading(true)
+    })
+    getIllustrationVersions(storyId, currentSceneId)
+      .then(info => {
+        if (!cancelled) setVersionInfo(info)
+      })
+      .catch(() => {
+        if (!cancelled) setVersionInfo(null)
+      })
+      .finally(() => {
+        if (!cancelled) setVersionLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [storyId, currentSceneId, versionReloadKey])
 
   const prevPage = useCallback(() => {
     setResultPageIndex(i => Math.max(0, i - 1))
@@ -162,7 +185,6 @@ export function FinalPreviewStep({
     setRegenError(null)
   }, [totalPages])
 
-  // ===== 재생성 핸들러 =====
   const handleOpenPrompt = useCallback((sceneId: number) => {
     setRegenError(null)
     setOpenPromptScene(sceneId)
@@ -181,42 +203,69 @@ export function FinalPreviewStep({
       setRegenError('어떻게 바꾸고 싶은지 적어주세요.')
       return
     }
+
     setRegenError(null)
     try {
       const result = await postIllustrationRegenerate(storyId, openPromptScene, trimmed)
-      setRegenCount(c => c + 1)
+      setRegenStatus(prev => prev
+        ? {
+            ...prev,
+            used: Math.min(prev.limit, prev.used + 1),
+            remaining: Math.max(0, prev.remaining - 1),
+          }
+        : prev)
       setActiveRegen({ sceneId: openPromptScene, jobId: result.jobId })
       setOpenPromptScene(null)
       setPromptText('')
     } catch (err) {
       if (isApiError(err) && err.code === 'REGENERATION_LIMIT_EXCEEDED') {
-        setRegenError('이 동화의 다시 그리기 횟수를 다 썼어요.')
-        // FE 카운터를 limit 까지 동기화
-        setRegenCount(REGEN_LIMIT_TOTAL)
+        setRegenError('이 동화의 다시 그리기 횟수를 모두 사용했습니다.')
+        setRegenStatus(prev => prev
+          ? { ...prev, used: prev.limit, remaining: 0 }
+          : { storyId, used: REGEN_LIMIT_TOTAL, limit: REGEN_LIMIT_TOTAL, remaining: 0 })
       } else if (isApiError(err)) {
-        setRegenError(err.message ?? '재생성 요청에 실패했어요.')
+        setRegenError(err.message ?? '재생성 요청에 실패했습니다.')
       } else {
-        setRegenError('재생성 요청에 실패했어요. 잠시 후 다시 시도해주세요.')
+        setRegenError('재생성 요청에 실패했습니다. 잠시 후 다시 시도해주세요.')
       }
     }
   }, [storyId, openPromptScene, promptText])
 
-  // 두 잡 중 하나라도 PENDING/RUNNING 이거나 scenes fetch 중이면 blocking.
+  const handleSelectVersion = useCallback(async (version: number) => {
+    if (!storyId || currentSceneId === null) return
+    try {
+      const result = await postSelectIllustrationVersion(storyId, currentSceneId, version)
+      setScenes(prev => prev.map(scene => (
+        scene.id === currentSceneId
+          ? { ...scene, illustrationUrl: result.illustrationUrl }
+          : scene
+      )))
+      setVersionInfo(prev => prev ? { ...prev, current: result.version } : prev)
+      setRegenError(null)
+    } catch (err) {
+      if (isApiError(err)) {
+        setRegenError(err.message ?? '삽화 버전 변경에 실패했습니다.')
+      } else {
+        setRegenError('삽화 버전 변경에 실패했습니다.')
+      }
+    }
+  }, [storyId, currentSceneId])
+
   const ttsInProgress =
     !!storyGenerationJobId &&
     (ttsJobQuery.data?.status === 'PENDING' || ttsJobQuery.data?.status === 'RUNNING')
   const finalInProgress =
     !!finalIllustrationJobId &&
     (finalJobQuery.data?.status === 'PENDING' || finalJobQuery.data?.status === 'RUNNING')
-  const blocking = ttsInProgress || finalInProgress || loadingScenes
+  const missingStoryError = !storyId ? '스토리 ID가 없습니다.' : null
+  const blocking = ttsInProgress || finalInProgress || (loadingScenes && storyId !== null)
 
-  // ===== 진행 중 화면 =====
   if (blocking) {
     const message = (() => {
-      if (finalInProgress && ttsInProgress) return '동화책 만드는 중... (삽화 + 음성)'
-      if (finalInProgress) return '컬러 삽화 마무리 중...'
-      if (ttsInProgress) return '음성 생성 중...'
-      return '동화 데이터 불러오는 중...'
+      if (finalInProgress && ttsInProgress) return '동화책을 만드는 중이에요... (삽화 + 음성)'
+      if (finalInProgress) return '컬러 삽화를 마무리하는 중이에요...'
+      if (ttsInProgress) return '음성을 생성하는 중이에요...'
+      return '동화 데이터를 불러오는 중이에요...'
     })()
     return (
       <div className="cr-shell">
@@ -234,7 +283,6 @@ export function FinalPreviewStep({
     )
   }
 
-  // ===== terminal-error (FAILED/CANCELLED) =====
   const isTerminalError = (status?: string) => status === 'FAILED' || status === 'CANCELLED'
   const failedJob = isTerminalError(ttsJobQuery.data?.status)
     ? ttsJobQuery.data
@@ -252,7 +300,7 @@ export function FinalPreviewStep({
             style={{ flexDirection: 'column', gap: 14 }}
           >
             <div className="cr-final-status-inner" style={{ flexDirection: 'column', gap: 10, padding: '22px 28px' }}>
-              <p className="cr-final-status-error-msg">동화 생성에 실패했어요.</p>
+              <p className="cr-final-status-error-msg">동화 생성에 실패했습니다.</p>
               {failedJob.errorMessage && (
                 <p className="cr-final-status-error-detail">{failedJob.errorMessage}</p>
               )}
@@ -266,8 +314,7 @@ export function FinalPreviewStep({
     )
   }
 
-  // ===== 데이터 없음 =====
-  if (error || !currentPreviewPage) {
+  if (missingStoryError || error || !currentPreviewPage) {
     return (
       <div className="cr-shell">
         <CreationDoodlesBg />
@@ -276,7 +323,7 @@ export function FinalPreviewStep({
           <main className="cr-shell-inner cr-fade-in cr-final-status">
             <div className="cr-final-status-inner">
               <p className="cr-final-status-text">
-                {error ?? '씬 데이터가 없어요. 이전 단계를 확인하세요.'}
+                {missingStoryError ?? error ?? '씬 데이터가 없습니다. 이전 단계를 확인해주세요.'}
               </p>
             </div>
           </main>
@@ -285,9 +332,8 @@ export function FinalPreviewStep({
     )
   }
 
-  // ===== 정상 화면 =====
-  const currentSceneId = currentScene?.id ?? null
-  const remaining = Math.max(0, REGEN_LIMIT_TOTAL - regenCount)
+  const regenLimit = regenStatus?.limit ?? REGEN_LIMIT_TOTAL
+  const remaining = regenStatus?.remaining ?? REGEN_LIMIT_TOTAL
   const isCurrentRegenPending = activeRegen?.sceneId === currentSceneId
   const isAnyRegenPending = activeRegen !== null
   const canRegen = currentSceneId !== null && !isAnyRegenPending && remaining > 0
@@ -303,7 +349,7 @@ export function FinalPreviewStep({
           <StepTitleBlock
             stepNumber={8}
             title="최종 미리보기"
-            subtitle={`마지막으로 펼쳐보세요. 마음에 안 드는 삽화는 전체 ${REGEN_LIMIT_TOTAL}번까지 다시 그릴 수 있어요.`}
+            subtitle={`마지막으로 펼쳐보세요. 마음에 안 드는 삽화는 전체 ${regenLimit}번까지 다시 그릴 수 있어요.`}
           />
 
           <section className="cr-card">
@@ -372,75 +418,76 @@ export function FinalPreviewStep({
               </span>
             </div>
 
-            {/* ===== 삽화 재생성(스토리 전체 횟수 제한) ===== */}
             {currentSceneId !== null && (
-            <div className="cr-final-regen-bar">
-              <button
-                type="button"
-                className="cr-final-regen-trigger"
-                onClick={() => currentSceneId !== null && handleOpenPrompt(currentSceneId)}
-                disabled={!canRegen || isPanelOpen}
-              >
-                <Wand2 className="w-4 h-4" />
-                {remaining > 0 ? '이 페이지 삽화 다시 그리기' : '더 이상 다시 그릴 수 없어요'}
-              </button>
-              <p className="cr-final-regen-meta">
-                전체 <strong>{remaining}/{REGEN_LIMIT_TOTAL}</strong> 회 더 가능해요.
-              </p>
+              <div className="cr-final-regen-bar">
+                <button
+                  type="button"
+                  className="cr-final-regen-trigger"
+                  onClick={() => handleOpenPrompt(currentSceneId)}
+                  disabled={!canRegen || isPanelOpen}
+                >
+                  <Wand2 className="w-4 h-4" />
+                  {remaining > 0 ? '이 페이지 삽화 다시 그리기' : '더 이상 다시 그릴 수 없어요'}
+                </button>
+                <p className="cr-final-regen-meta">
+                  전체 <strong>{remaining}/{regenLimit}</strong>회 더 가능해요.
+                </p>
 
-              {isPanelOpen && (
-                <div className="cr-final-regen-panel">
-                  <div className="cr-final-regen-panel-head">
-                    <h4 className="cr-final-regen-panel-title">어떻게 바꾸고 싶나요?</h4>
-                  </div>
-                  <textarea
-                    className="cr-final-regen-textarea"
-                    placeholder="예) 햇살이 더 따뜻하게, 아이 표정을 환하게 그려주세요"
-                    value={promptText}
-                    onChange={e => setPromptText(e.target.value)}
-                    autoFocus
-                    disabled={isAnyRegenPending}
-                  />
-                  <div className="cr-final-regen-actions">
-                    <button
-                      type="button"
-                      className="cr-final-regen-cancel"
-                      onClick={handleClosePrompt}
+                <FinalIllustrationVersionPicker
+                  data={versionInfo}
+                  disabled={isAnyRegenPending || versionLoading}
+                  onChange={handleSelectVersion}
+                />
+
+                {isPanelOpen && (
+                  <div className="cr-final-regen-panel">
+                    <div className="cr-final-regen-panel-head">
+                      <h4 className="cr-final-regen-panel-title">어떻게 바꾸고 싶나요?</h4>
+                    </div>
+                    <textarea
+                      className="cr-final-regen-textarea"
+                      placeholder="예) 햇살이 더 따뜻하게, 아이 표정을 환하게 그려주세요"
+                      value={promptText}
+                      onChange={e => setPromptText(e.target.value)}
+                      autoFocus
                       disabled={isAnyRegenPending}
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="button"
-                      className="cr-final-regen-submit"
-                      onClick={handleSubmitRegen}
-                      disabled={!promptText.trim() || isAnyRegenPending}
-                    >
-                      다시 그리기
-                    </button>
+                    />
+                    <div className="cr-final-regen-actions">
+                      <button
+                        type="button"
+                        className="cr-final-regen-cancel"
+                        onClick={handleClosePrompt}
+                        disabled={isAnyRegenPending}
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        className="cr-final-regen-submit"
+                        onClick={handleSubmitRegen}
+                        disabled={!promptText.trim() || isAnyRegenPending}
+                      >
+                        다시 그리기
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {regenError && <p className="cr-final-regen-error">{regenError}</p>}
-            </div>
+                {regenError && <p className="cr-final-regen-error">{regenError}</p>}
+              </div>
             )}
           </section>
-
         </main>
       </div>
 
       <CreationFooter
         currentStep={8}
         onBack={onBack}
-        /* 직접 onNext 호출하지 말고 확인 모달을 띄움 — Step 9 진입 = 자동 발행이라
-           사용자에게 한 번 더 확인 받는 게 안전. */
         onNext={() => setShowPublishConfirm(true)}
         nextLabel="발행하기"
         nextDisabled={isAnyRegenPending}
       />
 
-      {/* 발행 확인 모달 */}
       {showPublishConfirm && (
         <div
           className="cr-publish-confirm-overlay"
@@ -479,6 +526,62 @@ export function FinalPreviewStep({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function FinalIllustrationVersionPicker({
+  data,
+  disabled,
+  onChange,
+}: {
+  data: IllustrationVersionsResponse | null
+  disabled: boolean
+  onChange: (version: number) => void
+}) {
+  if (!data || data.versions.length <= 1) return null
+
+  const sorted: IllustrationVersionEntry[] = [...data.versions].sort(
+    (a, b) => b.version - a.version,
+  )
+  const currentValue = data.current ?? sorted[0].version
+
+  const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const next = parseInt(event.target.value, 10)
+    if (!Number.isFinite(next) || next === currentValue) return
+    onChange(next)
+  }
+
+  const formatLabel = (entry: IllustrationVersionEntry): string => {
+    if (entry.version === 1) return 'v1 초기 생성'
+    const trimmed = entry.prompt?.trim()
+    if (!trimmed) return `v${entry.version}`
+    const head = trimmed.length > 18 ? `${trimmed.slice(0, 18)}...` : trimmed
+    return `v${entry.version} 수정 ${head}`
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <label
+        className="text-[#3F6B2E] font-bold text-sm inline-flex items-center gap-1.5"
+        htmlFor={`final-illustration-version-picker-${data.sceneId}`}
+      >
+        <History className="w-3.5 h-3.5" /> 이전 버전
+      </label>
+      <select
+        id={`final-illustration-version-picker-${data.sceneId}`}
+        value={currentValue}
+        onChange={handleChange}
+        disabled={disabled}
+        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        aria-label={`최종 삽화 ${data.sceneId} 버전 선택`}
+      >
+        {sorted.map(entry => (
+          <option key={entry.version} value={entry.version}>
+            {formatLabel(entry)}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

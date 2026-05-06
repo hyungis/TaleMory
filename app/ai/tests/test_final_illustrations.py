@@ -1,3 +1,4 @@
+import app.services.final_illustration_service as final_illustration_service
 from app.schemas.final_illustration import (
     FinalIllustrationContext,
     FinalIllustrationGenerateItemRequest,
@@ -8,6 +9,7 @@ from app.services.final_illustration_service import (
     _build_final_prompt,
     _build_replicate_input,
     _build_revise_item,
+    _upload_and_resolve_url,
 )
 
 
@@ -28,7 +30,7 @@ def _sample_item() -> FinalIllustrationGenerateItemRequest:
         children=[{"name": "Lina", "age": 7, "gender": "FEMALE"}],
         companions=["mom", "dad"],
         roughStoryboardImageUrl="https://example.com/rough.png",
-        currentIllustrationImageS3Key="stories/1/final-illustration/1.png",
+        currentIllustrationImageS3Key="stories/1/final-illustration/1/v1.png",
         stylePrompt="Soft watercolor picture-book illustration with warm sunlight.",
         additionalInstruction="Keep Lina centered.",
     )
@@ -62,7 +64,16 @@ def test_build_revise_item_uses_current_illustration_as_primary_image() -> None:
     item = _build_revise_item(_sample_item(), "Make the sky softer.")
 
     assert item.roughStoryboardImageUrl is None
-    assert item.roughStoryboardImageS3Key == "stories/1/final-illustration/1.png"
+    assert item.roughStoryboardImageS3Key == "stories/1/final-illustration/1/v1.png"
     assert item.additionalInstruction is not None
     assert "Keep Lina centered." in item.additionalInstruction
     assert "User revision request: Make the sky softer." in item.additionalInstruction
+
+
+def test_upload_path_uses_output_version(monkeypatch) -> None:
+    item = _sample_item().model_copy(update={"outputVersion": 3})
+    monkeypatch.setattr(final_illustration_service, "_has_s3_upload_config", lambda: False)
+
+    url = _upload_and_resolve_url(1, item, b"png")
+
+    assert url.endswith("stories/1/final-illustration/1/v3.png")

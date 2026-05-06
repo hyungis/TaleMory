@@ -221,11 +221,13 @@ class StoryConfirmService(
 
         // 10) Redis versions 초기화 — best-effort, 실패해도 응답은 정상
         createdScenes.forEach { scene ->
+            val finalIllustrationUrl = finalUrlsByPage[scene.pageNumber]?.takeIf { it.isNotBlank() }
+                ?: return@forEach
             try {
                 illustrationVersionRedisRepository.pushVersion(
                     sceneId = scene.id,
                     version = 1,
-                    url = scene.illustrationUrl ?: "",
+                    url = finalIllustrationUrl,
                     prompt = null,
                     jobId = imageJob?.id,
                 )

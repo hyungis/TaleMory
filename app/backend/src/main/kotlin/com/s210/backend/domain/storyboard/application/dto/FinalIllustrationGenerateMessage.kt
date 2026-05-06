@@ -13,11 +13,26 @@ data class FinalIllustrationGenerateMessage(
     val payload: FinalIllustrationGeneratePayload,
 )
 
+data class FinalIllustrationReviseMessage(
+    val jobId: String,
+    val jobType: String = "FINAL_ILLUSTRATION",
+    val storyId: Long,
+    val payload: FinalIllustrationRevisePayload,
+)
+
 data class FinalIllustrationGeneratePayload(
     val storyId: Long,
     val seed: Int,
     val renderOptions: FinalIllustrationRenderOptions = FinalIllustrationRenderOptions(),
     val items: List<FinalIllustrationItem>,
+)
+
+data class FinalIllustrationRevisePayload(
+    val storyId: Long,
+    val seed: Int,
+    val renderOptions: FinalIllustrationRenderOptions = FinalIllustrationRenderOptions(),
+    val userPrompt: String,
+    val item: FinalIllustrationItem,
 )
 
 /** AI 측 기본값과 동일 — BE 는 모두 default 를 그대로 보낸다. */
@@ -42,8 +57,11 @@ data class FinalIllustrationItem(
      * Step 4 에서 생성된 storyboard rough 의 URL.
      */
     val roughStoryboardImageUrl: String? = null,
+    val roughStoryboardImageS3Key: String? = null,
+    val currentIllustrationImageS3Key: String? = null,
     val stylePrompt: String,
     val additionalInstruction: String? = null,
+    val outputVersion: Int? = null,
 )
 
 data class FinalIllustrationContext(
