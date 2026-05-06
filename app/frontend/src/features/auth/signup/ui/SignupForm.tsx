@@ -39,12 +39,22 @@ const INITIAL_VALUES: SignupFormValues = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
 const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
+const MIN_LOGIN_ID_LENGTH = 4
+const MIN_PASSWORD_LENGTH = 6
 
 type AvailabilityCheckStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
 
 interface AvailabilityCheckState {
   status: AvailabilityCheckStatus
   value: string
+}
+
+interface FieldValidationFeedback {
+  message: string
+}
+
+interface FieldValidationOptions {
+  showRequired?: boolean
 }
 
 const INITIAL_AVAILABILITY_CHECK: AvailabilityCheckState = {
@@ -74,17 +84,110 @@ function getAvailabilityMessageColor(status: AvailabilityCheckStatus): string {
   return '#8a7558'
 }
 
+function getLoginIdFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
+  const loginId = value.trim()
+
+  if (!loginId) {
+    return options.showRequired ? { message: '아이디를 입력해주세요.' } : null
+  }
+
+  if (loginId.length < MIN_LOGIN_ID_LENGTH) {
+    return {
+      message: `아이디는 ${MIN_LOGIN_ID_LENGTH}자 이상 입력해주세요.`,
+    }
+  }
+
+  return null
+}
+
+function getPasswordFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
+  if (!value) {
+    return options.showRequired ? { message: '비밀번호를 입력해주세요.' } : null
+  }
+
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    return {
+      message: `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상 입력해주세요.`,
+    }
+  }
+
+  return null
+}
+
+function getPasswordCheckFeedback(
+  password: string,
+  passwordCheck: string,
+): FieldValidationFeedback | null {
+  if (!password) return null
+
+  if (!passwordCheck) {
+    return {
+      message: '비밀번호 확인을 입력해주세요.',
+    }
+  }
+
+  if (password !== passwordCheck) {
+    return {
+      message: '비밀번호가 서로 일치하지 않아요.',
+    }
+  }
+
+  return null
+}
+
+function getEmailFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
+  const email = value.trim()
+  if (!email) {
+    return options.showRequired ? { message: '이메일을 입력해주세요.' } : null
+  }
+
+  if (!EMAIL_PATTERN.test(email)) {
+    return {
+      message: '올바른 이메일 형식으로 입력해주세요.',
+    }
+  }
+
+  return null
+}
+
+function getPhoneFormatFeedback(value: string): FieldValidationFeedback | null {
+  if (value && !PHONE_PATTERN.test(value)) {
+    return {
+      message: '휴대폰 번호 형식을 확인해주세요.',
+    }
+  }
+
+  return null
+}
+
 function validate(values: SignupFormValues): string | null {
-  if (!values.id.trim()) return '아이디를 입력해주세요.'
-  if (values.id.trim().length < 4) return '아이디는 4자 이상이어야 해요.'
-  if (!values.password) return '비밀번호를 입력해주세요.'
-  if (values.password.length < 6) return '비밀번호는 6자 이상이어야 해요.'
-  if (!values.passwordCheck) return '비밀번호 확인을 입력해주세요.'
-  if (values.password !== values.passwordCheck) return '비밀번호가 서로 일치하지 않아요.'
-  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email.trim())) return '올바른 이메일 형식을 입력해주세요.'
+  const loginIdFeedback = getLoginIdFormatFeedback(values.id, { showRequired: true })
+  if (loginIdFeedback) return loginIdFeedback.message
+
+  const passwordFeedback = getPasswordFormatFeedback(values.password, { showRequired: true })
+  if (passwordFeedback) return passwordFeedback.message
+
+  const passwordCheckFeedback = getPasswordCheckFeedback(values.password, values.passwordCheck)
+  if (passwordCheckFeedback) return passwordCheckFeedback.message
+
+  const emailFeedback = getEmailFormatFeedback(values.email, { showRequired: true })
+  if (emailFeedback) return emailFeedback.message
+
   if (!values.name.trim()) return '실명을 입력해주세요.'
   if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
-  if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
+
+  const phoneFeedback = getPhoneFormatFeedback(values.phone)
+  if (phoneFeedback) return phoneFeedback.message
+
   if (!values.serviceTermsAgree) return '서비스 이용약관에 동의해주세요.'
   if (!values.privacyAgree) return '개인정보 수집 및 이용에 동의해주세요.'
   return null
@@ -155,6 +258,13 @@ const checkButtonStyle: CSSProperties = {
   cursor: 'pointer',
 }
 
+const fieldFeedbackStyle: CSSProperties = {
+  margin: '6px 0 0',
+  fontFamily: 'var(--font-display)',
+  fontSize: 13,
+  lineHeight: 1.4,
+}
+
 /**
  * 회원가입 폼 — paper-craft 톤.
  */
@@ -176,43 +286,33 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
 
   const handleLoginIdCheck = useCallback(async () => {
     const loginId = values.id.trim()
-    if (!loginId) {
-      setError('아이디를 입력해주세요.')
-      return
-    }
-    if (loginId.length < 4) {
-      setError('아이디는 4자 이상이어야 해요.')
+    if (getLoginIdFormatFeedback(loginId, { showRequired: true })) {
       return
     }
 
-    setError('')
     setLoginIdCheck({ status: 'checking', value: loginId })
 
     try {
       const result = await getLoginIdAvailability(loginId)
       setLoginIdCheck({ status: result.available ? 'available' : 'unavailable', value: loginId })
-    } catch (checkError) {
+    } catch {
       setLoginIdCheck({ status: 'error', value: loginId })
-      setError(getSignupErrorMessage(checkError))
     }
   }, [values.id])
 
   const handleNicknameCheck = useCallback(async () => {
     const nickname = values.nickname.trim()
     if (!nickname) {
-      setError('닉네임을 입력해주세요.')
       return
     }
 
-    setError('')
     setNicknameCheck({ status: 'checking', value: nickname })
 
     try {
       const result = await getNicknameAvailability(nickname)
       setNicknameCheck({ status: result.available ? 'available' : 'unavailable', value: nickname })
-    } catch (checkError) {
+    } catch {
       setNicknameCheck({ status: 'error', value: nickname })
-      setError(getSignupErrorMessage(checkError))
     }
   }, [values.nickname])
 
@@ -305,6 +405,10 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
 
   const loginIdMessage = getAvailabilityMessage('아이디', loginIdCheck, values.id)
   const nicknameMessage = getAvailabilityMessage('닉네임', nicknameCheck, values.nickname)
+  const loginIdFormatFeedback = getLoginIdFormatFeedback(values.id)
+  const passwordFormatFeedback = getPasswordFormatFeedback(values.password)
+  const passwordCheckFeedback = getPasswordCheckFeedback(values.password, values.passwordCheck)
+  const emailFormatFeedback = getEmailFormatFeedback(values.email)
 
   const required = (
     <span style={{ color: '#c47254', fontWeight: 700, marginLeft: 2 }}>*</span>
@@ -345,6 +449,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
               {loginIdCheck.status === 'checking' ? '확인 중' : '중복 확인'}
             </button>
           </div>
+          {loginIdFormatFeedback && <FieldFeedback feedback={loginIdFormatFeedback} />}
           {loginIdMessage && (
             <p
               style={{
@@ -369,6 +474,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             placeholder="6자 이상"
             style={inputStyle}
           />
+          {passwordFormatFeedback && <FieldFeedback feedback={passwordFormatFeedback} />}
         </div>
         <div>
           <label style={labelStyle}>비밀번호 확인 {required}</label>
@@ -381,6 +487,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             placeholder="비밀번호 재입력"
             style={inputStyle}
           />
+          {passwordCheckFeedback && <FieldFeedback feedback={passwordCheckFeedback} />}
         </div>
         <div>
           <label style={labelStyle}>이메일 {required}</label>
@@ -393,6 +500,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             placeholder="example@email.com"
             style={inputStyle}
           />
+          {emailFormatFeedback && <FieldFeedback feedback={emailFormatFeedback} />}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -550,6 +658,19 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         />
       )}
     </>
+  )
+}
+
+function FieldFeedback({ feedback }: { feedback: FieldValidationFeedback }) {
+  return (
+    <p
+      style={{
+        ...fieldFeedbackStyle,
+        color: '#8c3a1f',
+      }}
+    >
+      {feedback.message}
+    </p>
   )
 }
 
