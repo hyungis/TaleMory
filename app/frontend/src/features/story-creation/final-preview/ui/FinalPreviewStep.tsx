@@ -104,7 +104,7 @@ export function FinalPreviewStep({
         if (cancelled) return
         /* BE 가 page_number=0(표지) scene 도 함께 내려주는데 미리보기는 본문(page 1+) 만 보여줘야 함.
            표지는 책 표지 위치에 별도로 표시되고 step 8 미리보기 페이지 rotation 에 들어가면 안 됨. */
-        setScenes(scenesData.filter(s => s.pageNumber !== 0))
+        setScenes(scenesData)
         setError(null)
       })
       .catch(() => {
@@ -128,7 +128,7 @@ export function FinalPreviewStep({
     if (status === 'SUCCESS') {
       if (storyId) {
         getScenes(storyId)
-          .then(updated => setScenes(updated.filter(s => s.pageNumber !== 0)))
+          .then(updated => setScenes(updated))
           .catch(() => {
             /* 재조회 실패는 silent — 다음 마운트 시 다시 시도 */
           })
@@ -287,8 +287,7 @@ export function FinalPreviewStep({
 
   // ===== 정상 화면 =====
   const currentSceneId = currentScene?.id ?? null
-  const currentRegenCount = currentSceneId !== null ? (regenCounts[currentSceneId] ?? 0) : 0
-  const remaining = Math.max(0, REGEN_LIMIT_PER_SCENE - currentRegenCount)
+  const remaining = Math.max(0, REGEN_LIMIT_TOTAL - regenCount)
   const isCurrentRegenPending = activeRegen?.sceneId === currentSceneId
   const isAnyRegenPending = activeRegen !== null
   const canRegen = currentSceneId !== null && !isAnyRegenPending && remaining > 0
@@ -373,12 +372,8 @@ export function FinalPreviewStep({
               </span>
             </div>
 
-<<<<<<< HEAD
-            {/* ===== 페이지별 삽화 재생성 ===== */}
+            {/* ===== 삽화 재생성(스토리 전체 횟수 제한) ===== */}
             {currentSceneId !== null && (
-=======
-            {/* ===== 삽화 재생성 (동화 전체 합산 한도) ===== */}
->>>>>>> dev
             <div className="cr-final-regen-bar">
               <button
                 type="button"
