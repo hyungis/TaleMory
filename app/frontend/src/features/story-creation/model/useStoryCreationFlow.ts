@@ -44,6 +44,12 @@ interface CreationProgressSnapshot {
   /** Step 8 최종 삽화 잡 id — 새로고침 시 폴링 재개용. */
   finalIllustrationJobId: number | null
   storyboardReadOnlyLocked: boolean
+  /**
+   * Step 7 → 8 confirmStoryboard 가 한번이라도 성공했는지 (= TTS 잡 발행 + scenes 확정).
+   * 한 번 true 가 되면 step 6, 7 의 입력/녹음/스타일 변경을 모두 막아 옛 데이터로 만들어진
+   * 미리보기와 새 입력이 섞이는 걸 방지. 새로고침을 거쳐 다시 진입해도 동일하게 잠금 유지.
+   */
+  confirmedReadOnlyLocked: boolean
 }
 
 function readProgressSnapshot(): CreationProgressSnapshot | null {
@@ -78,6 +84,7 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
         typeof parsed.finalIllustrationJobId === 'number' ? parsed.finalIllustrationJobId : null,
       storyboardReadOnlyLocked:
         parsed.storyboardReadOnlyLocked === true || typeof parsed.finalIllustrationJobId === 'number',
+      confirmedReadOnlyLocked: parsed.confirmedReadOnlyLocked === true,
     }
   } catch {
     return null
@@ -128,6 +135,11 @@ export interface UseStoryCreationFlowResult {
   finalIllustrationJobId: number | null
   storyboardReadOnlyLocked: boolean
   /**
+   * step 7 → 8 confirm 한 번이라도 성공한 후 step 6/7 의 입력/녹음을 잠그기 위한 플래그.
+   * 한 번 true 로 바뀌면 다시 false 로 안 돌아옴.
+   */
+  confirmedReadOnlyLocked: boolean
+  /**
    * 마지막으로 사용자가 "스토리 확정하고 다음" 으로 본문 발행에 사용한 SUMMARY 잡의 id (string).
    * Step 3 으로 돌아와서 confirm 다시 누를 때 이 값과 현재 summary jobId 를 비교해
    * 같으면 본문 재발행을 skip (불필요한 OpenAI 호출 + 페이지 통째 교체 방지).
@@ -141,6 +153,8 @@ export interface UseStoryCreationFlowResult {
   setStoryGenerationJobId: (jobId: number | null) => void
   setFinalIllustrationJobId: (jobId: number | null) => void
   setLastConfirmedSummaryJobId: (jobId: string | null) => void
+  /** Step 7 → 8 confirm 성공 시 호출 — 한 번 호출되면 다시 false 로 되돌릴 수 없음 (단방향). */
+  markConfirmedReadOnly: () => void
   updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   updateStep2: <K extends keyof StoryProject['step2']>(key: K, value: StoryProject['step2'][K]) => void
   updateStoryText: (story: string) => void
@@ -222,6 +236,13 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     restored?.storyboardReadOnlyLocked ?? false,
   )
   /**
+   * Step 7 → 8 confirm 한번이라도 성공한 후 step 6/7 의 입력/녹음/저장 모두 막는 잠금 플래그.
+   * sessionStorage 로 영속 — 새로고침 후 재진입해도 잠금 유지.
+   */
+  const [confirmedReadOnlyLocked, setConfirmedReadOnlyLocked] = useState<boolean>(
+    restored?.confirmedReadOnlyLocked ?? false,
+  )
+  /**
    * 마지막으로 본문 발행에 사용된 SUMMARY 잡 id. PromptStep 에서 confirm 시 비교 → 재발행 skip 판단.
    *
    * sessionStorage 로 영속화하는 이유:
@@ -260,9 +281,10 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
         storyGenerationJobId,
         finalIllustrationJobId,
         storyboardReadOnlyLocked,
+        confirmedReadOnlyLocked,
       })
     }
-  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId, storyboardReadOnlyLocked])
+  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId, storyboardReadOnlyLocked, confirmedReadOnlyLocked])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))
@@ -360,6 +382,11 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     setLastConfirmedSummaryJobIdState(jobId)
   }, [])
 
+  /** 단방향 잠금 — Step 7 → 8 confirm 성공 직후 호출. 한 번 잠그면 풀리지 않음. */
+  const markConfirmedReadOnly = useCallback(() => {
+    setConfirmedReadOnlyLocked(true)
+  }, [])
+
   const removeChildAt = useCallback((index: number) => {
     setStoryProject(prev => {
       const children = prev.step1.children.filter((_, i) => i !== index)
@@ -384,6 +411,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     storyGenerationJobId,
     finalIllustrationJobId,
     storyboardReadOnlyLocked,
+    confirmedReadOnlyLocked,
     lastConfirmedSummaryJobId,
     setCurrentStep,
     handleNext,
@@ -392,6 +420,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     setStoryGenerationJobId,
     setFinalIllustrationJobId,
     setLastConfirmedSummaryJobId,
+    markConfirmedReadOnly,
     updateStep1,
     updateStep2,
     updateStoryText,

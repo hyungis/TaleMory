@@ -28,6 +28,11 @@ interface VoiceCloneStepProps {
   onBack: () => void
   onNext: () => void
   onVoiceSaved?: (voiceModel: string) => void
+  /**
+   * step 7 → 8 confirm 이후로 잠긴 상태. 녹음/저장/불러오기/TTS 등 모든 변경 액션을 막고
+   * "다음" 버튼은 그대로 동작 (이미 이 단계는 통과한 상태이므로 다음 단계로 자유 이동).
+   */
+  readOnly?: boolean
 }
 
 /**
@@ -35,7 +40,13 @@ interface VoiceCloneStepProps {
  * 3 섹션: 녹음 / TTS 미리듣기 / TTS 저장.
  * 모든 useVoiceClone 로직 그대로 유지.
  */
-export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceCloneStepProps) {
+export function VoiceCloneStep({
+  storyId,
+  onBack,
+  onNext,
+  onVoiceSaved,
+  readOnly = false,
+}: VoiceCloneStepProps) {
   const vc = useVoiceClone(storyId)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showLoadModal, setShowLoadModal] = useState(false)
@@ -84,8 +95,32 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
           <StepTitleBlock
             stepNumber={6}
             title="부모 목소리를 들려주세요"
-            subtitle="샘플 문장을 따라 읽고 녹음을 저장하면, 부모님 목소리로 동화를 읽어줄 수 있어요"
+            subtitle={
+              readOnly
+                ? '동화책이 만들어진 뒤라 더 이상 보이스를 바꿀 수 없어요.'
+                : '샘플 문장을 따라 읽고 녹음을 저장하면, 부모님 목소리로 동화를 읽어줄 수 있어요'
+            }
           />
+
+          {readOnly && (
+            <div
+              role="status"
+              style={{
+                marginBottom: 18,
+                padding: '14px 18px',
+                borderRadius: 14,
+                background: '#fbf2da',
+                border: '2px dashed var(--cr-caramel)',
+                color: 'var(--cr-caramel-deep)',
+                fontFamily: 'var(--cr-font-gaegu)',
+                fontWeight: 700,
+                fontSize: 17,
+              }}
+            >
+              이 단계는 잠겨 있어요. 동화책이 이미 만들어지고 있어 새 녹음·기존 음성 변경은
+              할 수 없어요.
+            </div>
+          )}
 
           {/* Section 1: 녹음 스크립트 + 녹음 컨트롤 */}
           <section className="cr-card">
@@ -111,8 +146,9 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <button
                 type="button"
                 onClick={() => setShowLoadModal(true)}
+                disabled={readOnly}
                 className="cr-btn-back"
-                style={{ justifySelf: 'auto' }}
+                style={{ justifySelf: 'auto', opacity: readOnly ? 0.4 : 1, cursor: readOnly ? 'not-allowed' : 'pointer' }}
               >
                 <FolderOpen className="w-4 h-4" /> 기존 음성 불러오기
               </button>
@@ -141,9 +177,10 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <button
                 type="button"
                 onClick={() => void vc.startRecording()}
-                disabled={vc.status === 'recording'}
+                disabled={vc.status === 'recording' || readOnly}
                 className={`cr-vc-mic${vc.status === 'recording' ? ' recording' : ''}`}
                 aria-label="녹음 시작"
+                style={readOnly ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
               >
                 <Mic className="w-9 h-9" />
               </button>
@@ -198,8 +235,13 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <button
                 type="button"
                 onClick={vc.rerecord}
+                disabled={readOnly}
                 className="cr-btn-back"
-                style={{ justifySelf: 'auto' }}
+                style={{
+                  justifySelf: 'auto',
+                  opacity: readOnly ? 0.4 : 1,
+                  cursor: readOnly ? 'not-allowed' : 'pointer',
+                }}
               >
                 <RotateCcw className="w-4 h-4" /> 다시 녹음하기
               </button>
@@ -237,9 +279,13 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                   <button
                     type="button"
                     onClick={() => setShowSaveModal(true)}
-                    disabled={!vc.recordedAudioUrl || vc.isSaving}
+                    disabled={!vc.recordedAudioUrl || vc.isSaving || readOnly}
                     className="cr-btn-next"
-                    style={{ justifySelf: 'auto' }}
+                    style={{
+                      justifySelf: 'auto',
+                      opacity: readOnly ? 0.4 : undefined,
+                      cursor: readOnly ? 'not-allowed' : undefined,
+                    }}
                   >
                     <Save className="w-4 h-4" />
                     <span>{vc.isSaving ? '저장 중...' : '녹음 저장하기'}</span>
@@ -304,6 +350,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                 rows={3}
                 placeholder="동화 속 문장을 입력해 주세요."
                 className="cr-textarea"
+                disabled={readOnly}
               />
             </div>
 
@@ -311,9 +358,13 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               <button
                 type="button"
                 onClick={() => void vc.previewTts()}
-                disabled={!vc.recordedAudioUrl || vc.isTtsLoading}
+                disabled={!vc.recordedAudioUrl || vc.isTtsLoading || readOnly}
                 className="cr-btn-next"
-                style={{ justifySelf: 'auto' }}
+                style={{
+                  justifySelf: 'auto',
+                  opacity: readOnly ? 0.4 : undefined,
+                  cursor: readOnly ? 'not-allowed' : undefined,
+                }}
               >
                 <Wand2 className="w-4 h-4" />
                 <span>{vc.isTtsLoading ? 'TTS 생성 중…' : 'TTS 들어보기'}</span>
@@ -395,15 +446,20 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
             type="button"
             onClick={onNext}
             className="cr-btn-next"
-            disabled={vc.savedProfileId === null || vc.attachStatus !== 'attached'}
+            /* readOnly = step 7 confirm 이후 재진입한 상태 → BE 에 voice_profile_id 가 이미 박혀있어
+               FE 의 savedProfileId / attachStatus 는 component 리마운트로 비어있어도 진행 가능.
+               이 가드를 안 풀면 사용자가 잠금된 버튼들 때문에 재attach 도 못해서 stuck 됨. */
+            disabled={readOnly ? false : vc.savedProfileId === null || vc.attachStatus !== 'attached'}
             title={
-              vc.savedProfileId === null
-                ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
-                : vc.attachStatus === 'attaching'
-                  ? '음성 연결 중...'
-                  : vc.attachStatus === 'failed'
-                    ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
-                    : undefined
+              readOnly
+                ? undefined
+                : vc.savedProfileId === null
+                  ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
+                  : vc.attachStatus === 'attaching'
+                    ? '음성 연결 중...'
+                    : vc.attachStatus === 'failed'
+                      ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
+                      : undefined
             }
           >
             <span>마지막 녹음하기</span>
