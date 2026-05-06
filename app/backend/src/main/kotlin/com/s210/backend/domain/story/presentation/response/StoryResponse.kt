@@ -208,6 +208,13 @@ data class IllustrationVersionsResponse(
     val versions: List<IllustrationVersionEntryResponse>,
 )
 
+data class IllustrationRegenStatusResponse(
+    val storyId: Long,
+    val used: Int,
+    val limit: Int,
+    val remaining: Int,
+)
+
 data class ConfirmStoryboardResponse(
     val jobId: Long,
     val jobType: String,

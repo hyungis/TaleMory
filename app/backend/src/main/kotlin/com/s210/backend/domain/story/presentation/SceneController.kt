@@ -18,6 +18,7 @@ import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
 import com.s210.backend.domain.story.presentation.request.VoiceProfileModifyRequest
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.HighlightVoicesExistsResponse
+import com.s210.backend.domain.story.presentation.response.IllustrationRegenStatusResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRegenerateResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRollbackResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationVersionEntryResponse
@@ -85,6 +86,25 @@ class SceneController(
             ApiResponse(data = IllustrationRegenerateResponse(
                 jobId = result.jobId,
                 status = result.status,
+            ))
+        )
+    }
+
+    @GetMapping("/scenes/illustration/regen-status")
+    fun sceneIllustrationRegenStatus(
+        @PathVariable storyId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<IllustrationRegenStatusResponse>> {
+        val result = sceneIllustrationService.getRegenStatus(
+            userId = user.userId,
+            storyId = storyId,
+        )
+        return ResponseEntity.ok(
+            ApiResponse(data = IllustrationRegenStatusResponse(
+                storyId = result.storyId,
+                used = result.used,
+                limit = result.limit,
+                remaining = result.remaining,
             ))
         )
     }

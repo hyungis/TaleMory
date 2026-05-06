@@ -20,6 +20,13 @@ export interface IllustrationVersionSelectResponse {
   version: number
 }
 
+export interface IllustrationRegenStatusResponse {
+  storyId: number
+  used: number
+  limit: number
+  remaining: number
+}
+
 export function getIllustrationVersions(
   storyId: number,
   sceneId: number,
@@ -37,5 +44,13 @@ export function postSelectIllustrationVersion(
   return post<IllustrationVersionSelectResponse>(
     `/stories/${storyId}/scenes/${sceneId}/illustration/select`,
     { version },
+  )
+}
+
+export function getIllustrationRegenStatus(
+  storyId: number,
+): Promise<IllustrationRegenStatusResponse> {
+  return get<IllustrationRegenStatusResponse>(
+    `/stories/${storyId}/scenes/illustration/regen-status`,
   )
 }

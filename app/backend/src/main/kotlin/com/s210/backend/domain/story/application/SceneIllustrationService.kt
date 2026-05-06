@@ -74,6 +74,13 @@ class SceneIllustrationService(
         val versions: List<VersionEntry>,
     )
 
+    data class RegenStatusResult(
+        val storyId: Long,
+        val used: Int,
+        val limit: Int,
+        val remaining: Int,
+    )
+
     fun regenerateIllustration(
         userId: Long,
         storyId: Long,
@@ -84,10 +91,10 @@ class SceneIllustrationService(
         val scene = sceneRepository.findByIdAndStoryId(sceneId, storyId)
             ?: throw BusinessException(StoryErrorCode.SCENE_NOT_FOUND)
 
-        val terminalStatuses = listOf(JobStatus.SUCCESS, JobStatus.FAILED)
+        val countedStatuses = listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS, JobStatus.FAILED)
         // 동화 전체 합산 한도 — 페이지별 한도는 두지 않고 사용자가 자유롭게 분배해서 쓸 수 있게 한다.
         val storyCount = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
-            storyId, JobType.ILLUSTRATION, terminalStatuses,
+            storyId, JobType.ILLUSTRATION, countedStatuses,
         )
         if (storyCount >= STORY_REGEN_LIMIT) {
             throw BusinessException(StoryErrorCode.REGENERATION_LIMIT_EXCEEDED)
@@ -268,6 +275,22 @@ class SceneIllustrationService(
         scene.illustrationUrl = selected.url
         illustrationVersionRedisRepository.setCurrent(sceneId, version)
         return RollbackResult(illustrationUrl = selected.url, version = version)
+    }
+
+    @Transactional(readOnly = true)
+    fun getRegenStatus(userId: Long, storyId: Long): RegenStatusResult {
+        ownedStory(userId, storyId)
+        val used = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
+            storyId,
+            JobType.ILLUSTRATION,
+            listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS, JobStatus.FAILED),
+        ).toInt()
+        return RegenStatusResult(
+            storyId = storyId,
+            used = used,
+            limit = STORY_REGEN_LIMIT,
+            remaining = (STORY_REGEN_LIMIT - used).coerceAtLeast(0),
+        )
     }
 
     private fun loadLastSuccessStoryPayload(storyId: Long): StoryboardPayload {
