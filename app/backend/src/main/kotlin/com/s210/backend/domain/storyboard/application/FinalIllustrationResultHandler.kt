@@ -2,6 +2,8 @@ package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.redis.JobStatusRedisRepository
+import com.s210.backend.common.transaction.afterCommit
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -28,6 +30,7 @@ class FinalIllustrationResultHandler(
     private val jobRepository: StoryGenerationJobRepository,
     private val sceneRepository: SceneRepository,
     private val objectMapper: ObjectMapper,
+    private val jobStatusRedisRepo: JobStatusRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -64,6 +67,7 @@ class FinalIllustrationResultHandler(
         if (accumulator.size >= expected) {
             job.status = JobStatus.SUCCESS
             job.finishedAt = LocalDateTime.now()
+            tryInvalidatePollingCache(job.id)
         } else {
             job.status = JobStatus.RUNNING
         }
@@ -94,6 +98,7 @@ class FinalIllustrationResultHandler(
         val msg = envelope.error?.message
         job.errorMessage = listOfNotNull(code, msg).joinToString(": ").ifBlank { "FINAL_ILLUSTRATION_FAILED" }.take(65_535)
         job.finishedAt = LocalDateTime.now()
+        tryInvalidatePollingCache(jobId)
 
         log.warn("[FINAL_ILLUST:RES] failed — jobId={}, code={}, message={}",
             jobId, envelope.error?.code, envelope.error?.message)
@@ -115,6 +120,16 @@ class FinalIllustrationResultHandler(
         } catch (e: Exception) {
             log.warn("[FINAL_ILLUST:RES] cannot parse accumulator JSON for job={}: {}", job.id, raw, e)
             mutableMapOf()
+        }
+    }
+
+    private fun tryInvalidatePollingCache(jobId: Long) {
+        afterCommit {
+            try {
+                jobStatusRedisRepo.invalidateJobResponse(jobId)
+            } catch (e: Exception) {
+                log.warn("Redis polling cache invalidate failed for FINAL_ILLUSTRATION job {} (non-fatal): {}", jobId, e.message)
+            }
         }
     }
 

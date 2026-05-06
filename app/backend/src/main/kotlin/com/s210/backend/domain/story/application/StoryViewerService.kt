@@ -38,7 +38,7 @@ class StoryViewerService(
     private val objectMapper: ObjectMapper,
 ) {
     companion object {
-        private const val SAMPLE_STORY_ID = 61L
+        private const val SAMPLE_STORY_ID = 1L
     }
 
     fun findSampleStoryView(): StoryViewResponse {
