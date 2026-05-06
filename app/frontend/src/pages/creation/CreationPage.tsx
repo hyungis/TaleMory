@@ -146,6 +146,7 @@ export function CreationPage() {
           onBack={handleBack}
           onNext={flow.handleNext}
           setFinalIllustrationJobId={flow.setFinalIllustrationJobId}
+          finalIllustrationJobId={flow.finalIllustrationJobId}
         />
       )}
 
@@ -155,6 +156,7 @@ export function CreationPage() {
           onBack={handleBack}
           onNext={flow.handleNext}
           onVoiceSaved={flow.updateVoiceModel}
+          readOnly={flow.confirmedReadOnlyLocked}
         />
       )}
 
@@ -166,6 +168,8 @@ export function CreationPage() {
           onNext={flow.handleNext}
           setStoryGenerationJobId={flow.setStoryGenerationJobId}
           setFinalIllustrationJobId={flow.setFinalIllustrationJobId}
+          markConfirmedReadOnly={flow.markConfirmedReadOnly}
+          readOnly={flow.confirmedReadOnlyLocked}
         />
       )}
 
