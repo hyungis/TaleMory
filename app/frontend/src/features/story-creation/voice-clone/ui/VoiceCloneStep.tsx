@@ -446,15 +446,20 @@ export function VoiceCloneStep({
             type="button"
             onClick={onNext}
             className="cr-btn-next"
-            disabled={vc.savedProfileId === null || vc.attachStatus !== 'attached'}
+            /* readOnly = step 7 confirm 이후 재진입한 상태 → BE 에 voice_profile_id 가 이미 박혀있어
+               FE 의 savedProfileId / attachStatus 는 component 리마운트로 비어있어도 진행 가능.
+               이 가드를 안 풀면 사용자가 잠금된 버튼들 때문에 재attach 도 못해서 stuck 됨. */
+            disabled={readOnly ? false : vc.savedProfileId === null || vc.attachStatus !== 'attached'}
             title={
-              vc.savedProfileId === null
-                ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
-                : vc.attachStatus === 'attaching'
-                  ? '음성 연결 중...'
-                  : vc.attachStatus === 'failed'
-                    ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
-                    : undefined
+              readOnly
+                ? undefined
+                : vc.savedProfileId === null
+                  ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
+                  : vc.attachStatus === 'attaching'
+                    ? '음성 연결 중...'
+                    : vc.attachStatus === 'failed'
+                      ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
+                      : undefined
             }
           >
             <span>마지막 녹음하기</span>
