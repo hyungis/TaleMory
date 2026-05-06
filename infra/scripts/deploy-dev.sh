@@ -10,6 +10,7 @@
 #   bash infra/scripts/deploy-dev.sh                       # 전체
 #   bash infra/scripts/deploy-dev.sh backend               # backend 만
 #   bash infra/scripts/deploy-dev.sh frontend              # nginx 별칭
+#   bash infra/scripts/deploy-dev.sh ai                    # ai-* 모든 워커
 #   bash infra/scripts/deploy-dev.sh ai-tts-story-worker   # 임의의 단일 서비스
 
 set -euo pipefail
@@ -47,6 +48,14 @@ resolve_services() {
     frontend)
       # UX 별칭 — 사용자가 nginx 라는 compose service name 을 외울 필요 없게.
       echo "nginx"
+      ;;
+    ai)
+      # ai-* prefix 모든 서비스 (ai-worker, ai-tts-*-worker 등). compose 에 새 ai-* 추가 시 자동 포함.
+      # CI 의 deploy_dev_ai job 이 이 별칭으로 호출.
+      echo "$ALL_SERVICES" | grep -E '^ai-' || {
+        echo "no ai-* services found in compose" >&2
+        exit 1
+      }
       ;;
     *)
       if echo "$ALL_SERVICES" | grep -qx "$SERVICE"; then

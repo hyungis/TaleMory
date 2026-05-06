@@ -10,6 +10,7 @@
 #   bash infra/scripts/deploy-master.sh                       # 전체
 #   bash infra/scripts/deploy-master.sh backend               # backend 만
 #   bash infra/scripts/deploy-master.sh frontend              # nginx 별칭
+#   bash infra/scripts/deploy-master.sh ai                    # ai-* 모든 워커
 #   bash infra/scripts/deploy-master.sh ai-tts-story-worker   # 임의의 단일 서비스
 
 set -euo pipefail
@@ -44,6 +45,13 @@ resolve_services() {
       ;;
     frontend)
       echo "nginx"
+      ;;
+    ai)
+      # ai-* prefix 모든 서비스. CI 의 deploy_master_ai job 이 이 별칭으로 호출.
+      echo "$ALL_SERVICES" | grep -E '^ai-' || {
+        echo "no ai-* services found in compose" >&2
+        exit 1
+      }
       ;;
     *)
       if echo "$ALL_SERVICES" | grep -qx "$SERVICE"; then
