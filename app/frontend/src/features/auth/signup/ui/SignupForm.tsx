@@ -53,6 +53,10 @@ interface FieldValidationFeedback {
   message: string
 }
 
+interface FieldValidationOptions {
+  showRequired?: boolean
+}
+
 const INITIAL_AVAILABILITY_CHECK: AvailabilityCheckState = {
   status: 'idle',
   value: '',
@@ -80,10 +84,17 @@ function getAvailabilityMessageColor(status: AvailabilityCheckStatus): string {
   return '#8a7558'
 }
 
-function getLoginIdFormatFeedback(value: string): FieldValidationFeedback | null {
-  if (!value) return null
+function getLoginIdFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
+  const loginId = value.trim()
 
-  if (value.trim().length < MIN_LOGIN_ID_LENGTH) {
+  if (!loginId) {
+    return options.showRequired ? { message: '아이디를 입력해주세요.' } : null
+  }
+
+  if (loginId.length < MIN_LOGIN_ID_LENGTH) {
     return {
       message: `아이디는 ${MIN_LOGIN_ID_LENGTH}자 이상 입력해주세요.`,
     }
@@ -92,8 +103,13 @@ function getLoginIdFormatFeedback(value: string): FieldValidationFeedback | null
   return null
 }
 
-function getPasswordFormatFeedback(value: string): FieldValidationFeedback | null {
-  if (!value) return null
+function getPasswordFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
+  if (!value) {
+    return options.showRequired ? { message: '비밀번호를 입력해주세요.' } : null
+  }
 
   if (value.length < MIN_PASSWORD_LENGTH) {
     return {
@@ -125,9 +141,14 @@ function getPasswordCheckFeedback(
   return null
 }
 
-function getEmailFormatFeedback(value: string): FieldValidationFeedback | null {
+function getEmailFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
   const email = value.trim()
-  if (!email) return null
+  if (!email) {
+    return options.showRequired ? { message: '이메일을 입력해주세요.' } : null
+  }
 
   if (!EMAIL_PATTERN.test(email)) {
     return {
@@ -138,17 +159,35 @@ function getEmailFormatFeedback(value: string): FieldValidationFeedback | null {
   return null
 }
 
+function getPhoneFormatFeedback(value: string): FieldValidationFeedback | null {
+  if (value && !PHONE_PATTERN.test(value)) {
+    return {
+      message: '휴대폰 번호 형식을 확인해주세요.',
+    }
+  }
+
+  return null
+}
+
 function validate(values: SignupFormValues): string | null {
-  if (!values.id.trim()) return '아이디를 입력해주세요.'
-  if (values.id.trim().length < MIN_LOGIN_ID_LENGTH) return '아이디는 4자 이상이어야 해요.'
-  if (!values.password) return '비밀번호를 입력해주세요.'
-  if (values.password.length < MIN_PASSWORD_LENGTH) return '비밀번호는 6자 이상이어야 해요.'
-  if (!values.passwordCheck) return '비밀번호 확인을 입력해주세요.'
-  if (values.password !== values.passwordCheck) return '비밀번호가 서로 일치하지 않아요.'
-  if (!values.email.trim() || !EMAIL_PATTERN.test(values.email.trim())) return '올바른 이메일 형식을 입력해주세요.'
+  const loginIdFeedback = getLoginIdFormatFeedback(values.id, { showRequired: true })
+  if (loginIdFeedback) return loginIdFeedback.message
+
+  const passwordFeedback = getPasswordFormatFeedback(values.password, { showRequired: true })
+  if (passwordFeedback) return passwordFeedback.message
+
+  const passwordCheckFeedback = getPasswordCheckFeedback(values.password, values.passwordCheck)
+  if (passwordCheckFeedback) return passwordCheckFeedback.message
+
+  const emailFeedback = getEmailFormatFeedback(values.email, { showRequired: true })
+  if (emailFeedback) return emailFeedback.message
+
   if (!values.name.trim()) return '실명을 입력해주세요.'
   if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
-  if (values.phone && !PHONE_PATTERN.test(values.phone)) return '휴대폰 번호 형식을 확인해주세요.'
+
+  const phoneFeedback = getPhoneFormatFeedback(values.phone)
+  if (phoneFeedback) return phoneFeedback.message
+
   if (!values.serviceTermsAgree) return '서비스 이용약관에 동의해주세요.'
   if (!values.privacyAgree) return '개인정보 수집 및 이용에 동의해주세요.'
   return null
@@ -247,11 +286,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
 
   const handleLoginIdCheck = useCallback(async () => {
     const loginId = values.id.trim()
-    setError('')
-    if (!loginId) {
-      return
-    }
-    if (loginId.length < MIN_LOGIN_ID_LENGTH) {
+    if (getLoginIdFormatFeedback(loginId, { showRequired: true })) {
       return
     }
 
@@ -267,7 +302,6 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
 
   const handleNicknameCheck = useCallback(async () => {
     const nickname = values.nickname.trim()
-    setError('')
     if (!nickname) {
       return
     }
