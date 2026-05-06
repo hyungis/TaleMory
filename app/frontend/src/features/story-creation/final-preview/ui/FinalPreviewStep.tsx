@@ -12,6 +12,11 @@ import {
   getScenes,
   type SceneDto,
 } from '../../highlight-outro/api/highlightOutroApi'
+import {
+  getIllustrationVersions,
+  postSelectIllustrationVersion,
+  type IllustrationVersionsResponse,
+} from '../api/illustrationVersions'
 import { postIllustrationRegenerate } from '../../storyboard-editor/api/postIllustrationRegenerate'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -78,6 +83,9 @@ export function FinalPreviewStep({
   const [openPromptScene, setOpenPromptScene] = useState<number | null>(null)
   const [promptText, setPromptText] = useState('')
   const [regenError, setRegenError] = useState<string | null>(null)
+  const [versionInfo, setVersionInfo] = useState<IllustrationVersionsResponse | null>(null)
+  const [versionLoading, setVersionLoading] = useState(false)
+  const [versionReloadKey, setVersionReloadKey] = useState(0)
 
   /* 발행 확인 모달 — "발행하기" 클릭 시 즉시 onNext 호출하지 않고 사용자 확인 받음.
      Step 9 진입 = 자동 발행이라 클릭 한 번이 곧 발행 트리거이기 때문. */
@@ -133,6 +141,7 @@ export function FinalPreviewStep({
             /* 재조회 실패는 silent — 다음 마운트 시 다시 시도 */
           })
       }
+      setVersionReloadKey(key => key + 1)
       setActiveRegen(null)
     } else if (status === 'FAILED' || status === 'CANCELLED') {
       setRegenError('재생성에 실패했어요. 잠시 후 다시 시도해주세요.')
@@ -149,6 +158,31 @@ export function FinalPreviewStep({
   const bodyPageCount = bodyScenes.length
   const currentPreviewPage = previewPages[resultPageIndex] ?? null
   const currentScene = currentPreviewPage?.kind === 'scene' ? currentPreviewPage.scene : null
+  const currentSceneId = currentScene?.id ?? null
+
+  useEffect(() => {
+    if (!storyId || currentSceneId === null) {
+      setVersionInfo(null)
+      return
+    }
+
+    let cancelled = false
+    setVersionLoading(true)
+    getIllustrationVersions(storyId, currentSceneId)
+      .then(info => {
+        if (!cancelled) setVersionInfo(info)
+      })
+      .catch(() => {
+        if (!cancelled) setVersionInfo(null)
+      })
+      .finally(() => {
+        if (!cancelled) setVersionLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [storyId, currentSceneId, versionReloadKey])
 
   const prevPage = useCallback(() => {
     setResultPageIndex(i => Math.max(0, i - 1))
@@ -200,6 +234,26 @@ export function FinalPreviewStep({
       }
     }
   }, [storyId, openPromptScene, promptText])
+
+  const handleSelectVersion = useCallback(async (version: number) => {
+    if (!storyId || currentSceneId === null) return
+    try {
+      const result = await postSelectIllustrationVersion(storyId, currentSceneId, version)
+      setScenes(prev => prev.map(scene => (
+        scene.id === currentSceneId
+          ? { ...scene, illustrationUrl: result.illustrationUrl }
+          : scene
+      )))
+      setVersionInfo(prev => prev ? { ...prev, current: result.version } : prev)
+      setRegenError(null)
+    } catch (err) {
+      if (isApiError(err)) {
+        setRegenError(err.message ?? '?ì„ì” ï§žÂ€ è¸°ê¾©ìŸ¾ë¥¼ ë°”ê¾¸ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.')
+      } else {
+        setRegenError('?ì„ì” ï§žÂ€ è¸°ê¾©ìŸ¾ë¥¼ ë°”ê¾¸ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.')
+      }
+    }
+  }, [storyId, currentSceneId])
 
   // 두 잡 중 하나라도 PENDING/RUNNING 이거나 scenes fetch 중이면 blocking.
   const ttsInProgress =
@@ -286,7 +340,6 @@ export function FinalPreviewStep({
   }
 
   // ===== 정상 화면 =====
-  const currentSceneId = currentScene?.id ?? null
   const remaining = Math.max(0, REGEN_LIMIT_TOTAL - regenCount)
   const isCurrentRegenPending = activeRegen?.sceneId === currentSceneId
   const isAnyRegenPending = activeRegen !== null
@@ -387,6 +440,32 @@ export function FinalPreviewStep({
               <p className="cr-final-regen-meta">
                 전체 <strong>{remaining}/{REGEN_LIMIT_TOTAL}</strong> 회 더 가능해요.
               </p>
+
+              {versionInfo && versionInfo.versions.length > 0 && (
+                <label className="cr-final-regen-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span>Version</span>
+                  <select
+                    value={versionInfo.current ?? ''}
+                    disabled={isAnyRegenPending || versionLoading}
+                    onChange={event => handleSelectVersion(Number(event.target.value))}
+                    style={{
+                      height: 34,
+                      borderRadius: 8,
+                      border: '1px solid rgba(69, 53, 31, 0.22)',
+                      padding: '0 10px',
+                      background: '#fffaf0',
+                      color: '#45351f',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {versionInfo.versions.map(version => (
+                      <option key={version.version} value={version.version}>
+                        v{version.version}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               {isPanelOpen && (
                 <div className="cr-final-regen-panel">
