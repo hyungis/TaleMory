@@ -4,16 +4,14 @@ import type { SceneDto } from '../../highlight-outro/api/highlightOutroApi'
 
 interface BookSpreadProps {
   scene: SceneDto
-  /** 0-based 페이지 인덱스. 표시용 페이지 번호는 idx*2+1 / idx*2+2. */
+  /** 0-based scene index. Visible book page numbers are idx*2+1 / idx*2+2. */
   pageIndex: number
 }
 
 /**
- * 펼쳐진 동화책 1 스프레드(좌/우 2페이지) — paper-craft 톤.
- * - 왼쪽: 실제 삽화 이미지 (illustrationUrl)
- * - 오른쪽: Page 라벨 + 영문/한글 본문 + TTS 미니 플레이어
- *
- * 클래스 정의는 `creation-paper.css` 의 Step 8 섹션 (`.cr-spread-*`, `.cr-tts-player`).
+ * Final preview paper-craft book spread.
+ * - Left: final illustration
+ * - Right: page label, story text, translated text, and TTS controls
  */
 export function BookSpread({ scene, pageIndex }: BookSpreadProps) {
   const englishText = scene.sentences.map(s => s.englishText).join(' ')
@@ -27,7 +25,6 @@ export function BookSpread({ scene, pageIndex }: BookSpreadProps) {
     <div className="cr-spread">
       <div className="cr-spread-spine" aria-hidden="true" />
 
-      {/* 좌측 — 일러스트 */}
       <div className="cr-spread-page cr-spread-page-left">
         <div className="cr-spread-illust">
           {scene.illustrationUrl ? (
@@ -42,10 +39,8 @@ export function BookSpread({ scene, pageIndex }: BookSpreadProps) {
         <span className="cr-spread-page-num">{pageIndex * 2 + 1}</span>
       </div>
 
-      {/* 우측 — 본문 + TTS */}
       <div className="cr-spread-page cr-spread-page-right">
         <span className="cr-spread-eyebrow">Page {scene.pageNumber}</span>
-        <h3 className="cr-spread-title">장면 {scene.pageNumber}</h3>
         <p className="cr-spread-english">{englishText}</p>
         {koreanText && <p className="cr-spread-korean">{koreanText}</p>}
 
@@ -62,7 +57,6 @@ function TtsPlayer({ src }: { src: string }) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
 
-  // 다른 페이지로 넘기거나 src 가 바뀌면 즉시 정지
   useEffect(() => {
     audioRef.current?.pause()
     setPlaying(false)
