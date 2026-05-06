@@ -53,5 +53,9 @@ WHERE `style_preset_id` IS NOT NULL
 DELETE FROM `style_presets`
 WHERE `id` NOT IN (1, 2, 3, 4);
 
+UPDATE `style_presets`
+SET `style_prompt` = `code`
+WHERE `style_prompt` IS NULL OR TRIM(`style_prompt`) = '';
+
 ALTER TABLE `style_presets`
     MODIFY COLUMN `style_prompt` TEXT NOT NULL;
