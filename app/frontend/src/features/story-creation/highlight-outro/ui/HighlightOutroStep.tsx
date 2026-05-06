@@ -46,6 +46,16 @@ interface HighlightOutroStepProps {
    * 때를 위한 보정 경로.
    */
   setFinalIllustrationJobId: (jobId: number | null) => void
+  /**
+   * 단방향 잠금 트리거 — confirmStoryboard 성공 직후 호출하여 step 6/7 을 영구 잠금.
+   * 사용자가 step 8 에서 뒤로 돌아와 입력을 바꾸는 걸 차단.
+   */
+  markConfirmedReadOnly: () => void
+  /**
+   * confirm 한 번이라도 성공한 후엔 true. 모든 입력/녹음/선택 disable + 잠금 배너 노출.
+   * (step 8 미리보기가 만들어진 데이터와 일관성 유지)
+   */
+  readOnly?: boolean
 }
 
 interface HighlightSentence {
@@ -80,6 +90,8 @@ export function HighlightOutroStep({
   onNext,
   setStoryGenerationJobId,
   setFinalIllustrationJobId,
+  markConfirmedReadOnly,
+  readOnly = false,
 }: HighlightOutroStepProps) {
   const { mutateAsync: confirmStoryboard, isPending: isConfirming } = useStoryboardConfirm()
   const [confirmError, setConfirmError] = useState<string | null>(null)
@@ -306,6 +318,7 @@ export function HighlightOutroStep({
 
   const startRecording = useCallback(
     async (target: RecordingTarget) => {
+      if (readOnly) return
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         streamRef.current = stream
@@ -357,7 +370,7 @@ export function HighlightOutroStep({
         alert('마이크 권한이 필요합니다.')
       }
     },
-    [cleanupStream, highlights, storyId, uploadHighlightVoice, uploadOutroVoiceToServer],
+    [cleanupStream, highlights, storyId, uploadHighlightVoice, uploadOutroVoiceToServer, readOnly],
   )
 
   const stopRecording = useCallback(() => {
@@ -367,6 +380,7 @@ export function HighlightOutroStep({
 
   const toggleHighlight = useCallback(
     (pageIndex: number, sentenceIndex: number, sentenceId: number | null, text: string) => {
+      if (readOnly) return
       setHighlights(prev => {
         const exists = prev.find(h => h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex)
         if (exists) {
@@ -381,7 +395,7 @@ export function HighlightOutroStep({
         ]
       })
     },
-    [storyId],
+    [storyId, readOnly],
   )
 
   const handleSaveOutro = useCallback(async () => {
@@ -398,6 +412,11 @@ export function HighlightOutroStep({
 
   const handleNext = useCallback(async () => {
     if (!storyId) return
+    // 이미 confirm 된 상태로 재진입(readOnly) — confirm 재호출 없이 바로 step 8 로.
+    if (readOnly) {
+      onNext()
+      return
+    }
     setConfirmError(null)
     try {
       if (outroText.trim()) {
@@ -409,6 +428,8 @@ export function HighlightOutroStep({
       if (job.finalIllustrationJobId !== null) {
         setFinalIllustrationJobId(job.finalIllustrationJobId)
       }
+      // step 6/7 영구 잠금 — 이후 사용자가 step 8 에서 뒤로 와도 입력 변경 불가.
+      markConfirmedReadOnly()
       onNext()
     } catch (err: unknown) {
       const apiErr = err as { status?: number; message?: string }
@@ -418,7 +439,7 @@ export function HighlightOutroStep({
         setConfirmError(apiErr?.message ?? '동화책 생성 요청 중 오류가 발생했어요.')
       }
     }
-  }, [storyId, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, setFinalIllustrationJobId, onNext])
+  }, [storyId, readOnly, outroText, outroSignature, confirmStoryboard, setStoryGenerationJobId, setFinalIllustrationJobId, markConfirmedReadOnly, onNext])
 
   const playAudio = useCallback((url: string) => {
     if (audioRef.current) audioRef.current.pause()
@@ -467,8 +488,32 @@ export function HighlightOutroStep({
           <StepTitleBlock
             stepNumber={7}
             title="특별한 문장을 직접 읽어주세요"
-            subtitle="각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요"
+            subtitle={
+              readOnly
+                ? '동화책이 만들어진 뒤라 더 이상 강조 문장이나 마무리 멘트를 바꿀 수 없어요.'
+                : '각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요'
+            }
           />
+
+          {readOnly && (
+            <div
+              role="status"
+              style={{
+                marginBottom: 18,
+                padding: '14px 18px',
+                borderRadius: 14,
+                background: '#fbf2da',
+                border: '2px dashed var(--cr-caramel)',
+                color: 'var(--cr-caramel-deep)',
+                fontFamily: 'var(--cr-font-gaegu)',
+                fontWeight: 700,
+                fontSize: 17,
+              }}
+            >
+              이 단계는 잠겨 있어요. 동화책이 이미 만들어지고 있어 강조 녹음·마무리 멘트는
+              변경할 수 없어요.
+            </div>
+          )}
 
           {loadingScenes && (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
@@ -792,6 +837,7 @@ export function HighlightOutroStep({
                 rows={4}
                 placeholder="예: 해솔아, 오늘도 씩씩했어. 잘 자, 내 작은 용감이. 사랑해!"
                 className="cr-textarea"
+                disabled={readOnly}
               />
             </div>
 
@@ -804,6 +850,7 @@ export function HighlightOutroStep({
                 onBlur={handleSaveOutro}
                 placeholder="예: — 사랑하는 엄마가"
                 className="cr-input"
+                disabled={readOnly}
               />
             </div>
 
@@ -880,29 +927,6 @@ export function HighlightOutroStep({
               )}
             </div>
 
-            {outroText.trim() && (
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: '14px 18px',
-                  background: '#fbf2da',
-                  border: '2px dashed var(--cr-caramel)',
-                  borderRadius: 14,
-                }}
-              >
-                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, color: 'var(--cr-caramel-deep)', fontWeight: 700, margin: '0 0 6px' }}>
-                  미리보기
-                </p>
-                <p style={{ fontFamily: 'var(--cr-font-serif)', fontSize: 19, color: 'var(--cr-ink)', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 }}>
-                  {outroText}
-                </p>
-                {outroSignature && (
-                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 17, color: 'var(--cr-ink-soft)', fontStyle: 'italic', margin: '8px 0 0' }}>
-                    {outroSignature}
-                  </p>
-                )}
-              </div>
-            )}
           </section>
 
           {confirmError && (
