@@ -91,6 +91,20 @@ fi
 echo "[INFO] recreating: ${SERVICES_TO_UP[*]}"
 compose_cmd up -d --no-build --no-deps "${SERVICES_TO_UP[@]}"
 
+# backend 만 recreate 됐을 때 nginx 가 직전 backend 컨테이너의 stale IP 를 잡고 있어
+# /api/* upstream routing 실패 (nginx worker 시작 시 한 번만 DNS resolve). reload 로
+# worker 재시작 → 새 backend IP 재해석. nginx 자체가 recreate 된 경우는 새 worker 가
+# fresh resolve 하니 reload 불필요.
+# compose ps -q 로 컨테이너 ID 직접 얻어 HOST_PREFIX/container_name 매핑 의존성 제거.
+if [[ " ${SERVICES_TO_UP[*]} " == *" backend "* ]] \
+   && [[ " ${SERVICES_TO_UP[*]} " != *" nginx "* ]]; then
+  NGINX_CID=$(compose_cmd ps -q nginx 2>/dev/null || true)
+  if [[ -n "$NGINX_CID" ]]; then
+    echo "[INFO] backend recreated without nginx → reload nginx (refresh upstream DNS)"
+    docker exec "$NGINX_CID" nginx -s reload || true
+  fi
+fi
+
 bash "$SCRIPT_DIR/health-check-${ENV_NAME}.sh" "$SERVICE"
 
 # ── Legacy uvicorn AI 컨테이너 정리 ──
