@@ -69,10 +69,31 @@ resolve_services() {
   esac
 }
 
-# 다중 서비스를 한 번의 up 호출로 — depends_on 자동 해석 (nginx 가 backend 보다 늦게 뜸).
-# build 는 build stage 에서 끝났으니 --no-build.
-# shellcheck disable=SC2046
-compose_cmd up -d --no-build $(resolve_services)
+# selective recreate — daemon 에 새 SHA 이미지가 있는 서비스만 up.
+# 변경 없는 서비스는 build_<svc> 가 changes 필터로 skip → 그 SHA 의 이미지가 daemon 에
+# 존재하지 않음 → 컨테이너를 건드리지 않고 이전 SHA 이미지로 그대로 유지.
+# --no-deps: nginx 의 depends_on backend 같은 의존 추가 끌어오기 방지 — 없는 이미지를
+# pull 시도하다 실패하는 케이스 차단 (이번 PR 의 핵심 수정).
+COMPOSE_CONFIG_JSON=$(compose_cmd config --format json)
+SERVICES_TO_UP=()
+while IFS= read -r svc; do
+  [[ -z "$svc" ]] && continue
+  IMG=$(echo "$COMPOSE_CONFIG_JSON" \
+    | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['services'].get('$svc',{}).get('image',''))")
+  if [[ -n "$IMG" ]] && docker image inspect "$IMG" >/dev/null 2>&1; then
+    SERVICES_TO_UP+=("$svc")
+  else
+    echo "[SKIP] ${svc}: image '${IMG}' not in daemon (build skipped or first deploy)"
+  fi
+done < <(resolve_services)
+
+if [[ ${#SERVICES_TO_UP[@]} -eq 0 ]]; then
+  echo "no services with built image — nothing to deploy"
+  exit 0
+fi
+
+echo "[INFO] recreating: ${SERVICES_TO_UP[*]}"
+compose_cmd up -d --no-build --no-deps "${SERVICES_TO_UP[@]}"
 
 bash "$SCRIPT_DIR/health-check-${ENV_NAME}.sh" "$SERVICE"
 
