@@ -406,7 +406,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                     : undefined
             }
           >
-            <span>동화책 만들기</span>
+            <span>마지막 녹음하기</span>
             <Sparkles className="w-4 h-4" />
           </button>
         }

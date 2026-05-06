@@ -265,7 +265,7 @@ export function PromptStep({
               </>
             ) : isLocked ? (
               <>
-                <span>본문으로 돌아가기</span>
+                <span>스토리보드 생성하기</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             ) : (
