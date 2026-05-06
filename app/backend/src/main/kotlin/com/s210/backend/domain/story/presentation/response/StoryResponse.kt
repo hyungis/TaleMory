@@ -193,6 +193,28 @@ data class IllustrationRollbackResponse(
     val version: Int,
 )
 
+data class IllustrationVersionEntryResponse(
+    val version: Int,
+    val url: String,
+    val prompt: String?,
+    val createdAt: String?,
+    val jobId: Long?,
+)
+
+data class IllustrationVersionsResponse(
+    val storyId: Long,
+    val sceneId: Long,
+    val current: Int?,
+    val versions: List<IllustrationVersionEntryResponse>,
+)
+
+data class IllustrationRegenStatusResponse(
+    val storyId: Long,
+    val used: Int,
+    val limit: Int,
+    val remaining: Int,
+)
+
 data class ConfirmStoryboardResponse(
     val jobId: Long,
     val jobType: String,

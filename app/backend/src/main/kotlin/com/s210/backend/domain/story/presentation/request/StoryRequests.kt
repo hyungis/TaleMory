@@ -89,6 +89,10 @@ data class IllustrationRegenerateRequest(
     val userPrompt: String,
 )
 
+data class SelectIllustrationVersionRequest(
+    val version: Int,
+)
+
 data class BookmarkRequest(
     val isBookmarked: Boolean,
 )
