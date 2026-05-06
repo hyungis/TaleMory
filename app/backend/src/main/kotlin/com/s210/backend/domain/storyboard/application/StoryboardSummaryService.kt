@@ -243,12 +243,15 @@ class StoryboardSummaryService(
      */
     @Transactional(readOnly = true)
     fun findSummary(userId: Long, storyId: Long): SummaryResponseData {
-        // 1) Cache-aside read — 진행 중 SUMMARY 잡은 같은 storyId 로 polling 이 반복되므로 hit 율 ↑.
-        //    소유권 검증은 캐시 hit 경로에서도 항상 DB 의 stories.user_id 로 수행 — 인가 우회 차단.
-        val cached = tryReadCachedSummary(storyId)
+        // 1) Cache-aside read (envelope 패턴) — hit 시 DB **0회**.
+        //    envelope.ownerUserId 가 요청자 userId 와 일치하면 그대로 응답.
+        //    storyId→userId 는 immutable 이라 envelope 의 ownerUserId 가 stale 될 수 없음.
+        val cached = tryReadCachedSummaryEnvelope(storyId)
         if (cached != null) {
-            ownedStory(userId, storyId)
-            return cached
+            if (cached.ownerUserId != userId) {
+                throw BusinessException(CommonErrorCode.FORBIDDEN)
+            }
+            return cached.response
         }
 
         val story = ownedStory(userId, storyId)
@@ -295,20 +298,20 @@ class StoryboardSummaryService(
         // 2) 적재 — 잡이 PENDING/RUNNING 일 때만. 종결(SUCCESS/FAILED) / null / CANCELLED 는 적재 안 함.
         //    종결 응답은 어차피 FE 가 polling 멈추므로 캐시 의미 없음 + listener invalidate 와 의미 충돌.
         if (latestJob.status == JobStatus.PENDING || latestJob.status == JobStatus.RUNNING) {
-            tryWriteCachedSummary(storyId, response)
+            tryWriteCachedSummaryEnvelope(storyId, story.userId, response)
         }
 
         return response
     }
 
     /**
-     * Cache hit 시 deserialize. 실패는 swallow + WARN + **invalidate** — 깨진 캐시가 박제되지 않도록.
-     * invalidate 안 하면 다음 polling 도 같은 깨진 JSON 을 읽고 또 실패 → 5분 동안 stale.
+     * Cache hit 시 envelope 으로 deserialize. 실패는 swallow + WARN + **invalidate** —
+     * 깨진 envelope 가 박제되지 않도록 한 번 비우고 다음 polling 부터 정상 흐름으로 복구.
      */
-    private fun tryReadCachedSummary(storyId: Long): SummaryResponseData? {
+    private fun tryReadCachedSummaryEnvelope(storyId: Long): CachedSummaryEnvelope? {
         return try {
             val json = jobStatusRedisRepo.getCachedSummaryResponse(storyId) ?: return null
-            objectMapper.readValue(json, SummaryResponseData::class.java)
+            objectMapper.readValue(json, CachedSummaryEnvelope::class.java)
         } catch (e: Exception) {
             log.warn("SummaryResponse cache read/parse failed storyId={}, invalidating: {}", storyId, e.message)
             runCatching { jobStatusRedisRepo.invalidateSummaryResponse(storyId) }
@@ -316,9 +319,9 @@ class StoryboardSummaryService(
         }
     }
 
-    private fun tryWriteCachedSummary(storyId: Long, response: SummaryResponseData) {
+    private fun tryWriteCachedSummaryEnvelope(storyId: Long, ownerUserId: Long, response: SummaryResponseData) {
         try {
-            val json = objectMapper.writeValueAsString(response)
+            val json = objectMapper.writeValueAsString(CachedSummaryEnvelope(ownerUserId, response))
             jobStatusRedisRepo.cacheSummaryResponse(storyId, json)
         } catch (e: Exception) {
             log.warn("SummaryResponse cache write failed storyId={}: {}", storyId, e.message)
@@ -446,4 +449,17 @@ data class SummaryResponseData(
     val summaryKo: String?,
     val jobStatus: String?,
     val jobId: String?,
+)
+
+/**
+ * Polling 캐시 envelope — 응답 본체 + 소유자 userId.
+ *
+ * envelope 으로 ownerUserId 를 함께 캐시하면 hit 시 DB 0회 (owner 검증을 위한 stories 조회 회피).
+ * storyId → userId 매핑은 immutable (동화 소유자 이전 불가) 이라 ownerUserId 가 stale 될 수 없음.
+ * hit 검증은 "envelope.ownerUserId == 요청자 userId" — 공격자가 Redis 를 조작해도 자신의 userId 로
+ * 인증된 요청만 통과 가능 → 권한 우회 X.
+ */
+data class CachedSummaryEnvelope(
+    val ownerUserId: Long,
+    val response: SummaryResponseData,
 )
