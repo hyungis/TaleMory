@@ -24,8 +24,9 @@ class IllustrationVersionRedisRepository(
     companion object {
         const val VERSIONS_PREFIX = "storybook:illust:versions"
         const val CURRENT_PREFIX = "storybook:illust:current"
+        const val MAX_VERSION_PREFIX = "storybook:illust:max-version"
         const val MAX_VERSIONS = 10L
-        val TTL: Duration = Duration.ofHours(24)
+        val TTL: Duration = Duration.ofDays(4)
     }
 
     fun pushVersion(
@@ -57,6 +58,15 @@ class IllustrationVersionRedisRepository(
     fun getCurrent(sceneId: Long): Int? =
         redis.opsForValue().get(currentKey(sceneId))?.toIntOrNull()
 
+    fun computeNextVersion(sceneId: Long): Int {
+        val key = maxVersionKey(sceneId)
+        redis.opsForValue().setIfAbsent(key, "1", TTL)
+        val next = redis.opsForValue().increment(key)
+            ?: throw IllegalStateException("Redis INCR returned null for key=$key")
+        redis.expire(key, TTL)
+        return next.toInt()
+    }
+
     fun listVersions(sceneId: Long): List<String> =
         redis.opsForList().range(versionsKey(sceneId), 0, -1) ?: emptyList()
 
@@ -67,8 +77,10 @@ class IllustrationVersionRedisRepository(
     fun deleteAll(sceneId: Long) {
         redis.delete(versionsKey(sceneId))
         redis.delete(currentKey(sceneId))
+        redis.delete(maxVersionKey(sceneId))
     }
 
     internal fun versionsKey(sceneId: Long) = "$VERSIONS_PREFIX:$sceneId"
     private fun currentKey(sceneId: Long) = "$CURRENT_PREFIX:$sceneId"
+    private fun maxVersionKey(sceneId: Long) = "$MAX_VERSION_PREFIX:$sceneId"
 }

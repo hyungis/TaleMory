@@ -98,6 +98,7 @@ class FinalIllustrationGenerationService(
                     roughStoryboardImageUrl = nonBlankImageUrl,
                     stylePrompt = stylePrompt,
                     additionalInstruction = "This is the front cover, not an interior page.",
+                    outputVersion = 1,
                 )
             } else {
                 val sceneSummary = page.sceneSummary?.takeIf { it.isNotBlank() }
@@ -130,6 +131,7 @@ class FinalIllustrationGenerationService(
                     roughStoryboardImageUrl = nonBlankImageUrl,
                     stylePrompt = stylePrompt,
                     additionalInstruction = null,
+                    outputVersion = 1,
                 )
             }
         }

@@ -2,6 +2,7 @@ package com.s210.backend.domain.storyboard.application
 
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
 import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.common.transaction.afterCommit
 import com.s210.backend.domain.job.entity.StoryGenerationJob
@@ -31,6 +32,7 @@ class FinalIllustrationResultHandler(
     private val sceneRepository: SceneRepository,
     private val objectMapper: ObjectMapper,
     private val jobStatusRedisRepo: JobStatusRedisRepository,
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -75,6 +77,16 @@ class FinalIllustrationResultHandler(
         // 2) scenes 가 이미 있으면 즉시 update (confirm 이 먼저 발생한 케이스).
         sceneRepository.findByStoryIdAndPageNumber(job.storyId, pageNumber)?.let { scene ->
             scene.illustrationUrl = imageUrl
+            if (job.sceneId != null && job.sceneId == scene.id) {
+                val versionMeta = readReviseVersionMeta(job)
+                illustrationVersionRedisRepository.pushVersion(
+                    sceneId = scene.id,
+                    version = versionMeta.version ?: (illustrationVersionRedisRepository.getCurrent(scene.id) ?: 1),
+                    url = imageUrl,
+                    prompt = versionMeta.prompt,
+                    jobId = job.id,
+                )
+            }
         }
 
         log.info(
@@ -149,6 +161,21 @@ class FinalIllustrationResultHandler(
         } catch (e: Exception) {
             log.warn("[FINAL_ILLUST:RES] cannot parse expectedPageCount for jobId={}", job.id, e)
             Int.MAX_VALUE
+        }
+    }
+
+    private data class ReviseVersionMeta(val version: Int?, val prompt: String?)
+
+    private fun readReviseVersionMeta(job: StoryGenerationJob): ReviseVersionMeta {
+        return try {
+            val payload = objectMapper.readTree(job.requestPayload).path("payload")
+            ReviseVersionMeta(
+                version = payload.path("item").path("outputVersion").asInt(0).takeIf { it > 0 },
+                prompt = payload.path("userPrompt").asString(null),
+            )
+        } catch (e: Exception) {
+            log.warn("[FINAL_ILLUST:RES] cannot parse revise version meta for jobId={}", job.id, e)
+            ReviseVersionMeta(version = null, prompt = null)
         }
     }
 }

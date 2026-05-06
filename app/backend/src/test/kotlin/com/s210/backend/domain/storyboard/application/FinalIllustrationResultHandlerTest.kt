@@ -1,5 +1,7 @@
 package com.s210.backend.domain.storyboard.application
 
+import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.common.redis.JobStatusRedisRepository
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -39,13 +41,22 @@ class FinalIllustrationResultHandlerTest {
 
     private val jobRepository: StoryGenerationJobRepository = mock(StoryGenerationJobRepository::class.java)
     private val sceneRepository: SceneRepository = mock(SceneRepository::class.java)
+    private val jobStatusRedisRepository: JobStatusRedisRepository = mock(JobStatusRedisRepository::class.java)
+    private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository =
+        mock(IllustrationVersionRedisRepository::class.java)
     private val objectMapper = jacksonObjectMapper()
 
     private lateinit var sut: FinalIllustrationResultHandler
 
     @BeforeEach
     fun setUp() {
-        sut = FinalIllustrationResultHandler(jobRepository, sceneRepository, objectMapper)
+        sut = FinalIllustrationResultHandler(
+            jobRepository,
+            sceneRepository,
+            objectMapper,
+            jobStatusRedisRepository,
+            illustrationVersionRedisRepository,
+        )
     }
 
     // -----------------------------------------------------------------------

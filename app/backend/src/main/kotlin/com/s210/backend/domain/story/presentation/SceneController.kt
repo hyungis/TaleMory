@@ -13,12 +13,15 @@ import com.s210.backend.domain.story.presentation.request.OutroRequest
 import com.s210.backend.domain.story.presentation.request.OutroVoiceCommitRequest
 import com.s210.backend.domain.story.presentation.request.PresignedUrlRequest
 import com.s210.backend.domain.story.presentation.request.ProgressRequest
+import com.s210.backend.domain.story.presentation.request.SelectIllustrationVersionRequest
 import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
 import com.s210.backend.domain.story.presentation.request.VoiceProfileModifyRequest
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.HighlightVoicesExistsResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRegenerateResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRollbackResponse
+import com.s210.backend.domain.story.presentation.response.IllustrationVersionEntryResponse
+import com.s210.backend.domain.story.presentation.response.IllustrationVersionsResponse
 import com.s210.backend.domain.story.presentation.response.OutroResponse
 import com.s210.backend.domain.story.presentation.response.PresignedUrlResponse
 import com.s210.backend.domain.story.presentation.response.ProgressResponse
@@ -108,6 +111,56 @@ class SceneController(
     // ── 강조 문장 녹음 (3-phase presigned URL) ──
 
     // Phase 1: presigned PUT URL 발급
+    @GetMapping("/scenes/{sceneId}/illustration/versions")
+    fun sceneIllustrationVersions(
+        @PathVariable storyId: Long,
+        @PathVariable sceneId: Long,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<IllustrationVersionsResponse>> {
+        val result = sceneIllustrationService.listVersions(
+            userId = user.userId,
+            storyId = storyId,
+            sceneId = sceneId,
+        )
+        return ResponseEntity.ok(
+            ApiResponse(data = IllustrationVersionsResponse(
+                storyId = result.storyId,
+                sceneId = result.sceneId,
+                current = result.current,
+                versions = result.versions.map {
+                    IllustrationVersionEntryResponse(
+                        version = it.version,
+                        url = it.url,
+                        prompt = it.prompt,
+                        createdAt = it.createdAt,
+                        jobId = it.jobId,
+                    )
+                },
+            ))
+        )
+    }
+
+    @PostMapping("/scenes/{sceneId}/illustration/select")
+    fun sceneIllustrationSelect(
+        @PathVariable storyId: Long,
+        @PathVariable sceneId: Long,
+        @RequestBody request: SelectIllustrationVersionRequest,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<IllustrationRollbackResponse>> {
+        val result = sceneIllustrationService.selectVersion(
+            userId = user.userId,
+            storyId = storyId,
+            sceneId = sceneId,
+            version = request.version,
+        )
+        return ResponseEntity.ok(
+            ApiResponse(data = IllustrationRollbackResponse(
+                illustrationUrl = result.illustrationUrl,
+                version = result.version,
+            ))
+        )
+    }
+
     @PostMapping("/sentences/{sentenceId}/highlight-voice/presigned-url")
     fun highlightVoicePresignedUrl(
         @PathVariable storyId: Long,

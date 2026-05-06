@@ -5,6 +5,7 @@ import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.mq.RabbitMQConfig
 import com.s210.backend.common.mq.RoutingKeys
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
+import com.s210.backend.common.s3.S3Service
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
@@ -43,6 +44,7 @@ class SceneIllustrationService(
     private val rabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
     private val storyParticipantParser: StoryParticipantParser,
+    private val s3Service: S3Service,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -56,6 +58,21 @@ class SceneIllustrationService(
     data class RegenerateResult(val jobId: Long, val status: String = "PENDING")
 
     data class RollbackResult(val illustrationUrl: String, val version: Int)
+
+    data class VersionEntry(
+        val version: Int,
+        val url: String,
+        val prompt: String?,
+        val createdAt: String?,
+        val jobId: Long?,
+    )
+
+    data class VersionsResult(
+        val storyId: Long,
+        val sceneId: Long,
+        val current: Int?,
+        val versions: List<VersionEntry>,
+    )
 
     fun regenerateIllustration(
         userId: Long,
@@ -107,6 +124,19 @@ class SceneIllustrationService(
         val roughStoryboard = page.imageUrl?.takeIf { it.isNotBlank() }
         val referenceImage = currentIllustration ?: roughStoryboard
             ?: throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)
+        val currentIllustrationS3Key = currentIllustration
+            ?.let(s3Service::extractS3Key)
+            ?.takeIf(::looksLikeS3Key)
+        val roughStoryboardS3Key = roughStoryboard
+            ?.let(s3Service::extractS3Key)
+            ?.takeIf(::looksLikeS3Key)
+        val roughStoryboardReferenceUrl = when {
+            currentIllustration != null && currentIllustrationS3Key == null -> currentIllustration
+            currentIllustrationS3Key != null -> null
+            roughStoryboardS3Key == null -> referenceImage.takeUnless(::looksLikeS3Key)
+            else -> null
+        }
+        val nextVersion = illustrationVersionRedisRepository.computeNextVersion(sceneId)
         val item = FinalIllustrationItem(
             pageNumber = scene.pageNumber,
             storyboard = FinalIllustrationContext(
@@ -122,10 +152,11 @@ class SceneIllustrationService(
             ),
             children = children,
             companions = companions,
-            roughStoryboardImageUrl = referenceImage.takeUnless(::looksLikeS3Key),
-            roughStoryboardImageS3Key = roughStoryboard?.takeIf(::looksLikeS3Key),
-            currentIllustrationImageS3Key = currentIllustration?.takeIf(::looksLikeS3Key),
+            roughStoryboardImageUrl = roughStoryboardReferenceUrl,
+            roughStoryboardImageS3Key = roughStoryboardS3Key,
+            currentIllustrationImageS3Key = currentIllustrationS3Key,
             stylePrompt = stylePrompt,
+            outputVersion = nextVersion,
         )
 
         val seed = ((storyId * 2654435761L) and 0x7FFFFFFFL).toInt()
@@ -204,6 +235,41 @@ class SceneIllustrationService(
         return RollbackResult(illustrationUrl = prevUrl, version = prevVersion)
     }
 
+    @Transactional(readOnly = true)
+    fun listVersions(userId: Long, storyId: Long, sceneId: Long): VersionsResult {
+        ownedStory(userId, storyId)
+        sceneRepository.findByIdAndStoryId(sceneId, storyId)
+            ?: throw BusinessException(StoryErrorCode.SCENE_NOT_FOUND)
+
+        val versions = illustrationVersionRedisRepository.listVersions(sceneId)
+            .mapNotNull(::parseVersionEntry)
+            .distinctBy { it.version }
+            .sortedByDescending { it.version }
+
+        return VersionsResult(
+            storyId = storyId,
+            sceneId = sceneId,
+            current = illustrationVersionRedisRepository.getCurrent(sceneId),
+            versions = versions,
+        )
+    }
+
+    fun selectVersion(userId: Long, storyId: Long, sceneId: Long, version: Int): RollbackResult {
+        ownedStory(userId, storyId)
+        val scene = sceneRepository.findByIdAndStoryId(sceneId, storyId)
+            ?: throw BusinessException(StoryErrorCode.SCENE_NOT_FOUND)
+        if (version < 1) throw BusinessException(CommonErrorCode.INVALID_INPUT)
+
+        val selected = illustrationVersionRedisRepository.listVersions(sceneId)
+            .mapNotNull(::parseVersionEntry)
+            .firstOrNull { it.version == version }
+            ?: throw BusinessException(StoryErrorCode.NOTHING_TO_ROLLBACK)
+
+        scene.illustrationUrl = selected.url
+        illustrationVersionRedisRepository.setCurrent(sceneId, version)
+        return RollbackResult(illustrationUrl = selected.url, version = version)
+    }
+
     private fun loadLastSuccessStoryPayload(storyId: Long): StoryboardPayload {
         val storyJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusOrderByIdDesc(
             storyId = storyId,
@@ -229,6 +295,23 @@ class SceneIllustrationService(
     private fun looksLikeS3Key(value: String): Boolean {
         if (value.startsWith("http://") || value.startsWith("https://")) return false
         return S3_KEY_PATTERN.containsMatchIn(value)
+    }
+
+    private fun parseVersionEntry(json: String): VersionEntry? {
+        return try {
+            val node = objectMapper.readTree(json)
+            val version = node.get("version")?.asInt() ?: return null
+            val url = node.get("url")?.asString()?.takeIf { it.isNotBlank() } ?: return null
+            VersionEntry(
+                version = version,
+                url = url,
+                prompt = node.get("prompt")?.asString(),
+                createdAt = node.get("createdAt")?.asString(),
+                jobId = node.get("jobId")?.asLong(),
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 
 }

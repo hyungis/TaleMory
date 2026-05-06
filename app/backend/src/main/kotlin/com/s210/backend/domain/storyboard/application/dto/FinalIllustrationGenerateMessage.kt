@@ -61,6 +61,7 @@ data class FinalIllustrationItem(
     val currentIllustrationImageS3Key: String? = null,
     val stylePrompt: String,
     val additionalInstruction: String? = null,
+    val outputVersion: Int? = null,
 )
 
 data class FinalIllustrationContext(
