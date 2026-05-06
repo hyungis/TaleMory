@@ -10,10 +10,9 @@ const POLLING_INTERVAL_MS = 5_000
 /**
  * AI 워커가 예기치 못한 크래시(OOM/네트워크 단절/무한 루프 등)로 결과를 돌려주지 못해
  * DB job 이 PENDING/RUNNING 에 박제되는 경우 FE 가 무한 polling 에 갇히는 걸 막는 상한선.
- * 실제 OpenAI 호출은 보통 30초 ~ 1분 내 완료되므로 5분 마진이면 충분.
- * 후속 이슈: BE 측 스케줄러가 오래된 PENDING 을 FAILED 로 전이하면 이 값이 의미하는 맥락이 작아짐.
+ * 최종 삽화(FINAL_ILLUSTRATION) 잡은 페이지 수에 따라 수 분~수십 분 소요될 수 있어 1시간으로 설정.
  */
-const MAX_POLLING_DURATION_MS = 5 * 60 * 1000
+const MAX_POLLING_DURATION_MS = 60 * 60 * 1000
 
 const FINAL_STATUSES: JobStatusApi[] = ['SUCCESS', 'FAILED', 'CANCELLED']
 
