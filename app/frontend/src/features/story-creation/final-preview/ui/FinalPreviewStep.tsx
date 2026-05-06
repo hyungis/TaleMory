@@ -104,7 +104,7 @@ export function FinalPreviewStep({
         if (cancelled) return
         /* BE 가 page_number=0(표지) scene 도 함께 내려주는데 미리보기는 본문(page 1+) 만 보여줘야 함.
            표지는 책 표지 위치에 별도로 표시되고 step 8 미리보기 페이지 rotation 에 들어가면 안 됨. */
-        setScenes(scenesData.filter(s => s.pageNumber !== 0))
+        setScenes(scenesData)
         setError(null)
       })
       .catch(() => {
@@ -128,7 +128,7 @@ export function FinalPreviewStep({
     if (status === 'SUCCESS') {
       if (storyId) {
         getScenes(storyId)
-          .then(updated => setScenes(updated.filter(s => s.pageNumber !== 0)))
+          .then(updated => setScenes(updated))
           .catch(() => {
             /* 재조회 실패는 silent — 다음 마운트 시 다시 시도 */
           })
@@ -140,8 +140,15 @@ export function FinalPreviewStep({
     }
   }, [regenJobQuery.data?.status, activeRegen, storyId])
 
-  const totalPages = scenes.length
-  const currentScene = scenes[resultPageIndex] ?? null
+  const coverScene = scenes.find(scene => scene.pageNumber === 0) ?? null
+  const bodyScenes = coverScene ? scenes.filter(scene => scene.pageNumber !== 0) : scenes
+  const previewPages = coverScene
+    ? [{ kind: 'cover' as const, scene: coverScene }, ...bodyScenes.map(scene => ({ kind: 'scene' as const, scene }))]
+    : bodyScenes.map(scene => ({ kind: 'scene' as const, scene }))
+  const totalPages = previewPages.length
+  const bodyPageCount = bodyScenes.length
+  const currentPreviewPage = previewPages[resultPageIndex] ?? null
+  const currentScene = currentPreviewPage?.kind === 'scene' ? currentPreviewPage.scene : null
 
   const prevPage = useCallback(() => {
     setResultPageIndex(i => Math.max(0, i - 1))
@@ -260,7 +267,7 @@ export function FinalPreviewStep({
   }
 
   // ===== 데이터 없음 =====
-  if (error || !currentScene) {
+  if (error || !currentPreviewPage) {
     return (
       <div className="cr-shell">
         <CreationDoodlesBg />
@@ -279,11 +286,11 @@ export function FinalPreviewStep({
   }
 
   // ===== 정상 화면 =====
-  const currentSceneId = currentScene.id
+  const currentSceneId = currentScene?.id ?? null
   const remaining = Math.max(0, REGEN_LIMIT_TOTAL - regenCount)
   const isCurrentRegenPending = activeRegen?.sceneId === currentSceneId
   const isAnyRegenPending = activeRegen !== null
-  const canRegen = !isAnyRegenPending && remaining > 0
+  const canRegen = currentSceneId !== null && !isAnyRegenPending && remaining > 0
   const isPanelOpen = openPromptScene === currentSceneId
 
   return (
@@ -303,7 +310,17 @@ export function FinalPreviewStep({
             <span className="cr-tape" aria-hidden="true" />
 
             <div style={{ position: 'relative' }}>
-              <BookSpread scene={currentScene} pageIndex={resultPageIndex} />
+              {currentPreviewPage.kind === 'cover' ? (
+                <div className="cr-final-cover-shell">
+                  {currentPreviewPage.scene.illustrationUrl ? (
+                    <img className="cr-final-cover-image" src={currentPreviewPage.scene.illustrationUrl} alt="" />
+                  ) : (
+                    <BookOpen className="cr-final-cover-icon" strokeWidth={1.5} />
+                  )}
+                </div>
+              ) : (
+                <BookSpread scene={currentPreviewPage.scene} pageIndex={resultPageIndex - (coverScene ? 1 : 0)} />
+              )}
 
               {isCurrentRegenPending && (
                 <div className="cr-final-regen-overlay">
@@ -349,16 +366,19 @@ export function FinalPreviewStep({
             <div style={{ textAlign: 'center', marginTop: 18 }}>
               <span className="cr-final-page-pill">
                 <BookOpen className="w-4 h-4" />
-                Page {resultPageIndex + 1} / {totalPages}
+                {currentPreviewPage.kind === 'cover'
+                  ? `Cover / ${bodyPageCount}`
+                  : `Page ${resultPageIndex + (coverScene ? 0 : 1)} / ${bodyPageCount}`}
               </span>
             </div>
 
-            {/* ===== 삽화 재생성 (동화 전체 합산 한도) ===== */}
+            {/* ===== 삽화 재생성(스토리 전체 횟수 제한) ===== */}
+            {currentSceneId !== null && (
             <div className="cr-final-regen-bar">
               <button
                 type="button"
                 className="cr-final-regen-trigger"
-                onClick={() => handleOpenPrompt(currentSceneId)}
+                onClick={() => currentSceneId !== null && handleOpenPrompt(currentSceneId)}
                 disabled={!canRegen || isPanelOpen}
               >
                 <Wand2 className="w-4 h-4" />
@@ -404,6 +424,7 @@ export function FinalPreviewStep({
 
               {regenError && <p className="cr-final-regen-error">{regenError}</p>}
             </div>
+            )}
           </section>
 
         </main>

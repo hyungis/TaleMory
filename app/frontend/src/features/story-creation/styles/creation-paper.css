@@ -1406,6 +1406,7 @@
 .cr-spread {
   position: relative;
   width: 100%;
+  height: min(calc(100vh - 240px), 680px);
   display: grid;
   grid-template-columns: 1fr 1fr;
   background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
@@ -1415,7 +1416,7 @@
     0 3px 0 var(--cr-caramel-deep),
     0 14px 32px rgba(140, 100, 60, 0.22);
   overflow: hidden;
-  min-height: 480px;
+  min-height: 0;
 }
 
 /* 책 가운데 책등 그림자 */
@@ -1443,7 +1444,7 @@
   padding: 28px 28px 36px;
   display: flex;
   flex-direction: column;
-  min-height: 440px;
+  min-height: 0;
 }
 .cr-spread-page-left { padding-right: 36px; }
 .cr-spread-page-right { padding-left: 36px; gap: 12px; }
@@ -1460,17 +1461,57 @@
 
 .cr-spread-illust {
   flex: 1;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 2px solid var(--cr-caramel);
-  box-shadow: inset 0 2px 6px rgba(140, 100, 60, 0.16);
-  background: linear-gradient(135deg, #c9d8b2, #e8c79b);
   display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
 }
 .cr-spread-illust img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
+}
+.cr-final-cover-shell {
+  position: relative;
+  width: auto;
+  height: min(calc(100vh - 240px), 680px);
+  aspect-ratio: 2 / 2.7;
+  min-height: 0;
+  margin: 0 auto;
+  border-radius: 4px 14px 14px 4px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    2px 0 0 #efe1c2,
+    4px 0 0 #e6d2a8,
+    6px 0 0 #efe1c2,
+    8px 0 0 #e6d2a8,
+    10px 0 0 #efe1c2,
+    12px 0 0 #e6d2a8,
+    14px 1px 0 #d2bc8a,
+    0 2px 0 #efe1c2,
+    0 4px 0 #e6d2a8,
+    0 6px 0 #efe1c2,
+    0 8px 0 #e6d2a8,
+    0 10px 0 #efe1c2,
+    0 12px 0 #d2bc8a,
+    14px 18px 40px rgba(140, 100, 60, 0.35),
+    20px 30px 60px rgba(140, 100, 60, 0.2);
+}
+.cr-final-cover-image {
+  width: 100%;
+  height: 100%;
+  display: block;
   object-fit: cover;
+}
+.cr-final-cover-icon {
+  position: absolute;
+  inset: 0;
+  width: 110px;
+  height: 110px;
+  margin: auto;
+  color: rgba(255, 250, 230, 0.95);
+  filter: drop-shadow(0 10px 24px rgba(74, 59, 42, 0.25));
 }
 .cr-spread-illust-empty {
   flex: 1;

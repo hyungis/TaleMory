@@ -75,9 +75,9 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
        표지 일러스트는 `story.coverIllustrationUrl` 로 별도 제공되므로 책 펼침 흐름에선
        scene 0 를 본문 페이지로 또 보여주면 안 됨 (앞표지 ↔ 첫 본문이 같은 컷으로 중복 노출).
        두 모드 모두 scene 0 를 본문 rotation 에서 제외하고 sceneIndex 는 원본 배열 좌표로 유지. */
-    const contentScenes = story.scenes.slice(1).map((_, i) => ({
+    const contentScenes = story.scenes.map((_, i) => ({
       kind: 'scene' as const,
-      sceneIndex: i + 1,
+      sceneIndex: i,
       displayIndex: i,
     }))
     if (isPreview) {
