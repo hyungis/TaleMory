@@ -4,19 +4,19 @@
 # 포함 job:
 #   - generate_env_<env>  : GitLab Variables → env 파일 생성
 #   - verify_infra_<env>  : mysql/redis/rabbitmq 실접속 + creds 정렬 검증
-#   - build_*             : frontend / backend / ai (병렬, changes 필터로 변경 영역만)
-#   - deploy_<env>_*      : 서비스별 배포 (backend / frontend / ai)
+#   - build_app           : frontend / backend / ai 통합 빌드 (한 영역만 변경되어도 전체 재빌드)
+#   - deploy_<env>        : compose 정의된 모든 서비스 일괄 배포 (인자 없음 → SERVICE=all)
 #   - notify_*, cleanup_* : .post
 #
 # deploy_infra_* 는 여기 없음 → .gitlab/ci/infra.gitlab-ci.yml (조건부 로드).
 #
-# ── changes 필터 정책 ────────────────────────────────────────
-# 각 서비스의 build/deploy rule.changes 는 다음 path 변경에만 트리거:
-#   - 해당 서비스의 app 코드 (app/{backend,frontend,ai}/**)
-#   - 그 서비스 build 스크립트 (build-{svc}.sh)
-#   - 공용 (compose, deploy 스크립트, health-check, common.sh, CI 파일) → 모든 서비스에 영향
-# build 와 deploy 의 changes 리스트는 동일 — APP_IMAGE_TAG=$CI_COMMIT_SHORT_SHA 일관성.
-# build 가 fire 해야 deploy 가 가리키는 SHA 태그 이미지가 존재.
+# ── 통합 정책 (이전 서비스별 분리에서 회귀) ─────────────────────
+# 이전: 서비스별 build_*/deploy_*_* 분리 — 변경 영역만 build/deploy 하여 빠름.
+# 문제: nginx 가 compose `depends_on: backend` 로 backend 도 recreate 시도 → 그 SHA 의
+#       backend 이미지가 build skip 되어 존재하지 않으면 pull access denied 로 실패.
+# 결정: build/deploy 모두 통합. 한 영역만 변경되어도 전체를 재빌드/재배포한다.
+#       BuildKit cache mount + Docker layer cache 로 변경 없는 서비스는 캐시 hit 으로 빠르게 끝남.
+#       SHA 태그 일관성 자동 보장 — 변경 없는 서비스도 항상 그 SHA 의 이미지가 존재.
 
 # ─── generate_env ─────────────────────────────────────────────
 generate_env_dev:
@@ -59,15 +59,20 @@ verify_infra_master:
   script:
     - bash infra/scripts/health-check-infra.sh master
 
-# ─── build (3개 병렬, 변경 영역만 빌드) ───────────────────────
-build_backend:
+# ─── build (3개 서비스 통합) ──────────────────────────────────
+# 한 job 에서 3개 빌드 스크립트 순차 실행. Docker layer cache + BuildKit cache mount
+# 로 변경 없는 서비스는 캐시 hit 으로 빠르게 끝남. changes 필터로 docs/README 등
+# 무관한 변경엔 build/deploy 트리거되지 않음.
+build_app:
   stage: build
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
       changes:
-        - app/backend/**/*
+        - app/**/*
         - infra/compose/docker-compose.app-dev.yml
         - infra/scripts/build-backend.sh
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/build-ai.sh
         - infra/scripts/deploy-dev.sh
         - infra/scripts/health-check-dev.sh
         - infra/scripts/common.sh
@@ -77,9 +82,11 @@ build_backend:
         - verify_infra_dev
     - if: '$CI_COMMIT_BRANCH == "master"'
       changes:
-        - app/backend/**/*
+        - app/**/*
         - infra/compose/docker-compose.app-master.yml
         - infra/scripts/build-backend.sh
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/build-ai.sh
         - infra/scripts/deploy-master.sh
         - infra/scripts/health-check-master.sh
         - infra/scripts/common.sh
@@ -89,118 +96,21 @@ build_backend:
         - verify_infra_master
   script:
     - bash infra/scripts/build-backend.sh
-
-build_frontend:
-  stage: build
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - app/frontend/**/*
-        - infra/compose/docker-compose.app-dev.yml
-        - infra/scripts/build-frontend.sh
-        - infra/scripts/deploy-dev.sh
-        - infra/scripts/health-check-dev.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-      needs:
-        - verify_infra_dev
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      changes:
-        - app/frontend/**/*
-        - infra/compose/docker-compose.app-master.yml
-        - infra/scripts/build-frontend.sh
-        - infra/scripts/deploy-master.sh
-        - infra/scripts/health-check-master.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-      needs:
-        - verify_infra_master
-  script:
     - bash infra/scripts/build-frontend.sh
-
-build_ai:
-  stage: build
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - app/ai/**/*
-        - infra/compose/docker-compose.app-dev.yml
-        - infra/scripts/build-ai.sh
-        - infra/scripts/deploy-dev.sh
-        - infra/scripts/health-check-dev.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-      needs:
-        - verify_infra_dev
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      changes:
-        - app/ai/**/*
-        - infra/compose/docker-compose.app-master.yml
-        - infra/scripts/build-ai.sh
-        - infra/scripts/deploy-master.sh
-        - infra/scripts/health-check-master.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-      needs:
-        - verify_infra_master
-  script:
     - bash infra/scripts/build-ai.sh
 
-# ─── deploy (서비스별 분할, build 와 동일한 changes) ───────────
-# 한 서비스 build 가 fire 하면 같은 서비스의 deploy 도 fire — SHA 태그 일관성 보장.
-# 다른 서비스는 컨테이너 그대로 유지 (운영 중 무관 서비스 재시작 X).
-
-deploy_dev_backend:
+# ─── deploy (env 별 일괄 배포) ────────────────────────────────
+# deploy-<env>.sh 를 인자 없이 호출 → SERVICE=all → compose 정의된 모든 서비스 한 번에 up.
+# depends_on 자동 해석 (nginx 가 backend 보다 늦게 뜸).
+deploy_dev:
   stage: deploy
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
       changes:
-        - app/backend/**/*
+        - app/**/*
         - infra/compose/docker-compose.app-dev.yml
         - infra/scripts/build-backend.sh
-        - infra/scripts/deploy-dev.sh
-        - infra/scripts/health-check-dev.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-  needs:
-    - generate_env_dev
-    - verify_infra_dev
-    - build_backend
-  script:
-    - bash infra/scripts/deploy-dev.sh backend
-
-deploy_dev_frontend:
-  stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - app/frontend/**/*
-        - infra/compose/docker-compose.app-dev.yml
         - infra/scripts/build-frontend.sh
-        - infra/scripts/deploy-dev.sh
-        - infra/scripts/health-check-dev.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-  needs:
-    - generate_env_dev
-    - verify_infra_dev
-    - build_frontend
-  script:
-    - bash infra/scripts/deploy-dev.sh frontend
-
-deploy_dev_ai:
-  stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - app/ai/**/*
-        - infra/compose/docker-compose.app-dev.yml
         - infra/scripts/build-ai.sh
         - infra/scripts/deploy-dev.sh
         - infra/scripts/health-check-dev.sh
@@ -210,18 +120,20 @@ deploy_dev_ai:
   needs:
     - generate_env_dev
     - verify_infra_dev
-    - build_ai
+    - build_app
   script:
-    - bash infra/scripts/deploy-dev.sh ai
+    - bash infra/scripts/deploy-dev.sh
 
-deploy_master_backend:
+deploy_master:
   stage: deploy
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
       changes:
-        - app/backend/**/*
+        - app/**/*
         - infra/compose/docker-compose.app-master.yml
         - infra/scripts/build-backend.sh
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/build-ai.sh
         - infra/scripts/deploy-master.sh
         - infra/scripts/health-check-master.sh
         - infra/scripts/common.sh
@@ -231,51 +143,9 @@ deploy_master_backend:
   needs:
     - generate_env_master
     - verify_infra_master
-    - build_backend
+    - build_app
   script:
-    - bash infra/scripts/deploy-master.sh backend
-
-deploy_master_frontend:
-  stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      changes:
-        - app/frontend/**/*
-        - infra/compose/docker-compose.app-master.yml
-        - infra/scripts/build-frontend.sh
-        - infra/scripts/deploy-master.sh
-        - infra/scripts/health-check-master.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-      when: manual
-  needs:
-    - generate_env_master
-    - verify_infra_master
-    - build_frontend
-  script:
-    - bash infra/scripts/deploy-master.sh frontend
-
-deploy_master_ai:
-  stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      changes:
-        - app/ai/**/*
-        - infra/compose/docker-compose.app-master.yml
-        - infra/scripts/build-ai.sh
-        - infra/scripts/deploy-master.sh
-        - infra/scripts/health-check-master.sh
-        - infra/scripts/common.sh
-        - .gitlab-ci.yml
-        - .gitlab/ci/app.gitlab-ci.yml
-      when: manual
-  needs:
-    - generate_env_master
-    - verify_infra_master
-    - build_ai
-  script:
-    - bash infra/scripts/deploy-master.sh ai
+    - bash infra/scripts/deploy-master.sh
 
 # ─── 수동 유틸: dev RabbitMQ 큐 purge ───────────────────────────
 # 큐 스키마 변경 / 스테일 메시지 정리 / 개발 환경 리셋 시 사용.
