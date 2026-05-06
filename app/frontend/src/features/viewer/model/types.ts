@@ -43,9 +43,13 @@ export interface OutroView {
   signature: string | null
 }
 
+export type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
+
 export interface StoryView {
   storyId: number
   title: string | null
+  /** BE Story.difficulty enum 명. 미지의 값이 와도 InvitationCard 가 string fallback 처리 가능하도록 string 으로 받음. */
+  difficulty: Difficulty | string
   mainCharacter: MainCharacterView | null
   coverIllustrationUrl: string | null
   publishedAt: string | null

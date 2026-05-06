@@ -126,7 +126,7 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
   const [isToolbarOpen, setIsToolbarOpen] = useState(false)
   // preview 모드는 한글 해석을 항상 ON 으로 시작. 토글 UI 자체가 없어 setter 호출 경로 자연 차단.
   const [showTranslation, setShowTranslation] = useState(isPreview)
-  const [fontSize, setFontSize] = useState(22)
+  const [fontSize, setFontSize] = useState(24)
   const toolbarCloseTimerRef = useRef<number | null>(null)
 
   // 삽화 확대 모달

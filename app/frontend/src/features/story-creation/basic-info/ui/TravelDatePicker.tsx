@@ -249,7 +249,7 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 17, color: 'var(--cr-ink)' }}>
+            <span style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 19, color: 'var(--cr-ink)' }}>
               {monthLabel}
             </span>
             <button
@@ -270,7 +270,7 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
               marginBottom: 6,
               fontFamily: 'var(--cr-font-gaegu)',
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 15,
               textAlign: 'center',
             }}
           >
@@ -329,7 +329,7 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
                 border: 0,
                 color: 'var(--cr-rust)',
                 fontFamily: 'var(--cr-font-gaegu)',
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: 700,
                 cursor: !start && !end ? 'not-allowed' : 'pointer',
                 opacity: !start && !end ? 0.4 : 1,
@@ -352,7 +352,7 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
                 borderRadius: 999,
                 padding: '5px 16px',
                 fontFamily: 'var(--cr-font-gaegu)',
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: '0 2px 0 var(--cr-sage-deep)',
@@ -418,7 +418,7 @@ function getDayCellStyle(opts: {
     borderRadius: 8,
     border: 'none',
     fontFamily: 'var(--cr-font-gaegu)',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 600,
     cursor: isFuture ? 'not-allowed' : 'pointer',
     transition: 'background 0.12s ease, color 0.12s ease',

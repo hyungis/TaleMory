@@ -100,7 +100,7 @@
   border-radius: 999px;
   padding: 8px 18px 8px 14px;
   font-family: var(--iv-font-display);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--iv-ink);
   cursor: pointer;
@@ -123,7 +123,7 @@
 /* mypage(.mp-logo) 와 동일 톤 — Gaegu 32px sage-deep 손글씨 + rust accent */
 .iv-brand {
   font-family: var(--iv-font-display);
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 700;
   color: var(--iv-sage-deep);
   letter-spacing: 0.04em;
@@ -191,7 +191,7 @@
 .iv-cover-eyebrow {
   font-family: var(--iv-font-display);
   font-weight: 700;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--iv-sage-deep);
   letter-spacing: 4px;
   margin-bottom: 6px;
@@ -221,7 +221,7 @@
 .iv-cover-title {
   font-family: var(--iv-font-serif);
   font-weight: 800;
-  font-size: 30px;
+  font-size: 32px;
   color: var(--iv-ink);
   margin: 4px 0 4px;
   letter-spacing: -0.5px;
@@ -249,7 +249,7 @@
   border: 1.5px solid var(--iv-caramel);
   color: var(--iv-ink);
   font-family: var(--iv-font-display);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   padding: 4px 12px;
   border-radius: 999px;
@@ -273,13 +273,13 @@
 }
 .iv-choose-eyebrow .iv-choose-label {
   font-family: var(--iv-font-pen);
-  font-size: 22px;
+  font-size: 24px;
   color: var(--iv-ink);
   letter-spacing: 1px;
 }
 .iv-choose-eyebrow .iv-choose-sub {
   font-family: var(--iv-font-display);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--iv-ink-soft);
   margin-top: 2px;
 }
@@ -337,13 +337,13 @@
 }
 .iv-mode-disabled-title {
   font-family: var(--iv-font-serif);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   margin: 0;
   letter-spacing: -0.3px;
 }
 .iv-mode-disabled-sub {
-  font-size: 12px;
+  font-size: 14px;
   opacity: 0.85;
   margin: 0;
 }
@@ -384,14 +384,14 @@
 .iv-mode-title {
   font-family: var(--iv-font-serif);
   font-weight: 800;
-  font-size: 20px;
+  font-size: 22px;
   color: var(--iv-ink);
   margin: 0 0 4px;
   letter-spacing: -0.5px;
 }
 .iv-mode-sub {
   font-family: var(--iv-font-display);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--iv-ink-soft);
   margin: 0 0 10px;
   line-height: 1.45;
@@ -409,7 +409,7 @@
   padding: 7px 16px;
   font-family: var(--iv-font-serif);
   font-weight: 800;
-  font-size: 13px;
+  font-size: 15px;
   cursor: pointer;
   box-shadow: 0 2px 0 #2a3f1f, 0 4px 8px rgba(40, 60, 30, 0.18);
   letter-spacing: 0.5px;
@@ -468,12 +468,12 @@
 
 @media (max-width: 700px) {
   .iv-modes { grid-template-columns: 1fr; gap: 10px; }
-  .iv-cover-title { font-size: 24px; }
+  .iv-cover-title { font-size: 26px; }
   .iv-shell-inner { padding-top: 50px; padding-bottom: 12px; }
   .iv-cover { padding: 22px 20px 18px; margin-bottom: 10px; }
   .iv-book-mark { width: 60px; height: 60px; }
   .iv-book-mark > svg { width: 30px; height: 30px; }
-  .iv-meta-pill { font-size: 12px; padding: 3px 10px; }
+  .iv-meta-pill { font-size: 14px; padding: 3px 10px; }
   .iv-mode { padding: 14px 12px 12px; }
   .iv-preview-strip { display: none; } /* 모바일에선 preview 생략 */
 }
@@ -500,7 +500,7 @@
 }
 .iv-status-text {
   font-family: var(--iv-font-display);
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   color: var(--iv-ink-soft);
   margin: 0;
 }
@@ -515,13 +515,13 @@
   background: rgba(196, 114, 84, 0.15);
   border: 2.5px solid var(--iv-rust);
   color: var(--iv-rust);
-  font-size: 1.6rem;
+  font-size: 1.75rem;
   font-weight: 700;
   font-family: var(--iv-font-serif);
 }
 .iv-status-error-msg {
   font-family: var(--iv-font-display);
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   color: var(--iv-ink);
   margin: 0 0 18px;
   font-weight: 700;
@@ -536,7 +536,7 @@
   border: 2px solid var(--iv-sage-deep);
   border-radius: 999px;
   font-family: var(--iv-font-display);
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 3px 0 var(--iv-sage-deep);
@@ -601,12 +601,12 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 .iv-notice-emoji {
-  font-size: 2rem;
+  font-size: 2.15rem;
   margin-bottom: 6px;
 }
 .iv-notice-title {
   font-family: var(--iv-font-serif);
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   margin: 0 0 8px;
   color: var(--iv-sage-deep);
   font-weight: 800;
@@ -614,7 +614,7 @@
 }
 .iv-notice-desc {
   font-family: var(--iv-font-display);
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   color: var(--iv-ink-soft);
   margin: 0 0 20px;
   line-height: 1.5;
@@ -626,7 +626,7 @@
   border: 2px solid var(--iv-sage-deep);
   border-radius: 999px;
   font-family: var(--iv-font-display);
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 3px 0 var(--iv-sage-deep);

@@ -76,17 +76,28 @@ class StoryConfirmService(
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
-        // 2) 선행 잡 SUCCESS 검증
+        // 2) 선행 잡 + 데이터 검증
+        // 텍스트는 STORYBOARD_STORY 잡 자체가 진실 소스 — status 가 곧 신호.
         val storyJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
             storyId, JobType.STORYBOARD_STORY)
         if (storyJob == null || storyJob.status != JobStatus.SUCCESS) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
-        val imageJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
-            storyId, JobType.STORYBOARD_IMAGE)
-        if (imageJob == null || imageJob.status != JobStatus.SUCCESS) {
+        // 이미지는 배치 잡(STORYBOARD_IMAGE) status 대신 storyboard_pages.image_url 이 모두
+        // 채워졌는지 직접 검증한다. 배치 잡은 한 페이지라도 FAILED 면 영구 FAILED 로 남지만,
+        // 사용자가 페이지별 재생성(STORYBOARD_IMAGE_REGENERATE) 으로 image_url 을 채울 수
+        // 있으므로 페이지 데이터 자체가 진짜 신호. 잡 status 만 보면 정상 보완 흐름까지
+        // INVALID_STORY_STATE 로 차단되는 버그가 있었음.
+        val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        val pages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
+        if (pages.isEmpty() || pages.any { it.imageUrl.isNullOrBlank() }) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
+        // 배치 잡 ID 는 Redis 일러스트 버전 트래킹의 v1 메타데이터로 쓰임. status 는 검증에 사용 안 하지만
+        // 잡 row 자체는 보통 존재 (배치 시작 시 INSERT). null 이면 트래킹 jobId 도 null.
+        val imageJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
+            storyId, JobType.STORYBOARD_IMAGE)
 
         // 3) 멱등 응답 — 이미 confirm 된 동화는 기존 결과를 그대로 200 으로 돌려준다.
         //
@@ -133,16 +144,8 @@ class StoryConfirmService(
             pageNumber to list
         }
 
-        // 5) 최신 story_board → storyboard_pages 조회
-        val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
-            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
-        val pages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
-
-        if (pages.isEmpty()) {
-            throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
-        }
-
-        // 6) 최신 FINAL_ILLUSTRATION 잡의 페이지별 결과 (있으면 우선 사용).
+        // 5) 최신 FINAL_ILLUSTRATION 잡의 페이지별 결과 (있으면 우선 사용).
+        // (storyBoard / pages 는 step 2 에서 검증과 함께 이미 로드 — 재사용)
         val latestFinalJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
             storyId, JobType.FINAL_ILLUSTRATION,
         )
@@ -224,7 +227,7 @@ class StoryConfirmService(
                     version = 1,
                     url = scene.illustrationUrl ?: "",
                     prompt = null,
-                    jobId = imageJob.id,
+                    jobId = imageJob?.id,
                 )
             } catch (e: Exception) {
                 log.warn("Redis versions init failed for scene {}: {}", scene.id, e.message)

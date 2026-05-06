@@ -58,7 +58,9 @@ class FinalIllustrationGenerationService(
             BusinessException(StoryErrorCode.STYLE_PRESET_NOT_FOUND)
         }
 
-        findReusableJob(storyId, stylePresetId, stylePreset.code)?.let { return it.id }
+        val stylePrompt = stylePreset.stylePrompt.trim().takeIf { it.isNotEmpty() } ?: stylePreset.code
+
+        findReusableJob(storyId, stylePresetId, stylePrompt)?.let { return it.id }
 
         // 2) storyboard_pages 가 채워져 있어야 함.
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
@@ -94,7 +96,7 @@ class FinalIllustrationGenerationService(
                     children = children,
                     companions = companions,
                     roughStoryboardImageUrl = nonBlankImageUrl,
-                    stylePrompt = stylePreset.code,
+                    stylePrompt = stylePrompt,
                     additionalInstruction = "This is the front cover, not an interior page.",
                 )
             } else {
@@ -126,7 +128,7 @@ class FinalIllustrationGenerationService(
                     children = children,
                     companions = companions,
                     roughStoryboardImageUrl = nonBlankImageUrl,
-                    stylePrompt = stylePreset.code,
+                    stylePrompt = stylePrompt,
                     additionalInstruction = null,
                 )
             }
@@ -170,15 +172,15 @@ class FinalIllustrationGenerationService(
      * 같은 storyId + JobType.FINAL_ILLUSTRATION 의 최근 잡이
      * PENDING/RUNNING/SUCCESS 이고 requestPayload.stylePresetId 가 같으면 재사용.
      */
-    private fun findReusableJob(storyId: Long, stylePresetId: Long, styleCode: String): StoryGenerationJob? {
+    private fun findReusableJob(storyId: Long, stylePresetId: Long, stylePrompt: String): StoryGenerationJob? {
         val recent = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
             storyId, JobType.FINAL_ILLUSTRATION,
         ) ?: return null
         if (recent.status !in REUSABLE_STATUSES) return null
-        return if (requestMatchesStyle(recent.requestPayload, stylePresetId, styleCode)) recent else null
+        return if (requestMatchesStyle(recent.requestPayload, stylePresetId, stylePrompt)) recent else null
     }
 
-    private fun requestMatchesStyle(requestPayload: String?, stylePresetId: Long, styleCode: String): Boolean {
+    private fun requestMatchesStyle(requestPayload: String?, stylePresetId: Long, stylePrompt: String): Boolean {
         if (requestPayload.isNullOrBlank()) return false
         return try {
             val root = objectMapper.readTree(requestPayload)
@@ -192,7 +194,7 @@ class FinalIllustrationGenerationService(
             var hasItems = false
             for (item in items) {
                 hasItems = true
-                if (item.get("stylePrompt")?.asText() != styleCode) return false
+                if (item.get("stylePrompt")?.asText() != stylePrompt) return false
             }
             hasItems
         } catch (_: Exception) {

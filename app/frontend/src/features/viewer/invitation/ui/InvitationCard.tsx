@@ -27,6 +27,7 @@ export function InvitationCard({
   const title = story.title?.trim() || '제목 없는 동화'
   const pageCount = story.scenes.length
   const publishedAtLabel = formatPublishedAtLabel(story.publishedAt)
+  const difficultyLabel = formatDifficultyLabel(story.difficulty)
 
   return (
     <section className="iv-shell">
@@ -120,7 +121,7 @@ export function InvitationCard({
             )}
             <span className="iv-meta-pill">
               <span className="iv-meta-dot iv-gold" aria-hidden="true" />
-              초급
+              {difficultyLabel}
             </span>
           </div>
         </div>
@@ -212,4 +213,18 @@ function formatPublishedAtLabel(publishedAt: string | null): string | null {
   const date = new Date(publishedAt)
   if (Number.isNaN(date.getTime())) return null
   return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
+}
+
+/** BE Story.difficulty enum → 한글 라벨. 미지의 값은 그대로 표기. */
+function formatDifficultyLabel(difficulty: string): string {
+  switch (difficulty) {
+    case 'BEGINNER':
+      return '초급'
+    case 'INTERMEDIATE':
+      return '중급'
+    case 'ADVANCED':
+      return '고급'
+    default:
+      return difficulty
+  }
 }

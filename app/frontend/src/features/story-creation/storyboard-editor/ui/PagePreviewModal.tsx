@@ -42,10 +42,10 @@ export function PagePreviewModal({
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <span className="bg-[#2d5a27] text-[#b4dc8c] px-4 py-1 rounded-full shadow-sm text-lg font-bold border border-[#b4dc8c]/50">
+          <span className="bg-[#2d5a27] text-[#b4dc8c] px-4 py-1 rounded-full shadow-sm text-xl font-bold border border-[#b4dc8c]/50">
             Page {previewIndex + 1}
           </span>
-          <h2 className="text-2xl text-[#2d5a27] font-bold">페이지 미리보기</h2>
+          <h2 className="text-3xl text-[#2d5a27] font-bold">페이지 미리보기</h2>
         </div>
 
         <div className="w-full aspect-[4/3] bg-[#fff9dd] border-2 border-[#b4dc8c] rounded-3xl flex flex-col items-center justify-center p-6 shadow-sm mb-5">
@@ -53,14 +53,14 @@ export function PagePreviewModal({
         </div>
 
         <div className="bg-[#e8ddb4] p-5 rounded-2xl border-2 border-[#8b7a52]/40 mb-5">
-          <p className="text-[#2d5a27] text-base font-sans leading-relaxed">{p.ko}</p>
+          <p className="text-[#2d5a27] text-lg font-sans leading-relaxed">{p.ko}</p>
         </div>
 
         <div className="flex justify-end">
           <button
             type="button"
             onClick={onGoToDetail}
-            className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all font-bold text-lg flex items-center gap-2"
+            className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-3 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14] hover:translate-y-0.5 hover:shadow-[0_2px_0_#1a3a14] hover:bg-[#3d6f34] transition-all font-bold text-xl flex items-center gap-2"
           >
             이 페이지 자세히 보기 <ArrowRight className="w-5 h-5" />
           </button>

@@ -128,7 +128,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
               style={{
                 fontFamily: 'var(--cr-font-serif)',
                 fontWeight: 800,
-                fontSize: 20,
+                fontSize: 22,
                 color: 'var(--cr-ink)',
                 margin: 0,
                 letterSpacing: '-0.5px',
@@ -176,7 +176,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
                 gap: 10,
                 padding: '24px 12px',
                 color: 'var(--cr-ink-soft)',
-                fontSize: 15,
+                fontSize: 17,
               }}
             >
               <Loader2 className="w-4 h-4" style={{ animation: 'spin 1s linear infinite' }} />
@@ -188,7 +188,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
               style={{
                 padding: '20px 12px',
                 color: 'var(--cr-rust)',
-                fontSize: 15,
+                fontSize: 17,
                 textAlign: 'center',
               }}
             >
@@ -200,7 +200,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
               style={{
                 padding: '24px 12px',
                 color: 'var(--cr-ink-soft)',
-                fontSize: 15,
+                fontSize: 17,
                 textAlign: 'center',
               }}
             >
@@ -254,7 +254,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
                       <div style={{ display: 'grid', gap: 2, minWidth: 0, flex: 1 }}>
                         <span
                           style={{
-                            fontSize: 16,
+                            fontSize: 18,
                             fontWeight: 700,
                             color: 'var(--cr-ink)',
                             overflow: 'hidden',
@@ -264,7 +264,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
                         >
                           {profile.title || '(제목 없음)'}
                         </span>
-                        <span style={{ fontSize: 12, color: 'var(--cr-ink-soft)' }}>
+                        <span style={{ fontSize: 14, color: 'var(--cr-ink-soft)' }}>
                           {createdLabel}
                         </span>
                       </div>
@@ -280,7 +280,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
                       ) : (
                         <span
                           style={{
-                            fontSize: 13,
+                            fontSize: 15,
                             color: 'var(--cr-sage-deep)',
                             fontWeight: 700,
                             flexShrink: 0,

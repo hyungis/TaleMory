@@ -209,7 +209,7 @@ function SavedChildPicker({
                   borderRadius: 10,
                   fontFamily: 'var(--cr-font-gaegu)',
                   fontWeight: 700,
-                  fontSize: 16,
+                  fontSize: 18,
                   color: 'var(--cr-ink)',
                   display: 'flex',
                   alignItems: 'center',

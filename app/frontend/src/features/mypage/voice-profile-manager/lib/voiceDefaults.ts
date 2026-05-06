@@ -5,4 +5,4 @@
  */
 export const VOICE_SAMPLE_SCRIPT =
   'Hello, my dear! This story is for you. ' +
-  'That quick beige fox jumped over each lazy dog, shouting through the thin valley. '
+  'That quick beige fox jumped over each lazy dog, shouting through the thin valley.'

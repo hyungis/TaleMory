@@ -285,6 +285,13 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
         const url = await blobToDataUrl(blob)
         setRecordedAudioUrl(url)
         setTtsAudioUrl(null)
+        /* 새 녹음을 받으면 직전에 "기존 음성 불러오기" 로 채워졌거나 previewTts 가 auto-commit
+           해 둔 savedProfileId 는 더 이상 이 녹음과 무관하다. 다음 previewTts 호출이 새 녹음을
+           업로드하도록 reset 한다 (안 그러면 FE 가 옛날 profileId 로 TTS 호출 → 사용자가 새로
+           녹음했는데도 이전 음성으로 합성됨). attach 상태도 같이 idle 로 되돌림. */
+        setSavedProfileId(null)
+        setAttachStatus('idle')
+        setAttachError(null)
         setStatus('ready')
         setStatusLabel('새 녹음 준비 완료')
         setTtsStatusText('이 녹음으로 TTS를 미리 들어볼 수 있어요.')
@@ -320,6 +327,11 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   const rerecord = useCallback(() => {
     setRecordedAudioUrl(null)
     setTtsAudioUrl(null)
+    /* 옛 녹음/불러온 프로필과의 연결을 끊는다 — 다음 녹음의 onstop 에서도 어차피 한 번 더 reset
+       되지만, idle 상태에서도 일관되게 비워두기 위해 여기서도 처리. */
+    setSavedProfileId(null)
+    setAttachStatus('idle')
+    setAttachError(null)
     setStatus('idle')
     setStatusLabel('다시 녹음 준비')
     setTtsStatusText('새로 녹음한 뒤 TTS를 들어볼 수 있어요.')
@@ -364,6 +376,13 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
       setTtsStatusText('먼저 음성을 녹음하거나 불러와 주세요.')
       return
     }
+    /* 이전엔 savedProfileId 가 없으면 자동 commit 해서 마이페이지에 임시 제목으로 row 가
+       남는 부작용이 있었음. 이제 사용자가 "녹음 저장하기" 로 명시적으로 저장한 보이스 프로필
+       (또는 "기존 음성 불러오기" 로 선택한 프로필) 이 있을 때만 미리듣기 가능. */
+    if (savedProfileId === null) {
+      setTtsStatusText('먼저 "녹음 저장하기" 로 보이스를 저장한 뒤 미리듣기 할 수 있어요.')
+      return
+    }
     const text = ttsText.trim()
     if (!text) {
       setTtsStatusText('TTS로 들어볼 문장을 입력해 주세요.')
@@ -374,21 +393,8 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     setTtsStatusText('보이스 클론 TTS를 만드는 중입니다…')
 
     try {
-      // 음성 프로필이 아직 서버에 저장되지 않았으면 먼저 업로드
-      let profileId = savedProfileId
-      if (!profileId) {
-        const audioBlob = dataUrlToBlob(recordedAudioUrl)
-        const autoTitle = `녹음_${new Date().toISOString().slice(0, 19).replace('T', '_')}`
-        const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
-        await uploadAudioToS3(presigned.uploadUrl, audioBlob)
-        const profile = await commitVoiceProfile(autoTitle, presigned.s3Key)
-        profileId = profile.voiceProfileId
-        setSavedProfileId(profileId)
-        await tryAttachToStory(profileId)
-      }
-
       // BE에 TTS 미리듣기 비동기 작업 요청
-      const { previewId } = await postVoicePreview(profileId, text)
+      const { previewId } = await postVoicePreview(savedProfileId, text)
 
       // 3초 간격 polling — 최대 5분
       const POLL_INTERVAL = 3_000
@@ -429,7 +435,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
       const dataUrl = await blobToDataUrl(audioBlob)
 
       setTtsAudioUrl(dataUrl)
-      setTtsStatusText('TTS가 준비됐어요. 재생 후 제목을 입력하고 저장하세요.')
+      setTtsStatusText('TTS가 준비됐어요. 재생해서 들어보세요.')
     } catch (err) {
       setTtsAudioUrl(null)
       const message = err instanceof Error ? err.message : 'TTS 생성에 실패했습니다.'
@@ -437,7 +443,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
     } finally {
       setIsTtsLoading(false)
     }
-  }, [recordedAudioUrl, ttsText, savedProfileId, tryAttachToStory])
+  }, [recordedAudioUrl, ttsText, savedProfileId])
 
   /**
    * 녹음 원본을 서버에 업로드한다 (3-phase, 사진 업로드와 동일 패턴).

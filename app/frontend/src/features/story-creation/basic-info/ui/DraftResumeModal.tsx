@@ -49,8 +49,8 @@ export function DraftResumeModal({
             <AlertTriangle className="w-5 h-5 text-[#3E2A18]" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg text-[#3E2A18] font-bold mb-1">새로 시작하시겠어요?</h2>
-            <p className="text-[#6B4A28] text-sm leading-relaxed">
+            <h2 className="text-xl text-[#3E2A18] font-bold mb-1">새로 시작하시겠어요?</h2>
+            <p className="text-[#6B4A28] text-base leading-relaxed">
               진행 중인 동화책이 사라지고 복구할 수 없어요.
             </p>
           </div>
@@ -70,7 +70,7 @@ export function DraftResumeModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex-1 bg-[#E9DBBE] text-[#3E2A18] px-4 py-2.5 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-colors font-bold text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 bg-[#E9DBBE] text-[#3E2A18] px-4 py-2.5 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-colors font-bold text-base disabled:opacity-60 disabled:cursor-not-allowed"
           >
             취소
           </button>
@@ -78,7 +78,7 @@ export function DraftResumeModal({
             type="button"
             onClick={onStartNew}
             disabled={isSubmitting}
-            className="flex-1 bg-[#D8857C] text-[#3E2A18] px-4 py-2.5 rounded-full border-2 border-[#E2BFB9] shadow-[0_2px_0_#B0473F] hover:translate-y-0.5 hover:shadow-[0_1px_0_#B0473F] hover:bg-[#E2BFB9] transition-all font-bold flex items-center justify-center gap-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            className="flex-1 bg-[#D8857C] text-[#3E2A18] px-4 py-2.5 rounded-full border-2 border-[#E2BFB9] shadow-[0_2px_0_#B0473F] hover:translate-y-0.5 hover:shadow-[0_1px_0_#B0473F] hover:bg-[#E2BFB9] transition-all font-bold flex items-center justify-center gap-1.5 text-base disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             <Plus className="w-4 h-4" /> {isSubmitting ? '정리 중…' : '네, 새로 시작'}
           </button>
@@ -90,7 +90,7 @@ export function DraftResumeModal({
 
 function DraftRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 text-sm">
+    <div className="flex items-baseline justify-between gap-3 text-base">
       <span className="text-[#6B4A28] font-semibold shrink-0">{label}</span>
       <span className="text-[#3E2A18] font-bold text-right truncate">{value}</span>
     </div>

@@ -18,7 +18,7 @@ export function NextButton({ onClick, disabled, children = '다음 단계' }: Ne
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center gap-2 text-xl whitespace-nowrap"
+        className="bg-[#2d5a27] text-[#f0e6c0] px-8 py-4 rounded-full border border-[#b4dc8c]/40 shadow-[0_4px_0_#1a3a14,0_0_20px_rgba(180,220,140,0.25)] hover:translate-y-1 hover:shadow-[0_2px_0_#1a3a14,0_0_30px_rgba(180,220,140,0.5)] hover:bg-[#3d6f34] disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center gap-2 text-2xl whitespace-nowrap"
       >
         {children} <ArrowRight className="w-5 h-5" />
       </button>

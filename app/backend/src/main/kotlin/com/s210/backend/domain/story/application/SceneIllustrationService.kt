@@ -49,10 +49,9 @@ class SceneIllustrationService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        // Step 8 (FinalPreviewStep) 에서 페이지별로 최종 삽화를 3번까지 다시 그릴 수 있도록 허용.
-        // 기존 2 였다가 사용자 요청으로 3 으로 상향 — story 단위 총량(STORY_REGEN_LIMIT) 은 유지.
-        private const val SCENE_REGEN_LIMIT = 3
-        private const val STORY_REGEN_LIMIT = 10
+        // Step 8 (FinalPreviewStep) 에서 동화 한 권당 최종 삽화 재생성 총합 한도.
+        // 페이지별이 아니라 동화 전체 합산 — 사용자가 어떤 페이지를 몇 번 재생성하든 총 3회까지.
+        private const val STORY_REGEN_LIMIT = 3
         private const val MAX_REFERENCE_IMAGES = 3
     }
 
@@ -71,12 +70,7 @@ class SceneIllustrationService(
             ?: throw BusinessException(StoryErrorCode.SCENE_NOT_FOUND)
 
         val terminalStatuses = listOf(JobStatus.SUCCESS, JobStatus.FAILED)
-        val sceneCount = jobRepository.countBySceneIdAndJobTypeAndStatusIn(
-            sceneId, JobType.ILLUSTRATION, terminalStatuses,
-        )
-        if (sceneCount >= SCENE_REGEN_LIMIT) {
-            throw BusinessException(StoryErrorCode.REGENERATION_LIMIT_EXCEEDED)
-        }
+        // 동화 전체 합산 한도 — 페이지별 한도는 두지 않고 사용자가 자유롭게 분배해서 쓸 수 있게 한다.
         val storyCount = jobRepository.countByStoryIdAndJobTypeAndStatusIn(
             storyId, JobType.ILLUSTRATION, terminalStatuses,
         )
