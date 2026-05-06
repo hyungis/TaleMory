@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CheckCircle2,
   FolderOpen,
@@ -218,62 +218,15 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               onPause={() => vc.setIsAudioPlaying(false)}
               onEnded={() => vc.setIsAudioPlaying(false)}
             />
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                background: '#fdf6dc',
-                border: '2px solid var(--cr-caramel)',
-                borderRadius: 999,
-                padding: '8px 14px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={vc.toggleAudioPlayback}
-                disabled={!vc.recordedAudioUrl}
-                aria-label={vc.isAudioPlaying ? '일시정지' : '재생'}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '50%',
-                  background: 'var(--cr-sage)',
-                  border: '2px solid var(--cr-sage-deep)',
-                  color: '#fdf6dc',
-                  display: 'grid',
-                  placeItems: 'center',
-                  cursor: vc.recordedAudioUrl ? 'pointer' : 'not-allowed',
-                  opacity: vc.recordedAudioUrl ? 1 : 0.5,
-                  flexShrink: 0,
-                }}
-              >
-                {vc.isAudioPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </button>
-              <div style={{ flex: 1, display: 'grid', gap: 4 }}>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={progressPercent}
-                  onChange={e => vc.seekAudio(Number(e.target.value))}
-                  disabled={!vc.recordedAudioUrl}
-                  style={{ width: '100%', accentColor: 'var(--cr-sage-deep)' }}
-                />
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontFamily: 'var(--cr-font-gaegu)',
-                    fontSize: 15,
-                    color: 'var(--cr-ink-soft)',
-                  }}
-                >
-                  <span>{formatAudioTime(vc.audioCurrentTime)}</span>
-                  <span>{formatAudioTime(vc.audioDuration)}</span>
-                </div>
-              </div>
-            </div>
+            <CreationAudioBar
+              isPlaying={vc.isAudioPlaying}
+              onToggle={vc.toggleAudioPlayback}
+              disabled={!vc.recordedAudioUrl}
+              progressPercent={progressPercent}
+              onSeek={vc.seekAudio}
+              currentLabel={formatAudioTime(vc.audioCurrentTime)}
+              durationLabel={formatAudioTime(vc.audioDuration)}
+            />
 
             {vc.status === 'ready' && (
               <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -379,13 +332,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
               </p>
             </div>
 
-            {vc.ttsAudioUrl && (
-              <audio
-                src={vc.ttsAudioUrl}
-                controls
-                style={{ width: '100%', marginTop: 14, borderRadius: 999 }}
-              />
-            )}
+            {vc.ttsAudioUrl && <TtsPreviewPlayer src={vc.ttsAudioUrl} />}
           </section>
         </main>
       </div>
@@ -482,6 +429,148 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
           onClose={() => setShowLoadModal(false)}
         />
       )}
+    </div>
+  )
+}
+
+function TtsPreviewPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+
+  useEffect(() => {
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+  }, [src])
+
+  const togglePlayback = () => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (audio.paused) {
+      void audio.play()
+    } else {
+      audio.pause()
+    }
+  }
+
+  const seekAudio = (percent: number) => {
+    const audio = audioRef.current
+    if (!audio || duration <= 0) return
+
+    const nextTime = (Math.max(0, Math.min(100, percent)) / 100) * duration
+    audio.currentTime = nextTime
+    setCurrentTime(nextTime)
+  }
+
+  const progressPercent =
+    duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        style={{ display: 'none' }}
+        onLoadedMetadata={e => {
+          const nextDuration = e.currentTarget.duration
+          setDuration(Number.isFinite(nextDuration) ? nextDuration : 0)
+        }}
+        onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime ?? 0)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => setIsPlaying(false)}
+      />
+      <CreationAudioBar
+        isPlaying={isPlaying}
+        onToggle={togglePlayback}
+        disabled={false}
+        progressPercent={progressPercent}
+        onSeek={seekAudio}
+        currentLabel={formatAudioTime(currentTime)}
+        durationLabel={formatAudioTime(duration)}
+      />
+    </div>
+  )
+}
+
+function CreationAudioBar({
+  isPlaying,
+  onToggle,
+  disabled,
+  progressPercent,
+  onSeek,
+  currentLabel,
+  durationLabel,
+}: {
+  isPlaying: boolean
+  onToggle: () => void
+  disabled: boolean
+  progressPercent: number
+  onSeek: (percent: number) => void
+  currentLabel: string
+  durationLabel: string
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        background: '#fdf6dc',
+        border: '2px solid var(--cr-caramel)',
+        borderRadius: 999,
+        padding: '8px 14px',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        aria-label={isPlaying ? '일시정지' : '재생'}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          background: 'var(--cr-sage)',
+          border: '2px solid var(--cr-sage-deep)',
+          color: '#fdf6dc',
+          display: 'grid',
+          placeItems: 'center',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.5 : 1,
+          flexShrink: 0,
+        }}
+      >
+        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+      </button>
+      <div style={{ flex: 1, display: 'grid', gap: 4 }}>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={progressPercent}
+          onChange={e => onSeek(Number(e.target.value))}
+          disabled={disabled}
+          aria-label="재생 위치"
+          style={{ width: '100%', accentColor: 'var(--cr-sage-deep)' }}
+        />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontFamily: 'var(--cr-font-gaegu)',
+            fontSize: 15,
+            color: 'var(--cr-ink-soft)',
+          }}
+        >
+          <span>{currentLabel}</span>
+          <span>{durationLabel}</span>
+        </div>
+      </div>
     </div>
   )
 }
