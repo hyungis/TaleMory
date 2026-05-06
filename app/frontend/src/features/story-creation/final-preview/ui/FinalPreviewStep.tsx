@@ -143,6 +143,7 @@ export function FinalPreviewStep({
     ? [{ kind: 'cover' as const, scene: coverScene }, ...bodyScenes.map(scene => ({ kind: 'scene' as const, scene }))]
     : bodyScenes.map(scene => ({ kind: 'scene' as const, scene }))
   const totalPages = previewPages.length
+  const bodyPageCount = bodyScenes.length
   const currentPreviewPage = previewPages[resultPageIndex] ?? null
   const currentScene = currentPreviewPage?.kind === 'scene' ? currentPreviewPage.scene : null
 
@@ -367,8 +368,8 @@ export function FinalPreviewStep({
               <span className="cr-final-page-pill">
                 <BookOpen className="w-4 h-4" />
                 {currentPreviewPage.kind === 'cover'
-                  ? `Cover / ${totalPages}`
-                  : `Page ${resultPageIndex + (coverScene ? 0 : 1)} / ${totalPages}`}
+                  ? `Cover / ${bodyPageCount}`
+                  : `Page ${resultPageIndex + (coverScene ? 0 : 1)} / ${bodyPageCount}`}
               </span>
             </div>
 

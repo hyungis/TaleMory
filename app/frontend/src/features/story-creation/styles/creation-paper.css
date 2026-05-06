@@ -1482,10 +1482,7 @@
   margin: 0 auto;
   border-radius: 4px 14px 14px 4px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255, 250, 230, 0.55), transparent 45%),
-    radial-gradient(circle at 70% 75%, rgba(255, 250, 230, 0.32), transparent 50%),
-    linear-gradient(150deg, #7a9968, #c89968);
+  background: #fff;
   box-shadow:
     2px 0 0 #efe1c2,
     4px 0 0 #e6d2a8,
@@ -1502,14 +1499,6 @@
     0 12px 0 #d2bc8a,
     14px 18px 40px rgba(140, 100, 60, 0.35),
     20px 30px 60px rgba(140, 100, 60, 0.2);
-}
-.cr-final-cover-shell::after {
-  content: '';
-  position: absolute;
-  inset: 24px;
-  border: 3px dashed rgba(255, 250, 230, 0.6);
-  border-radius: 22px;
-  pointer-events: none;
 }
 .cr-final-cover-image {
   width: 100%;
