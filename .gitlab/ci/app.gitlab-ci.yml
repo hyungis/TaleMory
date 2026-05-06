@@ -2,13 +2,21 @@
 # 엔트리(.gitlab-ci.yml)에 stages / workflow / default / variables 가 정의되어 있음.
 #
 # 포함 job:
-#   - generate_env_<env> : GitLab Variables → env 파일 생성
-#   - verify_infra_<env> : mysql/redis/rabbitmq 실접속 + creds 정렬 검증
-#   - build_*            : frontend / backend / ai (3개 병렬)
-#   - deploy_<env>       : compose up
-#   - notify_*, cleanup_*: .post
+#   - generate_env_<env>  : GitLab Variables → env 파일 생성
+#   - verify_infra_<env>  : mysql/redis/rabbitmq 실접속 + creds 정렬 검증
+#   - build_*             : frontend / backend / ai (병렬, changes 필터로 변경 영역만)
+#   - deploy_<env>_*      : 서비스별 배포 (backend / frontend / ai)
+#   - notify_*, cleanup_* : .post
 #
-# deploy_infra_*는 여기 없음 → .gitlab/ci/infra.gitlab-ci.yml (조건부 로드).
+# deploy_infra_* 는 여기 없음 → .gitlab/ci/infra.gitlab-ci.yml (조건부 로드).
+#
+# ── changes 필터 정책 ────────────────────────────────────────
+# 각 서비스의 build/deploy rule.changes 는 다음 path 변경에만 트리거:
+#   - 해당 서비스의 app 코드 (app/{backend,frontend,ai}/**)
+#   - 그 서비스 build 스크립트 (build-{svc}.sh)
+#   - 공용 (compose, deploy 스크립트, health-check, common.sh, CI 파일) → 모든 서비스에 영향
+# build 와 deploy 의 changes 리스트는 동일 — APP_IMAGE_TAG=$CI_COMMIT_SHORT_SHA 일관성.
+# build 가 fire 해야 deploy 가 가리키는 SHA 태그 이미지가 존재.
 
 # ─── generate_env ─────────────────────────────────────────────
 generate_env_dev:
@@ -27,8 +35,8 @@ generate_env_master:
 
 # ─── verify infra 연결 (build 앞에서 사전 검증) ───────────────
 # mysql/redis/rabbitmq 실 접속 + GitLab Variables 정렬 검증.
-# infra.gitlab-ci.yml이 로드된 경우에만 deploy_infra_<env>가 파이프라인에 존재.
-# optional:true 덕분에 로드되지 않은 경우는 needs가 자동으로 스킵되어 바로 실행됨.
+# infra.gitlab-ci.yml 이 로드된 경우에만 deploy_infra_<env> 가 파이프라인에 존재.
+# optional: true 덕분에 로드되지 않은 경우는 needs 가 자동 스킵되어 바로 실행됨.
 verify_infra_dev:
   stage: verify
   rules:
@@ -51,75 +59,228 @@ verify_infra_master:
   script:
     - bash infra/scripts/health-check-infra.sh master
 
-# ─── build (3개 병렬, verify 통과 후) ─────────────────────────
-build_frontend:
-  stage: build
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      needs:
-        - verify_infra_dev
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      needs:
-        - verify_infra_master
-  script:
-    - bash infra/scripts/build-frontend.sh
-
+# ─── build (3개 병렬, 변경 영역만 빌드) ───────────────────────
 build_backend:
   stage: build
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - app/backend/**/*
+        - infra/compose/docker-compose.app-dev.yml
+        - infra/scripts/build-backend.sh
+        - infra/scripts/deploy-dev.sh
+        - infra/scripts/health-check-dev.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
       needs:
         - verify_infra_dev
     - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - app/backend/**/*
+        - infra/compose/docker-compose.app-master.yml
+        - infra/scripts/build-backend.sh
+        - infra/scripts/deploy-master.sh
+        - infra/scripts/health-check-master.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
       needs:
         - verify_infra_master
   script:
     - bash infra/scripts/build-backend.sh
 
+build_frontend:
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - app/frontend/**/*
+        - infra/compose/docker-compose.app-dev.yml
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/deploy-dev.sh
+        - infra/scripts/health-check-dev.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+      needs:
+        - verify_infra_dev
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - app/frontend/**/*
+        - infra/compose/docker-compose.app-master.yml
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/deploy-master.sh
+        - infra/scripts/health-check-master.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+      needs:
+        - verify_infra_master
+  script:
+    - bash infra/scripts/build-frontend.sh
+
 build_ai:
   stage: build
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - app/ai/**/*
+        - infra/compose/docker-compose.app-dev.yml
+        - infra/scripts/build-ai.sh
+        - infra/scripts/deploy-dev.sh
+        - infra/scripts/health-check-dev.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
       needs:
         - verify_infra_dev
     - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - app/ai/**/*
+        - infra/compose/docker-compose.app-master.yml
+        - infra/scripts/build-ai.sh
+        - infra/scripts/deploy-master.sh
+        - infra/scripts/health-check-master.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
       needs:
         - verify_infra_master
   script:
     - bash infra/scripts/build-ai.sh
 
-# ─── deploy ───────────────────────────────────────────────────
-deploy_dev:
+# ─── deploy (서비스별 분할, build 와 동일한 changes) ───────────
+# 한 서비스 build 가 fire 하면 같은 서비스의 deploy 도 fire — SHA 태그 일관성 보장.
+# 다른 서비스는 컨테이너 그대로 유지 (운영 중 무관 서비스 재시작 X).
+
+deploy_dev_backend:
   stage: deploy
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - app/backend/**/*
+        - infra/compose/docker-compose.app-dev.yml
+        - infra/scripts/build-backend.sh
+        - infra/scripts/deploy-dev.sh
+        - infra/scripts/health-check-dev.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+  needs:
+    - generate_env_dev
+    - verify_infra_dev
+    - build_backend
+  script:
+    - bash infra/scripts/deploy-dev.sh backend
+
+deploy_dev_frontend:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - app/frontend/**/*
+        - infra/compose/docker-compose.app-dev.yml
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/deploy-dev.sh
+        - infra/scripts/health-check-dev.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
   needs:
     - generate_env_dev
     - verify_infra_dev
     - build_frontend
-    - build_backend
+  script:
+    - bash infra/scripts/deploy-dev.sh frontend
+
+deploy_dev_ai:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - app/ai/**/*
+        - infra/compose/docker-compose.app-dev.yml
+        - infra/scripts/build-ai.sh
+        - infra/scripts/deploy-dev.sh
+        - infra/scripts/health-check-dev.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+  needs:
+    - generate_env_dev
+    - verify_infra_dev
     - build_ai
   script:
-    - bash infra/scripts/deploy-dev.sh all
+    - bash infra/scripts/deploy-dev.sh ai
 
-deploy_master:
+deploy_master_backend:
   stage: deploy
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
-      when: manual       # master는 승인 후 배포
+      changes:
+        - app/backend/**/*
+        - infra/compose/docker-compose.app-master.yml
+        - infra/scripts/build-backend.sh
+        - infra/scripts/deploy-master.sh
+        - infra/scripts/health-check-master.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+      when: manual       # master 는 승인 후 배포
+  needs:
+    - generate_env_master
+    - verify_infra_master
+    - build_backend
+  script:
+    - bash infra/scripts/deploy-master.sh backend
+
+deploy_master_frontend:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - app/frontend/**/*
+        - infra/compose/docker-compose.app-master.yml
+        - infra/scripts/build-frontend.sh
+        - infra/scripts/deploy-master.sh
+        - infra/scripts/health-check-master.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+      when: manual
   needs:
     - generate_env_master
     - verify_infra_master
     - build_frontend
-    - build_backend
+  script:
+    - bash infra/scripts/deploy-master.sh frontend
+
+deploy_master_ai:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      changes:
+        - app/ai/**/*
+        - infra/compose/docker-compose.app-master.yml
+        - infra/scripts/build-ai.sh
+        - infra/scripts/deploy-master.sh
+        - infra/scripts/health-check-master.sh
+        - infra/scripts/common.sh
+        - .gitlab-ci.yml
+        - .gitlab/ci/app.gitlab-ci.yml
+      when: manual
+  needs:
+    - generate_env_master
+    - verify_infra_master
     - build_ai
   script:
-    - bash infra/scripts/deploy-master.sh all
+    - bash infra/scripts/deploy-master.sh ai
 
 # ─── 수동 유틸: dev RabbitMQ 큐 purge ───────────────────────────
 # 큐 스키마 변경 / 스테일 메시지 정리 / 개발 환경 리셋 시 사용.
 # - 평소 dev 배포엔 영향 없음 (manual + allow_failure).
-# - dev 브랜치 파이프라인에만 버튼이 렌더링됨. master에선 아예 보이지 않음.
+# - dev 브랜치 파이프라인에만 버튼이 렌더링됨. master 에선 아예 보이지 않음.
 # - 큐 이름은 /tmp/env/app.dev.env 에서 읽음 (하드코딩 없음).
 purge_queues_dev:
   stage: deploy
@@ -151,8 +312,8 @@ notify_failure:
     - CI_JOB_STATUS=failed bash infra/scripts/notify.sh
 
 # ─── .post: 이미지 정리 (notify 이후, 성공 pipeline만) ──────────
-# 실패 pipeline에서는 실행되지 않아 디버깅용 이미지/상태 보존.
-# s210-* prefix만 대상 — healthcheck용 public 이미지 캐시는 건드리지 않음.
+# 실패 pipeline 에서는 실행되지 않아 디버깅용 이미지/상태 보존.
+# s210-* prefix 만 대상 — healthcheck 용 public 이미지 캐시는 건드리지 않음.
 cleanup_dev:
   stage: .post
   rules:
