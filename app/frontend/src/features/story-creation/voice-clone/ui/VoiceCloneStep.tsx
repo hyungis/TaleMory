@@ -84,7 +84,7 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
           <StepTitleBlock
             stepNumber={6}
             title="부모 목소리를 들려주세요"
-            subtitle="샘플 문장을 따라 읽어 녹음하면, 보이스 클론으로 동화를 들려줄 수 있어요"
+            subtitle="샘플 문장을 따라 읽고 녹음을 저장하면, 부모님 목소리로 동화를 읽어줄 수 있어요"
           />
 
           {/* Section 1: 녹음 스크립트 + 녹음 컨트롤 */}
@@ -292,9 +292,13 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
                     <span>{vc.isSaving ? '저장 중...' : '녹음 저장하기'}</span>
                   </button>
                 )}
-                {vc.savedProfileId && (
+                {vc.savedProfileId ? (
                   <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: 'var(--cr-sage-deep)', fontWeight: 700, margin: 0 }}>
                     {vc.savedVoiceSummary}
+                  </p>
+                ) : (
+                  <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: 'var(--cr-rust)', fontWeight: 700, margin: 0 }}>
+                    녹음을 저장해야 보이스 클론이 적용돼요
                   </p>
                 )}
               </div>
@@ -444,13 +448,15 @@ export function VoiceCloneStep({ storyId, onBack, onNext, onVoiceSaved }: VoiceC
             type="button"
             onClick={onNext}
             className="cr-btn-next"
-            disabled={vc.savedProfileId !== null && vc.attachStatus !== 'attached'}
+            disabled={vc.savedProfileId === null || vc.attachStatus !== 'attached'}
             title={
-              vc.savedProfileId !== null && vc.attachStatus === 'attaching'
-                ? '음성 연결 중...'
-                : vc.savedProfileId !== null && vc.attachStatus === 'failed'
-                  ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
-                  : undefined
+              vc.savedProfileId === null
+                ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
+                : vc.attachStatus === 'attaching'
+                  ? '음성 연결 중...'
+                  : vc.attachStatus === 'failed'
+                    ? '음성 연결 실패 — 다시 연결 후 진행해 주세요'
+                    : undefined
             }
           >
             <span>동화책 만들기</span>
