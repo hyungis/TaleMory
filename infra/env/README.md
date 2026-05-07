@@ -1,4 +1,4 @@
-# GitLab CI/CD Variables 카탈로그
+﻿# GitLab CI/CD Variables 카탈로그
 
 S210의 **CI/운영 배포용** 환경변수 단일 문서. GitLab → **Settings → CI/CD → Variables**에 등록하는 모든 키를 여기서 관리한다.
 
@@ -158,14 +158,31 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_AWS_S3_ENV_PREFIX` | — | `dev` — 같은 버킷에서 환경(local/dev/prod) 격리용 root prefix. BE/AI 워커가 모든 S3 key 앞에 prepend |
 | `ENV_DEV_APP_FRONTEND_PORT` | — | `3001` (호스트 publish 포트) |
 | `ENV_DEV_APP_VITE_API_BASE_URL` | — | `/api` (Vite build-time 주입) |
+| `ENV_DEV_APP_VITE_TTS_API_BASE` | — | `http://127.0.0.1:8000` |
+| `ENV_DEV_APP_VITE_VIEWER_USE_MOCK` | — | `false` |
 | `ENV_DEV_APP_OPENAI_API_KEY` | ✅ | OpenAI API 키 |
 | `ENV_DEV_APP_GEMINI_API_KEY` | ✅ | Gemini API 키 (storyboard 이미지 생성). 미설정 시 이미지 생성 호출 실패 |
 | `ENV_DEV_APP_REPLICATE_API_TOKEN` | ✅ | Replicate API 토큰 (final illustration 생성). 미설정 시 1픽셀 검은 PNG fallback 으로 떨어짐 |
+| `ENV_DEV_APP_TTS_ENGINE` | — | `qwen` |
+| `ENV_DEV_APP_QWEN_TTS_SERVER_URL` | — | `http://100.64.201.34:8091` |
+| `ENV_DEV_APP_QWEN_TTS_VOICE_CLONE_PATH` | — | `/tts/voice-clone` |
+| `ENV_DEV_APP_QWEN_TTS_TIMEOUT_SEC` | — | `300` |
+| `ENV_DEV_APP_QWEN_TTS_X_VECTOR_ONLY_MODE` | — | `true` |
+| `ENV_DEV_APP_TTS_DEFAULT_LANGUAGE` | — | `ko-KR` |
+| `ENV_DEV_APP_TTS_STORAGE_ROOT` | — | `/app/.runtime/storage` |
+| `ENV_DEV_APP_TTS_MANIFEST_ROOT` | — | `/app/.runtime/manifests` |
+| `ENV_DEV_APP_LOG_LEVEL` | — | `INFO` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | — | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | — | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | — | `gemini-2.5-flash-image` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_PUBLIC_BASE_URL` | no | optional CDN/public base URL |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_ENDPOINT_URL` | no | optional S3-compatible endpoint URL |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_REGION` | no | `ap-northeast-2` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_BUCKET` | no | `s210-iportfolio-dev` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_ACCESS_KEY_ID` | ✅ | optional storyboard image S3 access key override |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY` | ✅ | optional storyboard image S3 secret key override |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | — | `ai.image.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | — | `ai.image.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | — | `ai.image.regenerate.request.queue` |
@@ -368,6 +385,12 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_PUBLIC_BASE_URL` | no | optional CDN/public base URL |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_ENDPOINT_URL` | no | optional S3-compatible endpoint URL |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_REGION` | no | `ap-northeast-2` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_BUCKET` | no | `s210-iportfolio-dev` |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_ACCESS_KEY_ID` | ✅ | optional storyboard image S3 access key override |
+| `ENV_DEV_APP_STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY` | ✅ | optional storyboard image S3 secret key override |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | no | `ai.image.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_GENERATE_ITEM_QUEUE` | no | `ai.image.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_QUEUE` | no | `ai.image.regenerate.request.queue` |

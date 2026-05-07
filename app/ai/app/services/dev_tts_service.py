@@ -17,6 +17,7 @@ from uuid import uuid4
 from app.core.config import settings
 from app.schemas.tts import PreviewOptions, VoiceRegisterRequest
 from app.services.cosyvoice_client import synthesize_cross_lingual_tts
+from app.services.qwen_server_client import synthesize_voice_clone_tts, synthesize_voice_clone_tts_batch
 from app.services.storage_service import (
     build_public_url,
     download_s3_bytes,
@@ -43,6 +44,10 @@ EMOTION_INSTRUCTIONS = {
     "TENDER": "Tender.",
     "BRAVE": "Brave.",
 }
+
+
+def _tts_engine() -> str:
+    return settings.TTS_ENGINE.strip().lower()
 
 
 def _now() -> str:
@@ -217,6 +222,51 @@ def _cross_lingual_text(text: str) -> str:
     return f"{ASSISTANT_PREFIX}{normalized}"
 
 
+def _synthesize_tts(
+    *,
+    text: str,
+    prompt_wav_path: Path,
+    audio_format: str,
+    language: str | None,
+) -> tuple[bytes, str]:
+    if _tts_engine() == "qwen":
+        return synthesize_voice_clone_tts(
+            text=text,
+            prompt_wav_path=prompt_wav_path,
+            audio_format=audio_format,
+            language=language,
+        )
+    return synthesize_cross_lingual_tts(
+        text=_cross_lingual_text(text),
+        prompt_wav_path=prompt_wav_path,
+        audio_format=audio_format,
+    )
+
+
+def _synthesize_tts_batch(
+    *,
+    texts: list[str],
+    prompt_wav_path: Path,
+    audio_format: str,
+    language: str | None,
+) -> list[tuple[bytes, str]]:
+    if _tts_engine() == "qwen":
+        return synthesize_voice_clone_tts_batch(
+            texts=texts,
+            prompt_wav_path=prompt_wav_path,
+            audio_format=audio_format,
+            language=language,
+        )
+    return [
+        synthesize_cross_lingual_tts(
+            text=_cross_lingual_text(text),
+            prompt_wav_path=prompt_wav_path,
+            audio_format=audio_format,
+        )
+        for text in texts
+    ]
+
+
 def _voice_metadata(voice_id: str) -> dict[str, Any]:
     metadata_path = _voice_metadata_path(voice_id)
     if not metadata_path.exists():
@@ -348,19 +398,21 @@ def generate_preview(
     reference_path = resolve_reference_voice(voice_id, reference_audio_url, reference_audio_s3_key)
 
     preview_id = f"preview_{uuid4().hex[:12]}"
-    cosy_started = perf_counter()
-    audio_bytes, resolved_format = synthesize_cross_lingual_tts(
-        text=_cross_lingual_text(text),
+    engine_started = perf_counter()
+    audio_bytes, resolved_format = _synthesize_tts(
+        text=text,
         prompt_wav_path=reference_path,
         audio_format=output_format,
+        language=language,
     )
     logger.info(
-        "[TTS_PREVIEW:COSYVOICE] previewId=%s voiceId=%s textLen=%d audioBytes=%d elapsedMs=%d",
+        "[TTS_PREVIEW:ENGINE] engine=%s previewId=%s voiceId=%s textLen=%d audioBytes=%d elapsedMs=%d",
+        _tts_engine(),
         preview_id,
         voice_id,
         len(text),
         len(audio_bytes),
-        _elapsed_ms(cosy_started),
+        _elapsed_ms(engine_started),
     )
     output_path = (
         settings.TTS_STORAGE_ROOT
@@ -401,7 +453,7 @@ def generate_preview(
             "stylePrompt": options.stylePrompt,
             "speakingRate": options.speakingRate,
             "pitch": options.pitch,
-            "engine": "cosyvoice.inference_cross_lingual",
+            "engine": _tts_engine(),
         },
     }
 
@@ -435,19 +487,22 @@ def generate_story_tts_result(
     default_style_prompt = request["options"].get("defaultStylePrompt")
     output_format = request.get("format", "wav")
     items: list[dict[str, Any]] = []
+    sentences = request["sentences"]
+    engine_started = perf_counter()
+    audio_results = _synthesize_tts_batch(
+        texts=[sentence["text"] for sentence in sentences],
+        prompt_wav_path=reference_path,
+        audio_format=output_format,
+        language=request.get("language"),
+    )
+    engine_elapsed = _elapsed_ms(engine_started)
 
-    for index, sentence in enumerate(request["sentences"], start=1):
+    for index, (sentence, audio_result) in enumerate(zip(sentences, audio_results, strict=True), start=1):
         sentence_id = sentence["sentenceId"]
         emotion = sentence.get("emotion") or default_emotion
         style_prompt = sentence.get("stylePrompt") or default_style_prompt
         sentence_started = perf_counter()
-        cosy_started = perf_counter()
-        audio_bytes, resolved_format = synthesize_cross_lingual_tts(
-            text=_cross_lingual_text(sentence["text"]),
-            prompt_wav_path=reference_path,
-            audio_format=output_format,
-        )
-        cosy_elapsed = _elapsed_ms(cosy_started)
+        audio_bytes, resolved_format = audio_result
         sentence_path = (
             settings.TTS_STORAGE_ROOT
             / "generated"
@@ -460,15 +515,16 @@ def generate_story_tts_result(
         stored_sentence = store_bytes(sentence_path, audio_bytes, _audio_content_type(resolved_format))
         store_elapsed = _elapsed_ms(store_started)
         logger.info(
-            "[TTS:STORY:SENTENCE] storyId=%s voiceId=%s sentenceId=%s index=%d/%d textLen=%d audioBytes=%d cosyMs=%d storeMs=%d elapsedMs=%d",
+            "[TTS:STORY:SENTENCE] engine=%s storyId=%s voiceId=%s sentenceId=%s index=%d/%d textLen=%d audioBytes=%d engineBatchMs=%d storeMs=%d elapsedMs=%d",
+            _tts_engine(),
             story_id,
             voice_id,
             sentence_id,
             index,
-            len(request["sentences"]),
+            len(sentences),
             len(sentence["text"]),
             len(audio_bytes),
-            cosy_elapsed,
+            engine_elapsed,
             store_elapsed,
             _elapsed_ms(sentence_started),
         )
@@ -488,7 +544,7 @@ def generate_story_tts_result(
             }
         )
         if progress_callback is not None:
-            progress_callback(min(95, int(index / len(request["sentences"]) * 90) + 5))
+            progress_callback(min(95, int(index / len(sentences) * 90) + 5))
 
     result: dict[str, Any] = {
         "storyId": story_id,
@@ -506,7 +562,7 @@ def generate_story_tts_result(
             "sentenceCount": len(items),
         },
         "usage": {
-            "model": "cosyvoice",
+            "model": _tts_engine(),
             "inputTokens": None,
             "outputTokens": None,
             "totalTokens": None,

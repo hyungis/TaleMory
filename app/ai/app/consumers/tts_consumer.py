@@ -13,6 +13,7 @@ from app.schemas.mq_tts_preview import (
     PreviewTtsResultPayload,
 )
 from app.services.cosyvoice_client import CosyVoiceInvocationError, CosyVoiceNotConfiguredError
+from app.services.qwen_server_client import QwenTtsInvocationError, QwenTtsNotConfiguredError
 from app.services.dev_tts_service import (
     create_pending_manifest,
     generate_preview,
@@ -22,6 +23,9 @@ from app.services.dev_tts_service import (
 from app.services.storage_service import StorageConfigurationError, StorageDownloadError, StorageUploadError
 
 logger = logging.getLogger(__name__)
+
+TtsNotConfiguredError = (CosyVoiceNotConfiguredError, QwenTtsNotConfiguredError)
+TtsInvocationError = (CosyVoiceInvocationError, QwenTtsInvocationError)
 
 
 def consume_tts_jobs() -> None:
@@ -141,7 +145,7 @@ def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
             {"status": "FAILED", "finishedAt": _now(), "error": {"message": f"Voice not found: {exc}"}},
         )
         return
-    except CosyVoiceNotConfiguredError as exc:
+    except TtsNotConfiguredError as exc:
         _handle_failure(
             publisher,
             message.jobId,
@@ -154,7 +158,7 @@ def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
             {"status": "FAILED", "finishedAt": _now(), "error": {"message": str(exc)}},
         )
         return
-    except CosyVoiceInvocationError as exc:
+    except TtsInvocationError as exc:
         _handle_failure(
             publisher,
             message.jobId,
@@ -244,13 +248,13 @@ def handle_preview_message(body: bytes, publisher: TtsResultPublisher) -> None:
             PreviewTtsError(code="GENERATE_TTS_VOICE_NOT_FOUND", message=f"Voice not found: {exc}"),
         )
         return
-    except CosyVoiceNotConfiguredError as exc:
+    except TtsNotConfiguredError as exc:
         publisher.publish_preview_failure(
             message.jobId,
             PreviewTtsError(code="GENERATE_TTS_NOT_CONFIGURED", message=str(exc)),
         )
         return
-    except CosyVoiceInvocationError as exc:
+    except TtsInvocationError as exc:
         publisher.publish_preview_failure(
             message.jobId,
             PreviewTtsError(code="GENERATE_TTS_ENGINE_ERROR", message=str(exc)),
