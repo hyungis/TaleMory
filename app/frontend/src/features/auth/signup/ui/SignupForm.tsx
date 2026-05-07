@@ -10,6 +10,9 @@ import {
   isRequiredTermsNotFoundError,
   TermsCheckboxes,
 } from '../../terms'
+import type { LoginResponse } from '../../login'
+import { useKakaoSignupPost } from '../../oauth/model/useKakaoSignupPost'
+import type { KakaoSignupProfile, KakaoSignupRequest } from '../../oauth/types'
 import { useSignupPost } from '../model/useSignupPost'
 import type { SignupRequest } from '../types'
 
@@ -62,6 +65,11 @@ interface SignupSuccessDialogState {
   title: string
   message: string
   idHint: string
+}
+
+interface KakaoSignupContext {
+  signupToken: string
+  profile: KakaoSignupProfile
 }
 
 const INITIAL_AVAILABILITY_CHECK: AvailabilityCheckState = {
@@ -176,15 +184,17 @@ function getPhoneFormatFeedback(value: string): FieldValidationFeedback | null {
   return null
 }
 
-function validate(values: SignupFormValues): string | null {
-  const loginIdFeedback = getLoginIdFormatFeedback(values.id, { showRequired: true })
-  if (loginIdFeedback) return loginIdFeedback.message
+function validate(values: SignupFormValues, options: { isKakaoSignup?: boolean } = {}): string | null {
+  if (!options.isKakaoSignup) {
+    const loginIdFeedback = getLoginIdFormatFeedback(values.id, { showRequired: true })
+    if (loginIdFeedback) return loginIdFeedback.message
 
-  const passwordFeedback = getPasswordFormatFeedback(values.password, { showRequired: true })
-  if (passwordFeedback) return passwordFeedback.message
+    const passwordFeedback = getPasswordFormatFeedback(values.password, { showRequired: true })
+    if (passwordFeedback) return passwordFeedback.message
 
-  const passwordCheckFeedback = getPasswordCheckFeedback(values.password, values.passwordCheck)
-  if (passwordCheckFeedback) return passwordCheckFeedback.message
+    const passwordCheckFeedback = getPasswordCheckFeedback(values.password, values.passwordCheck)
+    if (passwordCheckFeedback) return passwordCheckFeedback.message
+  }
 
   const emailFeedback = getEmailFormatFeedback(values.email, { showRequired: true })
   if (emailFeedback) return emailFeedback.message
@@ -216,9 +226,30 @@ function getSignupErrorMessage(error: unknown): string {
   return error.message
 }
 
+function getKakaoSignupErrorMessage(error: unknown): string {
+  if (isRequiredTermsNotFoundError(error)) {
+    return '약관 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (!isApiError(error)) {
+    return '카카오 회원가입 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (error.code === 'AUTH_001') return '기존 계정 비밀번호를 확인해주세요.'
+  if (error.code === 'AUTH_002') return '이미 사용 중인 이메일입니다.'
+  if (error.code === 'USER_002') return '이미 사용 중인 닉네임입니다.'
+  if (error.code === 'AUTH_008') return '카카오 인증 시간이 만료됐어요. 다시 카카오로 시작해주세요.'
+  if (error.code === 'NETWORK_ERROR') return '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.'
+  if (error.code === 'REQUEST_TIMEOUT') return '응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.'
+  return error.message
+}
+
 interface SignupFormProps {
   onSignedUp: (idHint: string) => void
   onSwitchToLogin: () => void
+  kakaoSignup?: KakaoSignupContext | null
+  onKakaoSignedUp?: (result: LoginResponse) => void
+  onKakaoSignupCancel?: () => void
 }
 
 const labelStyle: CSSProperties = {
@@ -242,6 +273,12 @@ const inputStyle: CSSProperties = {
   outline: 'none',
   transition: 'border-color 0.15s, box-shadow 0.15s',
   boxShadow: 'inset 0 1px 2px rgba(140, 100, 60, 0.08)',
+}
+
+const readonlyInputStyle: CSSProperties = {
+  ...inputStyle,
+  background: '#efe2bd',
+  color: '#5f7d50',
 }
 
 const fieldActionRowStyle: CSSProperties = {
@@ -272,17 +309,41 @@ const fieldFeedbackStyle: CSSProperties = {
   lineHeight: 1.4,
 }
 
+function createInitialValues(kakaoSignup?: KakaoSignupContext | null): SignupFormValues {
+  if (!kakaoSignup) return { ...INITIAL_VALUES }
+
+  return {
+    ...INITIAL_VALUES,
+    email: kakaoSignup.profile.email.trim(),
+    name: kakaoSignup.profile.name ?? '',
+    nickname: kakaoSignup.profile.nickname ?? '',
+    phone: formatPhoneNumber(kakaoSignup.profile.phone ?? ''),
+  }
+}
+
 /**
  * 회원가입 폼 — paper-craft 톤.
  */
-export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
-  const [values, setValues] = useState<SignupFormValues>(INITIAL_VALUES)
+export function SignupForm({
+  onSignedUp,
+  onSwitchToLogin,
+  kakaoSignup,
+  onKakaoSignedUp,
+  onKakaoSignupCancel,
+}: SignupFormProps) {
+  const [values, setValues] = useState<SignupFormValues>(() => createInitialValues(kakaoSignup))
   const [error, setError] = useState('')
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
   const [nicknameCheck, setNicknameCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
   const [restoreRequest, setRestoreRequest] = useState<SignupRequest | null>(null)
+  const [kakaoRestoreRequest, setKakaoRestoreRequest] = useState<KakaoSignupRequest | null>(null)
+  const [kakaoRestorePassword, setKakaoRestorePassword] = useState('')
+  const [kakaoRestorePasswordError, setKakaoRestorePasswordError] = useState('')
   const [successDialog, setSuccessDialog] = useState<SignupSuccessDialogState | null>(null)
   const { isPending, signup } = useSignupPost()
+  const { isPending: isKakaoPending, signup: kakaoSignupPost } = useKakaoSignupPost()
+  const isKakaoSignup = kakaoSignup !== null && kakaoSignup !== undefined
+  const isSubmitting = isPending || isKakaoPending
 
   const handleChange = useCallback(
     <K extends keyof SignupFormValues>(key: K, value: SignupFormValues[K]) => {
@@ -327,15 +388,15 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault()
-      if (isPending) return
+      if (isSubmitting) return
 
-      const validationError = validate(values)
+      const validationError = validate(values, { isKakaoSignup })
       if (validationError) {
         setError(validationError)
         return
       }
 
-      if (!isAvailabilityConfirmed(loginIdCheck, values.id)) {
+      if (!isKakaoSignup && !isAvailabilityConfirmed(loginIdCheck, values.id)) {
         setError(
           loginIdCheck.status === 'unavailable' && loginIdCheck.value === values.id.trim()
             ? '이미 사용 중인 아이디입니다.'
@@ -350,6 +411,38 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             ? '이미 사용 중인 닉네임입니다.'
             : '닉네임 중복 확인을 완료해주세요.',
         )
+        return
+      }
+
+      if (isKakaoSignup && kakaoSignup) {
+        let kakaoRequest: KakaoSignupRequest | null = null
+
+        try {
+          const terms = await getTerms()
+          kakaoRequest = {
+            signupToken: kakaoSignup.signupToken,
+            email: values.email.trim(),
+            name: values.name.trim(),
+            nickname: values.nickname.trim(),
+            phone: values.phone.trim() || undefined,
+            termAgreements: buildRequiredTermAgreements(values, terms),
+          }
+
+          const result = await kakaoSignupPost(kakaoRequest)
+
+          setError('')
+          onKakaoSignedUp?.(result)
+        } catch (submitError) {
+          if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE && kakaoRequest !== null) {
+            setError('')
+            setKakaoRestoreRequest(kakaoRequest)
+            setKakaoRestorePassword('')
+            setKakaoRestorePasswordError('')
+            return
+          }
+
+          setError(getKakaoSignupErrorMessage(submitError))
+        }
         return
       }
 
@@ -386,7 +479,17 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         setError(getSignupErrorMessage(submitError))
       }
     },
-    [isPending, loginIdCheck, nicknameCheck, signup, values],
+    [
+      isKakaoSignup,
+      isSubmitting,
+      kakaoSignup,
+      kakaoSignupPost,
+      loginIdCheck,
+      nicknameCheck,
+      onKakaoSignedUp,
+      signup,
+      values,
+    ],
   )
 
   const handleRestoreCancel = useCallback(() => {
@@ -417,11 +520,46 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
     }
   }, [isPending, restoreRequest, signup])
 
+  const handleKakaoRestoreCancel = useCallback(() => {
+    if (!isKakaoPending) {
+      setKakaoRestoreRequest(null)
+      setKakaoRestorePassword('')
+      setKakaoRestorePasswordError('')
+    }
+  }, [isKakaoPending])
+
+  const handleKakaoRestoreConfirm = useCallback(async () => {
+    if (kakaoRestoreRequest === null || isKakaoPending) return
+
+    try {
+      const result = await kakaoSignupPost({
+        ...kakaoRestoreRequest,
+        password: kakaoRestorePassword.trim() || undefined,
+        restoreConfirmed: true,
+      })
+      setError('')
+      setKakaoRestoreRequest(null)
+      setKakaoRestorePassword('')
+      setKakaoRestorePasswordError('')
+      onKakaoSignedUp?.(result)
+    } catch (restoreError) {
+      if (isApiError(restoreError) && restoreError.code === 'AUTH_001') {
+        setKakaoRestorePasswordError('기존 계정 비밀번호를 확인해주세요.')
+        return
+      }
+
+      setKakaoRestoreRequest(null)
+      setKakaoRestorePassword('')
+      setKakaoRestorePasswordError('')
+      setError(getKakaoSignupErrorMessage(restoreError))
+    }
+  }, [isKakaoPending, kakaoRestorePassword, kakaoRestoreRequest, kakaoSignupPost, onKakaoSignedUp])
+
   const loginIdMessage = getAvailabilityMessage('아이디', loginIdCheck, values.id)
   const nicknameMessage = getAvailabilityMessage('닉네임', nicknameCheck, values.nickname)
-  const loginIdFormatFeedback = getLoginIdFormatFeedback(values.id)
-  const passwordFormatFeedback = getPasswordFormatFeedback(values.password)
-  const passwordCheckFeedback = getPasswordCheckFeedback(values.password, values.passwordCheck)
+  const loginIdFormatFeedback = isKakaoSignup ? null : getLoginIdFormatFeedback(values.id)
+  const passwordFormatFeedback = isKakaoSignup ? null : getPasswordFormatFeedback(values.password)
+  const passwordCheckFeedback = isKakaoSignup ? null : getPasswordCheckFeedback(values.password, values.passwordCheck)
   const emailFormatFeedback = getEmailFormatFeedback(values.email)
 
   const required = (
@@ -432,88 +570,113 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
     <>
       <form
         onSubmit={handleSubmit}
-        aria-busy={isPending}
+        aria-busy={isSubmitting}
         style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}
       >
-        <div>
-          <label style={labelStyle}>아이디 {required}</label>
-          <div style={fieldActionRowStyle}>
-            <input
-              type="text"
-              value={values.id}
-              disabled={isPending}
-              onChange={e => {
-                setLoginIdCheck(INITIAL_AVAILABILITY_CHECK)
-                handleChange('id', e.target.value)
-              }}
-              autoComplete="username"
-              placeholder="4자 이상"
-              style={inputStyle}
-            />
-            <button
-              type="button"
-              disabled={isPending || loginIdCheck.status === 'checking'}
-              onClick={handleLoginIdCheck}
-              style={{
-                ...checkButtonStyle,
-                cursor: isPending || loginIdCheck.status === 'checking' ? 'not-allowed' : 'pointer',
-                opacity: isPending || loginIdCheck.status === 'checking' ? 0.6 : 1,
-              }}
-            >
-              {loginIdCheck.status === 'checking' ? '확인 중' : '중복 확인'}
-            </button>
-          </div>
-          {loginIdFormatFeedback && <FieldFeedback feedback={loginIdFormatFeedback} />}
-          {loginIdMessage && (
-            <p
-              style={{
-                margin: '6px 0 0',
-                fontFamily: 'var(--font-display)',
-                fontSize: 13,
-                color: getAvailabilityMessageColor(loginIdCheck.status),
-              }}
-            >
-              {loginIdMessage}
-            </p>
-          )}
-        </div>
-        <div>
-          <label style={labelStyle}>비밀번호 {required}</label>
-          <input
-            type="password"
-            value={values.password}
-            disabled={isPending}
-            onChange={e => handleChange('password', e.target.value)}
-            autoComplete="new-password"
-            placeholder="6자 이상"
-            style={inputStyle}
-          />
-          {passwordFormatFeedback && <FieldFeedback feedback={passwordFormatFeedback} />}
-        </div>
-        <div>
-          <label style={labelStyle}>비밀번호 확인 {required}</label>
-          <input
-            type="password"
-            value={values.passwordCheck}
-            disabled={isPending}
-            onChange={e => handleChange('passwordCheck', e.target.value)}
-            autoComplete="new-password"
-            placeholder="비밀번호 재입력"
-            style={inputStyle}
-          />
-          {passwordCheckFeedback && <FieldFeedback feedback={passwordCheckFeedback} />}
-        </div>
+        {!isKakaoSignup && (
+          <>
+            <div>
+              <label style={labelStyle}>아이디 {required}</label>
+              <div style={fieldActionRowStyle}>
+                <input
+                  type="text"
+                  value={values.id}
+                  disabled={isSubmitting}
+                  onChange={e => {
+                    setLoginIdCheck(INITIAL_AVAILABILITY_CHECK)
+                    handleChange('id', e.target.value)
+                  }}
+                  autoComplete="username"
+                  placeholder="4자 이상"
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  disabled={isSubmitting || loginIdCheck.status === 'checking'}
+                  onClick={handleLoginIdCheck}
+                  style={{
+                    ...checkButtonStyle,
+                    cursor: isSubmitting || loginIdCheck.status === 'checking' ? 'not-allowed' : 'pointer',
+                    opacity: isSubmitting || loginIdCheck.status === 'checking' ? 0.6 : 1,
+                  }}
+                >
+                  {loginIdCheck.status === 'checking' ? '확인 중' : '중복 확인'}
+                </button>
+              </div>
+              {loginIdFormatFeedback && <FieldFeedback feedback={loginIdFormatFeedback} />}
+              {loginIdMessage && (
+                <p
+                  style={{
+                    margin: '6px 0 0',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 13,
+                    color: getAvailabilityMessageColor(loginIdCheck.status),
+                  }}
+                >
+                  {loginIdMessage}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={labelStyle}>비밀번호 {required}</label>
+              <input
+                type="password"
+                value={values.password}
+                disabled={isSubmitting}
+                onChange={e => handleChange('password', e.target.value)}
+                autoComplete="new-password"
+                placeholder="6자 이상"
+                style={inputStyle}
+              />
+              {passwordFormatFeedback && <FieldFeedback feedback={passwordFormatFeedback} />}
+            </div>
+            <div>
+              <label style={labelStyle}>비밀번호 확인 {required}</label>
+              <input
+                type="password"
+                value={values.passwordCheck}
+                disabled={isSubmitting}
+                onChange={e => handleChange('passwordCheck', e.target.value)}
+                autoComplete="new-password"
+                placeholder="비밀번호 재입력"
+                style={inputStyle}
+              />
+              {passwordCheckFeedback && <FieldFeedback feedback={passwordCheckFeedback} />}
+            </div>
+          </>
+        )}
         <div>
           <label style={labelStyle}>이메일 {required}</label>
-          <input
-            type="email"
-            value={values.email}
-            disabled={isPending}
-            onChange={e => handleChange('email', e.target.value)}
-            autoComplete="email"
-            placeholder="example@email.com"
-            style={inputStyle}
-          />
+          {isKakaoSignup ? (
+            <input
+              type="email"
+              value={values.email}
+              readOnly
+              autoComplete="email"
+              placeholder="example@email.com"
+              style={readonlyInputStyle}
+            />
+          ) : (
+            <input
+              type="email"
+              value={values.email}
+              disabled={isSubmitting}
+              onChange={e => handleChange('email', e.target.value)}
+              autoComplete="email"
+              placeholder="example@email.com"
+              style={inputStyle}
+            />
+          )}
+          {isKakaoSignup && (
+            <p
+              style={{
+                ...fieldFeedbackStyle,
+                color: '#8a7558',
+              }}
+            >
+              카카오 계정에서 인증된 이메일이라 수정할 수 없어요.
+            </p>
+          )}
           {emailFormatFeedback && <FieldFeedback feedback={emailFormatFeedback} />}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -522,7 +685,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             <input
               type="text"
               value={values.name}
-              disabled={isPending}
+              disabled={isSubmitting}
               onChange={e => handleChange('name', e.target.value)}
               autoComplete="name"
               placeholder="홍길동"
@@ -535,7 +698,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
               <input
                 type="text"
                 value={values.nickname}
-                disabled={isPending}
+                disabled={isSubmitting}
                 onChange={e => {
                   setNicknameCheck(INITIAL_AVAILABILITY_CHECK)
                   handleChange('nickname', e.target.value)
@@ -545,12 +708,12 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
               />
               <button
                 type="button"
-                disabled={isPending || nicknameCheck.status === 'checking'}
+                disabled={isSubmitting || nicknameCheck.status === 'checking'}
                 onClick={handleNicknameCheck}
                 style={{
                   ...checkButtonStyle,
-                  cursor: isPending || nicknameCheck.status === 'checking' ? 'not-allowed' : 'pointer',
-                  opacity: isPending || nicknameCheck.status === 'checking' ? 0.6 : 1,
+                  cursor: isSubmitting || nicknameCheck.status === 'checking' ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting || nicknameCheck.status === 'checking' ? 0.6 : 1,
                 }}
               >
                 {nicknameCheck.status === 'checking' ? '확인 중' : '중복 확인'}
@@ -577,7 +740,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
           <input
             type="tel"
             value={values.phone}
-            disabled={isPending}
+            disabled={isSubmitting}
             onChange={e => handleChange('phone', formatPhoneNumber(e.target.value))}
             autoComplete="tel"
             placeholder="010-1234-5678"
@@ -613,7 +776,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
 
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isSubmitting}
           style={{
             width: '100%',
             background: '#7a9968',
@@ -624,14 +787,14 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             fontFamily: 'var(--font-display)',
             fontSize: 20,
             fontWeight: 700,
-            cursor: isPending ? 'not-allowed' : 'pointer',
-            opacity: isPending ? 0.6 : 1,
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            opacity: isSubmitting ? 0.6 : 1,
             boxShadow: '0 3px 0 #5f7d50, 0 6px 14px rgba(95, 125, 80, 0.25)',
             transition: 'transform 0.15s ease, box-shadow 0.15s ease',
             marginTop: 6,
           }}
         >
-          {isPending ? '가입 처리 중...' : '가입하기'}
+          {isSubmitting ? '가입 처리 중...' : isKakaoSignup ? '가입하고 시작하기' : '가입하기'}
         </button>
 
         <p
@@ -643,24 +806,48 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
             paddingTop: 4,
           }}
         >
-          이미 계정이 있으신가요?{' '}
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#5f7d50',
-              fontFamily: 'var(--font-display)',
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              textUnderlineOffset: 3,
-            }}
-          >
-            로그인
-          </button>
+          {isKakaoSignup ? (
+            <button
+              type="button"
+              onClick={onKakaoSignupCancel}
+              disabled={isSubmitting}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#5f7d50',
+                fontFamily: 'var(--font-display)',
+                fontSize: 16,
+                fontWeight: 700,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.6 : 1,
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              다음에 할게요
+            </button>
+          ) : (
+            <>
+              이미 계정이 있으신가요?{' '}
+              <button
+                type="button"
+                onClick={onSwitchToLogin}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#5f7d50',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                }}
+              >
+                로그인
+              </button>
+            </>
+          )}
         </p>
       </form>
 
@@ -669,6 +856,19 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
           isPending={isPending}
           onCancel={handleRestoreCancel}
           onConfirm={handleRestoreConfirm}
+        />
+      )}
+      {kakaoRestoreRequest && (
+        <KakaoRestoreConfirmDialog
+          password={kakaoRestorePassword}
+          passwordError={kakaoRestorePasswordError}
+          isPending={isKakaoPending}
+          onCancel={handleKakaoRestoreCancel}
+          onConfirm={handleKakaoRestoreConfirm}
+          onPasswordChange={value => {
+            setKakaoRestorePassword(value)
+            setKakaoRestorePasswordError('')
+          }}
         />
       )}
       {successDialog && (
@@ -799,5 +999,72 @@ function RestoreConfirmDialog({
         </div>
       </div>
     </div>
+  )
+}
+
+function KakaoRestoreConfirmDialog({
+  password,
+  passwordError,
+  isPending,
+  onCancel,
+  onConfirm,
+  onPasswordChange,
+}: {
+  password: string
+  passwordError: string
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  onPasswordChange: (value: string) => void
+}) {
+  return (
+    <FeedbackDialog
+      variant="info"
+      title="계정 복구"
+      message={(
+        <>
+          <p style={{ margin: 0 }}>
+            기존에 가입한 이력이 있습니다. 복구를 진행할까요?
+          </p>
+          <div style={{ marginTop: 16, textAlign: 'left' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 6,
+                fontSize: 14,
+                fontWeight: 700,
+                color: '#6b5638',
+              }}
+            >
+              기존 계정 비밀번호 <span style={{ color: '#a37548', fontWeight: 400 }}>(필요 시)</span>
+            </label>
+            <input
+              type="password"
+              value={password}
+              disabled={isPending}
+              onChange={event => onPasswordChange(event.target.value)}
+              autoComplete="current-password"
+              placeholder="비밀번호가 있던 계정이면 입력하세요"
+              style={{
+                ...inputStyle,
+                fontSize: 16,
+                opacity: isPending ? 0.6 : 1,
+                cursor: isPending ? 'not-allowed' : 'text',
+              }}
+            />
+            {passwordError && (
+              <p style={{ margin: '6px 0 0', fontSize: 13, color: '#8c3a1f' }}>
+                {passwordError}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+      cancelLabel="아니오"
+      confirmLabel={isPending ? '복구 중...' : '예'}
+      isPending={isPending}
+      onClose={onCancel}
+      onConfirm={onConfirm}
+    />
   )
 }
