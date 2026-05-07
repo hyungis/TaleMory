@@ -183,6 +183,20 @@ export interface UseStoryCreationFlowInit {
   storyId?: number | null
   /** 서버 DRAFT 에서 복원한 step1 필드. */
   step1?: StoryProject['step1']
+  /**
+   * BE 진실 기반 lock 복원 메타.
+   *
+   * 크롬 종료로 sessionStorage 가 비워진 뒤 "이어서 작성하기" 로 다시 진입했을 때,
+   * 클라이언트에는 이전 진행 상태가 사라져 있지만 BE 의 Story.stylePresetId / Scene 존재
+   * 같은 진실은 그대로 남아있다. 이 진실을 init 으로 주입해 useState 초기값에 반영함으로써
+   * sessionStorage 가 비어있어도 락이 유지된다.
+   */
+  /** Step 5 PATCH /style 이 한 번이라도 성공한 상태 (Story.stylePresetId !== null). */
+  stylePresetLocked?: boolean
+  /** Step 7 → 8 confirmStoryboard 가 한 번이라도 성공한 상태 (Scene row 존재). */
+  confirmedReadOnly?: boolean
+  /** Step 6 에 연결된 보이스 프로필 id (현재는 단순 노출, voice rehydrate 후속 작업 대비). */
+  voiceProfileId?: number | null
 }
 
 /**
@@ -232,15 +246,23 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
   const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<number | null>(
     restored?.finalIllustrationJobId ?? null,
   )
+  // 락 초기값 우선순위:
+  //  1) BE 진실 (init.stylePresetLocked / init.confirmedReadOnly)
+  //     — "이어서 작성하기" 진입 시 GET /api/stories/draft 응답으로부터 derive 된 값.
+  //       크롬 종료 → sessionStorage 비움 시나리오에서 락 유지의 핵심 신호.
+  //  2) sessionStorage snapshot (같은 탭 새로고침 시)
+  //  3) false (신규 진입)
+  // OR 결합으로 한쪽이라도 true 면 잠긴 것으로 간주 — 단방향 잠금 정책과 일치.
   const [storyboardReadOnlyLocked, setStoryboardReadOnlyLocked] = useState<boolean>(
-    restored?.storyboardReadOnlyLocked ?? false,
+    (init?.stylePresetLocked ?? false) || (restored?.storyboardReadOnlyLocked ?? false),
   )
   /**
    * Step 7 → 8 confirm 한번이라도 성공한 후 step 6/7 의 입력/녹음/저장 모두 막는 잠금 플래그.
    * sessionStorage 로 영속 — 새로고침 후 재진입해도 잠금 유지.
+   * 추가로 `init.confirmedReadOnly` (BE Scene 존재 여부) 도 반영 — 크롬 종료 후에도 락 유지.
    */
   const [confirmedReadOnlyLocked, setConfirmedReadOnlyLocked] = useState<boolean>(
-    restored?.confirmedReadOnlyLocked ?? false,
+    (init?.confirmedReadOnly ?? false) || (restored?.confirmedReadOnlyLocked ?? false),
   )
   /**
    * 마지막으로 본문 발행에 사용된 SUMMARY 잡 id. PromptStep 에서 confirm 시 비교 → 재발행 skip 판단.

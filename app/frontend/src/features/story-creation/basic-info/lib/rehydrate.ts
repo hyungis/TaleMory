@@ -3,6 +3,32 @@ import type { MainCharacterPayload, StoryDraftResponse } from '../api/types'
 import { apiGenderToStoryChild, difficultyToLevel } from './mappers'
 
 /**
+ * 서버 DRAFT 의 진행 메타로부터 useStoryCreationFlow 가 lock state 를 복원하는 데
+ * 필요한 플래그/값만 추려낸다.
+ *
+ * 크롬 종료로 sessionStorage 가 비워진 뒤 "이어서 작성하기" 로 다시 진입했을 때,
+ * BE 진실 (Story.stylePresetId / Scene 존재) 을 기반으로 Step 5/6/7 의 readOnly 락이
+ * 유지되도록 하는 것이 목적이다.
+ *
+ *  - `stylePresetLocked`     : `stylePresetId !== null` → Step 5 잠금 (스타일 변경 불가)
+ *  - `confirmedReadOnly`     : `sceneConfirmed === true` → Step 6/7 잠금 (이미 confirm 됨)
+ *  - `voiceProfileId`        : Step 6 재진입 시 voice rehydrate 판단용 원본 값 (옵션)
+ */
+export interface RehydratedProgress {
+  stylePresetLocked: boolean
+  confirmedReadOnly: boolean
+  voiceProfileId: number | null
+}
+
+export function rehydrateProgress(draft: StoryDraftResponse): RehydratedProgress {
+  return {
+    stylePresetLocked: draft.stylePresetId !== null,
+    confirmedReadOnly: draft.sceneConfirmed === true,
+    voiceProfileId: draft.voiceProfileId,
+  }
+}
+
+/**
  * 서버 DRAFT 페이로드를 `StoryProject['step1']` 모양으로 되돌린다.
  * "이어서 작성하기" 선택 시 `useStoryCreationFlow` 의 초기 state 로 주입된다.
  *

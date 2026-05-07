@@ -37,6 +37,8 @@ class StoryController(
     ): ResponseEntity<ApiResponse<StoryDraftResponse?>> {
         val draft = storyService.findLatestDraft(user.userId)
         val body = draft?.let {
+            // 크롬 종료로 sessionStorage 가 비워져도 BE 진실 (stylePresetId / Scene 존재) 기반으로
+            // FE 가 Step 5/6/7 의 readOnly 락을 복원할 수 있도록 진행 메타를 함께 내린다.
             StoryDraftResponse(
                 storyId = it.id,
                 title = it.title,
@@ -47,6 +49,9 @@ class StoryController(
                 travelStartDate = it.travelStartDate,
                 travelEndDate = it.travelEndDate,
                 createdAt = it.createdAt,
+                stylePresetId = it.stylePresetId,
+                voiceProfileId = it.voiceProfileId,
+                sceneConfirmed = storyService.existsScenes(it.id),
             )
         }
         return ResponseEntity.ok(ApiResponse(data = body))

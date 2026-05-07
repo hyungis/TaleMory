@@ -21,8 +21,9 @@ export {
   getDraftStory,
   deleteStory,
   rehydrateStep1,
+  rehydrateProgress,
 } from './basic-info'
-export type { StoryDraftResponse } from './basic-info'
+export type { StoryDraftResponse, RehydratedProgress } from './basic-info'
 export { PhotoManagerStep } from './photo-manager'
 export { PromptStep } from './storyboard-prompt'
 export {

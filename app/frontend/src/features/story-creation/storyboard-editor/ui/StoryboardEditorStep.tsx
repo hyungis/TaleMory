@@ -676,7 +676,7 @@ export function StoryboardEditorStep({
                 <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                 <div>
                   <strong>최종삽화가 생성되어 이 단계는 읽기 전용이에요.</strong>
-                  <span style={{ fontSize: 16, opacity: 0.9 }}>
+                  <span style={{ fontSize: 18, opacity: 0.9 }}>
                     본문/이미지를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.
                   </span>
                 </div>
@@ -834,8 +834,8 @@ export function StoryboardEditorStep({
               <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
                 <span className="cr-tape" aria-hidden="true" />
                 <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
-                <p className="text-[#2d5a27] font-bold mb-2">동화 본문을 만들고 있어요</p>
-                <p className="text-[#8b7a52]">
+                <p className="text-[#2d5a27] font-bold mb-2 text-2xl">동화 본문을 만들고 있어요</p>
+                <p className="text-[#8b7a52] text-lg">
                   AI 가 페이지별 글을 쓰고 있어요.
                 </p>
               </div>

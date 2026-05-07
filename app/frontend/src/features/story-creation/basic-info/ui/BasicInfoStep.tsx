@@ -207,7 +207,7 @@ export function BasicInfoStep({
                     ? '최종삽화가 생성되어 이 단계는 읽기 전용이에요.'
                     : '본문이 생성되어 이 단계는 읽기 전용이에요.'}
                 </strong>
-                <span style={{ fontSize: 16, opacity: 0.9 }}>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
                   {readOnly && !isSummaryLocked
                     ? '가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.'
                     : '가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 본문/이미지를 이어 작업할 수 있어요.'}

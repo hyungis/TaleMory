@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ImageOff,
   Loader2,
+  Lock,
   Mic,
   Pause,
   Play,
@@ -488,30 +489,19 @@ export function HighlightOutroStep({
           <StepTitleBlock
             stepNumber={7}
             title="특별한 문장을 직접 읽어주세요"
-            subtitle={
-              readOnly
-                ? '동화책이 만들어진 뒤라 더 이상 강조 문장이나 마무리 멘트를 바꿀 수 없어요.'
-                : '각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요'
-            }
+            subtitle="각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요"
           />
 
+          {/* 락 안내 — step 1/2/3/5/6 와 동일한 노란 cr-banner 톤. */}
           {readOnly && (
-            <div
-              role="status"
-              style={{
-                marginBottom: 18,
-                padding: '14px 18px',
-                borderRadius: 14,
-                background: '#fbf2da',
-                border: '2px dashed var(--cr-caramel)',
-                color: 'var(--cr-caramel-deep)',
-                fontFamily: 'var(--cr-font-gaegu)',
-                fontWeight: 700,
-                fontSize: 17,
-              }}
-            >
-              이 단계는 잠겨 있어요. 동화책이 이미 만들어지고 있어 강조 녹음·마무리 멘트는
-              변경할 수 없어요.
+            <div className="cr-banner" role="status">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <div>
+                <strong>강조 녹음·마무리 멘트가 확정되어 이 단계는 읽기 전용이에요.</strong>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
+                  강조 문장이나 마무리 멘트를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 최종 작업을 이어갈 수 있어요.
+                </span>
+              </div>
             </div>
           )}
 
@@ -540,7 +530,7 @@ export function HighlightOutroStep({
                 <Star className="w-4 h-4" />
               </span>
               <div>
-                <div className="cr-step-label" style={{ marginBottom: 2 }}>
+                <div className="cr-step-label" style={{ marginBottom: 2, fontSize: 20 }}>
                   강조 문장
                 </div>
                 <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 24, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
@@ -594,7 +584,7 @@ export function HighlightOutroStep({
 
                     {/* Right: Sentences */}
                     <div style={{ flex: 1, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
-                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
+                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
                         문장을 탭하여 강조 선택 후 녹음하세요
                       </p>
 
@@ -606,13 +596,14 @@ export function HighlightOutroStep({
                         return (
                           <div
                             key={sIdx}
-                            onClick={() => { if (!isRecording) toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en) }}
+                            onClick={() => { if (!isRecording && !readOnly) toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en) }}
                             style={{
                               borderRadius: 14,
                               border: `2px solid ${isSelected ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'}`,
                               background: isSelected ? '#dceec8' : 'var(--cr-paper)',
                               padding: '12px 14px',
-                              cursor: isRecording ? 'default' : 'pointer',
+                              // readOnly = step7 confirm 후 잠긴 상태 → 막힘 커서로 시각 피드백.
+                              cursor: readOnly ? 'not-allowed' : isRecording ? 'default' : 'pointer',
                               transition: 'all 0.2s ease',
                             }}
                           >

@@ -29,6 +29,17 @@ data class StoryResult(
     val travelEndDate: LocalDate?,
     val publishedAt: LocalDateTime?,
     val createdAt: LocalDateTime,
+    /**
+     * Step 5 에서 PATCH /style 로 확정된 삽화 스타일 프리셋 id.
+     * non-null 이면 FINAL_ILLUSTRATION 잡이 이미 발행돼 스타일 변경 불가.
+     * "이어서 작성하기" 진입 시 FE 가 Step 5 락 복원에 사용.
+     */
+    val stylePresetId: Long?,
+    /**
+     * Step 6 에서 연결된 보이스 프로필 id.
+     * "이어서 작성하기" 진입 시 FE 가 voice 재선택 흐름 판단에 사용.
+     */
+    val voiceProfileId: Long?,
 ) {
     companion object {
         fun from(story: Story): StoryResult = StoryResult(
@@ -46,6 +57,8 @@ data class StoryResult(
             travelEndDate = story.travelEndDate,
             publishedAt = story.publishedAt,
             createdAt = story.createdAt,
+            stylePresetId = story.stylePresetId,
+            voiceProfileId = story.voiceProfileId,
         )
     }
 }
