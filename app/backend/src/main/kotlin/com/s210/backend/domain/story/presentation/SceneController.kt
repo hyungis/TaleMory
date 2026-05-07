@@ -251,7 +251,7 @@ class SceneController(
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<StyleModifyResponse>> {
         val jobId = storyService.modifyStyle(user.userId, storyId.value, request.stylePresetId)
-        return ResponseEntity.ok(ApiResponse(data = StyleModifyResponse(finalIllustrationJobId = jobId)))
+        return ResponseEntity.ok(ApiResponse(data = StyleModifyResponse(finalIllustrationJobId = JobId(jobId))))
     }
 
     // 보이스 프로필 선택 — Step 5 보이스 클론 commit/load 직후 FE 가 호출.
@@ -262,7 +262,7 @@ class SceneController(
         @RequestBody request: VoiceProfileModifyRequest,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<Unit>> {
-        storyService.modifyVoiceProfile(user.userId, storyId.value, request.voiceProfileId)
+        storyService.modifyVoiceProfile(user.userId, storyId.value, request.voiceProfileId.value)
         return ResponseEntity.ok(ApiResponse(data = null))
     }
 

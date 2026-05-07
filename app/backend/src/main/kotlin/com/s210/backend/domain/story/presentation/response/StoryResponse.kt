@@ -1,6 +1,7 @@
 package com.s210.backend.domain.story.presentation.response
 
 import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.PersonId
 import com.s210.backend.common.codec.SceneId
 import com.s210.backend.common.codec.SentenceId
 import com.s210.backend.common.codec.StoryId
@@ -186,7 +187,7 @@ data class MainCharacterView(
 )
 
 data class CharacterAnchorView(
-    val characterId: Long?,
+    val characterId: PersonId?,
     val x: Double?,
     val y: Double?,
     val scale: Double?

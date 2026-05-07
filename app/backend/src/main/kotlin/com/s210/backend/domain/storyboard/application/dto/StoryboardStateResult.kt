@@ -1,5 +1,6 @@
 package com.s210.backend.domain.storyboard.application.dto
 
+import com.s210.backend.common.codec.JobId
 import com.s210.backend.domain.job.model.JobStatus
 import java.time.LocalDateTime
 
@@ -55,13 +56,13 @@ data class StoryboardStateResult(
 )
 
 data class ActiveStoryJob(
-    val jobId: Long,
+    val jobId: JobId,
     val status: JobStatus,
     val createdAt: LocalDateTime,
 )
 
 data class ActiveTranslationJob(
-    val jobId: Long,
+    val jobId: JobId,
     val pageNumber: Int?,
     val status: JobStatus,
     val createdAt: LocalDateTime,
@@ -72,7 +73,7 @@ data class ActiveTranslationJob(
  * status 만 보면 충분 — 페이지별 진행률은 storyboard_pages query 가 별도로 들고 있다.
  */
 data class LatestImageJob(
-    val jobId: Long,
+    val jobId: JobId,
     val status: JobStatus,
 )
 
@@ -81,7 +82,7 @@ data class LatestImageJob(
  * pageNumber 는 BE 가 jobs.requestPayload 의 `item.pageNumber` 를 파싱해 내려주는 값.
  */
 data class ActiveImageRegenerateJob(
-    val jobId: Long,
+    val jobId: JobId,
     val pageNumber: Int,
     val status: JobStatus,
 )

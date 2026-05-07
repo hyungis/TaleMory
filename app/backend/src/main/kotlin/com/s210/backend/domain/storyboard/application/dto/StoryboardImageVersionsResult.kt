@@ -1,5 +1,8 @@
 package com.s210.backend.domain.storyboard.application.dto
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.StoryId
+
 /**
  * `GET /api/stories/{storyId}/storyboard/pages/{pageNumber}/image/versions` 응답.
  *
@@ -13,7 +16,7 @@ package com.s210.backend.domain.storyboard.application.dto
  *   v1 부터 vN 까지 모두 들어 있다.
  */
 data class StoryboardImageVersionsResult(
-    val storyId: Long,
+    val storyId: StoryId,
     val pageNumber: Int,
     val current: Int?,
     val versions: List<StoryboardImageVersionEntry>,
@@ -33,5 +36,5 @@ data class StoryboardImageVersionEntry(
     val url: String,
     val prompt: String?,
     val createdAt: String?,
-    val jobId: Long?,
+    val jobId: JobId?,
 )

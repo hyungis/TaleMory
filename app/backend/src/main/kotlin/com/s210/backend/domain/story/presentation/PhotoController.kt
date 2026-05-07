@@ -136,7 +136,7 @@ class PhotoController(
         @PathVariable storyId: StoryId,
         @RequestBody @Valid request: PhotoOrderRequest,
     ): ResponseEntity<ApiResponse<List<PhotoItemResponse>>> {
-        val reordered = photoService.reorderPhotos(user.userId, storyId.value, request.photoIds)
+        val reordered = photoService.reorderPhotos(user.userId, storyId.value, request.photoIds.map { it.value })
         val body = reordered.map { PhotoItemResponse.from(it, photoService.presignGetUrl(it.s3Key)) }
         return ResponseEntity.ok(ApiResponse(data = body))
     }
