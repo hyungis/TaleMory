@@ -29,7 +29,6 @@ interface AuthModalFrameProps {
   title: string
   subtitle?: string
   icon?: AuthMode
-  tabs?: ReactNode
   children: ReactNode
   onClose: () => void
 }
@@ -46,7 +45,6 @@ function AuthModalFrame({
   title,
   subtitle,
   icon = 'register',
-  tabs,
   children,
   onClose,
 }: AuthModalFrameProps) {
@@ -164,7 +162,7 @@ function AuthModalFrame({
           </button>
         </div>
 
-        {tabs ?? <div style={{ borderBottom: '2px dashed rgba(163, 117, 72, 0.35)', margin: '0 8px' }} />}
+        <div style={{ borderBottom: '2px dashed rgba(163, 117, 72, 0.35)', margin: '0 8px' }} />
 
         <div className="overflow-y-auto" style={{ maxHeight: '65vh' }}>
           {children}
@@ -220,53 +218,11 @@ export function AuthModal({
 
   const isKakaoSignupMode = mode === 'register' && kakaoSignupDraft !== null && kakaoSignupDraft !== undefined
 
-  const tabs = (
-    <div className="flex" style={{ borderBottom: '2px dashed rgba(163, 117, 72, 0.35)', margin: '0 8px' }}>
-      {(['login', 'register'] as const).map(tab => (
-        <button
-          key={tab}
-          type="button"
-          onClick={() => handleSwitchMode(tab)}
-          style={{
-            flex: 1,
-            padding: '10px 0',
-            fontFamily: 'var(--font-display)',
-            fontSize: 18,
-            fontWeight: 700,
-            color: mode === tab ? '#5f7d50' : '#8a7558',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            position: 'relative',
-            transition: 'color 0.2s',
-          }}
-        >
-          {tab === 'login' ? '로그인' : '회원가입'}
-          {mode === tab && (
-            <span
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                left: '20%',
-                right: '20%',
-                bottom: -2,
-                height: 3,
-                background: '#7a9968',
-                borderRadius: 2,
-              }}
-            />
-          )}
-        </button>
-      ))}
-    </div>
-  )
-
   return (
     <AuthModalFrame
       title={mode === 'login' ? '로그인' : '회원가입'}
       subtitle={isKakaoSignupMode ? '카카오 인증 완료' : undefined}
       icon={mode}
-      tabs={tabs}
       onClose={handleClose}
     >
       {mode === 'login' ? (
