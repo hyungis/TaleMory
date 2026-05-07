@@ -1,16 +1,17 @@
 import { get, post, put, deleteRequest } from '../../../../shared/api/client'
+import type { SceneId, SentenceId, StoryId } from '../../../../shared/types'
 
 // ── Types ──
 
 export interface SceneDto {
-  id: number
+  id: SceneId
   pageNumber: number
   illustrationUrl: string | null
   sentences: SentenceDto[]
 }
 
 export interface SentenceDto {
-  id: number
+  id: SentenceId
   sentenceOrder: number
   englishText: string
   koreanText: string | null
@@ -33,7 +34,7 @@ export interface PresignedUrlDto {
 
 export interface HighlightVoiceDto {
   highlightVoiceId: number
-  sentenceId: number
+  sentenceId: SentenceId
   audioUrl: string
 }
 
@@ -47,7 +48,7 @@ export interface OutroDto {
 // ── Scenes ──
 
 /** GET /api/stories/{storyId}/scenes */
-export async function getScenes(storyId: number): Promise<SceneDto[]> {
+export async function getScenes(storyId: StoryId): Promise<SceneDto[]> {
   return get<SceneDto[]>(`/stories/${storyId}/scenes`)
 }
 
@@ -63,7 +64,7 @@ export interface ScenesPrepareDto {
  * Step 7 진입 시점에 `storyboard_pages.sentences` JSON 으로부터 scene/scene_sentence 를
  * 평탄화 INSERT (멱등). 이후 getScenes 로 정규화된 데이터 조회.
  */
-export async function prepareScenes(storyId: number): Promise<ScenesPrepareDto> {
+export async function prepareScenes(storyId: StoryId): Promise<ScenesPrepareDto> {
   return post<ScenesPrepareDto>(`/stories/${storyId}/scenes/prepare`, {})
 }
 
@@ -77,13 +78,13 @@ export interface HighlightVoicesExistsDto {
  * Step 4 본문 재생성 경고 모달 트리거용 — 활성 강조 녹음이 하나라도 있으면 true.
  */
 export async function checkHighlightVoicesExists(
-  storyId: number,
+  storyId: StoryId,
 ): Promise<HighlightVoicesExistsDto> {
   return get<HighlightVoicesExistsDto>(`/stories/${storyId}/highlight-voices/exists`)
 }
 
 /** GET /api/stories/{storyId}/outro */
-export async function getOutro(storyId: number): Promise<OutroDto | null> {
+export async function getOutro(storyId: StoryId): Promise<OutroDto | null> {
   return get<OutroDto | null>(`/stories/${storyId}/outro`)
 }
 
@@ -91,8 +92,8 @@ export async function getOutro(storyId: number): Promise<OutroDto | null> {
 
 /** Phase 1: presigned PUT URL 발급 */
 export async function presignHighlightVoice(
-  storyId: number,
-  sentenceId: number,
+  storyId: StoryId,
+  sentenceId: SentenceId,
   contentType: string = 'audio/webm',
 ): Promise<PresignedUrlDto> {
   return post<PresignedUrlDto>(
@@ -113,8 +114,8 @@ export async function uploadAudioToS3(uploadUrl: string, audioBlob: Blob): Promi
 
 /** Phase 3: DB commit */
 export async function commitHighlightVoice(
-  storyId: number,
-  sentenceId: number,
+  storyId: StoryId,
+  sentenceId: SentenceId,
   s3Key: string,
 ): Promise<HighlightVoiceDto> {
   return post<HighlightVoiceDto>(
@@ -125,8 +126,8 @@ export async function commitHighlightVoice(
 
 /** DELETE 강조 녹음 삭제 */
 export async function deleteHighlightVoice(
-  storyId: number,
-  sentenceId: number,
+  storyId: StoryId,
+  sentenceId: SentenceId,
 ): Promise<void> {
   return deleteRequest<void>(`/stories/${storyId}/sentences/${sentenceId}/highlight-voice`)
 }
@@ -135,7 +136,7 @@ export async function deleteHighlightVoice(
 
 /** PUT /api/stories/{storyId}/outro — 마무리 멘트 텍스트 저장 */
 export async function saveOutro(
-  storyId: number,
+  storyId: StoryId,
   outroText: string,
   signature?: string | null,
 ): Promise<OutroDto> {
@@ -144,7 +145,7 @@ export async function saveOutro(
 
 /** Phase 1: 아웃트로 음성 presigned URL */
 export async function presignOutroVoice(
-  storyId: number,
+  storyId: StoryId,
   contentType: string = 'audio/webm',
 ): Promise<PresignedUrlDto> {
   return post<PresignedUrlDto>(
@@ -155,7 +156,7 @@ export async function presignOutroVoice(
 
 /** Phase 3: 아웃트로 음성 DB commit */
 export async function commitOutroVoice(
-  storyId: number,
+  storyId: StoryId,
   s3Key: string,
 ): Promise<OutroDto> {
   return post<OutroDto>(`/stories/${storyId}/outro/voice`, { s3Key })

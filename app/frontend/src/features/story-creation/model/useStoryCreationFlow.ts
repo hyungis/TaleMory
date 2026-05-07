@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { JobId, StoryId, VoiceProfileId } from '../../../shared/types'
 import type { StoryChild, StoryProject, StoryboardPageDraft } from './types'
 import { MAX_STEP } from './types'
 import { DEFAULT_STORYBOARD_PAGES } from '../storyboard-editor/lib/defaults'
@@ -30,7 +31,7 @@ const PROGRESS_TTL_MS = 24 * 60 * 60 * 1000
 interface CreationProgressSnapshot {
   savedAt: number
   currentStep: number
-  storyId: number | null
+  storyId: StoryId | null
   step3Story: string
   /**
    * 본문(STORY) 발행이 한 번이라도 트리거된 후의 SUMMARY 잡 id.
@@ -38,11 +39,11 @@ interface CreationProgressSnapshot {
    * BE 의 storyboard-pages 쿼리로 페이지 존재 여부를 확인해 락을 derive 하는 1차 방어선과
    * 더불어, STORY 잡이 진행 중이라 페이지가 아직 INSERT 되지 않은 짧은 구간을 메우는 2차 안전장치.
    */
-  lastConfirmedSummaryJobId: string | null
+  lastConfirmedSummaryJobId: JobId | null
   /** Step 8 TTS 잡 id — 새로고침 시 폴링 재개용. */
-  storyGenerationJobId: number | null
+  storyGenerationJobId: JobId | null
   /** Step 8 최종 삽화 잡 id — 새로고침 시 폴링 재개용. */
-  finalIllustrationJobId: number | null
+  finalIllustrationJobId: JobId | null
   storyboardReadOnlyLocked: boolean
   /**
    * Step 7 → 8 confirmStoryboard 가 한번이라도 성공했는지 (= TTS 잡 발행 + scenes 확정).
@@ -72,18 +73,17 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
     return {
       savedAt: parsed.savedAt,
       currentStep: Math.max(1, Math.min(MAX_STEP, parsed.currentStep)),
-      storyId: typeof parsed.storyId === 'number' ? parsed.storyId : null,
+      // BE 가 Sqids 토큰으로 발급하므로 모든 외부 ID 는 string. 옛 raw-id snapshot (number) 도 string 으로 강제.
+      storyId: parsed.storyId != null ? String(parsed.storyId) : null,
       step3Story: parsed.step3Story,
       lastConfirmedSummaryJobId:
-        typeof parsed.lastConfirmedSummaryJobId === 'string'
-          ? parsed.lastConfirmedSummaryJobId
-          : null,
+        parsed.lastConfirmedSummaryJobId != null ? String(parsed.lastConfirmedSummaryJobId) : null,
       storyGenerationJobId:
-        typeof parsed.storyGenerationJobId === 'number' ? parsed.storyGenerationJobId : null,
+        parsed.storyGenerationJobId != null ? String(parsed.storyGenerationJobId) : null,
       finalIllustrationJobId:
-        typeof parsed.finalIllustrationJobId === 'number' ? parsed.finalIllustrationJobId : null,
+        parsed.finalIllustrationJobId != null ? String(parsed.finalIllustrationJobId) : null,
       storyboardReadOnlyLocked:
-        parsed.storyboardReadOnlyLocked === true || typeof parsed.finalIllustrationJobId === 'number',
+        parsed.storyboardReadOnlyLocked === true || parsed.finalIllustrationJobId != null,
       confirmedReadOnlyLocked: parsed.confirmedReadOnlyLocked === true,
     }
   } catch {
@@ -120,19 +120,19 @@ export interface UseStoryCreationFlowResult {
   currentStep: number
   projectData: StoryProject
   /** POST /api/stories 성공 후 set. step 2~8 에서 리소스 FK 로 사용. */
-  storyId: number | null
+  storyId: StoryId | null
   /**
    * Step 3 의 "스토리 확정하고 다음" 클릭으로 발행된 본문(STORY) 잡 id.
    * Step 4 가 마운트되면 이 jobId 로 폴링하여 PENDING/RUNNING 동안 "본문 생성 중" 화면을 표시.
    * 잡 종결 또는 step 1 로 돌아가면 setter 로 null 처리.
    */
-  storyGenerationJobId: number | null
+  storyGenerationJobId: JobId | null
   /**
    * Step 5 PATCH /style 응답으로 받은 FINAL_ILLUSTRATION 잡 id (멱등 가드 시 기존 id 재사용).
    * Step 8 FinalPreviewStep 에서 TTS jobId 와 함께 동시 폴링.
    * 메모리 한정 — 새로고침 시 sessionStorage 미영속.
    */
-  finalIllustrationJobId: number | null
+  finalIllustrationJobId: JobId | null
   storyboardReadOnlyLocked: boolean
   /**
    * step 7 → 8 confirm 한 번이라도 성공한 후 step 6/7 의 입력/녹음을 잠그기 위한 플래그.
@@ -145,14 +145,14 @@ export interface UseStoryCreationFlowResult {
    * 같으면 본문 재발행을 skip (불필요한 OpenAI 호출 + 페이지 통째 교체 방지).
    * 다르면 줄거리가 새로 만들어진 것이므로 본문 재발행 트리거.
    */
-  lastConfirmedSummaryJobId: string | null
+  lastConfirmedSummaryJobId: JobId | null
   setCurrentStep: (step: number) => void
   handleNext: () => void
   handlePrev: () => void
-  setStoryId: (id: number | null) => void
-  setStoryGenerationJobId: (jobId: number | null) => void
-  setFinalIllustrationJobId: (jobId: number | null) => void
-  setLastConfirmedSummaryJobId: (jobId: string | null) => void
+  setStoryId: (id: StoryId | null) => void
+  setStoryGenerationJobId: (jobId: JobId | null) => void
+  setFinalIllustrationJobId: (jobId: JobId | null) => void
+  setLastConfirmedSummaryJobId: (jobId: JobId | null) => void
   /** Step 7 → 8 confirm 성공 시 호출 — 한 번 호출되면 다시 false 로 되돌릴 수 없음 (단방향). */
   markConfirmedReadOnly: () => void
   updateStep1: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
@@ -180,7 +180,7 @@ export interface UseStoryCreationFlowResult {
  */
 export interface UseStoryCreationFlowInit {
   /** 서버 DRAFT storyId. 첫 BasicInfoStep 진입부터 PATCH 모드로 동작. */
-  storyId?: number | null
+  storyId?: StoryId | null
   /** 서버 DRAFT 에서 복원한 step1 필드. */
   step1?: StoryProject['step1']
   /**
@@ -196,7 +196,7 @@ export interface UseStoryCreationFlowInit {
   /** Step 7 → 8 confirmStoryboard 가 한 번이라도 성공한 상태 (Scene row 존재). */
   confirmedReadOnly?: boolean
   /** Step 6 에 연결된 보이스 프로필 id (현재는 단순 노출, voice rehydrate 후속 작업 대비). */
-  voiceProfileId?: number | null
+  voiceProfileId?: VoiceProfileId | null
 }
 
 /**
@@ -232,7 +232,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     return base
   })
   /** BasicInfoStep 에서 POST /api/stories 성공 후 set 되며 step 2~8 의 FK 로 사용. */
-  const [storyId, setStoryIdState] = useState<number | null>(
+  const [storyId, setStoryIdState] = useState<StoryId | null>(
     init?.storyId ?? restored?.storyId ?? null,
   )
   /**
@@ -240,10 +240,10 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
    * 새로고침으로 sessionStorage 에서 복원되는 다른 state 와 달리 메모리 한정 — 새로고침 후에는
    * Step 4 가 storyboard-pages 캐시 기반으로 동작 (pages.length > 0 이면 정상 표시).
    */
-  const [storyGenerationJobId, setStoryGenerationJobIdState] = useState<number | null>(
+  const [storyGenerationJobId, setStoryGenerationJobIdState] = useState<JobId | null>(
     restored?.storyGenerationJobId ?? null,
   )
-  const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<number | null>(
+  const [finalIllustrationJobId, setFinalIllustrationJobIdState] = useState<JobId | null>(
     restored?.finalIllustrationJobId ?? null,
   )
   // 락 초기값 우선순위:
@@ -275,7 +275,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
    *  - 락의 1차 방어선은 BE 의 page 존재 여부 (PromptStep 의 useStoryboardPagesQuery) 이며,
    *    이 값은 본문 발행 직후 ~ page INSERT 직전 의 짧은 구간을 메우는 2차 안전장치.
    */
-  const [lastConfirmedSummaryJobId, setLastConfirmedSummaryJobIdState] = useState<string | null>(
+  const [lastConfirmedSummaryJobId, setLastConfirmedSummaryJobIdState] = useState<JobId | null>(
     restored?.lastConfirmedSummaryJobId ?? null,
   )
 
@@ -387,20 +387,20 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
     }))
   }, [])
 
-  const setStoryId = useCallback((id: number | null) => {
+  const setStoryId = useCallback((id: StoryId | null) => {
     setStoryIdState(id)
   }, [])
 
-  const setStoryGenerationJobId = useCallback((jobId: number | null) => {
+  const setStoryGenerationJobId = useCallback((jobId: JobId | null) => {
     setStoryGenerationJobIdState(jobId)
   }, [])
 
-  const setFinalIllustrationJobId = useCallback((jobId: number | null) => {
+  const setFinalIllustrationJobId = useCallback((jobId: JobId | null) => {
     setFinalIllustrationJobIdState(jobId)
     if (jobId !== null) setStoryboardReadOnlyLocked(true)
   }, [])
 
-  const setLastConfirmedSummaryJobId = useCallback((jobId: string | null) => {
+  const setLastConfirmedSummaryJobId = useCallback((jobId: JobId | null) => {
     setLastConfirmedSummaryJobIdState(jobId)
   }, [])
 

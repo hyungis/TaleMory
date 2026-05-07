@@ -1,5 +1,7 @@
 package com.s210.backend.domain.storyboard.application.dto
 
+import com.s210.backend.common.codec.StoryId
+
 /**
  * `GET /api/stories/{storyId}/storyboard/regen-status` 응답.
  *
@@ -11,7 +13,7 @@ package com.s210.backend.domain.storyboard.application.dto
  * - `remaining`: limit - used. 음수가 되지 않도록 0 으로 clamp.
  */
 data class StoryboardRegenStatusResult(
-    val storyId: Long,
+    val storyId: StoryId,
     val used: Int,
     val limit: Int,
     val remaining: Int,

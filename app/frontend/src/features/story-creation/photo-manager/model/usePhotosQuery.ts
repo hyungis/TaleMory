@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import { getPhotos } from '../api/getPhotos'
 import type { PhotoItemResponse } from '../api/types'
 
@@ -11,10 +12,10 @@ import type { PhotoItemResponse } from '../api/types'
  *
  * `imageUrl` 이 1시간짜리 presigned URL 이라 `staleTime` 55분으로 잡아 만료 직전 refetch 유도.
  */
-export function usePhotosQuery(storyId: number | null): UseQueryResult<PhotoItemResponse[], ApiError> {
+export function usePhotosQuery(storyId: StoryId | null): UseQueryResult<PhotoItemResponse[], ApiError> {
   return useQuery<PhotoItemResponse[], ApiError>({
     queryKey: ['photos', storyId],
-    queryFn: () => getPhotos(storyId as number),
+    queryFn: () => getPhotos(storyId as StoryId),
     enabled: storyId !== null,
     staleTime: 55 * 60 * 1000,
   })

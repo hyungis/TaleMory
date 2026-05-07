@@ -7,6 +7,6 @@
 import type { VoiceProfile } from '../../../../entities/voice-profile'
 
 export const mockVoiceProfiles: VoiceProfile[] = [
-  { id: 301, userId: 1, title: '엄마 목소리', audioUrl: '/mock/mom.wav', ttsVoiceUrl: '/mock/mom-tts.wav' },
-  { id: 302, userId: 1, title: '아빠 목소리', audioUrl: '/mock/dad.wav' },
+  { id: '301', userId: 1, title: '엄마 목소리', audioUrl: '/mock/mom.wav', ttsVoiceUrl: '/mock/mom-tts.wav' },
+  { id: '302', userId: 1, title: '아빠 목소리', audioUrl: '/mock/dad.wav' },
 ]

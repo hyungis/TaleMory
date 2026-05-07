@@ -15,6 +15,7 @@ import {
   MessageSquareHeart,
 } from 'lucide-react'
 import type { StoryProject } from '../../model/types'
+import type { JobId, SentenceId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -36,17 +37,17 @@ import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 import '../../styles/creation-paper.css'
 
 interface HighlightOutroStepProps {
-  storyId?: number | null
+  storyId?: StoryId | null
   projectData: StoryProject
   onBack: () => void
   onNext: () => void
-  setStoryGenerationJobId: (jobId: number | null) => void
+  setStoryGenerationJobId: (jobId: JobId | null) => void
   /**
    * confirm 응답에 finalIllustrationJobId 가 들어 있으면 store 동기화.
    * Step 5 에서 이미 set 된 값과 보통 같지만, 새로고침 등으로 store 가 비어있을
    * 때를 위한 보정 경로.
    */
-  setFinalIllustrationJobId: (jobId: number | null) => void
+  setFinalIllustrationJobId: (jobId: JobId | null) => void
   /**
    * 단방향 잠금 트리거 — confirmStoryboard 성공 직후 호출하여 step 6/7 을 영구 잠금.
    * 사용자가 step 8 에서 뒤로 돌아와 입력을 바꾸는 걸 차단.
@@ -60,7 +61,7 @@ interface HighlightOutroStepProps {
 }
 
 interface HighlightSentence {
-  sentenceId: number
+  sentenceId: SentenceId
   pageIndex: number
   sentenceIndex: number
   text: string
@@ -148,7 +149,7 @@ export function HighlightOutroStep({
     pageIndex: number
     pageLabel: number
     imageUrl: string | null
-    sentences: Array<{ sentenceId: number | null; en: string; ko: string | null }>
+    sentences: Array<{ sentenceId: string | null; en: string; ko: string | null }>
   }> = scenes
     ? scenes.flatMap((scene, idx) =>
         scene.pageNumber === 0
@@ -262,7 +263,7 @@ export function HighlightOutroStep({
     })
 
   const uploadHighlightVoice = useCallback(
-    async (pageIndex: number, sentenceIndex: number, sentenceId: number, blob: Blob) => {
+    async (pageIndex: number, sentenceIndex: number, sentenceId: SentenceId, blob: Blob) => {
       if (!storyId) return
       setHighlights(prev =>
         prev.map(h =>
@@ -380,7 +381,7 @@ export function HighlightOutroStep({
   }, [])
 
   const toggleHighlight = useCallback(
-    (pageIndex: number, sentenceIndex: number, sentenceId: number | null, text: string) => {
+    (pageIndex: number, sentenceIndex: number, sentenceId: SentenceId | null, text: string) => {
       if (readOnly) return
       setHighlights(prev => {
         const exists = prev.find(h => h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex)
@@ -392,7 +393,7 @@ export function HighlightOutroStep({
         }
         return [
           ...prev,
-          { pageIndex, sentenceIndex, sentenceId: sentenceId ?? 0, text, audioUrl: null, uploading: false },
+          { pageIndex, sentenceIndex, sentenceId: sentenceId ?? ('' as SentenceId), text, audioUrl: null, uploading: false },
         ]
       })
     },

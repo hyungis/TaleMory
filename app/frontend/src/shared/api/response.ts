@@ -1,3 +1,4 @@
+import type { JobId } from '../types'
 import type { ApiRequestConfig } from './request'
 
 /**
@@ -29,7 +30,7 @@ export type JobStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLE
 
 /** 비동기 생성 작업 시작 시 내려오는 최소 응답 구조다. */
 export interface JobStart {
-  jobId: number
+  jobId: JobId
   jobType: string
   status: JobStatus
 }

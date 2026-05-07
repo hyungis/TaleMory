@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Minus, Plus, User } from 'lucide-react'
 import type { StoryChild, Gender } from '../../model/types'
+import type { PersonId } from '../../../../shared/types'
 import type { PersonResponse } from '../api/types'
 
 const GENDERS: readonly Gender[] = ['남자', '여자'] as const
@@ -38,7 +39,7 @@ export function ChildrenList({
 }: ChildrenListProps) {
   /** 현재 입력 중인 children 에 이미 포함된 personId 는 드롭다운 옵션에서 제외. */
   const loadedPersonIds = new Set(
-    children.map(c => c.personId).filter((v): v is number => typeof v === 'number'),
+    children.map(c => c.personId).filter((v): v is PersonId => typeof v === 'string'),
   )
   const selectablePersons = (existingPersons ?? []).filter(p => !loadedPersonIds.has(p.id))
 

@@ -5,6 +5,7 @@
  *   BE 실제 응답은 대문자(`CHILD`/`MALE`) 이므로 이 레이어에서 별도 타입을 유지한다.
  *   (entity 수정은 다른 도메인 영향 우려로 이번 MR 범위 밖)
  */
+import type { PersonId, StoryId, VoiceProfileId } from '../../../../shared/types'
 
 export type PersonGender = 'MALE' | 'FEMALE' | 'OTHER'
 export type PersonRoleApi = 'CHILD' | 'COMPANION'
@@ -12,7 +13,7 @@ export type DifficultyApi = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 
 /** GET /api/persons 응답 원소 / POST/PATCH 성공 시 반환 페이로드. */
 export interface PersonResponse {
-  id: number
+  id: PersonId
   name: string
   /** 만 나이 (V10 마이그레이션으로 birth_date 가 age 로 교체됨). */
   age: number
@@ -48,7 +49,7 @@ export interface CreateStoryRequest {
 
 /** POST /api/stories 응답 — storyId 만 필요. */
 export interface StoryCreateResponse {
-  storyId: number
+  storyId: StoryId
 }
 
 /**
@@ -65,7 +66,7 @@ export interface StoryCreateResponse {
  * BE 가 진행 상태를 함께 내려준다.
  */
 export interface StoryDraftResponse {
-  storyId: number
+  storyId: StoryId
   title: string | null
   difficulty: DifficultyApi
   companionsJson: string
@@ -76,7 +77,7 @@ export interface StoryDraftResponse {
   /** ISO-8601 (LocalDateTime). 예: "2026-04-22T14:05:03". */
   createdAt: string
   stylePresetId: number | null
-  voiceProfileId: number | null
+  voiceProfileId: VoiceProfileId | null
   sceneConfirmed: boolean
 }
 
@@ -85,7 +86,7 @@ export interface StoryDraftResponse {
  * BE POST 시 FE 가 직렬화해 보낸 구조 그대로.
  */
 export interface MainCharacterPayload {
-  personId?: number
+  personId?: PersonId
   name: string
   age: number
   gender: PersonGender

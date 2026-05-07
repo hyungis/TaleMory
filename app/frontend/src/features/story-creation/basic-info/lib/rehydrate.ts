@@ -1,5 +1,6 @@
 import type { StoryChild, StoryProject } from '../../model/types'
 import type { MainCharacterPayload, StoryDraftResponse } from '../api/types'
+import type { VoiceProfileId } from '../../../../shared/types'
 import { apiGenderToStoryChild, difficultyToLevel } from './mappers'
 
 /**
@@ -17,7 +18,7 @@ import { apiGenderToStoryChild, difficultyToLevel } from './mappers'
 export interface RehydratedProgress {
   stylePresetLocked: boolean
   confirmedReadOnly: boolean
-  voiceProfileId: number | null
+  voiceProfileId: VoiceProfileId | null
 }
 
 export function rehydrateProgress(draft: StoryDraftResponse): RehydratedProgress {
@@ -61,7 +62,7 @@ function parseChildren(json: string): StoryChild[] {
         name: p.name,
         gender: apiGenderToStoryChild(p.gender),
         age: String(p.age),
-        personId: p.personId,
+        personId: typeof p.personId === 'string' ? p.personId : undefined,
       }))
     return children.length > 0 ? children : fallbackChildren()
   } catch {

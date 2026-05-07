@@ -3,6 +3,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { getGenerationJob } from '../api/getGenerationJob'
 import type { GenerationJobResponse, JobStatusApi } from '../api/types'
+import type { JobId } from '../../../../shared/types'
 
 // BE 가 cache-aside (Redis 10분 TTL) 로 polling read 부담을 흡수하므로 3s 가 아닌 5s 로 완화.
 // 진행 중 잡은 캐시 hit 위주라 사용자가 체감하는 응답성은 거의 동일.
@@ -29,7 +30,7 @@ export type GenerationJobQueryResult = UseQueryResult<GenerationJobResponse, Api
  * - `jobId` 세팅 시점부터 5분 경과하면 `isTimedOut=true` 로 폴링 종료 (AI 크래시 방어).
  * - `staleTime: 0` — 폴링 중에는 매번 fresh 하게 받는다.
  */
-export function useGenerationJobQuery(jobId: number | null): GenerationJobQueryResult {
+export function useGenerationJobQuery(jobId: JobId | null): GenerationJobQueryResult {
   const [isTimedOut, setIsTimedOut] = useState(false)
 
   // jobId 가 새로 설정되면 타임아웃 타이머 시작 / 초기화.
@@ -42,7 +43,7 @@ export function useGenerationJobQuery(jobId: number | null): GenerationJobQueryR
 
   const query = useQuery<GenerationJobResponse, ApiError>({
     queryKey: ['generation-job', jobId],
-    queryFn: () => getGenerationJob(jobId as number),
+    queryFn: () => getGenerationJob(jobId as JobId),
     enabled: jobId !== null && !isTimedOut,
     refetchInterval: q => {
       if (isTimedOut) return false

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, Loader2, Lock, PartyPopper } from 'lucide-react'
 import type { StoryProject, StylePresetCode } from '../../model/types'
+import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -11,7 +12,7 @@ import '../../styles/creation-paper.css'
 
 interface StyleSelectorStepProps {
   data: StoryProject['step5']
-  storyId: number | null
+  storyId: StoryId | null
   onStyleChange: (style: StylePresetCode) => void
   onBack: () => void
   onNext: () => void
@@ -19,13 +20,13 @@ interface StyleSelectorStepProps {
    * Step 5 PATCH /style 응답으로 받은 FINAL_ILLUSTRATION 잡 id 를 store 에 저장한다.
    * Step 8 FinalPreviewStep 가 이 jobId 로 폴링.
    */
-  setFinalIllustrationJobId: (jobId: number) => void
+  setFinalIllustrationJobId: (jobId: JobId) => void
   /**
    * 이미 PATCH /style 이 완료되어 백그라운드 FINAL_ILLUSTRATION 잡이 시작됐는지 판단용.
    * non-null 이면 사용자가 step 6→7 진행 중 step 5 로 다시 돌아온 케이스 → 카드 선택 잠금
    * (스타일 변경하면 잡 중복 발행 + 옛 잡이 orphan 되는 자원 낭비 방지).
    */
-  finalIllustrationJobId: number | null
+  finalIllustrationJobId: JobId | null
   /**
    * 크롬 종료로 sessionStorage 가 비워진 뒤 "이어서 작성하기" 로 재진입한 경우,
    * `finalIllustrationJobId` 는 in-memory 라 null 로 시작한다. 이 때 BE 의 진실

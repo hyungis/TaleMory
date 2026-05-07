@@ -37,6 +37,7 @@ import {
 import { useGenerateStoryboardStoryPost } from '../../storyboard-prompt/model/useGenerateStoryboardStoryPost'
 import { deleteStory } from '../../basic-info'
 import { ROUTES } from '../../../../shared/constants'
+import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -71,12 +72,12 @@ function getStoryboardImageFailureMessage(errorMessage?: string | null): string 
 }
 
 interface StoryboardEditorStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   /**
    * Step 3 의 "스토리 확정하고 다음" 클릭으로 막 발행된 본문(STORY) 잡 id.
    * null 이면 storyboard-pages 캐시 기반 fallback 동작 (새로고침 후 재진입 등).
    */
-  storyGenerationJobId: number | null
+  storyGenerationJobId: JobId | null
   /** STORY 잡이 종결(SUCCESS/FAILED/CANCELLED/타임아웃) 시 호출 — 부모 flow 의 jobId 를 null 로. */
   onStoryJobFinished: () => void
   readOnly?: boolean
@@ -125,7 +126,7 @@ export function StoryboardEditorStep({
   // ────────────────────────────────────────────────────────────
   const stateQuery = useStoryboardStateQuery(storyId)
   const stateData = stateQuery.data
-  const [currentTranslationJobId, setCurrentTranslationJobId] = useState<number | null>(null)
+  const [currentTranslationJobId, setCurrentTranslationJobId] = useState<JobId | null>(null)
   const [currentTranslationPageNumber, setCurrentTranslationPageNumber] = useState<number | null>(null)
 
   // sessionStorage 의 jobId 가 우선 — 없으면 BE state 의 active job id 로 회복.
@@ -267,7 +268,7 @@ export function StoryboardEditorStep({
   // 사용자가 메시지를 읽을 시간을 주되 "지금 이동" 버튼으로 즉시 이동 가능.
   // ────────────────────────────────────────────────────────────
   const limitDeleteMut = useMutation({
-    mutationFn: async (id: number) => deleteStory(id),
+    mutationFn: async (id: StoryId) => deleteStory(id),
   })
 
   const goHomeAfterLimit = useCallback(() => {
@@ -313,7 +314,7 @@ export function StoryboardEditorStep({
 
   // 진행 중인 이미지 잡 (배치 생성 / 재생성 중 하나).
   // 잡이 SUCCESS/FAILED/타임아웃 도달하면 null 로 되돌려 UI 풀림.
-  const [currentImageJobId, setCurrentImageJobId] = useState<number | null>(null)
+  const [currentImageJobId, setCurrentImageJobId] = useState<JobId | null>(null)
   const imageJobQuery = useGenerationJobQuery(currentImageJobId)
 
   /**
@@ -328,7 +329,7 @@ export function StoryboardEditorStep({
    * ref 로 두는 이유: recovery effect 가 dep 변화로 재실행될 때 즉시 보이는 동기 source 가 필요.
    * useState 면 setState → re-render → effect 재실행 사이에 한 tick 뒤늦게 반영되어 race 가 또 생김.
    */
-  const finishedImageJobIdsRef = useRef<Set<number>>(new Set())
+  const finishedImageJobIdsRef = useRef<Set<JobId>>(new Set())
 
   // ────────────────────────────────────────────────────────────
   // IMAGE 배치 잡 새로고침 복구 — sessionStorage 가 비어 있는 엣지케이스(탭 닫고 재진입,
@@ -1025,7 +1026,7 @@ export function StoryboardEditorStep({
  * BE 가 versioned S3 key (`v{N}.png`) 로 저장하므로 cache-buster query 불필요 — page.imageUrl 그대로 사용.
  */
 function PageCard(props: {
-  storyId: number | null
+  storyId: StoryId | null
   page: StoryboardPageItem
   pageIndex: number
   pageCount: number
@@ -1442,7 +1443,7 @@ function VersionPicker({
   disabled,
   onChange,
 }: {
-  storyId: number | null
+  storyId: StoryId | null
   pageNumber: number
   disabled: boolean
   onChange: (version: number) => void

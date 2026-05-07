@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { AlertCircle, Lock } from 'lucide-react'
 import { ApiError } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import type { StoryChild, StoryProject } from '../../model/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -25,7 +26,7 @@ import '../../styles/creation-paper.css'
 
 interface BasicInfoStepProps {
   data: StoryProject['step1']
-  storyId: number | null
+  storyId: StoryId | null
   onUpdate: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   onChildUpdate: (index: number, patch: Partial<StoryChild>) => void
   onChildAdd: () => void
@@ -33,7 +34,7 @@ interface BasicInfoStepProps {
   onChildRemove: (index: number) => void
   readOnly?: boolean
   onBack: () => void
-  onStoryCreated: (storyId: number) => void
+  onStoryCreated: (storyId: StoryId) => void
   onStaleStoryIdReset?: () => void
 }
 

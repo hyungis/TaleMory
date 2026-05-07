@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isApiError } from '../../../../shared/api'
+import type { VoiceProfileId } from '../../../../shared/types'
 import { createVoiceProfile } from '../api/createVoiceProfile'
 import { getVoiceProfiles } from '../api/getVoiceProfiles'
 
@@ -78,7 +79,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
   const [isSaving, setIsSaving] = useState(false)
   const [voiceTitle, setVoiceTitle] = useState('')
   const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 목소리가 없습니다.')
-  const [savedProfileId, setSavedProfileId] = useState<number | null>(null)
+  const [savedProfileId, setSavedProfileId] = useState<VoiceProfileId | null>(null)
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)

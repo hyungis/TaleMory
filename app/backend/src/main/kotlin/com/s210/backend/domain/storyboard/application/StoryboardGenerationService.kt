@@ -1,5 +1,6 @@
 package com.s210.backend.domain.storyboard.application
 
+import com.s210.backend.common.codec.JobId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.mq.RabbitMQConfig
@@ -182,7 +183,7 @@ class StoryboardGenerationService(
         )
 
         return StartGenerationResult(
-            jobId = job.id,
+            jobId = JobId(job.id),
             jobType = JobType.STORYBOARD_STORY.name,
             status = JobStatus.PENDING.name,
         )
@@ -299,7 +300,7 @@ class StoryboardGenerationService(
         // Step 4 IMAGE 배치 잡 복구 — 가장 최근 STORYBOARD_IMAGE 잡 1건 (status 무관).
         val latestImageJob = jobRepository.findFirstByStoryIdAndJobTypeOrderByIdDesc(
             storyId, JobType.STORYBOARD_IMAGE,
-        )?.let { LatestImageJob(jobId = it.id, status = it.status) }
+        )?.let { LatestImageJob(jobId = JobId(it.id), status = it.status) }
 
         val activeTranslationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
             storyId,
@@ -320,7 +321,7 @@ class StoryboardGenerationService(
             val pageNumber = parseRegeneratePageNumber(job.requestPayload)
             if (pageNumber == null) null
             else ActiveImageRegenerateJob(
-                jobId = job.id,
+                jobId = JobId(job.id),
                 pageNumber = pageNumber,
                 status = job.status,
             )
@@ -328,14 +329,14 @@ class StoryboardGenerationService(
 
         return StoryboardStateResult(
             activeJob = activeJob?.let {
-                ActiveStoryJob(jobId = it.id, status = it.status, createdAt = it.createdAt)
+                ActiveStoryJob(jobId = JobId(it.id), status = it.status, createdAt = it.createdAt)
             },
             latestFinalStatus = latestFinalStatus,
             failedCountSinceLastSuccess = failedCount,
             latestImageJob = latestImageJob,
             activeTranslationJob = activeTranslationJob?.let {
                 ActiveTranslationJob(
-                    jobId = it.id,
+                    jobId = JobId(it.id),
                     pageNumber = parseTranslationPageNumber(it.requestPayload),
                     status = it.status,
                     createdAt = it.createdAt,

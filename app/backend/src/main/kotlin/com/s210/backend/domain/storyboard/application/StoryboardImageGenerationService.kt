@@ -1,5 +1,6 @@
 package com.s210.backend.domain.storyboard.application
 
+import com.s210.backend.common.codec.JobId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.mq.RabbitMQConfig
@@ -184,7 +185,7 @@ class StoryboardImageGenerationService(
         )
 
         return StartGenerationResult(
-            jobId = job.id,
+            jobId = JobId(job.id),
             jobType = JobType.STORYBOARD_IMAGE.name,
             status = JobStatus.PENDING.name,
         )
@@ -298,7 +299,7 @@ class StoryboardImageGenerationService(
         )
 
         return StartGenerationResult(
-            jobId = job.id,
+            jobId = JobId(job.id),
             jobType = JobType.STORYBOARD_IMAGE_REGENERATE.name,
             status = JobStatus.PENDING.name,
         )

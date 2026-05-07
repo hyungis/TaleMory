@@ -219,6 +219,9 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY` | no | `ai.cpu.story.sentences.translate` |
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.completed` |
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.failed` |
+| `ENV_DEV_APP_APP_ID_CODEC_ALPHABET` | ✅ | Sqids ID 토큰 인코더 alphabet — DB BIGINT id 를 외부 노출용 토큰으로 인코딩하는 비밀 키. 26+ 자 무작위 alphanumeric. 노출되면 토큰 추측 가능 |
+| `ENV_DEV_APP_APP_ID_CODEC_MIN_LENGTH` | — | `8` (Sqids 토큰 최소 길이) |
+| `ENV_DEV_APP_APP_ID_CODEC_LOG` | — | `false` (운영). encode/decode 변환 INFO 로깅 — 운영 환경에선 토큰 평문 로그 노출 방지 차원에서 false 유지 |
 
 > Vite는 `VITE_` prefix만 클라이언트 번들에 주입. 새 frontend 변수 이름은 반드시 `VITE_`로 시작해야 함.
 
@@ -272,6 +275,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `AI_REPLICATE_IMAGE_API_CONCURRENCY` | `5` | `5` |
 | `RABBITMQ_PREFETCH_COUNT` | `10` | `10` |
 | `AWS_S3_ENV_PREFIX` | `dev` | `prod` |
+| `APP_ID_CODEC_ALPHABET` | (dev 전용 alphabet) | (master 전용 alphabet, **절대 dev와 공유 금지**) |
 
 Kakao Developers console registration guide:
 - Redirect URI: `http://talemory.site:3001/auth/kakao/callback`, `https://talemory.site:3443/auth/kakao/callback`, `https://talemory.site/auth/kakao/callback`

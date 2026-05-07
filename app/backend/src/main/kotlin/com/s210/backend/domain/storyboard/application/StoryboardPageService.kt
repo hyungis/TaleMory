@@ -1,5 +1,7 @@
 package com.s210.backend.domain.storyboard.application
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.mq.RabbitMQConfig
@@ -56,13 +58,13 @@ class StoryboardPageService(
         ownedStory(userId, storyId)
 
         val storyBoard = storyBoardRepository.findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
-            ?: return StoryboardPagesResult(storyId = storyId, pages = emptyList())
+            ?: return StoryboardPagesResult(storyId = StoryId(storyId), pages = emptyList())
 
         val pages = storyboardPageRepository
             .findAllByStoryBoardIdOrderByPageNumberAsc(storyBoard.id)
             .map { StoryboardPageResult.from(it, objectMapper) }
 
-        return StoryboardPagesResult(storyId = storyId, pages = pages)
+        return StoryboardPagesResult(storyId = StoryId(storyId), pages = pages)
     }
 
     /**
@@ -97,7 +99,7 @@ class StoryboardPageService(
         val translationJob = publishTranslationJob(storyId, pageNumber, trimmed)
         // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
 
-        return StoryboardPageResult.from(page, objectMapper, translationJobId = translationJob.id)
+        return StoryboardPageResult.from(page, objectMapper, translationJobId = JobId(translationJob.id))
     }
 
     private fun publishTranslationJob(

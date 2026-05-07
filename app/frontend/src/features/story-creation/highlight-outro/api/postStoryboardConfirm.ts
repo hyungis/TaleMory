@@ -1,7 +1,8 @@
 import { post } from '../../../../shared/api'
+import type { JobId, StoryId } from '../../../../shared/types'
 
 export interface ConfirmStoryboardResponse {
-  jobId: number
+  jobId: JobId
   jobType: 'TTS'
   status: 'PENDING' | 'SUCCESS' | 'FAILED'
   sceneCount: number
@@ -14,7 +15,7 @@ export interface ConfirmStoryboardResponse {
    * FE 가 폴링해서 실패 화면을 보여줄 수 있도록 의도된 동작.
    * Step 8 가 TTS jobId 와 함께 동시 폴링한다.
    */
-  finalIllustrationJobId: number | null
+  finalIllustrationJobId: JobId | null
 }
 
 /**
@@ -23,6 +24,6 @@ export interface ConfirmStoryboardResponse {
  * 202 Accepted + `{ jobId, jobType, status, sceneCount, sentenceCount, cacheHits, cacheMisses }` 반환.
  * 호출부는 응답 jobId 를 가지고 polling 한다.
  */
-export function postStoryboardConfirm(storyId: number): Promise<ConfirmStoryboardResponse> {
+export function postStoryboardConfirm(storyId: StoryId): Promise<ConfirmStoryboardResponse> {
   return post<ConfirmStoryboardResponse>(`/stories/${storyId}/storyboard/confirm`)
 }

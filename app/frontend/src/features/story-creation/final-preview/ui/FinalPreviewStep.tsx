@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 import {
   BookOpen,
   ChevronLeft,
@@ -32,9 +33,9 @@ import { isApiError } from '../../../../shared/api'
 import '../../styles/creation-paper.css'
 
 interface FinalPreviewStepProps {
-  storyId: number | null
-  storyGenerationJobId: number | null
-  finalIllustrationJobId: number | null
+  storyId: StoryId | null
+  storyGenerationJobId: JobId | null
+  finalIllustrationJobId: JobId | null
   onBack: () => void
   onNext: () => void
 }
@@ -55,10 +56,10 @@ export function FinalPreviewStep({
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
-  const [activeRegen, setActiveRegen] = useState<{ sceneId: number; jobId: number } | null>(null)
+  const [activeRegen, setActiveRegen] = useState<{ sceneId: SceneId; jobId: JobId } | null>(null)
   const regenJobQuery = useGenerationJobQuery(activeRegen?.jobId ?? null)
   const [regenStatus, setRegenStatus] = useState<IllustrationRegenStatusResponse | null>(null)
-  const [openPromptScene, setOpenPromptScene] = useState<number | null>(null)
+  const [openPromptScene, setOpenPromptScene] = useState<SceneId | null>(null)
   const [promptText, setPromptText] = useState('')
   const [regenError, setRegenError] = useState<string | null>(null)
   const [versionInfo, setVersionInfo] = useState<IllustrationVersionsResponse | null>(null)
@@ -186,7 +187,7 @@ export function FinalPreviewStep({
     setRegenError(null)
   }, [totalPages])
 
-  const handleOpenPrompt = useCallback((sceneId: number) => {
+  const handleOpenPrompt = useCallback((sceneId: SceneId) => {
     setRegenError(null)
     setOpenPromptScene(sceneId)
     setPromptText('')

@@ -1,10 +1,11 @@
 import type { Person } from '../../../../entities/person'
+import type { PersonId } from '../../../../shared/types'
 
 export type PersonGenderApi = 'MALE' | 'FEMALE' | 'OTHER'
 export type PersonRoleApi = 'CHILD' | 'COMPANION'
 
 export interface PersonResponse {
-  id: number
+  id: PersonId
   name: string
   age: number
   gender: PersonGenderApi

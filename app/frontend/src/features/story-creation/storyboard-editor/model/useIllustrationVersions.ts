@@ -8,10 +8,11 @@ import {
   postIllustrationRollback,
   type IllustrationRollbackResponse,
 } from '../api/postIllustrationRollback'
+import type { SceneId, StoryId } from '../../../../shared/types'
 
 interface RegenerateParams {
-  storyId: number
-  sceneId: number
+  storyId: StoryId
+  sceneId: SceneId
   userPrompt: string
 }
 
@@ -27,8 +28,8 @@ export function useIllustrationRegenerate(): UseMutationResult<
 }
 
 interface RollbackParams {
-  storyId: number
-  sceneId: number
+  storyId: StoryId
+  sceneId: SceneId
 }
 
 export function useIllustrationRollback(): UseMutationResult<

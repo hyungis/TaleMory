@@ -1,5 +1,6 @@
 import { get } from '../../../../shared/api'
 import type { StoryboardImageVersionsResponse } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * `GET /api/stories/{storyId}/storyboard/pages/{pageNumber}/image/versions` —
@@ -9,7 +10,7 @@ import type { StoryboardImageVersionsResponse } from './types'
  * FE 는 versions.length === 0 이면 picker 자체를 숨긴다.
  */
 export function getStoryboardPageImageVersions(
-  storyId: number,
+  storyId: StoryId,
   pageNumber: number,
 ): Promise<StoryboardImageVersionsResponse> {
   return get<StoryboardImageVersionsResponse>(

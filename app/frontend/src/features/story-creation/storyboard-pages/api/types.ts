@@ -6,6 +6,7 @@
  *  - GET  /api/stories/{storyId}/storyboard/pages          → StoryboardPagesResult
  *  - PATCH /api/stories/{storyId}/storyboard/pages/{n}     → StoryboardPageResult
  */
+import type { JobId, StoryId } from '../../../../shared/types'
 
 /** 페이지 1장 — listener 가 채우기 전이거나 image 미생성 상태에선 일부 필드가 null 일 수 있다. */
 export interface StoryboardPageItem {
@@ -15,7 +16,7 @@ export interface StoryboardPageItem {
   sceneSummary: string | null
   imagePrompt: string | null
   imageUrl: string | null
-  translationJobId?: number | null
+  translationJobId?: JobId | null
   sentences: StoryboardSentenceItem[] | null
 }
 
@@ -28,7 +29,7 @@ export interface StoryboardSentenceItem {
 
 /** GET 응답. 줄거리 미생성 상태에서도 200 으로 빈 배열 응답. */
 export interface StoryboardPagesResponse {
-  storyId: number
+  storyId: StoryId
   pages: StoryboardPageItem[]
 }
 
@@ -52,7 +53,7 @@ export interface RegenerateStoryboardImageRequest {
  * (storyboard-prompt 에 동일 정의 있음 — 의도적 복제 유지하여 sub-feature 경계 보존.)
  */
 export interface JobStartResponse {
-  jobId: number
+  jobId: JobId
   jobType: string
   status: string
 }
@@ -71,7 +72,7 @@ export interface StoryboardImageVersionEntry {
   url: string
   prompt: string | null
   createdAt: string | null
-  jobId: number | null
+  jobId: JobId | null
 }
 
 /**
@@ -81,7 +82,7 @@ export interface StoryboardImageVersionEntry {
  * FE 는 picker 자체를 숨긴다.
  */
 export interface StoryboardImageVersionsResponse {
-  storyId: number
+  storyId: StoryId
   pageNumber: number
   current: number | null
   versions: StoryboardImageVersionEntry[]
@@ -103,7 +104,7 @@ export interface SelectStoryboardImageVersionRequest {
  * `remaining = limit - used` 의 음수 clamp 까지 BE 가 처리해서 내려옴.
  */
 export interface StoryboardRegenStatusResponse {
-  storyId: number
+  storyId: StoryId
   used: number
   limit: number
   remaining: number

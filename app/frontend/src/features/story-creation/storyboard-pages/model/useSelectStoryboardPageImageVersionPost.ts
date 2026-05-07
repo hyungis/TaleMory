@@ -2,6 +2,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { postSelectStoryboardPageImageVersion } from '../api/postSelectStoryboardPageImageVersion'
 import type { StoryboardPageItem } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 interface SelectVariables {
   pageNumber: number
@@ -18,7 +19,7 @@ interface SelectVariables {
  *    invalidate 해 picker 의 현재 표시를 갱신.
  */
 export function useSelectStoryboardPageImageVersionPost(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseMutationResult<StoryboardPageItem, ApiError, SelectVariables> {
   return useMutation<StoryboardPageItem, ApiError, SelectVariables>({
     mutationFn: ({ pageNumber, version }) => {

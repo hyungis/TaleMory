@@ -23,6 +23,7 @@ import {
   useWithdraw,
 } from '../../features/mypage'
 import { isApiError } from '../../shared/api'
+import type { VoiceProfileId } from '../../shared/types'
 import { ROUTES } from '../../shared/constants'
 import { FeedbackDialog } from '../../shared/ui'
 import './styles/mypage.css'
@@ -33,7 +34,7 @@ type Modal =
   | { kind: 'withdraw' }
   | { kind: 'person-edit'; person?: Person }
   | { kind: 'person-delete'; person: Person }
-  | { kind: 'voice-delete'; voiceProfileId: number; title: string }
+  | { kind: 'voice-delete'; voiceProfileId: VoiceProfileId; title: string }
   | { kind: 'logout-success' }
   | { kind: 'logout-error' }
 
@@ -164,7 +165,7 @@ export function MypagePage() {
     setModal({ kind: 'person-delete', person })
   }
 
-  const handleVoiceDelete = async (voiceProfileId: number, title: string) => {
+  const handleVoiceDelete = async (voiceProfileId: VoiceProfileId, title: string) => {
     setModal({ kind: 'voice-delete', voiceProfileId, title })
   }
 

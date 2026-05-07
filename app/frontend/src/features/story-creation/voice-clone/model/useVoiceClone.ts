@@ -16,6 +16,7 @@ import {
   attachVoiceProfileToStory,
   type VoiceProfileDto,
 } from '../api/voiceProfileApi'
+import type { StoryId, VoiceProfileId } from '../../../../shared/types'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -53,7 +54,7 @@ export interface UseVoiceCloneResult {
   ttsAudioUrl: string | null
 
   // 서버 저장 결과
-  savedProfileId: number | null
+  savedProfileId: VoiceProfileId | null
   isSaving: boolean
 
   // story attach 상태
@@ -146,7 +147,7 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
  *  - 제목 + 저장 (VOICE_STORAGE_KEY + TTS_STORAGE_KEY)
  *  - 저장 상태 요약 문구
  */
-export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
+export function useVoiceClone(storyId?: StoryId | null): UseVoiceCloneResult {
   const [status, setStatus] = useState<RecordingStatus>('idle')
   const [statusLabel, setStatusLabel] = useState('대기 중')
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
@@ -159,7 +160,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
   const [isTtsLoading, setIsTtsLoading] = useState(false)
   const [voiceTitle, setVoiceTitle] = useState('')
   const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 음성이 없습니다.')
-  const [savedProfileId, setSavedProfileId] = useState<number | null>(null)
+  const [savedProfileId, setSavedProfileId] = useState<VoiceProfileId | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [attachStatus, setAttachStatus] = useState<AttachStatus>('idle')
   const [attachError, setAttachError] = useState<string | null>(null)
@@ -237,7 +238,7 @@ export function useVoiceClone(storyId?: number | null): UseVoiceCloneResult {
    *  - 최종 실패 시 attachStatus='failed' + attachError 세팅 → UI 가 다음 버튼을
    *    막고 inline 에러 + 재시도 버튼 노출 (10분 녹음 후 confirm 에서 발견되는 것 방지).
    */
-  const tryAttachToStory = useCallback(async (voiceProfileId: number) => {
+  const tryAttachToStory = useCallback(async (voiceProfileId: VoiceProfileId) => {
     if (!storyId) return
     setAttachStatus('attaching')
     setAttachError(null)
