@@ -2,6 +2,7 @@ import { useCallback, useState, type CSSProperties, type FormEvent } from 'react
 import { AlertCircle } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import { formatPhoneNumber } from '../../../../shared/lib'
+import { FeedbackDialog } from '../../../../shared/ui'
 import { getLoginIdAvailability, getNicknameAvailability } from '../../api/getAuthAvailability'
 import {
   buildRequiredTermAgreements,
@@ -55,6 +56,12 @@ interface FieldValidationFeedback {
 
 interface FieldValidationOptions {
   showRequired?: boolean
+}
+
+interface SignupSuccessDialogState {
+  title: string
+  message: string
+  idHint: string
 }
 
 const INITIAL_AVAILABILITY_CHECK: AvailabilityCheckState = {
@@ -274,6 +281,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
   const [nicknameCheck, setNicknameCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
   const [restoreRequest, setRestoreRequest] = useState<SignupRequest | null>(null)
+  const [successDialog, setSuccessDialog] = useState<SignupSuccessDialogState | null>(null)
   const { isPending, signup } = useSignupPost()
 
   const handleChange = useCallback(
@@ -363,8 +371,11 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         await signup(request)
 
         setError('')
-        alert(`"${values.nickname.trim()}" 님 가입이 완료됐어요! 로그인 해주세요.`)
-        onSignedUp(values.id.trim())
+        setSuccessDialog({
+          title: '가입 완료',
+          message: `"${values.nickname.trim()}" 님 가입이 완료됐어요! 로그인 해주세요.`,
+          idHint: values.id.trim(),
+        })
       } catch (submitError) {
         if (isApiError(submitError) && submitError.code === WITHDRAWN_ACCOUNT_CODE && request !== null) {
           setError('')
@@ -375,7 +386,7 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
         setError(getSignupErrorMessage(submitError))
       }
     },
-    [isPending, loginIdCheck, nicknameCheck, onSignedUp, signup, values],
+    [isPending, loginIdCheck, nicknameCheck, signup, values],
   )
 
   const handleRestoreCancel = useCallback(() => {
@@ -395,13 +406,16 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
 
       setError('')
       setRestoreRequest(null)
-      alert('계정이 복구됐어요! 로그인 해주세요.')
-      onSignedUp(restoreRequest.loginId)
+      setSuccessDialog({
+        title: '계정 복구 완료',
+        message: '계정이 복구됐어요! 로그인 해주세요.',
+        idHint: restoreRequest.loginId,
+      })
     } catch (restoreError) {
       setRestoreRequest(null)
       setError(getSignupErrorMessage(restoreError))
     }
-  }, [isPending, onSignedUp, restoreRequest, signup])
+  }, [isPending, restoreRequest, signup])
 
   const loginIdMessage = getAvailabilityMessage('아이디', loginIdCheck, values.id)
   const nicknameMessage = getAvailabilityMessage('닉네임', nicknameCheck, values.nickname)
@@ -655,6 +669,18 @@ export function SignupForm({ onSignedUp, onSwitchToLogin }: SignupFormProps) {
           isPending={isPending}
           onCancel={handleRestoreCancel}
           onConfirm={handleRestoreConfirm}
+        />
+      )}
+      {successDialog && (
+        <FeedbackDialog
+          variant="success"
+          title={successDialog.title}
+          message={successDialog.message}
+          onClose={() => {
+            const idHint = successDialog.idHint
+            setSuccessDialog(null)
+            onSignedUp(idHint)
+          }}
         />
       )}
     </>

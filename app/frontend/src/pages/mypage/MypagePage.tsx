@@ -24,6 +24,7 @@ import {
 } from '../../features/mypage'
 import { isApiError } from '../../shared/api'
 import { ROUTES } from '../../shared/constants'
+import { FeedbackDialog } from '../../shared/ui'
 import './styles/mypage.css'
 
 type Modal =
@@ -31,6 +32,10 @@ type Modal =
   | { kind: 'profile-edit' }
   | { kind: 'withdraw' }
   | { kind: 'person-edit'; person?: Person }
+  | { kind: 'person-delete'; person: Person }
+  | { kind: 'voice-delete'; voiceProfileId: number; title: string }
+  | { kind: 'logout-success' }
+  | { kind: 'logout-error' }
 
 export function MypagePage() {
   const navigate = useNavigate()
@@ -42,13 +47,14 @@ export function MypagePage() {
   const authSession = useAuthSession()
   const meQuery = useMeQuery(authSession.isAuthenticated)
   const meUpdate = useMeUpdate()
-  const { isPending: isLoggingOut, logout } = useLogout()
+  const { isPending: isLoggingOut, logout, finishLogout } = useLogout()
   const hasMissingUserError = isMissingUserError(meQuery.error)
+  const [modal, setModal] = useState<Modal>({ kind: 'none' })
 
   const handleLogoutClick = () => {
-    void logout().catch(() => {
-      window.alert('로그아웃에 실패했습니다. 잠시 후 다시 시도해주세요.')
-    })
+    void logout()
+      .then(() => setModal({ kind: 'logout-success' }))
+      .catch(() => setModal({ kind: 'logout-error' }))
   }
 
   useEffect(() => {
@@ -64,7 +70,6 @@ export function MypagePage() {
   const personUpdate = usePersonUpdate(currentUserId)
   const personDelete = usePersonDelete(currentUserId)
 
-  const [modal, setModal] = useState<Modal>({ kind: 'none' })
   const voiceProfilesQuery = useVoiceProfilesQuery(authSession.isAuthenticated)
   const voiceProfileDelete = useVoiceProfileDelete()
   const withdraw = useWithdraw()
@@ -84,9 +89,6 @@ export function MypagePage() {
   )
 
   // 로그아웃 진행 중에는 "로그인 필요" 분기로 들어가지 않고 빈 캔버스를 유지.
-  // useLogout 이 clearAuthSession 직후 isAuthenticated 를 false 로 만들기 때문에
-  // 가드 없이 두면 alert + window.location.assign 사이에 "로그인이 필요한 페이지" 가
-  // 한 프레임 깜빡이며 노출되는 문제 방지.
   if (isLoggingOut) {
     return <div className="mypage-shell" aria-hidden="true" />
   }
@@ -159,13 +161,35 @@ export function MypagePage() {
   }
 
   const handlePersonDelete = async (person: Person) => {
-    if (!window.confirm(`"${person.name}" 주인공 정보를 삭제할까요?`)) return
-    await personDelete.mutateAsync(person.id)
+    setModal({ kind: 'person-delete', person })
   }
 
   const handleVoiceDelete = async (voiceProfileId: number, title: string) => {
-    if (!window.confirm(`"${title}" 목소리를 삭제할까요?`)) return
-    await voiceProfileDelete.mutateAsync(voiceProfileId)
+    setModal({ kind: 'voice-delete', voiceProfileId, title })
+  }
+
+  const handlePersonDeleteConfirm = async () => {
+    if (modal.kind !== 'person-delete') return
+
+    const { person } = modal
+    closeModal()
+    try {
+      await personDelete.mutateAsync(person.id)
+    } catch {
+      // 페이지 상단 공통 에러 영역에서 mutation error를 보여준다.
+    }
+  }
+
+  const handleVoiceDeleteConfirm = async () => {
+    if (modal.kind !== 'voice-delete') return
+
+    const { voiceProfileId } = modal
+    closeModal()
+    try {
+      await voiceProfileDelete.mutateAsync(voiceProfileId)
+    } catch {
+      // 페이지 상단 공통 에러 영역에서 mutation error를 보여준다.
+    }
   }
 
   const handleWithdrawConfirm = async () => {
@@ -286,6 +310,46 @@ export function MypagePage() {
       )}
       {modal.kind === 'person-edit' && (
         <PersonEditModal initial={modal.person} onClose={closeModal} onSave={handlePersonSave} />
+      )}
+      {modal.kind === 'person-delete' && (
+        <FeedbackDialog
+          variant="danger"
+          title="주인공 정보 삭제"
+          message={`"${modal.person.name}" 주인공 정보를 삭제할까요?`}
+          cancelLabel="취소"
+          confirmLabel={personDelete.isPending ? '삭제 중...' : '삭제'}
+          isPending={personDelete.isPending}
+          onClose={closeModal}
+          onConfirm={() => void handlePersonDeleteConfirm()}
+        />
+      )}
+      {modal.kind === 'voice-delete' && (
+        <FeedbackDialog
+          variant="danger"
+          title="목소리 삭제"
+          message={`"${modal.title}" 목소리를 삭제할까요?`}
+          cancelLabel="취소"
+          confirmLabel={voiceProfileDelete.isPending ? '삭제 중...' : '삭제'}
+          isPending={voiceProfileDelete.isPending}
+          onClose={closeModal}
+          onConfirm={() => void handleVoiceDeleteConfirm()}
+        />
+      )}
+      {modal.kind === 'logout-success' && (
+        <FeedbackDialog
+          variant="success"
+          title="로그아웃 완료"
+          message="로그아웃되었습니다."
+          onClose={finishLogout}
+        />
+      )}
+      {modal.kind === 'logout-error' && (
+        <FeedbackDialog
+          variant="error"
+          title="로그아웃 실패"
+          message="로그아웃에 실패했습니다. 잠시 후 다시 시도해주세요."
+          onClose={closeModal}
+        />
       )}
     </>
   )
