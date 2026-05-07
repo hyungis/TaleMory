@@ -155,6 +155,9 @@ AI_REPLICATE_IMAGE_API_CONCURRENCY=5
 
 RABBITMQ_TTS_RESULT_QUEUE=ai.result.tts.queue
 RABBITMQ_TTS_RESULT_BINDING_KEY=ai.result.tts.#
+
+APP_ID_CODEC_MIN_LENGTH=8
+APP_ID_CODEC_LOG=false
 ```
 
 - [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
@@ -174,6 +177,7 @@ RABBITMQ_TTS_RESULT_BINDING_KEY=ai.result.tts.#
 - [x] `ENV_DEV_APP_OPENAI_API_KEY` — OpenAI API 키
 - [x] `ENV_DEV_APP_GEMINI_API_KEY` — Gemini API 키 (storyboard 이미지 생성)
 - [x] `ENV_DEV_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
+- [ ] `ENV_DEV_APP_APP_ID_CODEC_ALPHABET` — Sqids ID 토큰 인코더 alphabet (26+ 자 무작위 alphanumeric)
 
 ## ③ Infra — File Variable
 
@@ -323,6 +327,9 @@ AI_REPLICATE_IMAGE_API_CONCURRENCY=5
 
 RABBITMQ_TTS_RESULT_QUEUE=ai.result.tts.queue
 RABBITMQ_TTS_RESULT_BINDING_KEY=ai.result.tts.#
+
+APP_ID_CODEC_MIN_LENGTH=8
+APP_ID_CODEC_LOG=false
 ```
 
 - [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료
@@ -342,6 +349,7 @@ RABBITMQ_TTS_RESULT_BINDING_KEY=ai.result.tts.#
 - [x] `ENV_MASTER_APP_OPENAI_API_KEY` — OpenAI API 키
 - [x] `ENV_MASTER_APP_GEMINI_API_KEY` — prod Gemini API 키
 - [x] `ENV_MASTER_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
+- [ ] `ENV_MASTER_APP_APP_ID_CODEC_ALPHABET` — Sqids ID 토큰 인코더 alphabet (dev 와 반드시 다른 값, 26+ 자 무작위 alphanumeric)
 
 ## ③ Infra — File Variable
 
