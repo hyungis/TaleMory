@@ -1,5 +1,7 @@
 package com.s210.backend.domain.story.presentation
 
+import com.s210.backend.common.codec.PhotoId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.PhotoService
@@ -54,14 +56,14 @@ class PhotoController(
     @PostMapping("/presigned-url")
     fun photoPresignAdd(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @RequestBody @Valid request: PresignPhotoRequest,
     ): ResponseEntity<ApiResponse<PresignPhotoResponse>> {
         val purpose = request.purpose ?: PhotoPurpose.STORYBOARD
         if (purpose == PhotoPurpose.BOTH) {
             throw IllegalArgumentException("purpose=BOTH 는 토글 endpoint 로만 도달 가능합니다.")
         }
-        val result = photoService.presignUpload(user.userId, storyId, request.contentType, purpose)
+        val result = photoService.presignUpload(user.userId, storyId.value, request.contentType, purpose)
         return ResponseEntity.ok(
             ApiResponse(
                 data = PresignPhotoResponse(
@@ -82,12 +84,12 @@ class PhotoController(
     @PutMapping("/{photoId}/character-ref-toggle")
     fun photoCharacterRefToggle(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
-        @PathVariable photoId: Long,
+        @PathVariable storyId: StoryId,
+        @PathVariable photoId: PhotoId,
         @RequestBody @Valid request: CharacterRefToggleRequest,
     ): ResponseEntity<ApiResponse<PhotoItemResponse>> {
         val on = requireNotNull(request.on) { "`on` 은 필수입니다." }
-        val updated = photoService.toggleCharacterRef(user.userId, storyId, photoId, on)
+        val updated = photoService.toggleCharacterRef(user.userId, storyId.value, photoId.value, on)
         val presigned = photoService.presignGetUrl(updated.s3Key)
         return ResponseEntity.ok(ApiResponse(data = PhotoItemResponse.from(updated, presigned)))
     }
@@ -99,10 +101,10 @@ class PhotoController(
     @PostMapping
     fun photoAdd(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @RequestBody @Valid request: CreatePhotoRequest,
     ): ResponseEntity<ApiResponse<PhotoItemResponse>> {
-        val saved = photoService.addPhoto(request.toCommand(user.userId, storyId))
+        val saved = photoService.addPhoto(request.toCommand(user.userId, storyId.value))
         val presigned = photoService.presignGetUrl(saved.s3Key)
         return ResponseEntity
             .status(HttpStatus.CREATED)
@@ -116,9 +118,9 @@ class PhotoController(
     @GetMapping
     fun photoList(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<List<PhotoItemResponse>>> {
-        val photos = photoService.findPhotos(user.userId, storyId)
+        val photos = photoService.findPhotos(user.userId, storyId.value)
         val body = photos.map { PhotoItemResponse.from(it, photoService.presignGetUrl(it.s3Key)) }
         return ResponseEntity.ok(ApiResponse(data = body))
     }
@@ -131,10 +133,10 @@ class PhotoController(
     @PutMapping("/order")
     fun photoOrderModify(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @RequestBody @Valid request: PhotoOrderRequest,
     ): ResponseEntity<ApiResponse<List<PhotoItemResponse>>> {
-        val reordered = photoService.reorderPhotos(user.userId, storyId, request.photoIds)
+        val reordered = photoService.reorderPhotos(user.userId, storyId.value, request.photoIds)
         val body = reordered.map { PhotoItemResponse.from(it, photoService.presignGetUrl(it.s3Key)) }
         return ResponseEntity.ok(ApiResponse(data = body))
     }
@@ -145,11 +147,11 @@ class PhotoController(
     @PatchMapping("/{photoId}")
     fun photoModify(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
-        @PathVariable photoId: Long,
+        @PathVariable storyId: StoryId,
+        @PathVariable photoId: PhotoId,
         @RequestBody request: ModifyPhotoRequest,
     ): ResponseEntity<ApiResponse<PhotoItemResponse>> {
-        val updated = photoService.modifyPhoto(request.toCommand(user.userId, storyId, photoId))
+        val updated = photoService.modifyPhoto(request.toCommand(user.userId, storyId.value, photoId.value))
         val presigned = photoService.presignGetUrl(updated.s3Key)
         return ResponseEntity.ok(ApiResponse(data = PhotoItemResponse.from(updated, presigned)))
     }
@@ -160,10 +162,10 @@ class PhotoController(
     @DeleteMapping("/{photoId}")
     fun photoRemove(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
-        @PathVariable photoId: Long,
+        @PathVariable storyId: StoryId,
+        @PathVariable photoId: PhotoId,
     ): ResponseEntity<ApiResponse<Unit>> {
-        photoService.removePhoto(user.userId, storyId, photoId)
+        photoService.removePhoto(user.userId, storyId.value, photoId.value)
         return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 }

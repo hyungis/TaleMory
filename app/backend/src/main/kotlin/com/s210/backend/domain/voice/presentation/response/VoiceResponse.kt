@@ -1,5 +1,6 @@
 package com.s210.backend.domain.voice.presentation.response
 
+import com.s210.backend.common.codec.VoiceProfileId
 import com.s210.backend.domain.voice.application.dto.VoiceProfileResult
 import java.time.Instant
 import java.time.LocalDateTime
@@ -11,7 +12,7 @@ data class VoicePresignResponse(
 )
 
 data class VoiceProfileResponse(
-    val voiceProfileId: Long,
+    val voiceProfileId: VoiceProfileId,
     val userId: Long,
     val title: String,
     val audioUrl: String?,
@@ -21,7 +22,7 @@ data class VoiceProfileResponse(
 ) {
     companion object {
         fun from(result: VoiceProfileResult): VoiceProfileResponse = VoiceProfileResponse(
-            voiceProfileId = result.id,
+            voiceProfileId = VoiceProfileId(result.id),
             userId = result.userId,
             title = result.title,
             audioUrl = result.audioUrl,

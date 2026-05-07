@@ -1,5 +1,9 @@
 package com.s210.backend.domain.job.presentation.response
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.SceneId
+import com.s210.backend.common.codec.SentenceId
+import com.s210.backend.common.codec.StoryId
 import tools.jackson.databind.JsonNode
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -9,10 +13,10 @@ import java.time.LocalDateTime
  * FE 의 polling 대상 — `resultPayload` 가 채워지면 SUCCESS, `errorMessage` 가 채워지면 FAILED.
  */
 data class JobResponse(
-    val jobId: Long,
-    val storyId: Long,
-    val sentenceId: Long?,
-    val sceneId: Long?,
+    val jobId: JobId,
+    val storyId: StoryId,
+    val sentenceId: SentenceId?,
+    val sceneId: SceneId?,
     val jobType: String,
     val status: String,
     /** AI 에 보낸 원 요청 JSON. DB 에 string 으로 저장돼 있어 JsonNode 로 파싱 후 중첩 노출. */
@@ -31,7 +35,7 @@ data class JobResponse(
  * 현재 StartGenerationResult 와 중복이라 실사용은 StartGenerationResult 로 통일.
  */
 data class JobStartResponse(
-    val jobId: Long,
+    val jobId: JobId,
     val jobType: String,
     val status: String,
 )

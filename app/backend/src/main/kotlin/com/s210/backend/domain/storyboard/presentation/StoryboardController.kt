@@ -1,5 +1,6 @@
 package com.s210.backend.domain.storyboard.presentation
 
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.storyboard.application.StoryboardGenerationService
@@ -58,12 +59,12 @@ class StoryboardController(
     @PostMapping("/story")
     fun storyboardStoryGenerate(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @RequestBody(required = false) request: GenerateStoryRequest?,
     ): ResponseEntity<ApiResponse<StartGenerationResult>> {
         val result = storyboardGenerationService.generate(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             prompt = request?.prompt,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
@@ -83,12 +84,12 @@ class StoryboardController(
     @PatchMapping("/summary")
     fun storyboardSummaryUpdate(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @Valid @RequestBody request: UpdateStoryboardSummaryRequest,
     ): ResponseEntity<ApiResponse<StoryBoardResult>> {
         val result = storyboardGenerationService.editSummary(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             newSummaryKo = request.summaryKo,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
@@ -104,11 +105,11 @@ class StoryboardController(
     @GetMapping("/pages")
     fun listStoryboardPages(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<StoryboardPagesResult>> {
         val result = storyboardPageService.listPages(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
     }
@@ -121,13 +122,13 @@ class StoryboardController(
     @PatchMapping("/pages/{pageNumber}")
     fun updateStoryboardPage(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @PathVariable pageNumber: Int,
         @Valid @RequestBody request: UpdateStoryboardPageRequest,
     ): ResponseEntity<ApiResponse<StoryboardPageResult>> {
         val result = storyboardPageService.updatePageKoreanText(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             pageNumber = pageNumber,
             koreanText = request.koreanText,
         )
@@ -141,11 +142,11 @@ class StoryboardController(
     @PostMapping("/images")
     fun storyboardImagesGenerate(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<StartGenerationResult>> {
         val result = storyboardImageGenerationService.generate(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
     }
@@ -158,13 +159,13 @@ class StoryboardController(
     @PostMapping("/pages/{pageNumber}/image/regenerate")
     fun storyboardImageRegenerate(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @PathVariable pageNumber: Int,
         @Valid @RequestBody request: RegenerateStoryboardImageRequest,
     ): ResponseEntity<ApiResponse<StartGenerationResult>> {
         val result = storyboardImageGenerationService.regenerateOne(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             pageNumber = pageNumber,
             userPrompt = request.userPrompt,
         )
@@ -180,12 +181,12 @@ class StoryboardController(
     @GetMapping("/pages/{pageNumber}/image/versions")
     fun listStoryboardPageImageVersions(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @PathVariable pageNumber: Int,
     ): ResponseEntity<ApiResponse<StoryboardImageVersionsResult>> {
         val result = storyboardImageVersionService.listVersions(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             pageNumber = pageNumber,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
@@ -200,18 +201,18 @@ class StoryboardController(
     @PostMapping("/pages/{pageNumber}/image/select")
     fun selectStoryboardPageImageVersion(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @PathVariable pageNumber: Int,
         @Valid @RequestBody request: SelectStoryboardImageVersionRequest,
     ): ResponseEntity<ApiResponse<StoryboardPageResult>> {
         storyboardImageVersionService.selectVersion(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             pageNumber = pageNumber,
             version = request.version,
         )
         // 갱신 후 페이지 단건 응답 — FE 가 동일 형태로 즉시 반영 가능.
-        val result = storyboardPageService.listPages(user.userId, storyId).pages
+        val result = storyboardPageService.listPages(user.userId, storyId.value).pages
             .first { it.pageNumber == pageNumber }
         return ResponseEntity.ok(ApiResponse(data = result))
     }
@@ -225,11 +226,11 @@ class StoryboardController(
     @GetMapping("/regen-status")
     fun storyboardRegenStatusGet(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<StoryboardRegenStatusResult>> {
         val result = storyboardImageVersionService.getRegenStatus(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
     }
@@ -244,12 +245,12 @@ class StoryboardController(
     @PostMapping("/summary")
     fun storyboardSummaryGenerate(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @RequestBody(required = false) request: GenerateStoryRequest?,
     ): ResponseEntity<ApiResponse<StartGenerationResult>> {
         val result = storyboardSummaryService.generateSummary(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             prompt = request?.prompt,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
@@ -265,12 +266,12 @@ class StoryboardController(
     @PostMapping("/summary/regenerate")
     fun storyboardSummaryRegenerate(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @Valid @RequestBody request: RegenerateSummaryRequest,
     ): ResponseEntity<ApiResponse<StartGenerationResult>> {
         val result = storyboardSummaryService.regenerateSummary(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
             userPrompt = request.userPrompt,
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse(data = result))
@@ -288,11 +289,11 @@ class StoryboardController(
     @GetMapping("/summary")
     fun storyboardSummaryGet(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<SummaryResponseData>> {
         val result = storyboardSummaryService.findSummary(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
     }
@@ -311,11 +312,11 @@ class StoryboardController(
     @GetMapping("/state")
     fun storyboardStateGet(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<StoryboardStateResult>> {
         val result = storyboardGenerationService.findStoryboardState(
             userId = user.userId,
-            storyId = storyId,
+            storyId = storyId.value,
         )
         return ResponseEntity.ok(ApiResponse(data = result))
     }

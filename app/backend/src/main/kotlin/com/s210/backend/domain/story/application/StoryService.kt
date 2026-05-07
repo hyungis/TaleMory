@@ -1,5 +1,6 @@
 package com.s210.backend.domain.story.application
 
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
@@ -170,7 +171,7 @@ class StoryService(
         return stories.map { story ->
             val scenes = scenesByStory[story.id].orEmpty()
             StoryResponse(
-                id = story.id,
+                id = StoryId(story.id),
                 title = story.title,
                 difficulty = story.difficulty.name,
                 status = story.status.name,
