@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bookmark, ChevronLeft, ChevronRight, Maximize } from 'lucide-react'
 import type { StoryView, SceneView, WordEntry } from '../../model/types'
+import type { StoryId } from '../../../../shared/types'
 import { BookCover } from './BookCover'
 import { BookSpread } from './BookSpread'
 import { BookBackCover } from './BookBackCover'
@@ -53,7 +54,7 @@ const FLIP_DURATION_MS = 850
 const FADE_DURATION_MS = 600
 const TOOLBAR_CLOSE_DELAY_MS = 350
 
-const storageKeyBookmark = (storyId: number) => `viewer-bookmark-${storyId}`
+const storageKeyBookmark = (storyId: StoryId) => `viewer-bookmark-${storyId}`
 
 /**
  * 동화책 모드 메인 뷰어.

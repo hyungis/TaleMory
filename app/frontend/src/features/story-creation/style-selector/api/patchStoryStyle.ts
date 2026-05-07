@@ -1,4 +1,5 @@
 import { patch } from '../../../../shared/api/client'
+import type { JobId, StoryId } from '../../../../shared/types'
 
 /**
  * `PATCH /api/stories/{storyId}/style` — 삽화 스타일 프리셋 선택 + FINAL_ILLUSTRATION 잡 자동 enqueue.
@@ -12,11 +13,11 @@ import { patch } from '../../../../shared/api/client'
  * 직접 `JSON.stringify(...)` 를 넘기면 BE 가 이중 인코딩된 문자열을 받아 500 으로 떨어진다.
  */
 export interface StylePatchResponse {
-  finalIllustrationJobId: number
+  finalIllustrationJobId: JobId
 }
 
 export function patchStoryStyle(
-  storyId: number,
+  storyId: StoryId,
   stylePresetId: number,
 ): Promise<StylePatchResponse> {
   return patch<StylePatchResponse>(`/stories/${storyId}/style`, { stylePresetId })

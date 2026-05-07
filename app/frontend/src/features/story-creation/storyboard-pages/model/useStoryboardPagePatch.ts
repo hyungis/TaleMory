@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/r
 import type { ApiError } from '../../../../shared/api'
 import { patchStoryboardPage } from '../api/patchStoryboardPage'
 import type { UpdateStoryboardPageResponse } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 interface PagePatchVariables {
   pageNumber: number
@@ -15,7 +16,7 @@ interface PagePatchVariables {
  * Step 4 (페이지별 카드) 가 자동으로 새 데이터를 가져와 반영한다.
  */
 export function useStoryboardPagePatch(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseMutationResult<UpdateStoryboardPageResponse, ApiError, PagePatchVariables> {
   const queryClient = useQueryClient()
   return useMutation<UpdateStoryboardPageResponse, ApiError, PagePatchVariables>({

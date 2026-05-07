@@ -17,8 +17,8 @@ export function ViewerPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const mode = searchParams.get('mode')
 
-  const parsedId = storyId ? Number(storyId) : undefined
-  const { status, data: story, error } = useStoryViewQuery(parsedId)
+  // BE 가 Sqids 토큰으로 storyId 를 발급하므로 더 이상 Number() 코어션 불가 — 문자열 그대로 전달.
+  const { status, data: story, error } = useStoryViewQuery(storyId)
 
   const [showWebtoonNotice, setShowWebtoonNotice] = useState(false)
 

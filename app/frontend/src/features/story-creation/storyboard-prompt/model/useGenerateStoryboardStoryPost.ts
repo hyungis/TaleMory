@@ -2,6 +2,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { postGenerateStoryboardStory } from '../api/postGenerateStoryboardStory'
 import type { GenerateStoryboardStoryRequest, JobStartResponse } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * 스토리보드 줄거리 생성 트리거 — `POST /stories/{storyId}/storyboard/story`.
@@ -11,7 +12,7 @@ import type { GenerateStoryboardStoryRequest, JobStartResponse } from '../api/ty
  * 호출부는 `jobId` 를 `useJobQuery` 에 넘겨 상태 polling 을 시작한다.
  */
 export function useGenerateStoryboardStoryPost(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseMutationResult<JobStartResponse, ApiError, GenerateStoryboardStoryRequest> {
   return useMutation<JobStartResponse, ApiError, GenerateStoryboardStoryRequest>({
     mutationFn: body => {

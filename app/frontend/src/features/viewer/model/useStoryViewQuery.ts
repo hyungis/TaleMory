@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { StoryId } from '../../../shared/types'
 import { getStoryView } from '../api'
 import type { StoryView } from './types'
 
@@ -16,13 +17,13 @@ export interface StoryViewQueryResult {
   error: Error | null
 }
 
-export function useStoryViewQuery(storyId: number | undefined): StoryViewQueryResult {
+export function useStoryViewQuery(storyId: StoryId | undefined): StoryViewQueryResult {
   const [status, setStatus] = useState<Status>('idle')
   const [data, setData] = useState<StoryView | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    if (storyId === undefined || Number.isNaN(storyId)) return
+    if (!storyId) return
     let cancelled = false
     setStatus('loading')
     setError(null)

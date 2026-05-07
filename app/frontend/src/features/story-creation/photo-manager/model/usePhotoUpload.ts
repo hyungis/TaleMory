@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import exifr from 'exifr'
+import type { StoryId } from '../../../../shared/types'
 import { presignPhoto } from '../api/presignPhoto'
 import { postPhoto } from '../api/postPhoto'
 import type { UploadablePhotoPurpose } from '../api/types'
@@ -39,7 +40,7 @@ export interface PendingPhoto {
  * 받아오는 순서대로 displayOrder 가 매겨진다.
  */
 export function usePhotoUpload(
-  storyId: number | null,
+  storyId: StoryId | null,
   purpose: UploadablePhotoPurpose = 'STORYBOARD',
 ) {
   const queryClient = useQueryClient()

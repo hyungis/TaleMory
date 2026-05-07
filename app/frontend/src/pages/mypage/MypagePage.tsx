@@ -23,6 +23,7 @@ import {
   useWithdraw,
 } from '../../features/mypage'
 import { isApiError } from '../../shared/api'
+import type { VoiceProfileId } from '../../shared/types'
 import { ROUTES } from '../../shared/constants'
 import './styles/mypage.css'
 
@@ -163,7 +164,7 @@ export function MypagePage() {
     await personDelete.mutateAsync(person.id)
   }
 
-  const handleVoiceDelete = async (voiceProfileId: number, title: string) => {
+  const handleVoiceDelete = async (voiceProfileId: VoiceProfileId, title: string) => {
     if (!window.confirm(`"${title}" 목소리를 삭제할까요?`)) return
     await voiceProfileDelete.mutateAsync(voiceProfileId)
   }

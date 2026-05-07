@@ -3,6 +3,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { getStoryboardSummary } from '../api/getStoryboardSummary'
 import type { SummaryJobStatus, SummaryResponseData } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 // BE 가 cache-aside (Redis 10분 TTL) 로 polling read 부담을 흡수하므로 3s 가 아닌 5s 로 완화.
 // 진행 중 잡은 캐시 hit 위주라 사용자가 체감하는 응답성은 거의 동일.
@@ -39,12 +40,12 @@ export type StoryboardSummaryQueryResult = UseQueryResult<SummaryResponseData, A
  *   `null → PENDING` 또는 `SUCCESS → PENDING (재생성)` 같은 transition 에 맞춰 타이머 reset.
  * - staleTime: 0 — polling 중에는 매번 fresh.
  */
-export function useStoryboardSummaryQuery(storyId: number | null): StoryboardSummaryQueryResult {
+export function useStoryboardSummaryQuery(storyId: StoryId | null): StoryboardSummaryQueryResult {
   const [isTimedOut, setIsTimedOut] = useState(false)
 
   const query = useQuery<SummaryResponseData, ApiError>({
     queryKey: ['storyboard-summary', storyId],
-    queryFn: () => getStoryboardSummary(storyId as number),
+    queryFn: () => getStoryboardSummary(storyId as StoryId),
     enabled: storyId !== null && !isTimedOut,
     refetchInterval: q => {
       if (isTimedOut) return false

@@ -2,6 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { getStoryboardPages } from '../api/getStoryboardPages'
 import type { StoryboardPagesResponse } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * Step 3 / Step 4 공용 — `GET /storyboard/pages` 캐시.
@@ -13,11 +14,11 @@ import type { StoryboardPagesResponse } from '../api/types'
  * - 줄거리 생성 SUCCESS 직후에도 부모가 invalidate 해서 즉시 새 페이지를 가져오도록.
  */
 export function useStoryboardPagesQuery(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseQueryResult<StoryboardPagesResponse, ApiError> {
   return useQuery<StoryboardPagesResponse, ApiError>({
     queryKey: ['storyboard-pages', storyId],
-    queryFn: () => getStoryboardPages(storyId as number),
+    queryFn: () => getStoryboardPages(storyId as StoryId),
     enabled: storyId !== null,
     staleTime: 30_000,
   })

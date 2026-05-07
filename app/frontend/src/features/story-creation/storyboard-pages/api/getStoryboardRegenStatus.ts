@@ -1,5 +1,6 @@
 import { get } from '../../../../shared/api'
 import type { StoryboardRegenStatusResponse } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * `GET /api/stories/{storyId}/storyboard/regen-status` —
@@ -9,7 +10,7 @@ import type { StoryboardRegenStatusResponse } from './types'
  * Step 4 헤더 우측에 `{used}/{limit}` 형태로 표시.
  */
 export function getStoryboardRegenStatus(
-  storyId: number,
+  storyId: StoryId,
 ): Promise<StoryboardRegenStatusResponse> {
   return get<StoryboardRegenStatusResponse>(
     `/stories/${storyId}/storyboard/regen-status`,

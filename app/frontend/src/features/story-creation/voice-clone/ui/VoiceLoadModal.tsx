@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, Loader2, X } from 'lucide-react'
 import type { VoiceProfileDto } from '../api/voiceProfileApi'
+import type { VoiceProfileId } from '../../../../shared/types'
 
 interface VoiceLoadModalProps {
   /** hook 의 fetchVoiceProfiles — 모달 열릴 때 한 번 호출. */
@@ -20,7 +21,7 @@ export function VoiceLoadModal({ fetchProfiles, onSelect, onClose }: VoiceLoadMo
   const [profiles, setProfiles] = useState<VoiceProfileDto[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [pendingId, setPendingId] = useState<number | null>(null)
+  const [pendingId, setPendingId] = useState<VoiceProfileId | null>(null)
 
   // 모달 열릴 때 1회 fetch.
   useEffect(() => {

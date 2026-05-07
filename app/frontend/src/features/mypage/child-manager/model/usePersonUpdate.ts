@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
+import type { PersonId } from '../../../../shared/types'
 import type { Person } from '../../../../entities/person'
 import { patchPerson } from '../api/patchPerson'
 import type { UpdatePersonRequest } from '../api/types'
 
 interface UpdatePersonVariables {
-  personId: number
+  personId: PersonId
   body: UpdatePersonRequest
 }
 

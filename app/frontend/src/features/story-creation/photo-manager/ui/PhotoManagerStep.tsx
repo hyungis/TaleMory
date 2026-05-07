@@ -14,6 +14,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { isApiError } from '../../../../shared/api'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -34,7 +35,7 @@ import '../../styles/creation-paper.css'
 const MAX_CHARACTER_REFS = 3
 
 interface PhotoManagerStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   readOnly?: boolean
   onBack: () => void
   onNext: () => void
@@ -104,7 +105,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
   )
 
   const handleRemove = useCallback(
-    (photoId: number) => {
+    (photoId: PhotoId) => {
       deleteMutation.mutate(photoId, {
         onError: err => {
           if (isApiError(err)) {
@@ -131,8 +132,8 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
       const { active, over } = event
       if (!over || active.id === over.id) return
       const ids = memoryPhotos.map(p => p.photoId)
-      const fromIdx = ids.indexOf(Number(active.id))
-      const toIdx = ids.indexOf(Number(over.id))
+      const fromIdx = ids.indexOf(String(active.id))
+      const toIdx = ids.indexOf(String(over.id))
       if (fromIdx === -1 || toIdx === -1) return
       const next = arrayMove(ids, fromIdx, toIdx)
       reorderMutation.mutate(next)
@@ -141,7 +142,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
   )
 
   const handleToggleRef = useCallback(
-    (photoId: number, currentlyOn: boolean) => {
+    (photoId: PhotoId, currentlyOn: boolean) => {
       const next = !currentlyOn
       if (next && refAtCapacity) {
         showToast(`대표 사진은 최대 ${MAX_CHARACTER_REFS}장까지 선택할 수 있어요.`)

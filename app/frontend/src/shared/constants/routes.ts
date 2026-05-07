@@ -20,7 +20,9 @@ export const ROUTES = {
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES]
 
+import type { StoryId } from '../types'
+
 /** viewer 경로 조립 헬퍼 (:storyId 치환). */
-export function buildViewerPath(storyId: number | string): string {
+export function buildViewerPath(storyId: StoryId): string {
   return `/viewer/${storyId}`
 }

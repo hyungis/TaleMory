@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import type { StoryProject } from '../../model/types'
+import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -27,10 +28,10 @@ import '../../styles/creation-paper.css'
 const PROMPT_MAX_LENGTH = 1000
 
 interface PromptStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   data: StoryProject['step3']
   onStoryChange: (story: string) => void
-  onStoryJobStarted: (jobId: number) => void
+  onStoryJobStarted: (jobId: JobId) => void
   lastConfirmedSummaryJobId: string | null
   onSummaryConfirmed: (summaryJobId: string | null) => void
   readOnly?: boolean

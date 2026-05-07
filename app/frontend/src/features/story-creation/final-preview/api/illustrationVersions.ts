@@ -1,16 +1,17 @@
 import { get, post } from '../../../../shared/api'
+import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 
 export interface IllustrationVersionEntry {
   version: number
   url: string
   prompt: string | null
   createdAt: string | null
-  jobId: number | null
+  jobId: JobId | null
 }
 
 export interface IllustrationVersionsResponse {
-  storyId: number
-  sceneId: number
+  storyId: StoryId
+  sceneId: SceneId
   current: number | null
   versions: IllustrationVersionEntry[]
 }
@@ -21,15 +22,15 @@ export interface IllustrationVersionSelectResponse {
 }
 
 export interface IllustrationRegenStatusResponse {
-  storyId: number
+  storyId: StoryId
   used: number
   limit: number
   remaining: number
 }
 
 export function getIllustrationVersions(
-  storyId: number,
-  sceneId: number,
+  storyId: StoryId,
+  sceneId: SceneId,
 ): Promise<IllustrationVersionsResponse> {
   return get<IllustrationVersionsResponse>(
     `/stories/${storyId}/scenes/${sceneId}/illustration/versions`,
@@ -37,8 +38,8 @@ export function getIllustrationVersions(
 }
 
 export function postSelectIllustrationVersion(
-  storyId: number,
-  sceneId: number,
+  storyId: StoryId,
+  sceneId: SceneId,
   version: number,
 ): Promise<IllustrationVersionSelectResponse> {
   return post<IllustrationVersionSelectResponse>(
@@ -48,7 +49,7 @@ export function postSelectIllustrationVersion(
 }
 
 export function getIllustrationRegenStatus(
-  storyId: number,
+  storyId: StoryId,
 ): Promise<IllustrationRegenStatusResponse> {
   return get<IllustrationRegenStatusResponse>(
     `/stories/${storyId}/scenes/illustration/regen-status`,

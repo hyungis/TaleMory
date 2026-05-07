@@ -3,6 +3,7 @@ import type {
   SelectStoryboardImageVersionRequest,
   StoryboardPageItem,
 } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * `POST /api/stories/{storyId}/storyboard/pages/{pageNumber}/image/select` —
@@ -14,7 +15,7 @@ import type {
  *  - 응답으로 갱신된 단건 페이지(`StoryboardPageItem`) 반환 → FE 는 그대로 캐시 patch 가능.
  */
 export function postSelectStoryboardPageImageVersion(
-  storyId: number,
+  storyId: StoryId,
   pageNumber: number,
   body: SelectStoryboardImageVersionRequest,
 ): Promise<StoryboardPageItem> {

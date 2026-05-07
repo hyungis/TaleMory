@@ -1,5 +1,6 @@
 import { patch } from '../../../../shared/api'
 import type { UpdateStoryboardPageRequest, UpdateStoryboardPageResponse } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * `PATCH /api/stories/{storyId}/storyboard/pages/{pageNumber}` —
@@ -8,7 +9,7 @@ import type { UpdateStoryboardPageRequest, UpdateStoryboardPageResponse } from '
  * 한글 본문(`koreanText`)만 갱신한다. 영문본/sceneSummary/imagePrompt 는 AI 원본 그대로 보존.
  */
 export function patchStoryboardPage(
-  storyId: number,
+  storyId: StoryId,
   pageNumber: number,
   body: UpdateStoryboardPageRequest,
 ): Promise<UpdateStoryboardPageResponse> {

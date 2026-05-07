@@ -22,10 +22,11 @@ import { formatAudioTime, useVoiceClone } from '../model/useVoiceClone'
 import type { VoiceProfileDto } from '../api/voiceProfileApi'
 import { VoiceSaveModal } from './VoiceSaveModal'
 import { VoiceLoadModal } from './VoiceLoadModal'
+import type { StoryId } from '../../../../shared/types'
 import '../../styles/creation-paper.css'
 
 interface VoiceCloneStepProps {
-  storyId?: number | null
+  storyId?: StoryId | null
   onBack: () => void
   onNext: () => void
   onVoiceSaved?: (voiceModel: string) => void

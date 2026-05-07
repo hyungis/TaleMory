@@ -1,4 +1,5 @@
 import { get } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import type { PhotoItemResponse } from './types'
 
 /**
@@ -6,6 +7,6 @@ import type { PhotoItemResponse } from './types'
  * 각 사진의 `imageUrl` 은 5분 유효 presigned GET URL — 만료되면 다시 조회 필요.
  * (React Query 의 staleTime/refetchInterval 로 자동 갱신 가능.)
  */
-export function getPhotos(storyId: number): Promise<PhotoItemResponse[]> {
+export function getPhotos(storyId: StoryId): Promise<PhotoItemResponse[]> {
   return get<PhotoItemResponse[]>(`/stories/${storyId}/photos`)
 }

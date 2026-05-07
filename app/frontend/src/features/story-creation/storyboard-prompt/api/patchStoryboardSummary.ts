@@ -1,5 +1,6 @@
 import { patch } from '../../../../shared/api'
 import type { StoryBoardSnapshot, UpdateStoryboardSummaryRequest } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * `PATCH /api/stories/{storyId}/storyboard/summary` — 옵션 ② 디자인.
@@ -9,7 +10,7 @@ import type { StoryBoardSnapshot, UpdateStoryboardSummaryRequest } from './types
  * 세 곳에 sync 후 본문 발행 시 한글 ground 로 활용한다.
  */
 export function patchStoryboardSummary(
-  storyId: number,
+  storyId: StoryId,
   body: UpdateStoryboardSummaryRequest,
 ): Promise<StoryBoardSnapshot> {
   return patch<StoryBoardSnapshot>(`/stories/${storyId}/storyboard/summary`, body)

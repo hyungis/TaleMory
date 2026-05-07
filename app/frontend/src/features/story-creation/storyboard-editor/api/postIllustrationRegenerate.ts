@@ -1,13 +1,14 @@
 import { post } from '../../../../shared/api/client'
+import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 
 export interface IllustrationRegenerateResponse {
-  jobId: number
+  jobId: JobId
   status: 'PENDING'
 }
 
 export function postIllustrationRegenerate(
-  storyId: number,
-  sceneId: number,
+  storyId: StoryId,
+  sceneId: SceneId,
   userPrompt: string,
 ): Promise<IllustrationRegenerateResponse> {
   return post<IllustrationRegenerateResponse>(

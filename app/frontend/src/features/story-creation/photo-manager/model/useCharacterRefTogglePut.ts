@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import { toggleCharacterRef } from '../api/toggleCharacterRef'
 import type { PhotoItemResponse } from '../api/types'
 
 interface ToggleVars {
-  photoId: number
+  photoId: PhotoId
   on: boolean
 }
 
@@ -18,7 +19,7 @@ interface ToggleVars {
  *  - storyId null 가드 (이 훅은 storyId 가 보장됐을 때만 호출).
  *  - 에러 처리 (lock=409 STORY_021, max-3=400 STORY_020 등) — toast / banner 등으로.
  */
-export function useCharacterRefTogglePut(storyId: number | null) {
+export function useCharacterRefTogglePut(storyId: StoryId | null) {
   const queryClient = useQueryClient()
   return useMutation<PhotoItemResponse, unknown, ToggleVars>({
     mutationFn: ({ photoId, on }) => {
