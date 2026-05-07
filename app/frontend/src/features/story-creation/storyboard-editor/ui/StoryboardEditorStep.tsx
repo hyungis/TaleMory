@@ -1432,7 +1432,7 @@ function PageGrid({
  *  - select onChange → 부모의 `onChange(version)` 호출. 부모가 select mutation 트리거 + 캐시 갱신.
  *
  * UX 정책:
- *  - 옵션 라벨: `v{N} · 첫 생성` (v1) / `v{N} · {prompt 일부}` (v2+) / `v{N}` (prompt null fallback).
+ *  - 옵션 라벨: `첫 생성` (v1) / `{prompt 일부}` (v2+) / `(설명 없음)` (prompt null fallback).
  *  - current 가 선택된 상태로 표시. 같은 값을 선택해도 onChange 가 호출되지 않도록 controlled.
  *  - disabled: 부모가 progress 중이거나 select API 호출 중일 때 잠금.
  */
@@ -1464,11 +1464,10 @@ function VersionPicker({
   }
 
   const formatLabel = (entry: StoryboardImageVersionEntry): string => {
-    if (entry.version === 1) return `v1 · 첫 생성`
+    if (entry.version === 1) return '첫 생성'
     const trimmed = entry.prompt?.trim()
-    if (!trimmed) return `v${entry.version}`
-    const head = trimmed.length > 18 ? trimmed.slice(0, 18) + '…' : trimmed
-    return `v${entry.version} · ${head}`
+    if (!trimmed) return '(설명 없음)'
+    return trimmed.length > 18 ? trimmed.slice(0, 18) + '…' : trimmed
   }
 
   return (
@@ -1484,8 +1483,15 @@ function VersionPicker({
         value={currentValue}
         onChange={handleChange}
         disabled={disabled}
-        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 pl-2.5 pr-9 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`페이지 ${pageNumber} 이미지 버전 선택`}
+        style={{
+          appearance: 'none',
+          // native 화살표 대신 커스텀 SVG — 우측 가장자리에서 12px 띄움.
+          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1 L6 6 L11 1' stroke='%236b5638' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 12px center',
+        }}
       >
         {sorted.map(entry => (
           <option key={entry.version} value={entry.version}>
