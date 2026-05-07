@@ -61,6 +61,11 @@ interface FieldValidationOptions {
   showRequired?: boolean
 }
 
+interface AvailabilityFeedback {
+  message: string
+  tone: 'error' | 'neutral' | 'success'
+}
+
 interface SignupSuccessDialogState {
   title: string
   message: string
@@ -81,22 +86,43 @@ function isAvailabilityConfirmed(state: AvailabilityCheckState, value: string): 
   return state.status === 'available' && state.value === value.trim()
 }
 
-function getAvailabilityMessage(
+function getAvailabilityFeedback(
   label: '아이디' | '닉네임',
   state: AvailabilityCheckState,
   currentValue: string,
-): string | null {
-  if (state.status === 'idle' || state.value !== currentValue.trim()) return null
-  if (state.status === 'checking') return `${label} 중복 여부를 확인하고 있어요.`
-  if (state.status === 'available') return `사용 가능한 ${label}입니다.`
-  if (state.status === 'unavailable') return `이미 사용 중인 ${label}입니다.`
-  return `${label} 중복 확인에 실패했어요. 잠시 후 다시 시도해주세요.`
-}
+  options: { showPrompt?: boolean } = {},
+): AvailabilityFeedback | null {
+  const value = currentValue.trim()
 
-function getAvailabilityMessageColor(status: AvailabilityCheckStatus): string {
-  if (status === 'available') return '#5f7d50'
-  if (status === 'unavailable' || status === 'error') return '#8c3a1f'
-  return '#8a7558'
+  if (!value) {
+    return options.showPrompt
+      ? { message: `${label}를 입력한 뒤 중복 확인 버튼을 눌러주세요.`, tone: 'neutral' }
+      : null
+  }
+
+  if (state.status === 'idle') {
+    return options.showPrompt
+      ? { message: `${label} 중복 확인 버튼을 눌러주세요.`, tone: 'neutral' }
+      : null
+  }
+
+  if (state.value !== value) {
+    return { message: `${label} 중복 확인 버튼을 다시 눌러주세요.`, tone: 'neutral' }
+  }
+
+  if (state.status === 'checking') {
+    return { message: `${label} 중복 여부를 확인하고 있어요.`, tone: 'neutral' }
+  }
+
+  if (state.status === 'available') {
+    return { message: `사용 가능한 ${label}입니다.`, tone: 'success' }
+  }
+
+  if (state.status === 'unavailable') {
+    return { message: `이미 사용 중인 ${label}입니다.`, tone: 'error' }
+  }
+
+  return { message: `${label} 중복 확인에 실패했어요. 잠시 후 다시 시도해주세요.`, tone: 'error' }
 }
 
 function getLoginIdFormatFeedback(
@@ -340,6 +366,9 @@ export function SignupForm({
   const [kakaoRestorePassword, setKakaoRestorePassword] = useState('')
   const [kakaoRestorePasswordError, setKakaoRestorePasswordError] = useState('')
   const [successDialog, setSuccessDialog] = useState<SignupSuccessDialogState | null>(null)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
+  const [hasLoginIdCheckTriggered, setHasLoginIdCheckTriggered] = useState(false)
+  const [hasNicknameCheckTriggered, setHasNicknameCheckTriggered] = useState(false)
   const { isPending, signup } = useSignupPost()
   const { isPending: isKakaoPending, signup: kakaoSignupPost } = useKakaoSignupPost()
   const isKakaoSignup = kakaoSignup !== null && kakaoSignup !== undefined
@@ -355,6 +384,7 @@ export function SignupForm({
 
   const handleLoginIdCheck = useCallback(async () => {
     const loginId = values.id.trim()
+    setHasLoginIdCheckTriggered(true)
     if (getLoginIdFormatFeedback(loginId, { showRequired: true })) {
       return
     }
@@ -371,6 +401,7 @@ export function SignupForm({
 
   const handleNicknameCheck = useCallback(async () => {
     const nickname = values.nickname.trim()
+    setHasNicknameCheckTriggered(true)
     if (!nickname) {
       return
     }
@@ -389,6 +420,8 @@ export function SignupForm({
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault()
       if (isSubmitting) return
+
+      setHasSubmitted(true)
 
       const validationError = validate(values, { isKakaoSignup })
       if (validationError) {
@@ -555,12 +588,31 @@ export function SignupForm({
     }
   }, [isKakaoPending, kakaoRestorePassword, kakaoRestoreRequest, kakaoSignupPost, onKakaoSignedUp])
 
-  const loginIdMessage = getAvailabilityMessage('아이디', loginIdCheck, values.id)
-  const nicknameMessage = getAvailabilityMessage('닉네임', nicknameCheck, values.nickname)
-  const loginIdFormatFeedback = isKakaoSignup ? null : getLoginIdFormatFeedback(values.id)
-  const passwordFormatFeedback = isKakaoSignup ? null : getPasswordFormatFeedback(values.password)
+  const loginIdFormatFeedback = isKakaoSignup
+    ? null
+    : getLoginIdFormatFeedback(values.id, { showRequired: hasSubmitted || hasLoginIdCheckTriggered })
+  const passwordFormatFeedback = isKakaoSignup
+    ? null
+    : getPasswordFormatFeedback(values.password, { showRequired: hasSubmitted })
   const passwordCheckFeedback = isKakaoSignup ? null : getPasswordCheckFeedback(values.password, values.passwordCheck)
-  const emailFormatFeedback = getEmailFormatFeedback(values.email)
+  const emailFormatFeedback = getEmailFormatFeedback(values.email, { showRequired: hasSubmitted })
+  const nameRequiredFeedback =
+    hasSubmitted && !values.name.trim() ? { message: '실명을 입력해주세요.' } : null
+  const nicknameRequiredFeedback =
+    (hasSubmitted || hasNicknameCheckTriggered) && !values.nickname.trim()
+      ? { message: '닉네임을 입력해주세요.' }
+      : null
+  const phoneFormatFeedback = getPhoneFormatFeedback(values.phone)
+  const loginIdAvailabilityFeedback = loginIdFormatFeedback
+    ? null
+    : getAvailabilityFeedback('아이디', loginIdCheck, values.id, {
+        showPrompt: hasSubmitted || hasLoginIdCheckTriggered || Boolean(values.id.trim()),
+      })
+  const nicknameAvailabilityFeedback = nicknameRequiredFeedback
+    ? null
+    : getAvailabilityFeedback('닉네임', nicknameCheck, values.nickname, {
+        showPrompt: hasSubmitted || hasNicknameCheckTriggered || Boolean(values.nickname.trim()),
+      })
 
   const required = (
     <span style={{ color: '#c47254', fontWeight: 700, marginLeft: 2 }}>*</span>
@@ -584,6 +636,7 @@ export function SignupForm({
                   disabled={isSubmitting}
                   onChange={e => {
                     setLoginIdCheck(INITIAL_AVAILABILITY_CHECK)
+                    setHasLoginIdCheckTriggered(false)
                     handleChange('id', e.target.value)
                   }}
                   autoComplete="username"
@@ -604,17 +657,11 @@ export function SignupForm({
                 </button>
               </div>
               {loginIdFormatFeedback && <FieldFeedback feedback={loginIdFormatFeedback} />}
-              {loginIdMessage && (
-                <p
-                  style={{
-                    margin: '6px 0 0',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 13,
-                    color: getAvailabilityMessageColor(loginIdCheck.status),
-                  }}
-                >
-                  {loginIdMessage}
-                </p>
+              {loginIdAvailabilityFeedback && (
+                <FieldFeedback
+                  feedback={{ message: loginIdAvailabilityFeedback.message }}
+                  tone={loginIdAvailabilityFeedback.tone}
+                />
               )}
             </div>
             <div>
@@ -679,59 +726,54 @@ export function SignupForm({
           )}
           {emailFormatFeedback && <FieldFeedback feedback={emailFormatFeedback} />}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label style={labelStyle}>실명 {required}</label>
+        <div>
+          <label style={labelStyle}>실명 {required}</label>
+          <input
+            type="text"
+            value={values.name}
+            disabled={isSubmitting}
+            onChange={e => handleChange('name', e.target.value)}
+            autoComplete="name"
+            placeholder="홍길동"
+            style={inputStyle}
+          />
+          {nameRequiredFeedback && <FieldFeedback feedback={nameRequiredFeedback} />}
+        </div>
+        <div>
+          <label style={labelStyle}>닉네임 {required}</label>
+          <div style={fieldActionRowStyle}>
             <input
               type="text"
-              value={values.name}
+              value={values.nickname}
               disabled={isSubmitting}
-              onChange={e => handleChange('name', e.target.value)}
-              autoComplete="name"
-              placeholder="홍길동"
+              onChange={e => {
+                setNicknameCheck(INITIAL_AVAILABILITY_CHECK)
+                setHasNicknameCheckTriggered(false)
+                handleChange('nickname', e.target.value)
+              }}
+              placeholder="해솔맘"
               style={inputStyle}
             />
+            <button
+              type="button"
+              disabled={isSubmitting || nicknameCheck.status === 'checking'}
+              onClick={handleNicknameCheck}
+              style={{
+                ...checkButtonStyle,
+                cursor: isSubmitting || nicknameCheck.status === 'checking' ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting || nicknameCheck.status === 'checking' ? 0.6 : 1,
+              }}
+            >
+              {nicknameCheck.status === 'checking' ? '확인 중' : '중복 확인'}
+            </button>
           </div>
-          <div>
-            <label style={labelStyle}>닉네임 {required}</label>
-            <div style={fieldActionRowStyle}>
-              <input
-                type="text"
-                value={values.nickname}
-                disabled={isSubmitting}
-                onChange={e => {
-                  setNicknameCheck(INITIAL_AVAILABILITY_CHECK)
-                  handleChange('nickname', e.target.value)
-                }}
-                placeholder="해솔맘"
-                style={inputStyle}
-              />
-              <button
-                type="button"
-                disabled={isSubmitting || nicknameCheck.status === 'checking'}
-                onClick={handleNicknameCheck}
-                style={{
-                  ...checkButtonStyle,
-                  cursor: isSubmitting || nicknameCheck.status === 'checking' ? 'not-allowed' : 'pointer',
-                  opacity: isSubmitting || nicknameCheck.status === 'checking' ? 0.6 : 1,
-                }}
-              >
-                {nicknameCheck.status === 'checking' ? '확인 중' : '중복 확인'}
-              </button>
-            </div>
-            {nicknameMessage && (
-              <p
-                style={{
-                  margin: '6px 0 0',
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 13,
-                  color: getAvailabilityMessageColor(nicknameCheck.status),
-                }}
-              >
-                {nicknameMessage}
-              </p>
-            )}
-          </div>
+          {nicknameRequiredFeedback && <FieldFeedback feedback={nicknameRequiredFeedback} />}
+          {nicknameAvailabilityFeedback && (
+            <FieldFeedback
+              feedback={{ message: nicknameAvailabilityFeedback.message }}
+              tone={nicknameAvailabilityFeedback.tone}
+            />
+          )}
         </div>
         <div>
           <label style={labelStyle}>
@@ -746,6 +788,7 @@ export function SignupForm({
             placeholder="010-1234-5678"
             style={inputStyle}
           />
+          {phoneFormatFeedback && <FieldFeedback feedback={phoneFormatFeedback} />}
         </div>
 
         <TermsCheckboxes
@@ -887,12 +930,18 @@ export function SignupForm({
   )
 }
 
-function FieldFeedback({ feedback }: { feedback: FieldValidationFeedback }) {
+function FieldFeedback({
+  feedback,
+  tone = 'error',
+}: {
+  feedback: FieldValidationFeedback
+  tone?: 'error' | 'neutral' | 'success'
+}) {
   return (
     <p
       style={{
         ...fieldFeedbackStyle,
-        color: '#8c3a1f',
+        color: tone === 'success' ? '#5f7d50' : tone === 'error' ? '#8c3a1f' : '#8a7558',
       }}
     >
       {feedback.message}
