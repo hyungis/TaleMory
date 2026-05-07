@@ -741,8 +741,11 @@
 }
 .cr-hero-banner .body {
   font-family: var(--cr-font-gaegu);
-  font-size: 17px;
-  color: var(--cr-ink-soft);
+  /* Step 2 의 핵심 안내 — "가족이 모두 잘 나온 사진을 골라주세요…"
+     사진 선택 가이드라서 사용자가 반드시 읽어야 하는 메시지 → 크기 + 두께 + 진한 색으로 강조. */
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--cr-ink);
   line-height: 1.6;
 }
 .cr-hero-banner .body .gold {
@@ -803,6 +806,8 @@
   padding: 18px 22px;
   font-family: var(--cr-font-gaegu);
   font-size: 19px;
+  /* weight 500 으로 살짝 두껍게 → 색은 그대로 cr-ink 인데 시각적으로 더 진해 보임 (가독성 ↑). */
+  font-weight: 500;
   line-height: 1.7;
   color: var(--cr-ink);
   resize: vertical;
@@ -1549,8 +1554,7 @@
   letter-spacing: -0.5px;
 }
 .cr-spread-english {
-  /* 우리 서비스 메인 손글씨(Gaegu) — 한글/영어 모두 손글씨 톤으로 렌더링되어
-     다른 step 들과 일관된 paper-craft 분위기 유지. */
+  /* `.cr-shell` 컨테이너의 var(--cr-font-gaegu) inheritance 와 동일 — 스토리보드 본문 톤과 일치(Gaegu 손글씨). */
   font-family: var(--cr-font-gaegu);
   font-size: 26px;
   color: var(--cr-ink);
@@ -1559,7 +1563,8 @@
   letter-spacing: 0.01em;
 }
 .cr-spread-korean {
-  font-family: var(--cr-font-pen);
+  /* 영어 본문과 동일한 Gaegu 손글씨 — 스토리보드 한글 본문 톤과도 일치. */
+  font-family: var(--cr-font-gaegu);
   font-size: 24px;
   color: var(--cr-ink-soft);
   line-height: 1.6;
@@ -1972,6 +1977,8 @@
   font-family: var(--cr-font-gaegu);
   font-weight: 700;
   font-size: 18px;
+  /* 라벨 줄바꿈 방지 — 한 줄 유지. */
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: 0 2px 0 var(--cr-caramel);
   transition: transform 0.12s ease, background 0.12s ease;
@@ -1988,6 +1995,8 @@
   font-family: var(--cr-font-serif);
   font-weight: 800;
   font-size: 18px;
+  /* 라벨 줄바꿈 방지 — "네, 이걸로 그려주세요" 한 줄 유지. */
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: 0 3px 0 var(--cr-sage-deep), 0 6px 14px rgba(95, 125, 80, 0.25);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
@@ -2003,4 +2012,55 @@
 .cr-publish-confirm-submit:active {
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--cr-sage-deep);
+}
+
+/* =====================================================================
+   동화 생성 플로우 전체 — 가독성 강화 폰트 override
+   ---------------------------------------------------------------------
+   모든 step 의 `<main className="cr-shell-inner ...">` 안에서 폰트를
+   일관되게 +2~5px 키워 가독성을 높인다 (descendant selector).
+   step1~9 어느 컴포넌트에 있든 자동 적용.
+
+   강조 포인트:
+   - `.cr-step-sub` (= 각 step 의 소제목)
+     사용자 요청에 따라 두께(700) + 크기 24px + 부드러운 ink-soft 톤.
+   - 나머지는 +2~4px 정도 균일 인상.
+   ===================================================================== */
+.cr-shell-inner .cr-step-label {
+  font-size: 18px;
+}
+.cr-shell-inner .cr-step-title {
+  font-size: 44px;
+}
+.cr-shell-inner .cr-step-sub {
+  font-size: 24px;
+  font-weight: 700;
+  /* weight 700 으로 두께가 충분히 진하므로 색은 한 단계 연한 ink-soft 로 → 부드러운 안내 톤. */
+  color: var(--cr-ink-soft);
+}
+.cr-shell-inner .cr-label {
+  font-size: 22px;
+}
+.cr-shell-inner .cr-input,
+.cr-shell-inner .cr-select,
+.cr-shell-inner .cr-textarea {
+  font-size: 21px;
+}
+.cr-shell-inner .cr-seg button {
+  font-size: 22px;
+}
+.cr-shell-inner .cr-level-preview-meta {
+  font-size: 17px;
+}
+.cr-shell-inner .cr-level-preview-list li {
+  font-size: 19px;
+}
+/* 락/안내 배너 — "본문이 생성되어 이 단계는 읽기 전용이에요" 등.
+   strong(메인 메시지)은 한 단계 더 크고 두껍게 강조. */
+.cr-shell-inner .cr-banner {
+  font-size: 19px;
+}
+.cr-shell-inner .cr-banner strong {
+  font-size: 21px;
+  margin-bottom: 4px;
 }

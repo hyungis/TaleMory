@@ -6,6 +6,7 @@ import {
   History,
   Loader2,
   PartyPopper,
+  RefreshCw,
   Wand2,
 } from 'lucide-react'
 import { BookSpread } from './BookSpread'
@@ -352,6 +353,27 @@ export function FinalPreviewStep({
             subtitle={`마지막으로 펼쳐보세요. 마음에 안 드는 삽화는 전체 ${regenLimit}번까지 다시 그릴 수 있어요.`}
           />
 
+          {/* 동화 단위 재생성 카운터 — Step 4 스토리보드 페이지의 우측 상단 pill 과 동일 톤. */}
+          {regenStatus && (
+            <div className="flex justify-end mb-4">
+              <span
+                className={`inline-flex items-center gap-1.5 font-bold text-base px-3 py-1.5 rounded-full border-2 shadow-sm ${
+                  remaining > 0
+                    ? 'bg-[#E9DBBE] border-[#9A7548]/50 text-[#6B4A28]'
+                    : 'bg-[#F8C8C7] border-[#a3413f] text-[#a3413f]'
+                }`}
+                title={
+                  remaining > 0
+                    ? '이 동화에서 그림을 다시 그릴 수 있는 횟수예요.'
+                    : '재생성 한도에 도달했어요. 더는 재생성할 수 없어요.'
+                }
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                그림 재생성 {regenStatus.used} / {regenLimit}
+              </span>
+            </div>
+          )}
+
           <section className="cr-card">
             <span className="cr-tape" aria-hidden="true" />
 
@@ -429,9 +451,7 @@ export function FinalPreviewStep({
                   <Wand2 className="w-4 h-4" />
                   {remaining > 0 ? '이 페이지 삽화 다시 그리기' : '더 이상 다시 그릴 수 없어요'}
                 </button>
-                <p className="cr-final-regen-meta">
-                  전체 <strong>{remaining}/{regenLimit}</strong>회 더 가능해요.
-                </p>
+                {/* 재생성 횟수 안내는 상단 카운터 pill 로 이전됨 — 여기 글 형식은 제거. */}
 
                 <FinalIllustrationVersionPicker
                   data={versionInfo}
