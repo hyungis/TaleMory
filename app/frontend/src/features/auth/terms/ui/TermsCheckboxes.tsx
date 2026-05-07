@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
+import { FeedbackDialog } from '../../../../shared/ui'
 import type { TermsKey } from '../model/termAgreements'
 import type { TermDetail, TermDetailSlug } from '../model/termDetails'
 import { useTermsQuery } from '../model/useTermsQuery'
@@ -21,6 +22,7 @@ export function TermsCheckboxes({
 }: TermsCheckboxesProps) {
   const [selectedTerm, setSelectedTerm] = useState<TermDetail | null>(null)
   const [loadingTermSlug, setLoadingTermSlug] = useState<TermDetailSlug | null>(null)
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const { data: terms = [], refetch } = useTermsQuery({ enabled: false })
   const serviceTerm = terms.find(term => term.slug === 'service')
   const privacyTerm = terms.find(term => term.slug === 'privacy')
@@ -37,13 +39,13 @@ export function TermsCheckboxes({
 
       const term = result.data?.find(item => item.slug === slug)
       if (term === undefined) {
-        window.alert('약관 상세 내용을 찾지 못했어요. 잠시 후 다시 시도해주세요.')
+        setFeedbackMessage('약관 상세 내용을 찾지 못했어요. 잠시 후 다시 시도해주세요.')
         return
       }
 
       setSelectedTerm(term)
     } catch {
-      window.alert('약관 상세 내용을 불러오지 못했어요. 잠시 후 다시 시도해주세요.')
+      setFeedbackMessage('약관 상세 내용을 불러오지 못했어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setLoadingTermSlug(null)
     }
@@ -90,6 +92,14 @@ export function TermsCheckboxes({
         <TermsDetailModal
           term={selectedTerm}
           onClose={() => setSelectedTerm(null)}
+        />
+      )}
+      {feedbackMessage && (
+        <FeedbackDialog
+          variant="error"
+          title="약관 안내"
+          message={feedbackMessage}
+          onClose={() => setFeedbackMessage(null)}
         />
       )}
     </>

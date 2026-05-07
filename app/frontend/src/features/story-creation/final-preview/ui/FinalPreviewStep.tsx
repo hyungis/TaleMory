@@ -574,11 +574,10 @@ function FinalIllustrationVersionPicker({
   }
 
   const formatLabel = (entry: IllustrationVersionEntry): string => {
-    if (entry.version === 1) return 'v1 초기 생성'
+    if (entry.version === 1) return '초기 생성'
     const trimmed = entry.prompt?.trim()
-    if (!trimmed) return `v${entry.version}`
-    const head = trimmed.length > 18 ? `${trimmed.slice(0, 18)}...` : trimmed
-    return `v${entry.version} 수정 ${head}`
+    if (!trimmed) return '(설명 없음)'
+    return trimmed.length > 18 ? `${trimmed.slice(0, 18)}...` : trimmed
   }
 
   return (
@@ -594,8 +593,15 @@ function FinalIllustrationVersionPicker({
         value={currentValue}
         onChange={handleChange}
         disabled={disabled}
-        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 pl-2.5 pr-9 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`최종 삽화 ${data.sceneId} 버전 선택`}
+        style={{
+          appearance: 'none',
+          // native 화살표 대신 커스텀 SVG — 우측 가장자리에서 12px 띄움 (step 4 picker 와 동일).
+          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1 L6 6 L11 1' stroke='%236b5638' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 12px center',
+        }}
       >
         {sorted.map(entry => (
           <option key={entry.version} value={entry.version}>

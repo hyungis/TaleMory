@@ -1,3 +1,5 @@
 export { Header } from './Header'
 export { Navigation } from './Navigation'
 export { IllustrationMockup } from './IllustrationMockup'
+export { FeedbackDialog } from './FeedbackDialog'
+export type { FeedbackDialogVariant } from './FeedbackDialog'

@@ -29,6 +29,8 @@ export interface UseVoiceCloneResult {
   rerecord: () => void
   loadExistingVoice: () => Promise<void>
   saveVoiceRecording: () => Promise<string | null>
+  feedbackMessage: string | null
+  clearFeedbackMessage: () => void
 }
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -78,6 +80,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
   const [voiceTitle, setVoiceTitle] = useState('')
   const [savedVoiceSummary, setSavedVoiceSummary] = useState('아직 저장된 목소리가 없습니다.')
   const [savedProfileId, setSavedProfileId] = useState<VoiceProfileId | null>(null)
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
@@ -174,7 +177,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
       setStatusLabel('기존 목소리 불러옴')
       setSavedVoiceSummary(`저장된 보이스: ${latest.title}`)
     } catch {
-      alert('저장된 목소리를 불러오지 못했습니다.')
+      setFeedbackMessage('저장된 목소리를 불러오지 못했습니다.')
     }
   }, [])
 
@@ -208,7 +211,7 @@ export function useVoiceClone(): UseVoiceCloneResult {
     } catch (error) {
       const message = getVoiceSaveErrorMessage(error)
       setStatusLabel('저장 실패')
-      alert(message)
+      setFeedbackMessage(message)
       return null
     } finally {
       setIsSaving(false)
@@ -258,6 +261,8 @@ export function useVoiceClone(): UseVoiceCloneResult {
     rerecord,
     loadExistingVoice,
     saveVoiceRecording,
+    feedbackMessage,
+    clearFeedbackMessage: () => setFeedbackMessage(null),
   }
 }
 
