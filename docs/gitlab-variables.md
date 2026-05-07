@@ -177,7 +177,7 @@ APP_ID_CODEC_LOG=false
 - [x] `ENV_DEV_APP_OPENAI_API_KEY` — OpenAI API 키
 - [x] `ENV_DEV_APP_GEMINI_API_KEY` — Gemini API 키 (storyboard 이미지 생성)
 - [x] `ENV_DEV_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
-- [ ] `ENV_DEV_APP_APP_ID_CODEC_ALPHABET` — Sqids ID 토큰 인코더 alphabet (26+ 자 무작위 alphanumeric)
+- [x] `ENV_DEV_APP_APP_ID_CODEC_ALPHABET` — Sqids ID 토큰 인코더 alphabet (26+ 자 무작위 alphanumeric)
 
 ## ③ Infra — File Variable
 
@@ -349,7 +349,7 @@ APP_ID_CODEC_LOG=false
 - [x] `ENV_MASTER_APP_OPENAI_API_KEY` — OpenAI API 키
 - [x] `ENV_MASTER_APP_GEMINI_API_KEY` — prod Gemini API 키
 - [x] `ENV_MASTER_APP_REPLICATE_API_TOKEN` — Replicate API 토큰 (final illustration 생성)
-- [ ] `ENV_MASTER_APP_APP_ID_CODEC_ALPHABET` — Sqids ID 토큰 인코더 alphabet (dev 와 반드시 다른 값, 26+ 자 무작위 alphanumeric)
+- [x] `ENV_MASTER_APP_APP_ID_CODEC_ALPHABET` — Sqids ID 토큰 인코더 alphabet (dev 와 반드시 다른 값, 26+ 자 무작위 alphanumeric)
 
 ## ③ Infra — File Variable
 
