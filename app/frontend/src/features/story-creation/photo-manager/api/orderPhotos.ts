@@ -1,4 +1,5 @@
 import { put } from '../../../../shared/api'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import type { PhotoItemResponse } from './types'
 
 /**
@@ -7,8 +8,8 @@ import type { PhotoItemResponse } from './types'
  * 응답은 재정렬된 전체 목록 (presigned GET URL 포함).
  */
 export function orderPhotos(
-  storyId: number,
-  photoIds: number[],
+  storyId: StoryId,
+  photoIds: PhotoId[],
 ): Promise<PhotoItemResponse[]> {
   return put<PhotoItemResponse[]>(`/stories/${storyId}/photos/order`, { photoIds })
 }

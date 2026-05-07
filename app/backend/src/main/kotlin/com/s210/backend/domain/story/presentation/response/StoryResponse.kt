@@ -1,10 +1,16 @@
 package com.s210.backend.domain.story.presentation.response
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.PersonId
+import com.s210.backend.common.codec.SceneId
+import com.s210.backend.common.codec.SentenceId
+import com.s210.backend.common.codec.StoryId
+import com.s210.backend.common.codec.VoiceProfileId
 import java.time.LocalDate
 import java.time.LocalDateTime
 
 data class StoryResponse(
-    val id: Long,
+    val id: StoryId,
     val title: String?,
     val difficulty: String,
     val status: String,
@@ -20,7 +26,7 @@ data class StoryResponse(
 )
 
 data class StoryDetailResponse(
-    val id: Long,
+    val id: StoryId,
     val title: String?,
     val synopsis: String?,
     val difficulty: String,
@@ -39,15 +45,21 @@ data class StoryDetailResponse(
  * 후속 step 2~8 에서 다른 리소스를 붙일 때 FK 로 사용한다.
  */
 data class StoryCreateResponse(
-    val storyId: Long,
+    val storyId: StoryId,
 )
 
 /**
  * GET /api/stories/draft — 로그인 유저의 "진행 중인 동화" 를 BasicInfoStep 상태로 복원하기 위한 페이로드.
  * DRAFT 가 없으면 controller 가 `data = null` 로 내려준다.
+ *
+ * `stylePresetId`, `voiceProfileId`, `sceneConfirmed` 는 "이어서 작성하기" 진입 시 FE 가
+ * 각 step 의 readOnly 락을 BE 진실 기반으로 복원하기 위한 진행 메타.
+ *  - `stylePresetId != null` → Step 5 락 (스타일 변경 불가, FINAL_ILLUSTRATION 잡 이미 발행됨)
+ *  - `sceneConfirmed = true` → Step 6/7 락 (Step 7→8 confirm 한 번이라도 성공)
+ *  - `voiceProfileId` 는 현재 단순 노출 (Step 6 재진입 시 FE 가 voice rehydrate 판단에 사용)
  */
 data class StoryDraftResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val title: String?,
     val difficulty: String,
     val companionsJson: String,
@@ -56,6 +68,9 @@ data class StoryDraftResponse(
     val travelStartDate: LocalDate?,
     val travelEndDate: LocalDate?,
     val createdAt: LocalDateTime,
+    val stylePresetId: Long?,
+    val voiceProfileId: VoiceProfileId?,
+    val sceneConfirmed: Boolean,
 )
 
 data class PhotoResponse(
@@ -75,14 +90,14 @@ data class StoryboardPageResponse(
 )
 
 data class SceneResponse(
-    val id: Long,
+    val id: SceneId,
     val pageNumber: Int,
     val illustrationUrl: String?,
     val sentences: List<SentenceResponse>
 )
 
 data class SentenceResponse(
-    val id: Long,
+    val id: SentenceId,
     val sentenceOrder: Int,
     val englishText: String,
     val koreanText: String?,
@@ -107,7 +122,7 @@ data class OutroResponse(
 
 data class HighlightVoiceResponse(
     val highlightVoiceId: Long,
-    val sentenceId: Long,
+    val sentenceId: SentenceId,
     val audioUrl: String,
 )
 
@@ -118,7 +133,7 @@ data class PresignedUrlResponse(
 )
 
 data class ProgressResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val lastScenePage: Int
 )
 
@@ -132,7 +147,7 @@ data class ShareLinkResponse(
  * 메타 + scenes[] + outro 를 한 번의 호출로 내려 flip 애니메이션 중 네트워크 대기 제거.
  */
 data class StoryViewResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val title: String?,
     /** Story.difficulty.name — "BEGINNER" / "INTERMEDIATE" / "ADVANCED". 뷰어 InvitationCard 의 난이도 pill 에 사용. */
     val difficulty: String,
@@ -144,7 +159,7 @@ data class StoryViewResponse(
 )
 
 data class SceneViewResponse(
-    val sceneId: Long,
+    val sceneId: SceneId,
     val pageNumber: Int,
     val illustrationUrl: String?,
     val characterAnchors: List<CharacterAnchorView>,
@@ -152,7 +167,7 @@ data class SceneViewResponse(
 )
 
 data class SentenceViewResponse(
-    val sentenceId: Long,
+    val sentenceId: SentenceId,
     val sentenceOrder: Int,
     val englishText: String,
     val koreanText: String?,
@@ -172,7 +187,7 @@ data class MainCharacterView(
 )
 
 data class CharacterAnchorView(
-    val characterId: Long?,
+    val characterId: PersonId?,
     val x: Double?,
     val y: Double?,
     val scale: Double?
@@ -184,7 +199,7 @@ data class CharacterAnchorView(
  * 전부 캐시 적중(status=SUCCESS)인 경우도 202 로 통일.
  */
 data class IllustrationRegenerateResponse(
-    val jobId: Long,
+    val jobId: JobId,
     val status: String,
 )
 
@@ -198,32 +213,32 @@ data class IllustrationVersionEntryResponse(
     val url: String,
     val prompt: String?,
     val createdAt: String?,
-    val jobId: Long?,
+    val jobId: JobId?,
 )
 
 data class IllustrationVersionsResponse(
-    val storyId: Long,
-    val sceneId: Long,
+    val storyId: StoryId,
+    val sceneId: SceneId,
     val current: Int?,
     val versions: List<IllustrationVersionEntryResponse>,
 )
 
 data class IllustrationRegenStatusResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val used: Int,
     val limit: Int,
     val remaining: Int,
 )
 
 data class ConfirmStoryboardResponse(
-    val jobId: Long,
+    val jobId: JobId,
     val jobType: String,
     val status: String,
     val sceneCount: Int,
     val sentenceCount: Int,
     val cacheHits: Int,
     val cacheMisses: Int,
-    val finalIllustrationJobId: Long? = null,
+    val finalIllustrationJobId: JobId? = null,
 )
 
 /**

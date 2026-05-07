@@ -1,5 +1,6 @@
 package com.s210.backend.domain.story.application
 
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
@@ -74,5 +75,5 @@ class StoryProgressService(
     }
 
     private fun StoryProgress.toResponse(): ProgressResponse =
-        ProgressResponse(storyId = storyId, lastScenePage = lastScenePage)
+        ProgressResponse(storyId = StoryId(storyId), lastScenePage = lastScenePage)
 }

@@ -1,5 +1,6 @@
 import { post } from '../../../../shared/api'
 import type { RegenerateStoryboardSummaryRequest, StartGenerationResult } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * 스토리보드 줄거리(요약) 자연어 재생성 — `POST /stories/{storyId}/storyboard/summary/regenerate`.
@@ -8,7 +9,7 @@ import type { RegenerateStoryboardSummaryRequest, StartGenerationResult } from '
  * 202 Accepted + `{ jobId, jobType, status }` 반환.
  */
 export function postRegenerateStoryboardSummary(
-  storyId: number,
+  storyId: StoryId,
   body: RegenerateStoryboardSummaryRequest,
 ): Promise<StartGenerationResult> {
   return post<StartGenerationResult>(`/stories/${storyId}/storyboard/summary/regenerate`, body)

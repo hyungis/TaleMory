@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 import {
   BookOpen,
   ChevronLeft,
@@ -6,6 +7,7 @@ import {
   History,
   Loader2,
   PartyPopper,
+  RefreshCw,
   Wand2,
 } from 'lucide-react'
 import { BookSpread } from './BookSpread'
@@ -31,9 +33,9 @@ import { isApiError } from '../../../../shared/api'
 import '../../styles/creation-paper.css'
 
 interface FinalPreviewStepProps {
-  storyId: number | null
-  storyGenerationJobId: number | null
-  finalIllustrationJobId: number | null
+  storyId: StoryId | null
+  storyGenerationJobId: JobId | null
+  finalIllustrationJobId: JobId | null
   onBack: () => void
   onNext: () => void
 }
@@ -54,10 +56,10 @@ export function FinalPreviewStep({
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
 
-  const [activeRegen, setActiveRegen] = useState<{ sceneId: number; jobId: number } | null>(null)
+  const [activeRegen, setActiveRegen] = useState<{ sceneId: SceneId; jobId: JobId } | null>(null)
   const regenJobQuery = useGenerationJobQuery(activeRegen?.jobId ?? null)
   const [regenStatus, setRegenStatus] = useState<IllustrationRegenStatusResponse | null>(null)
-  const [openPromptScene, setOpenPromptScene] = useState<number | null>(null)
+  const [openPromptScene, setOpenPromptScene] = useState<SceneId | null>(null)
   const [promptText, setPromptText] = useState('')
   const [regenError, setRegenError] = useState<string | null>(null)
   const [versionInfo, setVersionInfo] = useState<IllustrationVersionsResponse | null>(null)
@@ -185,7 +187,7 @@ export function FinalPreviewStep({
     setRegenError(null)
   }, [totalPages])
 
-  const handleOpenPrompt = useCallback((sceneId: number) => {
+  const handleOpenPrompt = useCallback((sceneId: SceneId) => {
     setRegenError(null)
     setOpenPromptScene(sceneId)
     setPromptText('')
@@ -352,6 +354,27 @@ export function FinalPreviewStep({
             subtitle={`마지막으로 펼쳐보세요. 마음에 안 드는 삽화는 전체 ${regenLimit}번까지 다시 그릴 수 있어요.`}
           />
 
+          {/* 동화 단위 재생성 카운터 — Step 4 스토리보드 페이지의 우측 상단 pill 과 동일 톤. */}
+          {regenStatus && (
+            <div className="flex justify-end mb-4">
+              <span
+                className={`inline-flex items-center gap-1.5 font-bold text-base px-3 py-1.5 rounded-full border-2 shadow-sm ${
+                  remaining > 0
+                    ? 'bg-[#E9DBBE] border-[#9A7548]/50 text-[#6B4A28]'
+                    : 'bg-[#F8C8C7] border-[#a3413f] text-[#a3413f]'
+                }`}
+                title={
+                  remaining > 0
+                    ? '이 동화에서 그림을 다시 그릴 수 있는 횟수예요.'
+                    : '재생성 한도에 도달했어요. 더는 재생성할 수 없어요.'
+                }
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                그림 재생성 {regenStatus.used} / {regenLimit}
+              </span>
+            </div>
+          )}
+
           <section className="cr-card">
             <span className="cr-tape" aria-hidden="true" />
 
@@ -429,9 +452,7 @@ export function FinalPreviewStep({
                   <Wand2 className="w-4 h-4" />
                   {remaining > 0 ? '이 페이지 삽화 다시 그리기' : '더 이상 다시 그릴 수 없어요'}
                 </button>
-                <p className="cr-final-regen-meta">
-                  전체 <strong>{remaining}/{regenLimit}</strong>회 더 가능해요.
-                </p>
+                {/* 재생성 횟수 안내는 상단 카운터 pill 로 이전됨 — 여기 글 형식은 제거. */}
 
                 <FinalIllustrationVersionPicker
                   data={versionInfo}
@@ -553,11 +574,10 @@ function FinalIllustrationVersionPicker({
   }
 
   const formatLabel = (entry: IllustrationVersionEntry): string => {
-    if (entry.version === 1) return 'v1 초기 생성'
+    if (entry.version === 1) return '초기 생성'
     const trimmed = entry.prompt?.trim()
-    if (!trimmed) return `v${entry.version}`
-    const head = trimmed.length > 18 ? `${trimmed.slice(0, 18)}...` : trimmed
-    return `v${entry.version} 수정 ${head}`
+    if (!trimmed) return '(설명 없음)'
+    return trimmed.length > 18 ? `${trimmed.slice(0, 18)}...` : trimmed
   }
 
   return (
@@ -573,8 +593,15 @@ function FinalIllustrationVersionPicker({
         value={currentValue}
         onChange={handleChange}
         disabled={disabled}
-        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 pl-2.5 pr-9 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`최종 삽화 ${data.sceneId} 버전 선택`}
+        style={{
+          appearance: 'none',
+          // native 화살표 대신 커스텀 SVG — 우측 가장자리에서 12px 띄움 (step 4 picker 와 동일).
+          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1 L6 6 L11 1' stroke='%236b5638' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 12px center',
+        }}
       >
         {sorted.map(entry => (
           <option key={entry.version} value={entry.version}>

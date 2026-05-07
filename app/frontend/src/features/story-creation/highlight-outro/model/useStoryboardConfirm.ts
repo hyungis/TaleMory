@@ -1,5 +1,6 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import { postStoryboardConfirm, type ConfirmStoryboardResponse } from '../api/postStoryboardConfirm'
 
 /**
@@ -8,8 +9,8 @@ import { postStoryboardConfirm, type ConfirmStoryboardResponse } from '../api/po
  * HighlightOutroStep 의 "다음" 버튼 클릭 시 호출.
  * 성공 시 응답의 jobId 로 FinalPreviewStep 에서 TTS 잡 polling 시작.
  */
-export function useStoryboardConfirm(): UseMutationResult<ConfirmStoryboardResponse, ApiError, number> {
-  return useMutation<ConfirmStoryboardResponse, ApiError, number>({
+export function useStoryboardConfirm(): UseMutationResult<ConfirmStoryboardResponse, ApiError, StoryId> {
+  return useMutation<ConfirmStoryboardResponse, ApiError, StoryId>({
     mutationFn: storyId => postStoryboardConfirm(storyId),
   })
 }

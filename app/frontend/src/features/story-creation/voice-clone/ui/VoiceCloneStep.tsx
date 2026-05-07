@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   CheckCircle2,
   FolderOpen,
+  Lock,
   Mic,
   Pause,
   Play,
@@ -21,10 +22,11 @@ import { formatAudioTime, useVoiceClone } from '../model/useVoiceClone'
 import type { VoiceProfileDto } from '../api/voiceProfileApi'
 import { VoiceSaveModal } from './VoiceSaveModal'
 import { VoiceLoadModal } from './VoiceLoadModal'
+import type { StoryId } from '../../../../shared/types'
 import '../../styles/creation-paper.css'
 
 interface VoiceCloneStepProps {
-  storyId?: number | null
+  storyId?: StoryId | null
   onBack: () => void
   onNext: () => void
   onVoiceSaved?: (voiceModel: string) => void
@@ -95,30 +97,19 @@ export function VoiceCloneStep({
           <StepTitleBlock
             stepNumber={6}
             title="부모 목소리를 들려주세요"
-            subtitle={
-              readOnly
-                ? '동화책이 만들어진 뒤라 더 이상 보이스를 바꿀 수 없어요.'
-                : '샘플 문장을 따라 읽고 녹음을 저장하면, 부모님 목소리로 동화를 읽어줄 수 있어요'
-            }
+            subtitle="샘플 문장을 따라 읽고 녹음을 저장하면, 부모님 목소리로 동화를 읽어줄 수 있어요"
           />
 
+          {/* 락 안내 — step 1/2/3/5 와 동일한 노란 cr-banner 톤. */}
           {readOnly && (
-            <div
-              role="status"
-              style={{
-                marginBottom: 18,
-                padding: '14px 18px',
-                borderRadius: 14,
-                background: '#fbf2da',
-                border: '2px dashed var(--cr-caramel)',
-                color: 'var(--cr-caramel-deep)',
-                fontFamily: 'var(--cr-font-gaegu)',
-                fontWeight: 700,
-                fontSize: 17,
-              }}
-            >
-              이 단계는 잠겨 있어요. 동화책이 이미 만들어지고 있어 새 녹음·기존 음성 변경은
-              할 수 없어요.
+            <div className="cr-banner" role="status">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <div>
+                <strong>보이스가 확정되어 이 단계는 읽기 전용이에요.</strong>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
+                  보이스를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 최종 작업을 이어갈 수 있어요.
+                </span>
+              </div>
             </div>
           )}
 

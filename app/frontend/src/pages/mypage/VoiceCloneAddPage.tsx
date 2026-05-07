@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../shared/constants'
+import { FeedbackDialog } from '../../shared/ui'
 import { BookshelfDoodles } from '../../features/bookshelf'
 import {
   VOICE_SAMPLE_SCRIPT,
@@ -25,16 +26,38 @@ import './styles/mypage.css'
  */
 export function VoiceCloneAddPage() {
   const navigate = useNavigate()
-  const vc = useVoiceClone()
+  const {
+    status,
+    statusLabel,
+    recordedAudioUrl,
+    isSaving,
+    voiceTitle,
+    setVoiceTitle,
+    audioRef,
+    isAudioPlaying,
+    audioCurrentTime,
+    audioDuration,
+    setAudioDuration,
+    setAudioCurrentTime,
+    setIsAudioPlaying,
+    toggleAudioPlayback,
+    seekAudio,
+    startRecording,
+    stopRecording,
+    rerecord,
+    saveVoiceRecording,
+    feedbackMessage,
+    clearFeedbackMessage,
+  } = useVoiceClone()
 
   // 샘플 문장 — 한 문장 기준.
   const sample = useMemo(() => buildSample(VOICE_SAMPLE_SCRIPT), [])
 
   // 녹음 단계 phase 계산 — useVoiceClone 의 status 를 idle/recording/recorded 로 매핑.
   const phase: Phase =
-    vc.status === 'recording'
+    status === 'recording'
       ? 'recording'
-      : vc.status === 'ready'
+      : status === 'ready'
         ? 'recorded'
         : 'idle'
 
@@ -44,33 +67,49 @@ export function VoiceCloneAddPage() {
   useEffect(() => {
     if (phase !== 'recording') {
       // 녹음 종료 (recorded) 시점에는 마지막 값을 유지하고, idle 로 돌아가면 0 으로 리셋.
-      if (phase === 'idle') setRecordingSeconds(0)
-      return
+      if (phase !== 'idle') return
+
+      const resetTimer = window.setTimeout(() => setRecordingSeconds(0), 0)
+      return () => window.clearTimeout(resetTimer)
     }
-    setRecordingSeconds(0)
+
+    const resetTimer = window.setTimeout(() => setRecordingSeconds(0), 0)
     const interval = window.setInterval(() => {
       setRecordingSeconds(prev => prev + 1)
     }, 1000)
-    return () => window.clearInterval(interval)
+    return () => {
+      window.clearTimeout(resetTimer)
+      window.clearInterval(interval)
+    }
   }, [phase])
 
   const goBack = () => navigate(ROUTES.mypage)
 
   const handleSave = async () => {
-    const name = await vc.saveVoiceRecording()
+    const name = await saveVoiceRecording()
     if (name) goBack()
   }
 
   const handleRecordButton = () => {
-    if (vc.status === 'recording') {
-      vc.stopRecording()
+    if (status === 'recording') {
+      stopRecording()
     } else {
-      void vc.startRecording()
+      void startRecording()
     }
   }
 
   const progressPercent =
-    vc.audioDuration > 0 ? (vc.audioCurrentTime / vc.audioDuration) * 100 : 0
+    audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0
+
+  const handleAudioVolumeChange = useCallback((nextVolume: number) => {
+    const audio = audioRef.current
+    if (audio) audio.volume = nextVolume
+  }, [audioRef])
+
+  const handleAudioMutedChange = useCallback((nextMuted: boolean) => {
+    const audio = audioRef.current
+    if (audio) audio.muted = nextMuted
+  }, [audioRef])
 
   return (
     <div className="mypage-shell">
@@ -163,48 +202,49 @@ export function VoiceCloneAddPage() {
 
           <Recorder
             phase={phase}
-            statusLabel={vc.statusLabel}
+            statusLabel={statusLabel}
             recordingSeconds={recordingSeconds}
-            duration={vc.audioDuration}
+            duration={audioDuration}
             onMicClick={handleRecordButton}
-            onStop={() => vc.stopRecording()}
-            onPlay={vc.toggleAudioPlayback}
-            onRerecord={vc.rerecord}
-            isPlaying={vc.isAudioPlaying}
-            hasAudio={!!vc.recordedAudioUrl}
+            onStop={() => stopRecording()}
+            onPlay={toggleAudioPlayback}
+            onRerecord={rerecord}
+            isPlaying={isAudioPlaying}
+            hasAudio={!!recordedAudioUrl}
           />
 
           {/* 숨김 audio 태그 — useVoiceClone 의 audioRef 와 연결 */}
           <audio
-            ref={vc.audioRef}
-            src={vc.recordedAudioUrl ?? undefined}
+            ref={audioRef}
+            src={recordedAudioUrl ?? undefined}
             preload="metadata"
             style={{ display: 'none' }}
             onLoadedMetadata={e =>
-              vc.setAudioDuration((e.currentTarget.duration as number | undefined) ?? 0)
+              setAudioDuration((e.currentTarget.duration as number | undefined) ?? 0)
             }
-            onTimeUpdate={e => vc.setAudioCurrentTime(e.currentTarget.currentTime ?? 0)}
-            onPlay={() => vc.setIsAudioPlaying(true)}
-            onPause={() => vc.setIsAudioPlaying(false)}
-            onEnded={() => vc.setIsAudioPlaying(false)}
+            onTimeUpdate={e => setAudioCurrentTime(e.currentTarget.currentTime ?? 0)}
+            onPlay={() => setIsAudioPlaying(true)}
+            onPause={() => setIsAudioPlaying(false)}
+            onEnded={() => setIsAudioPlaying(false)}
           />
 
           {/* 녹음 완료 후 미리듣기 */}
-          {phase === 'recorded' && vc.recordedAudioUrl && (
+          {phase === 'recorded' && recordedAudioUrl && (
             <div className="vc-preview-audio">
               <div className="vc-preview-audio-head">
                 <span>녹음 미리듣기</span>
-                <span className="vc-tip">{formatAudioTime(vc.audioDuration)}</span>
+                <span className="vc-tip">{formatAudioTime(audioDuration)}</span>
               </div>
               <PaperAudioStrip
-                isPlaying={vc.isAudioPlaying}
-                onToggle={vc.toggleAudioPlayback}
-                onSeek={vc.seekAudio}
+                isPlaying={isAudioPlaying}
+                onToggle={toggleAudioPlayback}
+                onSeek={seekAudio}
                 progressPercent={progressPercent}
-                currentLabel={formatAudioTime(vc.audioCurrentTime)}
-                durationLabel={formatAudioTime(vc.audioDuration)}
-                audioRef={vc.audioRef}
-                src={vc.recordedAudioUrl}
+                currentLabel={formatAudioTime(audioCurrentTime)}
+                durationLabel={formatAudioTime(audioDuration)}
+                src={recordedAudioUrl}
+                onVolumeChange={handleAudioVolumeChange}
+                onMutedChange={handleAudioMutedChange}
               />
             </div>
           )}
@@ -236,14 +276,14 @@ export function VoiceCloneAddPage() {
               type="text"
               className="vc-save-input"
               placeholder="예) 엄마 따뜻한 목소리, 아빠 잠자리 보이스"
-              value={vc.voiceTitle}
-              onChange={e => vc.setVoiceTitle(e.target.value)}
+              value={voiceTitle}
+              onChange={e => setVoiceTitle(e.target.value)}
               disabled={phase !== 'recorded'}
             />
             <button
               type="button"
               className="mp-btn mp-btn-sage"
-              disabled={phase !== 'recorded' || !vc.voiceTitle.trim() || vc.isSaving}
+              disabled={phase !== 'recorded' || !voiceTitle.trim() || isSaving}
               onClick={() => void handleSave()}
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -254,7 +294,7 @@ export function VoiceCloneAddPage() {
                   fill="none"
                 />
               </svg>
-              {vc.isSaving ? '저장 중...' : '저장하고 돌아가기'}
+              {isSaving ? '저장 중...' : '저장하고 돌아가기'}
             </button>
           </div>
         </div>
@@ -263,6 +303,14 @@ export function VoiceCloneAddPage() {
           — 저장하지 않은 녹음은 페이지를 떠나면 사라져요 <span className="heart">♥</span> —
         </div>
       </div>
+      {feedbackMessage && (
+        <FeedbackDialog
+          variant="error"
+          title="목소리 안내"
+          message={feedbackMessage}
+          onClose={clearFeedbackMessage}
+        />
+      )}
     </div>
   )
 }
@@ -451,8 +499,9 @@ function PaperAudioStrip({
   progressPercent,
   currentLabel,
   durationLabel,
-  audioRef,
   src,
+  onVolumeChange,
+  onMutedChange,
 }: {
   isPlaying: boolean
   onToggle: () => void
@@ -460,8 +509,9 @@ function PaperAudioStrip({
   progressPercent: number
   currentLabel: string
   durationLabel: string
-  audioRef?: RefObject<HTMLAudioElement | null>
   src?: string | null
+  onVolumeChange?: (volume: number) => void
+  onMutedChange?: (muted: boolean) => void
 }) {
   const volumeWrapRef = useRef<HTMLSpanElement | null>(null)
   const [volume, setVolume] = useState(1)
@@ -470,9 +520,13 @@ function PaperAudioStrip({
 
   // src 가 바뀌면 reset
   useEffect(() => {
-    setVolume(1)
-    setMuted(false)
-    setVolumeOpen(false)
+    const resetTimer = window.setTimeout(() => {
+      setVolume(1)
+      setMuted(false)
+      setVolumeOpen(false)
+    }, 0)
+
+    return () => window.clearTimeout(resetTimer)
   }, [src])
 
   // 외부 클릭 시 popover 닫기
@@ -489,14 +543,12 @@ function PaperAudioStrip({
 
   // audio 엘리먼트에 volume / muted 반영
   useEffect(() => {
-    const audio = audioRef?.current
-    if (audio) audio.volume = volume
-  }, [audioRef, volume])
+    onVolumeChange?.(volume)
+  }, [onVolumeChange, volume])
 
   useEffect(() => {
-    const audio = audioRef?.current
-    if (audio) audio.muted = muted
-  }, [audioRef, muted])
+    onMutedChange?.(muted)
+  }, [onMutedChange, muted])
 
   return (
     <div className="mp-audio-bar" role="group" aria-label="녹음 재생">

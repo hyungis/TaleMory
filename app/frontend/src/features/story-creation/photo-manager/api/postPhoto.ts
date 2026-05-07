@@ -1,4 +1,5 @@
 import { post } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import type { CreatePhotoRequest, PhotoItemResponse } from './types'
 
 /**
@@ -6,7 +7,7 @@ import type { CreatePhotoRequest, PhotoItemResponse } from './types'
  * BE 가 s3Key prefix 검증 + photo_album_items INSERT 후, presigned GET URL 포함 응답을 돌려줌.
  */
 export function postPhoto(
-  storyId: number,
+  storyId: StoryId,
   body: CreatePhotoRequest,
 ): Promise<PhotoItemResponse> {
   return post<PhotoItemResponse>(`/stories/${storyId}/photos`, body)

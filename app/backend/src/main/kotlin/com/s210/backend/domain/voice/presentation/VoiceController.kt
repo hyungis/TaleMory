@@ -1,5 +1,7 @@
 package com.s210.backend.domain.voice.presentation
 
+import com.s210.backend.common.codec.StoryId
+import com.s210.backend.common.codec.VoiceProfileId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.tts.application.VoicePreviewService
@@ -30,9 +32,9 @@ class VoiceController(
 
     @GetMapping("/voice-recording-script")
     fun voiceRecordingScriptDetails(
-        @RequestParam(required = false) storyId: Long?,
+        @RequestParam(required = false) storyId: StoryId?,
     ): ResponseEntity<ApiResponse<VoiceRecordingScriptResponse>> {
-        val script = voiceService.findRecordingScript(storyId)
+        val script = voiceService.findRecordingScript(storyId?.value)
         return ResponseEntity.ok(ApiResponse(data = VoiceRecordingScriptResponse(script)))
     }
 
@@ -49,12 +51,12 @@ class VoiceController(
     @GetMapping("/voice-profiles/{voiceProfileId}")
     fun voiceProfileDetails(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable voiceProfileId: Long,
+        @PathVariable voiceProfileId: VoiceProfileId,
     ): ResponseEntity<ApiResponse<VoiceProfileResponse>> =
         ResponseEntity.ok(
             ApiResponse(
                 data = VoiceProfileResponse.from(
-                    voiceService.findVoiceProfile(user.userId, voiceProfileId),
+                    voiceService.findVoiceProfile(user.userId, voiceProfileId.value),
                 ),
             ),
         )
@@ -101,21 +103,21 @@ class VoiceController(
     @DeleteMapping("/voice-profiles/{voiceProfileId}")
     fun voiceProfileRemove(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable voiceProfileId: Long,
+        @PathVariable voiceProfileId: VoiceProfileId,
     ): ResponseEntity<ApiResponse<Unit>> {
-        voiceService.removeVoiceProfile(user.userId, voiceProfileId)
+        voiceService.removeVoiceProfile(user.userId, voiceProfileId.value)
         return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 
     @PostMapping("/voice-profiles/{voiceProfileId}/preview")
     fun voiceProfilePreview(
-        @PathVariable voiceProfileId: Long,
+        @PathVariable voiceProfileId: VoiceProfileId,
         @RequestBody request: VoicePreviewApiRequest,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<VoicePreviewJobResponse>> {
         val previewId = voicePreviewService.preview(
             userId = user.userId,
-            voiceProfileId = voiceProfileId,
+            voiceProfileId = voiceProfileId.value,
             text = request.text,
             emotion = request.emotion,
             language = request.language,

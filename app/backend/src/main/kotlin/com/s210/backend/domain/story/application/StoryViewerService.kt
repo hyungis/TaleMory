@@ -2,6 +2,9 @@ package com.s210.backend.domain.story.application
 
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
+import com.s210.backend.common.codec.SceneId
+import com.s210.backend.common.codec.SentenceId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.domain.story.entity.Scene
 import com.s210.backend.domain.story.entity.SceneSentence
@@ -125,7 +128,7 @@ class StoryViewerService(
         }
 
         return StoryViewResponse(
-            storyId = story.id,
+            storyId = StoryId(story.id),
             title = story.title,
             difficulty = story.difficulty.name,
             mainCharacter = parseMainCharacter(story.mainCharacterJson),
@@ -133,7 +136,7 @@ class StoryViewerService(
             publishedAt = story.publishedAt,
             scenes = bodyScenes.map { scene ->
                 SceneViewResponse(
-                    sceneId = scene.id,
+                    sceneId = SceneId(scene.id),
                     pageNumber = scene.pageNumber,
                     illustrationUrl = scene.illustrationUrl,
                     characterAnchors = parseCharacterAnchors(scene.characterAnchors),
@@ -156,7 +159,7 @@ class StoryViewerService(
 
     private fun toSentenceView(sentence: SceneSentence, highlightAudioMap: Map<Long, String>): SentenceViewResponse {
         return SentenceViewResponse(
-            sentenceId = sentence.id,
+            sentenceId = SentenceId(sentence.id),
             sentenceOrder = sentence.sentenceOrder,
             englishText = sentence.englishText,
             koreanText = sentence.koreanText,

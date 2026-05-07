@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { SceneId, SentenceId } from '../../../../shared/types'
 import type { SceneView, SentenceView } from '../../model/types'
 
 /**
@@ -19,9 +20,9 @@ type Mode = 'idle' | 'playing' | 'paused'
 interface TtsStatus {
   mode: Mode
   /** 현재 재생 중인 문장 id — UI 에서 하이라이트 용도 */
-  activeSentenceId: number | null
+  activeSentenceId: SentenceId | null
   /** 현재 재생 중인 scene id */
-  activeSceneId: number | null
+  activeSceneId: SceneId | null
 }
 
 type PlayMode = 'sentence' | 'page' | 'fullBook'

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/r
 import type { ApiError } from '../../../../shared/api'
 import { patchStoryboardSummary } from '../api/patchStoryboardSummary'
 import type { StoryBoardSnapshot, UpdateStoryboardSummaryRequest } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * 한글 줄거리(summaryKo) 편집 mutation — `PATCH /stories/{storyId}/storyboard/summary`.
@@ -17,7 +18,7 @@ import type { StoryBoardSnapshot, UpdateStoryboardSummaryRequest } from '../api/
  * 호출부에서 짧은 간격의 다중 onBlur 가 우려되면 debounce 권장. 여기서는 단순화를 위해 매번 호출.
  */
 export function useStoryboardSummaryPatch(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseMutationResult<StoryBoardSnapshot, ApiError, UpdateStoryboardSummaryRequest> {
   const queryClient = useQueryClient()
   return useMutation<StoryBoardSnapshot, ApiError, UpdateStoryboardSummaryRequest>({

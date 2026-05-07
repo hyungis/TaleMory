@@ -2,6 +2,7 @@
  * 뷰어 전용 도메인 타입 — BE `GET /api/stories/{storyId}/view` 응답과 1:1 매핑.
  * entities/scene, entities/sentence 와 필드명이 같지만 뷰어 화면 전용 통합 구조라 별도 정의.
  */
+import type { PersonId, SceneId, SentenceId, StoryId } from '../../../shared/types'
 
 export type BubbleSlot =
   | 'TOP_LEFT' | 'TOP_CENTER' | 'TOP_RIGHT'
@@ -13,14 +14,14 @@ export interface MainCharacterView {
 }
 
 export interface CharacterAnchorView {
-  characterId: number | null
+  characterId: PersonId | null
   x: number | null
   y: number | null
   scale: number | null
 }
 
 export interface SentenceView {
-  sentenceId: number
+  sentenceId: SentenceId
   sentenceOrder: number
   englishText: string
   koreanText: string | null
@@ -30,7 +31,7 @@ export interface SentenceView {
 }
 
 export interface SceneView {
-  sceneId: number
+  sceneId: SceneId
   pageNumber: number
   illustrationUrl: string | null
   characterAnchors: CharacterAnchorView[]
@@ -46,7 +47,7 @@ export interface OutroView {
 export type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 
 export interface StoryView {
-  storyId: number
+  storyId: StoryId
   title: string | null
   /** BE Story.difficulty enum 명. 미지의 값이 와도 InvitationCard 가 string fallback 처리 가능하도록 string 으로 받음. */
   difficulty: Difficulty | string

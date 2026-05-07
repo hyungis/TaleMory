@@ -1,4 +1,5 @@
 import { post } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import type { PresignPhotoRequest, PresignPhotoResponse } from './types'
 
 /**
@@ -6,7 +7,7 @@ import type { PresignPhotoRequest, PresignPhotoResponse } from './types'
  * 받은 uploadUrl 로 FE 가 브라우저에서 S3 에 직접 PUT 후, 반환된 s3Key 를 commit 요청에 포함.
  */
 export function presignPhoto(
-  storyId: number,
+  storyId: StoryId,
   body: PresignPhotoRequest,
 ): Promise<PresignPhotoResponse> {
   return post<PresignPhotoResponse>(`/stories/${storyId}/photos/presigned-url`, body)

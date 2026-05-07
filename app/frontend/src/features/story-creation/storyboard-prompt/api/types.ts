@@ -8,6 +8,7 @@
  *  - #28  POST /api/stories/{storyId}/storyboard/story         (본문 발행 — 줄거리 SUCCESS 후 호출)
  *  - #56  GET  /api/generation-jobs/{jobId}
  */
+import type { JobId, PhotoId, SceneId, SentenceId, StoryId } from '../../../../shared/types'
 
 /** `POST /api/stories/{storyId}/storyboard/story` request body. */
 export interface GenerateStoryboardStoryRequest {
@@ -42,13 +43,13 @@ export type SummaryJobStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED'
 export interface SummaryResponseData {
   summaryKo: string | null
   jobStatus: SummaryJobStatus | null
-  /** BE 가 String 으로 직렬화 — FE 에서는 그대로 string 으로 다룬다. */
-  jobId: string | null
+  /** BE 가 토큰 문자열로 직렬화 — FE 에서는 그대로 string 으로 다룬다. */
+  jobId: JobId | null
 }
 
 /** SUMMARY 비동기 잡 시작 응답 — `{ jobId, jobType, status }` 포맷. jobId 는 BE 가 string. */
 export interface StartGenerationResult {
-  jobId: string
+  jobId: JobId
   jobType: JobTypeApi
   status: JobStatusApi
 }
@@ -77,7 +78,7 @@ export interface UpdateStoryboardSummaryRequest {
  */
 export interface StoryboardStateResponse {
   activeJob: {
-    jobId: number
+    jobId: JobId
     status: 'PENDING' | 'RUNNING'
     /** ISO-8601 LocalDateTime — FE 가 polling timeout 카운트 보정에 활용. */
     createdAt: string
@@ -95,11 +96,11 @@ export interface StoryboardStateResponse {
    *  - null            → 한 번도 발행 안 함 (idle)
    */
   latestImageJob: {
-    jobId: number
+    jobId: JobId
     status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
   } | null
   activeTranslationJob: {
-    jobId: number
+    jobId: JobId
     pageNumber: number | null
     status: 'PENDING' | 'RUNNING'
     createdAt: string
@@ -112,7 +113,7 @@ export interface StoryboardStateResponse {
    * pageNumber 는 BE 가 jobs.requestPayload(JSON) 의 `item.pageNumber` 를 파싱해 내려준 값.
    */
   activeImageRegenerateJob: {
-    jobId: number
+    jobId: JobId
     pageNumber: number
     status: 'PENDING' | 'RUNNING'
   } | null
@@ -121,7 +122,7 @@ export interface StoryboardStateResponse {
 /** `PATCH /api/stories/{storyId}/storyboard/summary` 응답 — 저장된 story_board 스냅샷. */
 export interface StoryBoardSnapshot {
   storyBoardId: number
-  storyId: number
+  storyId: StoryId
   prompt: string
   story: string
   createAt: string
@@ -133,17 +134,17 @@ export interface StoryBoardSnapshot {
  * 202 Accepted 로 내려온다.
  */
 export interface JobStartResponse {
-  jobId: number
+  jobId: JobId
   jobType: JobTypeApi
   status: JobStatusApi
 }
 
 /** 명세 #56 — FE polling 대상. */
 export interface GenerationJobResponse {
-  jobId: number
-  storyId: number
-  sentenceId: number | null
-  sceneId: number | null
+  jobId: JobId
+  storyId: StoryId
+  sentenceId: SentenceId | null
+  sceneId: SceneId | null
   jobType: JobTypeApi
   status: JobStatusApi
   /** AI 에 보낸 원 요청 JSON. 역직렬화된 중첩 객체. */
@@ -207,7 +208,7 @@ export interface GenerationResultPayload {
 
 export interface StoryboardPageSnapshot {
   pageNumber: number
-  sourcePhotoIds: number[]
+  sourcePhotoIds: PhotoId[]
   sceneSummary: string
   englishText: string
   koreanText: string

@@ -1,6 +1,7 @@
 /**
  * Step 2 사진 업로드 API 계약 — BE DTO 와 1:1 정합.
  */
+import type { PhotoId, StoryId } from '../../../../shared/types'
 
 export type PhotoPurposeApi = 'CHARACTER_REF' | 'STORYBOARD' | 'BOTH'
 
@@ -60,8 +61,8 @@ export interface ModifyPhotoRequest {
  * `imageUrl` 은 presigned GET URL — 브라우저가 `<img src>` 로 바로 로드 가능 (유효 5분).
  */
 export interface PhotoItemResponse {
-  photoId: number
-  storyId: number
+  photoId: PhotoId
+  storyId: StoryId
   imageUrl: string
   purpose: PhotoPurposeApi
   description: string | null

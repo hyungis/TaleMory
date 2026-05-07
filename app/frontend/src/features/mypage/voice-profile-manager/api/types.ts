@@ -1,8 +1,9 @@
 import type { VoiceProfile } from '../../../../entities/voice-profile'
+import type { VoiceProfileId } from '../../../../shared/types'
 
 export interface VoiceProfileResponse {
-  id?: number
-  voiceProfileId?: number
+  id?: VoiceProfileId
+  voiceProfileId?: VoiceProfileId
   userId?: number
   title?: string
   audioUrl?: string | null
@@ -13,7 +14,7 @@ export interface VoiceProfileResponse {
 
 export function mapVoiceProfile(payload: VoiceProfileResponse): VoiceProfile {
   return {
-    id: typeof payload.voiceProfileId === 'number' ? payload.voiceProfileId : (payload.id ?? 0),
+    id: typeof payload.voiceProfileId === 'string' ? payload.voiceProfileId : (payload.id ?? ''),
     userId: payload.userId ?? 0,
     title: typeof payload.title === 'string' ? payload.title : '',
     audioUrl: typeof payload.audioUrl === 'string' ? payload.audioUrl : '',

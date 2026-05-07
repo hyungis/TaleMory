@@ -2,6 +2,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { postRegenerateStoryboardImage } from '../api/postRegenerateStoryboardImage'
 import type { JobStartResponse } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 interface RegenerateVariables {
   pageNumber: number
@@ -13,7 +14,7 @@ interface RegenerateVariables {
  * 응답의 jobId 로 호출부에서 폴링.
  */
 export function useRegenerateStoryboardImagePost(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseMutationResult<JobStartResponse, ApiError, RegenerateVariables> {
   return useMutation<JobStartResponse, ApiError, RegenerateVariables>({
     mutationFn: ({ pageNumber, userPrompt }) => {

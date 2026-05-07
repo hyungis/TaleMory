@@ -1,5 +1,6 @@
 package com.s210.backend.domain.story.application
 
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.redis.IllustrationVersionRedisRepository
@@ -69,6 +70,18 @@ class StoryService(
         storyRepository
             .findTopByUserIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(userId, StoryStatus.DRAFT)
             ?.let(StoryResult::from)
+
+    /**
+     * 해당 동화에 Scene row 가 한 건이라도 존재하는지 — Step 7 → 8 confirmStoryboard 가
+     * 한 번이라도 성공했음을 의미한다.
+     *
+     * "이어서 작성하기" 진입 시 FE 가 Step 6/7 의 `confirmedReadOnlyLocked` 를 BE 진실 기반으로
+     * 복원하기 위해 사용한다. 크롬 종료로 sessionStorage 가 비워져도 BE 의 Scene 존재 여부로
+     * 락이 유지되도록 보장.
+     */
+    @Transactional(readOnly = true)
+    fun existsScenes(storyId: Long): Boolean =
+        sceneRepository.countByStoryId(storyId) > 0
 
     /**
      * 기본 정보가 모두 채워진 상태로 새 동화 row 를 생성한다.
@@ -158,7 +171,7 @@ class StoryService(
         return stories.map { story ->
             val scenes = scenesByStory[story.id].orEmpty()
             StoryResponse(
-                id = story.id,
+                id = StoryId(story.id),
                 title = story.title,
                 difficulty = story.difficulty.name,
                 status = story.status.name,

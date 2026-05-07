@@ -1,5 +1,9 @@
 package com.s210.backend.domain.job.application
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.SceneId
+import com.s210.backend.common.codec.SentenceId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.redis.JobStatusRedisRepository
@@ -116,10 +120,10 @@ class JobService(
     }
 
     private fun StoryGenerationJob.toResponse(): JobResponse = JobResponse(
-        jobId = id,
-        storyId = storyId,
-        sentenceId = sentenceId,
-        sceneId = sceneId,
+        jobId = JobId(id),
+        storyId = StoryId(storyId),
+        sentenceId = sentenceId?.let { SentenceId(it) },
+        sceneId = sceneId?.let { SceneId(it) },
         jobType = jobType.name,
         status = status.name,
         requestPayload = requestPayload?.toJsonNodeOrNull(),

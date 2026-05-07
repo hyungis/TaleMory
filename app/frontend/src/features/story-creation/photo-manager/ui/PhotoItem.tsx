@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { PhotoId } from '../../../../shared/types'
 import type { PhotoPurposeApi } from '../api/types'
 
 function parseTagsJson(json: string | null | undefined): string {
@@ -23,7 +24,7 @@ function parseTagsJson(json: string | null | undefined): string {
 
 interface PhotoItemCommittedProps {
   mode: 'committed'
-  id: number
+  id: PhotoId
   imageUrl: string
   description: string | null
   tagsJson: string | null

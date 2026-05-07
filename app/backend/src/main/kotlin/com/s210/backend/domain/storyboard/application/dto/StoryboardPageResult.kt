@@ -1,5 +1,7 @@
 package com.s210.backend.domain.storyboard.application.dto
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.domain.story.entity.StoryboardPage
 import com.s210.backend.domain.storyboard.application.pageTexts
 import com.s210.backend.domain.storyboard.application.parseSentencesList
@@ -19,14 +21,14 @@ data class StoryboardPageResult(
     val sceneSummary: String?,
     val imagePrompt: String?,
     val imageUrl: String?,
-    val translationJobId: Long? = null,
+    val translationJobId: JobId? = null,
     val sentences: List<StorySentenceDto>?,
 ) {
     companion object {
         fun from(
             entity: StoryboardPage,
             objectMapper: ObjectMapper,
-            translationJobId: Long? = null,
+            translationJobId: JobId? = null,
         ): StoryboardPageResult {
             val texts = entity.pageTexts(objectMapper)
             val parsedSentences = entity.parseSentencesList(objectMapper)
@@ -52,6 +54,6 @@ data class StoryboardPageResult(
  * - 페이지는 항상 `pageNumber` 오름차순으로 정렬되어 있다.
  */
 data class StoryboardPagesResult(
-    val storyId: Long,
+    val storyId: StoryId,
     val pages: List<StoryboardPageResult>,
 )

@@ -1,5 +1,6 @@
 import { ImageIcon, Play, Volume2 } from 'lucide-react'
 import type { SceneView, SentenceView } from '../../model/types'
+import type { SentenceId } from '../../../../shared/types'
 
 interface LeftPageProps {
   scene: SceneView
@@ -39,7 +40,7 @@ interface RightPageProps {
   pageIndex: number
   showTranslation?: boolean
   fontSize?: number
-  activeSentenceId?: number | null
+  activeSentenceId?: SentenceId | null
   onSentenceClick?: (scene: SceneView, sentence: SentenceView) => void
   onWordClick?: (word: string) => void
   onPlayPage?: (scene: SceneView) => void
@@ -145,7 +146,7 @@ interface BookSpreadProps {
   pageIndex: number
   showTranslation: boolean
   fontSize?: number
-  activeSentenceId?: number | null
+  activeSentenceId?: SentenceId | null
   onSentenceClick?: (scene: SceneView, sentence: SentenceView) => void
   onWordClick?: (word: string) => void
   onPlayPage?: (scene: SceneView) => void

@@ -1,5 +1,6 @@
 import { post } from '../../../../shared/api'
 import type { JobStartResponse, RegenerateStoryboardImageRequest } from './types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * `POST /api/stories/{storyId}/storyboard/pages/{pageNumber}/image/regenerate` —
@@ -8,7 +9,7 @@ import type { JobStartResponse, RegenerateStoryboardImageRequest } from './types
  * userPrompt 는 NotBlank — 호출부에서 trim + 빈 검증.
  */
 export function postRegenerateStoryboardImage(
-  storyId: number,
+  storyId: StoryId,
   pageNumber: number,
   body: RegenerateStoryboardImageRequest,
 ): Promise<JobStartResponse> {

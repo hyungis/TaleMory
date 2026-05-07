@@ -41,8 +41,36 @@ export function BookSpread({ scene, pageIndex }: BookSpreadProps) {
 
       <div className="cr-spread-page cr-spread-page-right">
         <span className="cr-spread-eyebrow">Page {scene.pageNumber}</span>
-        <p className="cr-spread-english">{englishText}</p>
-        {koreanText && <p className="cr-spread-korean">{koreanText}</p>}
+        {/* 스토리보드(Step 4) 본문과 완전 동일한 톤 — Tailwind 클래스(text-2xl / font-medium /
+           leading-relaxed / text-[#3E2A18])를 inline 값으로 그대로 매칭해 inheritance/CSS 영향 차단. */}
+        <p
+          className="cr-spread-english"
+          style={{
+            fontFamily: 'var(--cr-font-gaegu)',
+            fontSize: '24px',
+            fontWeight: 500,
+            lineHeight: 1.625,
+            color: '#3E2A18',
+            letterSpacing: 'normal',
+          }}
+        >
+          {englishText}
+        </p>
+        {koreanText && (
+          <p
+            className="cr-spread-korean"
+            style={{
+              fontFamily: 'var(--cr-font-gaegu)',
+              fontSize: '20px',
+              fontWeight: 700,
+              lineHeight: 1.625,
+              color: '#6B4A28',
+              letterSpacing: 'normal',
+            }}
+          >
+            {koreanText}
+          </p>
+        )}
 
         <div className="cr-spread-tts">
           {ttsUrl ? <TtsPlayer src={ttsUrl} /> : <TtsPlayerDisabled />}

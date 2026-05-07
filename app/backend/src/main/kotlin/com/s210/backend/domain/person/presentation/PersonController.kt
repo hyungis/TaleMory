@@ -1,5 +1,6 @@
 package com.s210.backend.domain.person.presentation
 
+import com.s210.backend.common.codec.PersonId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.person.application.PersonService
@@ -62,9 +63,9 @@ class PersonController(
     @GetMapping("/{personId}")
     fun personDetails(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable personId: Long,
+        @PathVariable personId: PersonId,
     ): ResponseEntity<ApiResponse<PersonResponse>> {
-        val result = personService.findPerson(user.userId, personId)
+        val result = personService.findPerson(user.userId, personId.value)
         return ResponseEntity.ok(
             ApiResponse(data = PersonResponse.from(result)),
         )
@@ -74,10 +75,10 @@ class PersonController(
     @PatchMapping("/{personId}")
     fun personModify(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable personId: Long,
+        @PathVariable personId: PersonId,
         @RequestBody request: ModifyPersonRequest,
     ): ResponseEntity<ApiResponse<PersonResponse>> {
-        val result = personService.modifyPerson(user.userId, personId, request.toCommand())
+        val result = personService.modifyPerson(user.userId, personId.value, request.toCommand())
         return ResponseEntity.ok(
             ApiResponse(data = PersonResponse.from(result)),
         )
@@ -87,9 +88,9 @@ class PersonController(
     @DeleteMapping("/{personId}")
     fun personRemove(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable personId: Long,
+        @PathVariable personId: PersonId,
     ): ResponseEntity<ApiResponse<Unit>> {
-        personService.removePerson(user.userId, personId)
+        personService.removePerson(user.userId, personId.value)
         return ResponseEntity.ok(ApiResponse(success = true))
     }
 }

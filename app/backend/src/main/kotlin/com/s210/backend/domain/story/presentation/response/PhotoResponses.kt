@@ -1,5 +1,7 @@
 package com.s210.backend.domain.story.presentation.response
 
+import com.s210.backend.common.codec.PhotoId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.domain.story.application.dto.PhotoResult
 import java.time.Instant
 import java.time.LocalDateTime
@@ -20,8 +22,8 @@ data class PresignPhotoResponse(
  * private 버킷이라 raw s3Key 만으로는 로드 안 되는 점에 유의.
  */
 data class PhotoItemResponse(
-    val photoId: Long,
-    val storyId: Long,
+    val photoId: PhotoId,
+    val storyId: StoryId,
     val imageUrl: String,
     val purpose: String,
     val description: String?,
@@ -32,8 +34,8 @@ data class PhotoItemResponse(
 ) {
     companion object {
         fun from(result: PhotoResult, presignedUrl: String): PhotoItemResponse = PhotoItemResponse(
-            photoId = result.id,
-            storyId = result.storyId,
+            photoId = PhotoId(result.id),
+            storyId = StoryId(result.storyId),
             imageUrl = presignedUrl,
             purpose = result.purpose.name,
             description = result.description,

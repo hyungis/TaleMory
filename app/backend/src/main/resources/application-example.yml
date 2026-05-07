@@ -46,4 +46,15 @@ aws:
     bucket: ${AWS_S3_BUCKET:}
     env-prefix: ${AWS_S3_ENV_PREFIX:local}
 
+# 외부 노출 ID 토큰 인코더 (Sqids). alphabet 은 비밀 — 실제 운영 값은 GitLab CI variables 에서 주입.
+# 아래 default 는 로컬/테스트용 — 운영 배포에선 반드시 APP_ID_CODEC_ALPHABET 으로 override 한다
+# (default 가 그대로 노출되면 토큰 추측 가능). alphabet 길이는 26+ 권장.
+# min-length 는 8 정도면 시각적으로 충분히 의도가 드러나면서도 URL 이 짧음.
+# log-conversions: 디버깅 시 true. 운영 default false (토큰 평문 로그 노출 방지).
+app:
+  id-codec:
+    alphabet: ${APP_ID_CODEC_ALPHABET:Hf3xN8YwQa2ZRu7TgBVe5KcLJpDvy1MEnUbi9mWoXrSC4qzAjPsd6FOhk0lI}
+    min-length: ${APP_ID_CODEC_MIN_LENGTH:8}
+    log-conversions: ${APP_ID_CODEC_LOG:false}
+
 

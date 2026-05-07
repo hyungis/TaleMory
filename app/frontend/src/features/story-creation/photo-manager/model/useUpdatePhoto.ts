@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import { patchPhoto } from '../api/patchPhoto'
 import type { ModifyPhotoRequest, PhotoItemResponse } from '../api/types'
 
 interface Variables {
-  photoId: number
+  photoId: PhotoId
   body: ModifyPhotoRequest
 }
 
@@ -15,7 +16,7 @@ interface Variables {
  * invalidate 로 리스트 전체를 refetch 하면 모든 `<img>` 가 새 presigned URL 로 교체돼
  * 화면이 깜빡이는 UX 가 생김 → 해당 하나만 부분 업데이트.
  */
-export function useUpdatePhoto(storyId: number | null) {
+export function useUpdatePhoto(storyId: StoryId | null) {
   const queryClient = useQueryClient()
 
   return useMutation<PhotoItemResponse, ApiError, Variables>({

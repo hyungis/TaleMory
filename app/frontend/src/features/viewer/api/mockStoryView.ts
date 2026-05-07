@@ -21,7 +21,7 @@ const PAGE_URLS = [
 ]
 
 export const MOCK_STORY_VIEW: StoryView = {
-  storyId: 1,
+  storyId: '1',
   title: '해솔이의 첫 비행 이야기',
   difficulty: 'INTERMEDIATE',
   mainCharacter: { name: '해솔' },
@@ -31,7 +31,7 @@ export const MOCK_STORY_VIEW: StoryView = {
   scenes: [
     // 표지 (page 0) — 본문 rotation 에서 제외되지만 BE 응답 형태와 맞추려 포함.
     {
-      sceneId: 100,
+      sceneId: '100',
       pageNumber: 0,
       illustrationUrl: COVER_URL,
       characterAnchors: [],
@@ -39,13 +39,13 @@ export const MOCK_STORY_VIEW: StoryView = {
     },
     // 본문 page 1
     {
-      sceneId: 101,
+      sceneId: '101',
       pageNumber: 1,
       illustrationUrl: PAGE_URLS[0],
       characterAnchors: [],
       sentences: [
         {
-          sentenceId: 1001,
+          sentenceId: '1001',
           sentenceOrder: 1,
           englishText: 'Haesol arrived at the airport with sparkling eyes.',
           koreanText: '해솔이는 반짝이는 눈으로 공항에 도착했어요.',
@@ -54,7 +54,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1002,
+          sentenceId: '1002',
           sentenceOrder: 2,
           englishText: 'He had never seen such a big airplane before.',
           koreanText: '그렇게 큰 비행기를 본 것은 처음이었죠.',
@@ -63,7 +63,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1003,
+          sentenceId: '1003',
           sentenceOrder: 3,
           englishText: 'His heart bounced like a little drum.',
           koreanText: '해솔이의 심장은 작은 북처럼 두근거렸어요.',
@@ -75,13 +75,13 @@ export const MOCK_STORY_VIEW: StoryView = {
     },
     // 본문 page 2
     {
-      sceneId: 102,
+      sceneId: '102',
       pageNumber: 2,
       illustrationUrl: PAGE_URLS[1],
       characterAnchors: [],
       sentences: [
         {
-          sentenceId: 1004,
+          sentenceId: '1004',
           sentenceOrder: 1,
           englishText: 'Soon, Haesol found a window seat and pressed his nose to the glass.',
           koreanText: '곧 해솔이는 창가 자리를 찾아 유리창에 코를 바짝 댔어요.',
@@ -90,7 +90,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1005,
+          sentenceId: '1005',
           sentenceOrder: 2,
           englishText: 'Outside, the clouds looked like giant scoops of vanilla ice cream.',
           koreanText: '밖의 구름은 거대한 바닐라 아이스크림 한 스쿱처럼 보였어요.',
@@ -99,7 +99,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1006,
+          sentenceId: '1006',
           sentenceOrder: 3,
           englishText: 'The sky is a secret playground!',
           koreanText: '하늘은 비밀 놀이터 같아!',
@@ -111,13 +111,13 @@ export const MOCK_STORY_VIEW: StoryView = {
     },
     // 본문 page 3
     {
-      sceneId: 103,
+      sceneId: '103',
       pageNumber: 3,
       illustrationUrl: PAGE_URLS[2],
       characterAnchors: [],
       sentences: [
         {
-          sentenceId: 1007,
+          sentenceId: '1007',
           sentenceOrder: 1,
           englishText: 'Welcome aboard, everyone!',
           koreanText: '여러분, 환영합니다!',
@@ -126,7 +126,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: 'TOP_CENTER',
         },
         {
-          sentenceId: 1008,
+          sentenceId: '1008',
           sentenceOrder: 2,
           englishText: 'Haesol sat up straight and listened to every single word.',
           koreanText: '해솔이는 허리를 곧게 펴고 한 마디도 놓치지 않으려 했죠.',
@@ -135,7 +135,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1009,
+          sentenceId: '1009',
           sentenceOrder: 3,
           englishText: 'The flight suddenly felt less scary and much more exciting.',
           koreanText: '비행은 갑자기 덜 무섭고 훨씬 더 신나게 느껴졌어요.',
@@ -147,13 +147,13 @@ export const MOCK_STORY_VIEW: StoryView = {
     },
     // 본문 page 4
     {
-      sceneId: 104,
+      sceneId: '104',
       pageNumber: 4,
       illustrationUrl: PAGE_URLS[3],
       characterAnchors: [],
       sentences: [
         {
-          sentenceId: 1010,
+          sentenceId: '1010',
           sentenceOrder: 1,
           englishText: 'As the plane crossed the sunset, Haesol made a tiny promise to himself.',
           koreanText: '비행기가 노을을 가로지르자 해솔이는 작은 약속을 했어요.',
@@ -162,7 +162,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1011,
+          sentenceId: '1011',
           sentenceOrder: 2,
           englishText: 'I will keep collecting brave moments, wherever I go.',
           koreanText: '어디를 가든 용감한 순간들을 계속 모으기로 한 거예요.',
@@ -171,7 +171,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           bubbleSlot: null,
         },
         {
-          sentenceId: 1012,
+          sentenceId: '1012',
           sentenceOrder: 3,
           englishText: 'The sky felt wide enough to hold all his dreams.',
           koreanText: '하늘은 그의 모든 꿈을 담아낼 만큼 넓게 느껴졌답니다.',

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/r
 import type { ApiError } from '../../../../shared/api'
 import { postRegenerateStoryboardSummary } from '../api/postRegenerateStoryboardSummary'
 import type { RegenerateStoryboardSummaryRequest, StartGenerationResult } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * 줄거리(요약) 자연어 재생성 — `POST /stories/{storyId}/storyboard/summary/regenerate`.
@@ -10,7 +11,7 @@ import type { RegenerateStoryboardSummaryRequest, StartGenerationResult } from '
  * onSuccess 시 polling query invalidate.
  */
 export function useRegenerateSummary(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseMutationResult<StartGenerationResult, ApiError, RegenerateStoryboardSummaryRequest> {
   const queryClient = useQueryClient()
   return useMutation<StartGenerationResult, ApiError, RegenerateStoryboardSummaryRequest>({

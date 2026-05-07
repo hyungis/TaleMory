@@ -1,10 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import { patchStory } from '../api/patchStory'
 import type { ModifyStoryRequest, StoryCreateResponse } from '../api/types'
 
 interface Variables {
-  id: number
+  id: StoryId
   body: ModifyStoryRequest
 }
 
