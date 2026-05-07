@@ -58,6 +58,10 @@ dependencies {
     // BOM 을 import 해 모든 aws 모듈 버전을 한 곳에서 관리.
     implementation(platform("software.amazon.awssdk:bom:2.28.0"))
     implementation("software.amazon.awssdk:s3")
+
+    // Sqids — DB BIGINT id 를 짧은 alphanumeric 토큰으로 양방향 인코딩.
+    // BE 가 비밀 alphabet/seed 를 보유하고, 외부(FE/공유 URL/AI 워커 일부)에는 토큰만 노출.
+    implementation("org.sqids:sqids:0.1.0")
 }
 
 kotlin {

@@ -1,5 +1,6 @@
 package com.s210.backend.domain.story.presentation
 
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.StoryConfirmService
@@ -40,7 +41,7 @@ class StoryController(
             // 크롬 종료로 sessionStorage 가 비워져도 BE 진실 (stylePresetId / Scene 존재) 기반으로
             // FE 가 Step 5/6/7 의 readOnly 락을 복원할 수 있도록 진행 메타를 함께 내린다.
             StoryDraftResponse(
-                storyId = it.id,
+                storyId = StoryId(it.id),
                 title = it.title,
                 difficulty = it.difficulty.name,
                 companionsJson = it.companionsJson,
@@ -65,32 +66,32 @@ class StoryController(
         val result = storyService.addStory(request.toCommand(user.userId))
         return ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(ApiResponse(data = StoryCreateResponse(storyId = result.id)))
+            .body(ApiResponse(data = StoryCreateResponse(storyId = StoryId(result.id))))
     }
 
     @PatchMapping("/{storyId}")
     fun storyModify(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @RequestBody request: ModifyStoryRequest,
     ): ResponseEntity<ApiResponse<StoryCreateResponse>> {
-        val result = storyService.modifyStory(user.userId, storyId, request.toCommand())
-        return ResponseEntity.ok(ApiResponse(data = StoryCreateResponse(storyId = result.id)))
+        val result = storyService.modifyStory(user.userId, storyId.value, request.toCommand())
+        return ResponseEntity.ok(ApiResponse(data = StoryCreateResponse(storyId = StoryId(result.id))))
     }
 
     // 동화 상세 조회 (추후 구현)
     @GetMapping("/{storyId}")
-    fun storyDetails(@PathVariable storyId: Long): ResponseEntity<ApiResponse<StoryDetailResponse>> {
+    fun storyDetails(@PathVariable storyId: StoryId): ResponseEntity<ApiResponse<StoryDetailResponse>> {
         TODO("Not yet implemented")
     }
 
     // 뷰어 화면 통합 조회 (메타 + scenes + outro)
     @GetMapping("/{storyId}/view")
     fun storyViewDetails(
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<StoryViewResponse>> {
-        val result = storyViewerService.findStoryView(user.userId, storyId)
+        val result = storyViewerService.findStoryView(user.userId, storyId.value)
         return ResponseEntity.ok(ApiResponse(data = result))
     }
 
@@ -98,19 +99,19 @@ class StoryController(
     @DeleteMapping("/{storyId}")
     fun storyRemove(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<Unit>> {
-        storyService.removeStory(user.userId, storyId)
+        storyService.removeStory(user.userId, storyId.value)
         return ResponseEntity.ok(ApiResponse(data = Unit))
     }
 
     @PatchMapping("/{storyId}/bookmark")
     fun storyBookmarkModify(
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @AuthenticationPrincipal user: CustomUser,
         @RequestBody request: com.s210.backend.domain.story.presentation.request.BookmarkRequest,
     ): ResponseEntity<Unit> {
-        storyService.modifyBookmark(user.userId, storyId, request.isBookmarked)
+        storyService.modifyBookmark(user.userId, storyId.value, request.isBookmarked)
         return ResponseEntity.noContent().build()
     }
 
@@ -118,9 +119,9 @@ class StoryController(
     @PostMapping("/{storyId}/publish")
     fun storyPublish(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<ShareLinkResponse>> {
-        val result = storyService.publishStory(user.userId, storyId)
+        val result = storyService.publishStory(user.userId, storyId.value)
         return ResponseEntity.ok(ApiResponse(data = result))
     }
 
@@ -128,20 +129,20 @@ class StoryController(
     @GetMapping("/{storyId}/share-link")
     fun storyShareLinkDetails(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
     ): ResponseEntity<ApiResponse<ShareLinkResponse>> {
-        val result = storyService.findShareLink(user.userId, storyId)
+        val result = storyService.findShareLink(user.userId, storyId.value)
         return ResponseEntity.ok(ApiResponse(data = result))
     }
 
     // 스토리보드 확정 — TTS Job 시작 (비동기 202 Accepted)
     @PostMapping("/{storyId}/storyboard/confirm")
     fun storyboardConfirm(
-        @PathVariable storyId: Long,
+        @PathVariable storyId: StoryId,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<ConfirmStoryboardResponse>> {
         val result = storyConfirmService.confirmStoryboard(
-            storyId = storyId,
+            storyId = storyId.value,
             userId = user.userId,
         )
         return ResponseEntity.accepted().body(ApiResponse(data = ConfirmStoryboardResponse(

@@ -2,6 +2,7 @@ package com.s210.backend.domain.story.application
 
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.domain.story.entity.Scene
 import com.s210.backend.domain.story.entity.SceneSentence
@@ -125,7 +126,7 @@ class StoryViewerService(
         }
 
         return StoryViewResponse(
-            storyId = story.id,
+            storyId = StoryId(story.id),
             title = story.title,
             difficulty = story.difficulty.name,
             mainCharacter = parseMainCharacter(story.mainCharacterJson),

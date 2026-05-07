@@ -1,10 +1,11 @@
 package com.s210.backend.domain.story.presentation.response
 
+import com.s210.backend.common.codec.StoryId
 import java.time.LocalDate
 import java.time.LocalDateTime
 
 data class StoryResponse(
-    val id: Long,
+    val id: StoryId,
     val title: String?,
     val difficulty: String,
     val status: String,
@@ -20,7 +21,7 @@ data class StoryResponse(
 )
 
 data class StoryDetailResponse(
-    val id: Long,
+    val id: StoryId,
     val title: String?,
     val synopsis: String?,
     val difficulty: String,
@@ -39,7 +40,7 @@ data class StoryDetailResponse(
  * 후속 step 2~8 에서 다른 리소스를 붙일 때 FK 로 사용한다.
  */
 data class StoryCreateResponse(
-    val storyId: Long,
+    val storyId: StoryId,
 )
 
 /**
@@ -53,7 +54,7 @@ data class StoryCreateResponse(
  *  - `voiceProfileId` 는 현재 단순 노출 (Step 6 재진입 시 FE 가 voice rehydrate 판단에 사용)
  */
 data class StoryDraftResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val title: String?,
     val difficulty: String,
     val companionsJson: String,
@@ -127,7 +128,7 @@ data class PresignedUrlResponse(
 )
 
 data class ProgressResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val lastScenePage: Int
 )
 
@@ -141,7 +142,7 @@ data class ShareLinkResponse(
  * 메타 + scenes[] + outro 를 한 번의 호출로 내려 flip 애니메이션 중 네트워크 대기 제거.
  */
 data class StoryViewResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val title: String?,
     /** Story.difficulty.name — "BEGINNER" / "INTERMEDIATE" / "ADVANCED". 뷰어 InvitationCard 의 난이도 pill 에 사용. */
     val difficulty: String,
@@ -211,14 +212,14 @@ data class IllustrationVersionEntryResponse(
 )
 
 data class IllustrationVersionsResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val sceneId: Long,
     val current: Int?,
     val versions: List<IllustrationVersionEntryResponse>,
 )
 
 data class IllustrationRegenStatusResponse(
-    val storyId: Long,
+    val storyId: StoryId,
     val used: Int,
     val limit: Int,
     val remaining: Int,
