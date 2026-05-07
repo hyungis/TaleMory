@@ -1,6 +1,8 @@
 package com.s210.backend.domain.story.presentation
 
+import com.s210.backend.common.codec.JobId
 import com.s210.backend.common.codec.StoryId
+import com.s210.backend.common.codec.VoiceProfileId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.story.application.StoryConfirmService
@@ -51,7 +53,7 @@ class StoryController(
                 travelEndDate = it.travelEndDate,
                 createdAt = it.createdAt,
                 stylePresetId = it.stylePresetId,
-                voiceProfileId = it.voiceProfileId,
+                voiceProfileId = it.voiceProfileId?.let { id -> VoiceProfileId(id) },
                 sceneConfirmed = storyService.existsScenes(it.id),
             )
         }
@@ -146,14 +148,14 @@ class StoryController(
             userId = user.userId,
         )
         return ResponseEntity.accepted().body(ApiResponse(data = ConfirmStoryboardResponse(
-            jobId = result.jobId,
+            jobId = JobId(result.jobId),
             jobType = result.jobType,
             status = result.status,
             sceneCount = result.sceneCount,
             sentenceCount = result.sentenceCount,
             cacheHits = result.cacheHits,
             cacheMisses = result.cacheMisses,
-            finalIllustrationJobId = result.finalIllustrationJobId,
+            finalIllustrationJobId = result.finalIllustrationJobId?.let { JobId(it) },
         )))
     }
 

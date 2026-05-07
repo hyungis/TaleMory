@@ -1,5 +1,8 @@
 package com.s210.backend.domain.story.presentation
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.SceneId
+import com.s210.backend.common.codec.SentenceId
 import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
@@ -73,19 +76,19 @@ class SceneController(
     @PostMapping("/scenes/{sceneId}/illustration/regenerate")
     fun sceneIllustrationRegenerate(
         @PathVariable storyId: StoryId,
-        @PathVariable sceneId: Long,
+        @PathVariable sceneId: SceneId,
         @RequestBody request: IllustrationRegenerateRequest,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<IllustrationRegenerateResponse>> {
         val result = sceneIllustrationService.regenerateIllustration(
             userId = user.userId,
             storyId = storyId.value,
-            sceneId = sceneId,
+            sceneId = sceneId.value,
             userPrompt = request.userPrompt,
         )
         return ResponseEntity.accepted().body(
             ApiResponse(data = IllustrationRegenerateResponse(
-                jobId = result.jobId,
+                jobId = JobId(result.jobId),
                 status = result.status,
             ))
         )
@@ -113,13 +116,13 @@ class SceneController(
     @PostMapping("/scenes/{sceneId}/illustration/rollback")
     fun sceneIllustrationRollback(
         @PathVariable storyId: StoryId,
-        @PathVariable sceneId: Long,
+        @PathVariable sceneId: SceneId,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<IllustrationRollbackResponse>> {
         val result = sceneIllustrationService.rollbackIllustration(
             userId = user.userId,
             storyId = storyId.value,
-            sceneId = sceneId,
+            sceneId = sceneId.value,
         )
         return ResponseEntity.ok(
             ApiResponse(data = IllustrationRollbackResponse(
@@ -135,18 +138,18 @@ class SceneController(
     @GetMapping("/scenes/{sceneId}/illustration/versions")
     fun sceneIllustrationVersions(
         @PathVariable storyId: StoryId,
-        @PathVariable sceneId: Long,
+        @PathVariable sceneId: SceneId,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<IllustrationVersionsResponse>> {
         val result = sceneIllustrationService.listVersions(
             userId = user.userId,
             storyId = storyId.value,
-            sceneId = sceneId,
+            sceneId = sceneId.value,
         )
         return ResponseEntity.ok(
             ApiResponse(data = IllustrationVersionsResponse(
                 storyId = StoryId(result.storyId),
-                sceneId = result.sceneId,
+                sceneId = SceneId(result.sceneId),
                 current = result.current,
                 versions = result.versions.map {
                     IllustrationVersionEntryResponse(
@@ -154,7 +157,7 @@ class SceneController(
                         url = it.url,
                         prompt = it.prompt,
                         createdAt = it.createdAt,
-                        jobId = it.jobId,
+                        jobId = it.jobId?.let { jid -> JobId(jid) },
                     )
                 },
             ))
@@ -164,14 +167,14 @@ class SceneController(
     @PostMapping("/scenes/{sceneId}/illustration/select")
     fun sceneIllustrationSelect(
         @PathVariable storyId: StoryId,
-        @PathVariable sceneId: Long,
+        @PathVariable sceneId: SceneId,
         @RequestBody request: SelectIllustrationVersionRequest,
         @AuthenticationPrincipal user: CustomUser,
     ): ResponseEntity<ApiResponse<IllustrationRollbackResponse>> {
         val result = sceneIllustrationService.selectVersion(
             userId = user.userId,
             storyId = storyId.value,
-            sceneId = sceneId,
+            sceneId = sceneId.value,
             version = request.version,
         )
         return ResponseEntity.ok(
@@ -185,10 +188,10 @@ class SceneController(
     @PostMapping("/sentences/{sentenceId}/highlight-voice/presigned-url")
     fun highlightVoicePresignedUrl(
         @PathVariable storyId: StoryId,
-        @PathVariable sentenceId: Long,
+        @PathVariable sentenceId: SentenceId,
         @RequestBody request: PresignedUrlRequest,
     ): ResponseEntity<ApiResponse<PresignedUrlResponse>> {
-        val presigned = highlightOutroService.presignHighlightVoice(storyId.value, sentenceId, request.contentType)
+        val presigned = highlightOutroService.presignHighlightVoice(storyId.value, sentenceId.value, request.contentType)
         return ResponseEntity.ok(
             ApiResponse(
                 data = PresignedUrlResponse(
@@ -204,10 +207,10 @@ class SceneController(
     @PostMapping("/sentences/{sentenceId}/highlight-voice")
     fun highlightVoiceAdd(
         @PathVariable storyId: StoryId,
-        @PathVariable sentenceId: Long,
+        @PathVariable sentenceId: SentenceId,
         @RequestBody request: HighlightVoiceCommitRequest,
     ): ResponseEntity<ApiResponse<HighlightVoiceResponse>> {
-        val result = highlightOutroService.addHighlightVoice(storyId.value, sentenceId, request.s3Key)
+        val result = highlightOutroService.addHighlightVoice(storyId.value, sentenceId.value, request.s3Key)
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(ApiResponse(data = result))
@@ -217,9 +220,9 @@ class SceneController(
     @DeleteMapping("/sentences/{sentenceId}/highlight-voice")
     fun highlightVoiceRemove(
         @PathVariable storyId: StoryId,
-        @PathVariable sentenceId: Long,
+        @PathVariable sentenceId: SentenceId,
     ): ResponseEntity<Unit> {
-        highlightOutroService.removeHighlightVoice(storyId.value, sentenceId)
+        highlightOutroService.removeHighlightVoice(storyId.value, sentenceId.value)
         return ResponseEntity.noContent().build()
     }
 
