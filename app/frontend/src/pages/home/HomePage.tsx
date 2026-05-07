@@ -1,11 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthModal, useAuthModal, useAuthSession } from '../../features/auth'
 import { ROUTES } from '../../shared/constants'
+import { FeedbackDialog } from '../../shared/ui'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
 import { useButterflyAnim } from './model/useButterflyAnim'
 import './styles/landing.css'
 import { ButterflySwarm } from './ui/ButterflySwarm'
+
+interface HomeKakaoSignupDraft {
+  signupToken: string
+  profile: {
+    email: string
+    name: string
+    nickname: string
+    phone?: string | null
+  }
+}
+
+interface HomeLocationState {
+  kakaoSignupDraft?: HomeKakaoSignupDraft
+  kakaoSignupNotice?: boolean
+}
 
 /**
  * 디졸브(나비 떼 + 원형 마스크) 가 어느 정도 진행된 뒤 `/main` 으로 navigate 한다.
@@ -34,18 +50,37 @@ const LANDING_EXIT_DURATION_MS = 2500
  * 유지되므로 ForestScene 의 particles / 애니메이션 / phase 가 끊기지 않는다.
  */
 export function HomePage() {
+  const location = useLocation()
   const navigate = useNavigate()
+  const initialLocationState = location.state as HomeLocationState | null
+  const initialKakaoSignupDraft = initialLocationState?.kakaoSignupDraft ?? null
+  const shouldOpenKakaoSignup = initialKakaoSignupDraft !== null
   const [isExiting, setIsExiting] = useState(false)
   const [isLandingDone, setIsLandingDone] = useState(false)
+  const [kakaoSignupDraft, setKakaoSignupDraft] = useState<HomeKakaoSignupDraft | null>(initialKakaoSignupDraft)
+  const [isKakaoSignupNoticeOpen, setIsKakaoSignupNoticeOpen] = useState(
+    shouldOpenKakaoSignup ? (initialLocationState?.kakaoSignupNotice ?? true) : false,
+  )
   const butterflyAnim = useButterflyAnim()
   const particles = useMemo(() => generateSwarmParticles(), [])
-  const auth = useAuthModal('login')
+  const {
+    isOpen: isAuthOpen,
+    mode: authMode,
+    open: openAuth,
+    close: closeAuth,
+    switchMode: switchAuthMode,
+  } = useAuthModal(shouldOpenKakaoSignup ? 'register' : 'login', shouldOpenKakaoSignup)
   const { isAuthenticated } = useAuthSession()
 
   const startLandingExit = useCallback(() => {
-    auth.close()
+    closeAuth()
     setIsExiting(true)
-  }, [auth])
+  }, [closeAuth])
+
+  useEffect(() => {
+    if (!shouldOpenKakaoSignup) return
+    navigate(ROUTES.home, { replace: true, state: null })
+  }, [navigate, shouldOpenKakaoSignup])
 
   // 디졸브 시작 후 LANDING_EXIT_DURATION_MS 뒤에 landing DOM 제거 + URL 을 /main 으로 동기화.
   // useEffect 로 두어 HomePage 가 도중에 unmount 되면 cleanup 으로 timeout 자동 cancel.
@@ -67,12 +102,17 @@ export function HomePage() {
       startLandingExit()
       return
     }
-    auth.open('login')
-  }, [auth, isAuthenticated, isExiting, startLandingExit])
+    openAuth('login')
+  }, [isAuthenticated, isExiting, openAuth, startLandingExit])
 
   const handleAuthSuccess = useCallback(() => {
     startLandingExit()
   }, [startLandingExit])
+
+  const handleKakaoSignupCancel = useCallback(() => {
+    setKakaoSignupDraft(null)
+    setIsKakaoSignupNoticeOpen(false)
+  }, [])
 
   return (
     <>
@@ -113,12 +153,23 @@ export function HomePage() {
       )}
 
       <AuthModal
-        isOpen={auth.isOpen}
-        mode={auth.mode}
-        onClose={auth.close}
-        onSwitchMode={auth.switchMode}
+        isOpen={isAuthOpen}
+        mode={authMode}
+        onClose={closeAuth}
+        onSwitchMode={switchAuthMode}
         onSuccess={handleAuthSuccess}
+        kakaoSignupDraft={kakaoSignupDraft}
+        onKakaoSignupCancel={handleKakaoSignupCancel}
       />
+
+      {isKakaoSignupNoticeOpen && (
+        <FeedbackDialog
+          variant="info"
+          title="회원 정보 입력이 필요해요"
+          message="카카오 인증은 완료됐어요. 가입을 마치려면 서비스에서 사용할 회원 정보를 한 번 더 확인해주세요."
+          onClose={() => setIsKakaoSignupNoticeOpen(false)}
+        />
+      )}
 
       {isExiting && !isLandingDone && (
         <ButterflySwarm animationData={butterflyAnim} particles={particles} />

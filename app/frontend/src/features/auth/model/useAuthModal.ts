@@ -14,8 +14,8 @@ export interface UseAuthModalResult {
  * Auth 모달 열림/닫힘 + tab(login/register) 상태 관리.
  * HomePage 등 상위 컴포넌트에서 호출 후 AuthModal 에 props 로 바인딩.
  */
-export function useAuthModal(initialMode: AuthMode = 'login'): UseAuthModalResult {
-  const [isOpen, setIsOpen] = useState(false)
+export function useAuthModal(initialMode: AuthMode = 'login', initialOpen = false): UseAuthModalResult {
+  const [isOpen, setIsOpen] = useState(initialOpen)
   const [mode, setMode] = useState<AuthMode>(initialMode)
 
   const open = useCallback((nextMode?: AuthMode) => {
