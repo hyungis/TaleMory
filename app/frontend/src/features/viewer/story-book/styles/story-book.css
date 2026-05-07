@@ -1091,33 +1091,75 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 32px;
+  width: 36px;
   z-index: 38;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
 }
-.sb-side-trigger::before {
-  content: '';
+.sb-side-trigger.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 항상 보이는 사이드 탭 handle — 아이콘 + 세로 라벨 + pulse 로 명확히 신호. */
+.sb-side-trigger-handle {
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 6px;
-  height: 80px;
+  min-height: 100px;
+  padding: 14px 6px;
   background: var(--sb-sage);
-  border-radius: 0 999px 999px 0;
-  opacity: 0.55;
-  transition: width 0.2s ease, opacity 0.2s ease;
-  box-shadow: 2px 0 8px rgba(95, 125, 80, 0.3);
+  color: #fdf6dc;
+  border-radius: 0 14px 14px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 3px 0 12px rgba(95, 125, 80, 0.45);
+  transition: background 0.2s ease, box-shadow 0.2s ease, padding 0.2s ease;
+  pointer-events: none;
+  animation: sb-side-trigger-pulse 2.6s ease-in-out infinite;
 }
-.sb-side-trigger:hover::before {
-  width: 10px;
-  opacity: 0.95;
+.sb-side-trigger:hover .sb-side-trigger-handle {
+  background: var(--sb-sage-deep);
+  box-shadow: 5px 0 18px rgba(60, 90, 50, 0.55);
+  padding: 14px 8px;
+  animation: none;
+}
+.sb-side-trigger-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.sb-side-trigger-label {
+  font-family: 'Gaegu', cursive;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+@keyframes sb-side-trigger-pulse {
+  0%,
+  100% {
+    transform: translateY(-50%) translateX(0);
+    box-shadow: 3px 0 12px rgba(95, 125, 80, 0.45);
+  }
+  50% {
+    transform: translateY(-50%) translateX(3px);
+    box-shadow: 5px 0 16px rgba(95, 125, 80, 0.6);
+  }
 }
 
 .sb-side-toolbar {
   position: fixed;
   left: 14px;
   top: 20px;
-  width: min(320px, calc(100vw - 28px));
+  width: min(440px, calc(100vw - 28px));
   max-height: calc(100vh - 40px);
   z-index: 40;
   transform: translateX(0);
@@ -1132,46 +1174,46 @@
 .sb-toolbar-card {
   background: linear-gradient(135deg, #fbf2da 0%, #f5e6bd 100%);
   border: 2.5px solid var(--sb-caramel-deep);
-  border-radius: 20px;
+  border-radius: 22px;
   box-shadow: 0 4px 0 var(--sb-caramel-deep), 0 12px 28px rgba(140, 100, 60, 0.28);
-  padding: 18px;
+  padding: 24px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   color: var(--sb-ink);
 }
 .sb-toolbar-title {
   font-family: var(--sb-font-display);
-  font-size: 1.45rem;
-  font-weight: 700;
-  margin: 0 0 14px;
-  color: var(--sb-sage-deep);
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0 0 22px;
+  color: var(--sb-sage-darker);
   letter-spacing: 0.02em;
 }
 .sb-toolbar-section {
-  margin-bottom: 16px;
+  margin-bottom: 26px;
 }
 .sb-toolbar-section-label {
   font-family: var(--sb-font-pen);
-  font-size: 1.07rem;
-  color: var(--sb-ink-soft);
-  margin-bottom: 8px;
-  font-weight: 700;
+  font-size: 1.55rem;
+  color: var(--sb-ink);
+  margin-bottom: 12px;
+  font-weight: 900;
 }
 .sb-toolbar-btn {
   width: 100%;
-  padding: 10px 12px;
+  padding: 15px 16px;
   background: var(--sb-paper-warm);
-  border: 2px solid var(--sb-caramel);
-  border-radius: 12px;
+  border: 2.5px solid var(--sb-caramel);
+  border-radius: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   font-family: var(--sb-font-pen);
-  font-size: 1.15rem;
-  color: var(--sb-ink-soft);
-  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--sb-ink);
+  font-weight: 900;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 .sb-toolbar-btn:hover {
@@ -1209,18 +1251,19 @@
   margin-top: 8px;
 }
 .sb-toolbar-row .sb-toolbar-btn {
-  padding: 8px 4px;
-  font-size: 1rem;
+  padding: 13px 4px;
+  font-size: 1.35rem;
 }
 .sb-toolbar-range {
   width: 100%;
   accent-color: var(--sb-sage);
+  height: 8px;
 }
 .sb-toolbar-fontsize-value {
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
-  color: var(--sb-ink-mute);
-  font-weight: 700;
+  font-size: 1.4rem;
+  color: var(--sb-ink);
+  font-weight: 900;
 }
 
 /* ===== 테마 스와치 ===== */
@@ -1272,10 +1315,11 @@
 }
 .sb-bookmark-status-text {
   font-family: var(--sb-font-pen);
-  font-size: 1.07rem;
+  font-size: 1.45rem;
+  font-weight: 800;
 }
 .sb-bookmark-status-text strong {
-  font-weight: 700;
+  font-weight: 900;
   margin-left: 2px;
 }
 .sb-bookmark-jump {
@@ -1283,14 +1327,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
+  padding: 9px 16px;
   background: var(--sb-rust);
   border: none;
   border-radius: 999px;
   color: var(--sb-paper-warm);
   font-family: var(--sb-font-pen);
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.35rem;
+  font-weight: 900;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
@@ -1299,9 +1343,10 @@
 .sb-bookmark-jump:disabled { opacity: 0.5; cursor: default; }
 .sb-bookmark-empty {
   font-family: var(--sb-font-pen);
-  font-size: 1.07rem;
-  color: var(--sb-ink-mute);
-  margin: 8px 0 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--sb-ink-soft);
+  margin: 12px 0 0;
 }
 
 @media (max-width: 1023px) {

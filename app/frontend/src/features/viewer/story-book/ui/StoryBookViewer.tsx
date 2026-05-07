@@ -343,13 +343,19 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
       {/* preview 모드는 사이드 툴바 / 호버 트리거 / 전체화면 버튼 모두 숨김. */}
       {!isPreview && (
         <>
-          {/* 좌측 호버 트리거 */}
+          {/* 좌측 호버 트리거 — 사이드 탭 형태로 visible handle + pulse 애니메이션. */}
           <div
-            className="sb-side-trigger"
+            className={`sb-side-trigger${isToolbarOpen ? ' is-hidden' : ''}`}
             onMouseEnter={openToolbar}
             onMouseLeave={scheduleToolbarClose}
-            aria-hidden
-          />
+            role="button"
+            aria-label="읽기 도구 열기"
+          >
+            <div className="sb-side-trigger-handle" aria-hidden="true">
+              <ChevronRight className="sb-side-trigger-icon" />
+              <span className="sb-side-trigger-label">읽기 도구</span>
+            </div>
+          </div>
 
           {/* 사이드 툴바 */}
           <ViewerToolbar
