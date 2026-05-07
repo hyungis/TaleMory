@@ -26,11 +26,16 @@ class Settings(BaseModel):
     VERSION: str = getenv("APP_VERSION", "0.1.0")
     ENVIRONMENT: str = getenv("ENVIRONMENT", "local")
     APP_ROOT: Path = Path(__file__).resolve().parents[2]
+    TTS_ENGINE: str = getenv("TTS_ENGINE", "cosyvoice")
     COSYVOICE_BASE_URL: str = getenv("COSYVOICE_BASE_URL", "")
     COSYVOICE_INSTRUCT_PATH: str = getenv("COSYVOICE_INSTRUCT_PATH", "/inference_instruct2")
     COSYVOICE_CROSS_LINGUAL_PATH: str = getenv("COSYVOICE_CROSS_LINGUAL_PATH", "/inference_cross_lingual")
     COSYVOICE_ZERO_SHOT_PATH: str = getenv("COSYVOICE_ZERO_SHOT_PATH", "/inference_zero_shot")
     COSYVOICE_TIMEOUT_SEC: float = float(getenv("COSYVOICE_TIMEOUT_SEC", "60"))
+    QWEN_TTS_SERVER_URL: str = getenv("QWEN_TTS_SERVER_URL", "")
+    QWEN_TTS_VOICE_CLONE_PATH: str = getenv("QWEN_TTS_VOICE_CLONE_PATH", "/tts/voice-clone")
+    QWEN_TTS_TIMEOUT_SEC: float = float(getenv("QWEN_TTS_TIMEOUT_SEC", "300"))
+    QWEN_TTS_X_VECTOR_ONLY_MODE: bool = getenv("QWEN_TTS_X_VECTOR_ONLY_MODE", "true").lower() == "true"
     TTS_STORAGE_ROOT: Path = Path(
         getenv("TTS_STORAGE_ROOT", str(Path(__file__).resolve().parents[2] / ".runtime" / "storage"))
     )

@@ -10,6 +10,7 @@ from app.services.dev_tts_service import (
     process_story_tts_job,
     read_manifest,
 )
+from app.services.qwen_server_client import QwenTtsInvocationError, QwenTtsNotConfiguredError
 from app.services.storage_service import StorageConfigurationError, StorageDownloadError, StorageUploadError
 
 
@@ -32,9 +33,9 @@ def preview_voice(voiceId: str, request: PreviewRequest) -> ApiSuccessResponse:
         raise HTTPException(status_code=404, detail=f"Voice not found: {voiceId}") from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    except CosyVoiceNotConfiguredError as error:
+    except (CosyVoiceNotConfiguredError, QwenTtsNotConfiguredError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-    except CosyVoiceInvocationError as error:
+    except (CosyVoiceInvocationError, QwenTtsInvocationError) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     except (StorageConfigurationError, StorageDownloadError, StorageUploadError) as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
