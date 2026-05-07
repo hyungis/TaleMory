@@ -149,6 +149,16 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
     // 오늘 이후는 선택 불가 (여행은 이미 다녀온 일정).
     if (day > today) return
 
+    // 다른 달 셀 (`inMonth: false`) 을 클릭한 경우 → viewMonth 를 그 달로 자동 동기화.
+    // 그렇지 않으면 사용자가 5월을 보고 4월 셀을 클릭했을 때 선택된 표시가
+    // 다음 grid 까지 안 보여서 "선택됐는지 모르는" 혼란이 생긴다.
+    if (
+      day.getMonth() !== viewMonth.getMonth() ||
+      day.getFullYear() !== viewMonth.getFullYear()
+    ) {
+      setViewMonth(new Date(day.getFullYear(), day.getMonth(), 1))
+    }
+
     const iso = toIso(day)
     const isDayTrip = !!(start && end && sameDay(start, end))
 
@@ -189,13 +199,20 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   const triggerLabel = (() => {
     if (start && end) {
       if (sameDay(start, end)) {
-        return `${start.getMonth() + 1}월 ${start.getDate()}일 (당일치기)`
+        return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일 (당일치기)`
       }
       const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
-      return `${start.getMonth() + 1}월 ${start.getDate()}일 ~ ${end.getMonth() + 1}월 ${end.getDate()}일 (${days}일)`
+      // 같은 해면 시작에만 년도 표기 — 정보 중복 회피.
+      // 다른 해 (연말~연초 여행) 면 종료에도 년도 표기 — 모호성 제거.
+      const sameYear = start.getFullYear() === end.getFullYear()
+      const startStr = `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일`
+      const endStr = sameYear
+        ? `${end.getMonth() + 1}월 ${end.getDate()}일`
+        : `${end.getFullYear()}년 ${end.getMonth() + 1}월 ${end.getDate()}일`
+      return `${startStr} ~ ${endStr} (${days}일)`
     }
     if (start) {
-      return `${start.getMonth() + 1}월 ${start.getDate()}일 — 도착일 선택 (같은 날 재클릭 시 당일치기)`
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일 — 도착일 선택 (같은 날 재클릭 시 당일치기)`
     }
     return '여행 일정을 선택해주세요'
   })()
@@ -426,19 +443,16 @@ function getDayCellStyle(opts: {
     color: 'var(--cr-ink)',
   }
 
+  // 우선순위: 미래(비활성) > 선택/범위(inMonth 무관) > 오늘 > inMonth 옅게 > base.
+  // 선택 표시는 다른 달 셀(`inMonth=false`)에서도 항상 visible 해야
+  // viewMonth 가 다른 달일 때 잠깐이라도 사용자가 선택 상태를 볼 수 있다.
+
   if (isFuture) {
     return {
       ...base,
       color: 'rgba(74, 59, 42, 0.25)',
       background: 'transparent',
       cursor: 'not-allowed',
-    }
-  }
-
-  if (!inMonth) {
-    return {
-      ...base,
-      color: 'rgba(74, 59, 42, 0.3)',
     }
   }
 
@@ -466,6 +480,13 @@ function getDayCellStyle(opts: {
       boxShadow: 'inset 0 0 0 2px rgba(95, 125, 80, 0.55)',
       color: 'var(--cr-sage-deep)',
       fontWeight: 800,
+    }
+  }
+
+  if (!inMonth) {
+    return {
+      ...base,
+      color: 'rgba(74, 59, 42, 0.3)',
     }
   }
 
