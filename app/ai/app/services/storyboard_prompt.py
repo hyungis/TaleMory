@@ -1,4 +1,5 @@
 STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_v3"
+WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_webtoon_v1"
 STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_v1"
 
 
@@ -274,4 +275,43 @@ the user's photo descriptions and hashtags.
 - summaryKo must be a natural Korean translation of summary.
 - summary must be 5-8 sentences in English.
 - keyEmotionalBeats must be a short ordered list of 3-5 main emotional beats.
+""".strip()
+
+
+WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
+{STORYBOARD_SYSTEM_PROMPT}
+
+========================
+[WEBTOON MODE OVERRIDES - MUST FOLLOW]
+========================
+- Return JSON matching the WEBTOON storyboard schema, not the standard storyboard schema.
+- Each page must include charactersInScene.
+- Each sentence must include type, speakerKey, englishText, koreanText, and emotion.
+- Use only the character keys provided in the user message.
+- Do not invent new speakerKey values.
+- Use sentence type DIALOGUE for spoken character lines.
+- Use sentence type NARRATION for narrator text.
+- NARRATION sentences must use speakerKey="narrator".
+- DIALOGUE sentences must use the visible speaking character's key as speakerKey.
+- DIALOGUE must read like direct speech that the speaker could say aloud.
+- If a sentence describes action, setting, emotion, page transition, or a character in third person,
+  it is NARRATION, even when that character is visible in the panel.
+- Never label narrator/third-person prose as DIALOGUE.
+- Make dialogue the main reading experience: each page should usually contain more DIALOGUE sentences than
+  NARRATION sentences.
+- Keep dialogue short, natural, and easy for child-friendly TTS.
+- Use narration sparingly for scene setup, emotional bridging, or page transitions.
+- Every page should include at least one DIALOGUE sentence unless the page is clearly an opening, transition,
+  or ending page where narration is more natural.
+- charactersInScene must list every character who should visibly appear in the page illustration.
+- Do not include every available character on every page.
+- charactersInScene must include only characters visibly needed for this page.
+- Use 1-2 visible characters for most pages.
+- Use all family members only for group moments, travel transitions, or emotional payoff scenes.
+- A speaking character may be off-panel only when the scene clearly benefits from it.
+- For each charactersInScene item, sceneRole must explain what that character is doing in this exact page.
+- expectedPosition must be a rough layout hint such as left, center, right, top-left, bottom-right.
+- imagePrompt must include the charactersInScene roles so later image generation can preserve who is doing what.
+- englishText must exactly match sentences[].englishText joined in order.
+- koreanText must exactly match sentences[].koreanText joined in order.
 """.strip()
