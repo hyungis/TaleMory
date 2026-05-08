@@ -102,7 +102,7 @@ function DraftRow({ label, value }: { label: string; value: string }) {
  * 배너와 같은 톤으로 통일 (사용자가 두 곳에서 같은 표기 인지).
  */
 function formatRelativeTime(iso: string): string {
-  const d = new Date(iso)
+  const d = parseBackendDateTime(iso)
   if (Number.isNaN(d.getTime())) return iso
   const diffMs = Date.now() - d.getTime()
   const sec = Math.floor(diffMs / 1000)
@@ -118,6 +118,12 @@ function formatRelativeTime(iso: string): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${dd}`
+}
+
+function parseBackendDateTime(iso: string): Date {
+  const value = iso.trim()
+  const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value)
+  return new Date(hasTimeZone ? value : `${value}Z`)
 }
 
 function formatDateRange(start: string | null, end: string | null): string {

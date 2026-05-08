@@ -45,6 +45,7 @@ const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
 const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 const MIN_LOGIN_ID_LENGTH = 4
 const MIN_PASSWORD_LENGTH = 6
+const MAX_NICKNAME_LENGTH = 45
 
 type AvailabilityCheckStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
 
@@ -182,6 +183,25 @@ function getPasswordCheckFeedback(
   return null
 }
 
+function getNicknameFormatFeedback(
+  value: string,
+  options: FieldValidationOptions = {},
+): FieldValidationFeedback | null {
+  const nickname = value.trim()
+
+  if (!nickname) {
+    return options.showRequired ? { message: '닉네임을 입력해주세요.' } : null
+  }
+
+  if (Array.from(nickname).length > MAX_NICKNAME_LENGTH) {
+    return {
+      message: `닉네임은 ${MAX_NICKNAME_LENGTH}자 이하로 입력해주세요.`,
+    }
+  }
+
+  return null
+}
+
 function getEmailFormatFeedback(
   value: string,
   options: FieldValidationOptions = {},
@@ -226,7 +246,8 @@ function validate(values: SignupFormValues, options: { isKakaoSignup?: boolean }
   if (emailFeedback) return emailFeedback.message
 
   if (!values.name.trim()) return '실명을 입력해주세요.'
-  if (!values.nickname.trim()) return '닉네임을 입력해주세요.'
+  const nicknameFeedback = getNicknameFormatFeedback(values.nickname, { showRequired: true })
+  if (nicknameFeedback) return nicknameFeedback.message
 
   const phoneFeedback = getPhoneFormatFeedback(values.phone)
   if (phoneFeedback) return phoneFeedback.message
@@ -402,7 +423,7 @@ export function SignupForm({
   const handleNicknameCheck = useCallback(async () => {
     const nickname = values.nickname.trim()
     setHasNicknameCheckTriggered(true)
-    if (!nickname) {
+    if (getNicknameFormatFeedback(nickname, { showRequired: true })) {
       return
     }
 
@@ -598,17 +619,16 @@ export function SignupForm({
   const emailFormatFeedback = getEmailFormatFeedback(values.email, { showRequired: hasSubmitted })
   const nameRequiredFeedback =
     hasSubmitted && !values.name.trim() ? { message: '실명을 입력해주세요.' } : null
-  const nicknameRequiredFeedback =
-    (hasSubmitted || hasNicknameCheckTriggered) && !values.nickname.trim()
-      ? { message: '닉네임을 입력해주세요.' }
-      : null
+  const nicknameFormatFeedback = getNicknameFormatFeedback(values.nickname, {
+    showRequired: hasSubmitted || hasNicknameCheckTriggered,
+  })
   const phoneFormatFeedback = getPhoneFormatFeedback(values.phone)
   const loginIdAvailabilityFeedback = loginIdFormatFeedback
     ? null
     : getAvailabilityFeedback('아이디', loginIdCheck, values.id, {
         showPrompt: hasSubmitted || hasLoginIdCheckTriggered || Boolean(values.id.trim()),
       })
-  const nicknameAvailabilityFeedback = nicknameRequiredFeedback
+  const nicknameAvailabilityFeedback = nicknameFormatFeedback
     ? null
     : getAvailabilityFeedback('닉네임', nicknameCheck, values.nickname, {
         showPrompt: hasSubmitted || hasNicknameCheckTriggered || Boolean(values.nickname.trim()),
@@ -767,7 +787,7 @@ export function SignupForm({
               {nicknameCheck.status === 'checking' ? '확인 중' : '중복 확인'}
             </button>
           </div>
-          {nicknameRequiredFeedback && <FieldFeedback feedback={nicknameRequiredFeedback} />}
+          {nicknameFormatFeedback && <FieldFeedback feedback={nicknameFormatFeedback} />}
           {nicknameAvailabilityFeedback && (
             <FieldFeedback
               feedback={{ message: nicknameAvailabilityFeedback.message }}
