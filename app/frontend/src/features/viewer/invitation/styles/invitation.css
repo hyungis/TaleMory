@@ -226,6 +226,9 @@
   margin: 4px 0 4px;
   letter-spacing: -0.5px;
   line-height: 1.15;
+  /* 한국어 어절(공백) 단위 줄바꿈 — sb-cover-title 과 일관. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .iv-cover-title-underline {
   width: 160px;
