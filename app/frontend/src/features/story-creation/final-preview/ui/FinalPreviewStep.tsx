@@ -195,6 +195,29 @@ export function FinalPreviewStep({
   const currentScene = currentPreviewPage?.kind === 'scene' ? currentPreviewPage.scene : null
   const currentSceneId = currentScene?.id ?? null
 
+  /**
+   * 새로고침 후 활성 재생성 잡의 페이지로 자동 이동.
+   *
+   * recovery effect 가 setActiveRegen 으로 polling 컨텍스트만 복원하고 페이지 인덱스는
+   * 그대로 두면 mount 시 useState 초기값 0(=표지) 에 갇힌다. + isAnyRegenPending 으로
+   * prev/next 까지 disable 이라 사용자가 활성 페이지로 못 감.
+   * → activeRegen.sceneId 가 매칭되는 previewPages index 로 한 번 자동 이동.
+   * (사용자가 본문 N 페이지에서 다시그리기 → 새로고침 → 그 N 페이지로 자동 복귀)
+   */
+  useEffect(() => {
+    if (!activeRegen) return
+    if (previewPages.length === 0) return
+    const targetIndex = previewPages.findIndex(
+      p => p.kind === 'scene' && p.scene.id === activeRegen.sceneId,
+    )
+    if (targetIndex >= 0 && targetIndex !== resultPageIndex) {
+      setResultPageIndex(targetIndex)
+    }
+    // resultPageIndex 는 의도적으로 dep 에서 제외 — 사용자가 자동 이동 후 또 다른 페이지로
+    // 가는(는 disable 이라 거의 없겠지만) 시도 시 무한 navigate 방지.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRegen?.sceneId, previewPages.length])
+
   useEffect(() => {
     if (!storyId || currentSceneId === null) {
       return
