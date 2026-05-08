@@ -301,6 +301,10 @@ WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
   NARRATION sentences.
 - Keep dialogue short, natural, and easy for child-friendly TTS.
 - Use narration sparingly for scene setup, emotional bridging, or page transitions.
+- WEBTOON mode still needs real page body text, not one-line captions.
+- Each page must contain at least 3 sentences and should usually contain 3-5 sentences total.
+- For most pages, use 1 short NARRATION sentence plus 2-4 short DIALOGUE sentences.
+- Never return a page with only one sentence unless the user explicitly requests a one-line page.
 - Every page should include at least one DIALOGUE sentence unless the page is clearly an opening, transition,
   or ending page where narration is more natural.
 - charactersInScene must list every character who should visibly appear in the page illustration.

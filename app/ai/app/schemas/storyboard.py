@@ -160,6 +160,13 @@ class StoryboardRegenerateRequest(BaseModel):
     feedbackInstruction: str = Field(..., min_length=1, max_length=2000)
 
 
+class WebtoonStoryboardRegenerateRequest(BaseModel):
+    storyId: int | None = Field(default=None, ge=1)
+    originalRequest: StoryboardGenerateRequest
+    currentStoryboard: WebtoonStoryboardGenerateResponse
+    feedbackInstruction: str = Field(..., min_length=1, max_length=2000)
+
+
 class StorySentenceTranslationRequest(BaseModel):
     koreanText: str = Field(..., min_length=1, max_length=10000)
 

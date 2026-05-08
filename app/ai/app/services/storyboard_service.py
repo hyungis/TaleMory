@@ -23,6 +23,7 @@ from app.schemas.storyboard import (
     WebtoonCharacterInScene,
     WebtoonStoryboardGenerateResponse,
     WebtoonStoryboardPage,
+    WebtoonStoryboardRegenerateRequest,
     WebtoonStorySentence,
 )
 from app.services.storyboard_prompt import (
@@ -70,6 +71,17 @@ def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGen
     if use_openai:
         return _regenerate_with_openai(request)
     return _generate_locally(_build_regenerate_fallback_request(request))
+
+
+def regenerate_webtoon_storyboard(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[STORY:WEBTOON:REGEN] service entry — useOpenAI=%s, feedbackLen=%d",
+        use_openai, len(request.feedbackInstruction or ""),
+    )
+    if use_openai:
+        return _regenerate_webtoon_with_openai(request)
+    return _generate_webtoon_locally(_build_webtoon_regenerate_fallback_request(request))
 
 
 def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
@@ -181,6 +193,51 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
         len(parsed.pages), parsed.totalWordCount,
         token_usage["input_tokens"], token_usage["output_tokens"], parsed.usage.costUsd,
     )
+    return parsed
+
+
+def _regenerate_webtoon_with_openai(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    try:
+        from openai import OpenAI
+        from openai import OpenAIError
+    except ImportError as exc:
+        raise RuntimeError("openai package is not installed") from exc
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    schema = _to_openai_strict_json_schema(WebtoonStoryboardGenerateResponse.model_json_schema())
+    input_content = _build_openai_webtoon_regenerate_input_content(request)
+
+    try:
+        response = client.responses.create(
+            model=settings.STORYBOARD_MODEL,
+            input=[
+                {"role": "system", "content": WEBTOON_STORYBOARD_SYSTEM_PROMPT},
+                {"role": "user", "content": input_content},
+            ],
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "webtoon_storyboard_regeneration_response",
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+        )
+    except OpenAIError as exc:
+        raise ValueError(f"OpenAI webtoon storyboard regeneration failed: {exc}") from exc
+
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(response.output_text)
+    _reconcile_webtoon_derived_counts(parsed)
+    token_usage = _extract_token_usage(response.usage)
+    parsed.usage.model = settings.STORYBOARD_MODEL
+    parsed.usage.inputTokens = token_usage["input_tokens"]
+    parsed.usage.outputTokens = token_usage["output_tokens"]
+    parsed.usage.totalTokens = token_usage["total_tokens"]
+    parsed.usage.costUsd = _estimate_cost_usd(
+        input_tokens=token_usage["input_tokens"],
+        output_tokens=token_usage["output_tokens"],
+    )
+    parsed.usage.promptTemplateVersion = WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION
     return parsed
 
 
@@ -354,6 +411,47 @@ def _build_openai_regenerate_input_content(
                 "detail": FIXED_VISION_DETAIL,
             }
         )
+    return content
+
+
+def _build_openai_webtoon_regenerate_input_content(
+    request: WebtoonStoryboardRegenerateRequest,
+) -> list[dict[str, str]]:
+    original_request = request.originalRequest.model_copy(deep=True)
+    if request.storyId is not None:
+        original_request.storyId = request.storyId
+
+    payload = original_request.model_dump(mode="json")
+    content = _build_openai_webtoon_input_content(original_request, payload)
+    content.extend(
+        [
+            {
+                "type": "input_text",
+                "text": (
+                    "Regenerate the WEBTOON storyboard using the original request, "
+                    "the current webtoon storyboard, and the user's feedback. "
+                    "Keep the WEBTOON output schema. Improve the story according "
+                    "to the feedback instead of lightly paraphrasing the current storyboard."
+                ),
+            },
+            {
+                "type": "input_text",
+                "text": (
+                    "USER FEEDBACK - HIGH PRIORITY:\n"
+                    f"{request.feedbackInstruction.strip()}\n\n"
+                    "Prioritize this feedback while preserving hard webtoon schema rules, "
+                    "approvedSummary direction, character keys, and child-friendly tone."
+                ),
+            },
+            {
+                "type": "input_text",
+                "text": (
+                    "CURRENT WEBTOON STORYBOARD TO REVISE:\n"
+                    f"{json.dumps(request.currentStoryboard.model_dump(mode='json'), ensure_ascii=False)}"
+                ),
+            },
+        ]
+    )
     return content
 
 
@@ -791,6 +889,19 @@ def _build_regenerate_fallback_request(
     if request.feedbackInstruction:
         existing = (original_request.additionalInstruction or "").strip()
         extra = f"Regeneration feedback: {request.feedbackInstruction.strip()}"
+        original_request.additionalInstruction = f"{existing}\n{extra}".strip() if existing else extra
+    return original_request
+
+
+def _build_webtoon_regenerate_fallback_request(
+    request: WebtoonStoryboardRegenerateRequest,
+) -> StoryboardGenerateRequest:
+    original_request = request.originalRequest.model_copy(deep=True)
+    if request.storyId is not None:
+        original_request.storyId = request.storyId
+    if request.feedbackInstruction:
+        existing = (original_request.additionalInstruction or "").strip()
+        extra = f"Webtoon regeneration feedback: {request.feedbackInstruction.strip()}"
         original_request.additionalInstruction = f"{existing}\n{extra}".strip() if existing else extra
     return original_request
 

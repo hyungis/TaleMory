@@ -72,7 +72,7 @@ def test_handle_generate_message_publishes_completed_envelope() -> None:
     assert published["story_id"] == 1
     assert published["action"] == "GENERATE"
     assert 10 <= published["payload"].pageCount <= 20
-    assert published["payload"].usage.promptTemplateVersion == "storyboard_v2"
+    assert published["payload"].usage.promptTemplateVersion == "storyboard_v3"
 
 
 def test_handle_regenerate_message_publishes_completed_envelope() -> None:
