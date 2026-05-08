@@ -1,5 +1,7 @@
 package com.s210.backend.domain.storyboard.application
 
+import com.s210.backend.common.codec.JobId
+import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.redis.StoryboardPageImageVersionRedisRepository
@@ -68,7 +70,7 @@ class StoryboardImageVersionService(
             .sortedByDescending { it.version }
 
         return StoryboardImageVersionsResult(
-            storyId = storyId,
+            storyId = StoryId(storyId),
             pageNumber = pageNumber,
             current = current,
             versions = entries,
@@ -138,7 +140,7 @@ class StoryboardImageVersionService(
         val remaining = (limit - used).coerceAtLeast(0)
 
         return StoryboardRegenStatusResult(
-            storyId = storyId,
+            storyId = StoryId(storyId),
             used = used,
             limit = limit,
             remaining = remaining,
@@ -166,7 +168,7 @@ class StoryboardImageVersionService(
                 url = url,
                 prompt = prompt,
                 createdAt = createdAt,
-                jobId = jobId,
+                jobId = jobId?.let { JobId(it) },
             )
         } catch (e: Exception) {
             log.warn("Failed to parse version entry: {}", e.message)

@@ -37,6 +37,7 @@ import {
 import { useGenerateStoryboardStoryPost } from '../../storyboard-prompt/model/useGenerateStoryboardStoryPost'
 import { deleteStory } from '../../basic-info'
 import { ROUTES } from '../../../../shared/constants'
+import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -71,12 +72,12 @@ function getStoryboardImageFailureMessage(errorMessage?: string | null): string 
 }
 
 interface StoryboardEditorStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   /**
    * Step 3 의 "스토리 확정하고 다음" 클릭으로 막 발행된 본문(STORY) 잡 id.
    * null 이면 storyboard-pages 캐시 기반 fallback 동작 (새로고침 후 재진입 등).
    */
-  storyGenerationJobId: number | null
+  storyGenerationJobId: JobId | null
   /** STORY 잡이 종결(SUCCESS/FAILED/CANCELLED/타임아웃) 시 호출 — 부모 flow 의 jobId 를 null 로. */
   onStoryJobFinished: () => void
   readOnly?: boolean
@@ -125,7 +126,7 @@ export function StoryboardEditorStep({
   // ────────────────────────────────────────────────────────────
   const stateQuery = useStoryboardStateQuery(storyId)
   const stateData = stateQuery.data
-  const [currentTranslationJobId, setCurrentTranslationJobId] = useState<number | null>(null)
+  const [currentTranslationJobId, setCurrentTranslationJobId] = useState<JobId | null>(null)
   const [currentTranslationPageNumber, setCurrentTranslationPageNumber] = useState<number | null>(null)
 
   // sessionStorage 의 jobId 가 우선 — 없으면 BE state 의 active job id 로 회복.
@@ -267,7 +268,7 @@ export function StoryboardEditorStep({
   // 사용자가 메시지를 읽을 시간을 주되 "지금 이동" 버튼으로 즉시 이동 가능.
   // ────────────────────────────────────────────────────────────
   const limitDeleteMut = useMutation({
-    mutationFn: async (id: number) => deleteStory(id),
+    mutationFn: async (id: StoryId) => deleteStory(id),
   })
 
   const goHomeAfterLimit = useCallback(() => {
@@ -313,7 +314,7 @@ export function StoryboardEditorStep({
 
   // 진행 중인 이미지 잡 (배치 생성 / 재생성 중 하나).
   // 잡이 SUCCESS/FAILED/타임아웃 도달하면 null 로 되돌려 UI 풀림.
-  const [currentImageJobId, setCurrentImageJobId] = useState<number | null>(null)
+  const [currentImageJobId, setCurrentImageJobId] = useState<JobId | null>(null)
   const imageJobQuery = useGenerationJobQuery(currentImageJobId)
 
   /**
@@ -328,7 +329,7 @@ export function StoryboardEditorStep({
    * ref 로 두는 이유: recovery effect 가 dep 변화로 재실행될 때 즉시 보이는 동기 source 가 필요.
    * useState 면 setState → re-render → effect 재실행 사이에 한 tick 뒤늦게 반영되어 race 가 또 생김.
    */
-  const finishedImageJobIdsRef = useRef<Set<number>>(new Set())
+  const finishedImageJobIdsRef = useRef<Set<JobId>>(new Set())
 
   // ────────────────────────────────────────────────────────────
   // IMAGE 배치 잡 새로고침 복구 — sessionStorage 가 비어 있는 엣지케이스(탭 닫고 재진입,
@@ -676,7 +677,7 @@ export function StoryboardEditorStep({
                 <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                 <div>
                   <strong>최종삽화가 생성되어 이 단계는 읽기 전용이에요.</strong>
-                  <span style={{ fontSize: 16, opacity: 0.9 }}>
+                  <span style={{ fontSize: 18, opacity: 0.9 }}>
                     본문/이미지를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.
                   </span>
                 </div>
@@ -834,8 +835,8 @@ export function StoryboardEditorStep({
               <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
                 <span className="cr-tape" aria-hidden="true" />
                 <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
-                <p className="text-[#2d5a27] font-bold mb-2">동화 본문을 만들고 있어요</p>
-                <p className="text-[#8b7a52]">
+                <p className="text-[#2d5a27] font-bold mb-2 text-2xl">동화 본문을 만들고 있어요</p>
+                <p className="text-[#8b7a52] text-lg">
                   AI 가 페이지별 글을 쓰고 있어요.
                 </p>
               </div>
@@ -1025,7 +1026,7 @@ export function StoryboardEditorStep({
  * BE 가 versioned S3 key (`v{N}.png`) 로 저장하므로 cache-buster query 불필요 — page.imageUrl 그대로 사용.
  */
 function PageCard(props: {
-  storyId: number | null
+  storyId: StoryId | null
   page: StoryboardPageItem
   pageIndex: number
   pageCount: number
@@ -1432,7 +1433,7 @@ function PageGrid({
  *  - select onChange → 부모의 `onChange(version)` 호출. 부모가 select mutation 트리거 + 캐시 갱신.
  *
  * UX 정책:
- *  - 옵션 라벨: `v{N} · 첫 생성` (v1) / `v{N} · {prompt 일부}` (v2+) / `v{N}` (prompt null fallback).
+ *  - 옵션 라벨: `첫 생성` (v1) / `{prompt 일부}` (v2+) / `(설명 없음)` (prompt null fallback).
  *  - current 가 선택된 상태로 표시. 같은 값을 선택해도 onChange 가 호출되지 않도록 controlled.
  *  - disabled: 부모가 progress 중이거나 select API 호출 중일 때 잠금.
  */
@@ -1442,7 +1443,7 @@ function VersionPicker({
   disabled,
   onChange,
 }: {
-  storyId: number | null
+  storyId: StoryId | null
   pageNumber: number
   disabled: boolean
   onChange: (version: number) => void
@@ -1464,11 +1465,10 @@ function VersionPicker({
   }
 
   const formatLabel = (entry: StoryboardImageVersionEntry): string => {
-    if (entry.version === 1) return `v1 · 첫 생성`
+    if (entry.version === 1) return '첫 생성'
     const trimmed = entry.prompt?.trim()
-    if (!trimmed) return `v${entry.version}`
-    const head = trimmed.length > 18 ? trimmed.slice(0, 18) + '…' : trimmed
-    return `v${entry.version} · ${head}`
+    if (!trimmed) return '(설명 없음)'
+    return trimmed.length > 18 ? trimmed.slice(0, 18) + '…' : trimmed
   }
 
   return (
@@ -1484,8 +1484,15 @@ function VersionPicker({
         value={currentValue}
         onChange={handleChange}
         disabled={disabled}
-        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 pl-2.5 pr-9 py-1.5 rounded-lg border border-[#9A7548]/40 bg-[#F4E4BC]/60 text-sm text-[#3E2A18] focus:border-[#3F6B2E] focus:bg-[#F4E4BC]/85 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`페이지 ${pageNumber} 이미지 버전 선택`}
+        style={{
+          appearance: 'none',
+          // native 화살표 대신 커스텀 SVG — 우측 가장자리에서 12px 띄움.
+          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1 L6 6 L11 1' stroke='%236b5638' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 12px center',
+        }}
       >
         {sorted.map(entry => (
           <option key={entry.version} value={entry.version}>

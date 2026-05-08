@@ -14,6 +14,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { isApiError } from '../../../../shared/api'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -34,7 +35,7 @@ import '../../styles/creation-paper.css'
 const MAX_CHARACTER_REFS = 3
 
 interface PhotoManagerStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   readOnly?: boolean
   onBack: () => void
   onNext: () => void
@@ -104,7 +105,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
   )
 
   const handleRemove = useCallback(
-    (photoId: number) => {
+    (photoId: PhotoId) => {
       deleteMutation.mutate(photoId, {
         onError: err => {
           if (isApiError(err)) {
@@ -131,8 +132,8 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
       const { active, over } = event
       if (!over || active.id === over.id) return
       const ids = memoryPhotos.map(p => p.photoId)
-      const fromIdx = ids.indexOf(Number(active.id))
-      const toIdx = ids.indexOf(Number(over.id))
+      const fromIdx = ids.indexOf(String(active.id))
+      const toIdx = ids.indexOf(String(over.id))
       if (fromIdx === -1 || toIdx === -1) return
       const next = arrayMove(ids, fromIdx, toIdx)
       reorderMutation.mutate(next)
@@ -141,7 +142,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
   )
 
   const handleToggleRef = useCallback(
-    (photoId: number, currentlyOn: boolean) => {
+    (photoId: PhotoId, currentlyOn: boolean) => {
       const next = !currentlyOn
       if (next && refAtCapacity) {
         showToast(`대표 사진은 최대 ${MAX_CHARACTER_REFS}장까지 선택할 수 있어요.`)
@@ -206,7 +207,9 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
               가족이 모두 잘 나온 사진을 골라주세요. AI 가 일관성 있게 동화 속 주인공의 모습을 그려줍니다.
               <br />
               아래 <strong>'추억의 사진'</strong> 카드에 사진을 올린 뒤 <span className="gold">★</span> 대표로
-              지정 버튼을 누르거나, 페이지 아래쪽 <strong>'대표 사진'</strong> 영역에 직접 올릴 수도 있어요.
+              지정 버튼을 누르거나,
+              <br />
+              페이지 아래쪽 <strong>'대표 사진'</strong> 영역에 직접 올릴 수도 있어요.
             </div>
           </div>
 
@@ -225,7 +228,7 @@ export function PhotoManagerStep({ storyId, readOnly = false, onBack, onNext }: 
                     ? '최종삽화가 생성되어 이 단계는 읽기 전용이에요.'
                     : '본문이 생성되어 이 단계는 읽기 전용이에요.'}
                 </strong>
-                <span style={{ fontSize: 16, opacity: 0.9 }}>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
                   {readOnly && !isSummaryLocked
                     ? '사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.'
                     : '사진을 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 본문/이미지를 이어 작업할 수 있어요.'}

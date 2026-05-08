@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BookOpenCheck,
   Loader2,
+  Lock,
   RotateCcw,
   Send,
   Sparkles,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
 import type { StoryProject } from '../../model/types'
+import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -26,10 +28,10 @@ import '../../styles/creation-paper.css'
 const PROMPT_MAX_LENGTH = 1000
 
 interface PromptStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   data: StoryProject['step3']
   onStoryChange: (story: string) => void
-  onStoryJobStarted: (jobId: number) => void
+  onStoryJobStarted: (jobId: JobId) => void
   lastConfirmedSummaryJobId: string | null
   onSummaryConfirmed: (summaryJobId: string | null) => void
   readOnly?: boolean
@@ -192,6 +194,19 @@ export function PromptStep({
                 : '원하는 분위기나 주제를 자유롭게 적어주세요. 비워도 업로드한 사진·여행 정보만으로 만들 수 있어요'
             }
           />
+
+          {/* 락 안내 — step 1/2 와 동일한 노란 cr-banner 톤. 본문 작업이 시작되어 줄거리 변경 불가. */}
+          {isLocked && (
+            <div className="cr-banner" role="status">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <div>
+                <strong>줄거리가 확정되어 이 단계는 읽기 전용이에요.</strong>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
+                  줄거리를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 본문/이미지를 이어 작업할 수 있어요.
+                </span>
+              </div>
+            </div>
+          )}
 
           {showInput && (
             <PromptInputCard
@@ -480,41 +495,22 @@ function ResultSection(props: {
         maxLength={4000}
         className="cr-prompt-textarea"
       />
-      <p
-        style={{
-          marginTop: 8,
-          fontFamily: 'var(--cr-font-gaegu)',
-          fontSize: 15,
-          color: 'var(--cr-ink-soft)',
-        }}
-      >
-        {locked
-          ? '확정된 줄거리예요. 본문 작업이 시작되어 줄거리는 더 이상 변경할 수 없어요.'
-          : '표현이나 단어를 직접 다듬을 수 있어요. 큰 의미 변경(여행지/등장인물 등)은 아래 "AI 에게 다시 요청하기" 가 더 정확해요.'}
-      </p>
-
-      {locked ? (
-        <div
+      {/* locked 안내는 상단 cr-banner 로 이전됨 — 여기서는 편집 가능한 상태일 때만 안내 표시. */}
+      {!locked && (
+        <p
           style={{
-            marginTop: 18,
-            padding: '14px 16px',
-            background: '#fbf2da',
-            border: '2px dashed var(--cr-caramel)',
-            borderRadius: 14,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
+            marginTop: 8,
             fontFamily: 'var(--cr-font-gaegu)',
+            fontSize: 18,
+            fontWeight: 600,
             color: 'var(--cr-sage-deep)',
-            fontWeight: 700,
-            fontSize: 17,
           }}
         >
-          <BookOpenCheck className="w-4 h-4" />
-          <span>본문 편집은 다음 단계에서 이어서 할 수 있어요.</span>
-        </div>
-      ) : (
+          표현이나 단어를 직접 다듬을 수 있어요. 큰 의미 변경(여행지/등장인물 등)은 아래 "AI 에게 다시 요청하기" 가 더 정확해요.
+        </p>
+      )}
+
+      {locked ? null : (
         <div style={{ marginTop: 18 }}>
           <div
             style={{
@@ -566,8 +562,9 @@ function ResultSection(props: {
             style={{
               marginTop: 8,
               fontFamily: 'var(--cr-font-gaegu)',
-              fontSize: 15,
-              color: 'var(--cr-ink-soft)',
+              fontSize: 18,
+              fontWeight: 600,
+              color: 'var(--cr-sage-deep)',
             }}
           >
             재요청 시 기존 줄거리는 새 결과로 교체됩니다.

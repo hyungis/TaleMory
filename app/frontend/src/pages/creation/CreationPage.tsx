@@ -12,6 +12,7 @@ import {
   PublishStoryStep,
   useStoryCreationFlow,
   rehydrateStep1,
+  rehydrateProgress,
 } from '../../features/story-creation'
 import type {
   UseStoryCreationFlowInit,
@@ -38,13 +39,24 @@ export function CreationPage() {
    * BookstoreScene "이어서 작성하기" 에서 `navigate(ROUTES.creation, { state: { draft } })` 로
    * 넘겨준 DRAFT 를 rehydrate 해서 flow 초기값으로 주입.
    * - state 없음 → 빈 step1 / storyId=null (신규 플로우)
-   * - draft 있음 → step1 복원 + storyId 세팅 → 재클릭 시 PATCH 로 동작
+   * - draft 있음 → step1 복원 + storyId 세팅 + 진행 메타로 lock 복원
+   *   → 재클릭 시 PATCH 로 동작
+   *
+   * 진행 메타(stylePresetLocked / confirmedReadOnly)는 크롬 종료 → sessionStorage 비움
+   * 시나리오에서 Step 5/6/7 락이 누락되는 버그를 막기 위해 BE 진실 기반으로 주입한다.
    */
   const init = useMemo<UseStoryCreationFlowInit | undefined>(() => {
     const state = location.state as { draft?: StoryDraftResponse | null } | null
     const draft = state?.draft
     if (!draft) return undefined
-    return { storyId: draft.storyId, step1: rehydrateStep1(draft) }
+    const progress = rehydrateProgress(draft)
+    return {
+      storyId: draft.storyId,
+      step1: rehydrateStep1(draft),
+      stylePresetLocked: progress.stylePresetLocked,
+      confirmedReadOnly: progress.confirmedReadOnly,
+      voiceProfileId: progress.voiceProfileId,
+    }
     // 의도적으로 location.state 만 의존 — 최초 mount 시 한 번만 계산되면 충분.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -147,6 +159,9 @@ export function CreationPage() {
           onNext={flow.handleNext}
           setFinalIllustrationJobId={flow.setFinalIllustrationJobId}
           finalIllustrationJobId={flow.finalIllustrationJobId}
+          // 크롬 종료 → sessionStorage 비움 시나리오에서 in-memory `finalIllustrationJobId` 가
+          // null 로 초기화되어도 BE 진실 기반의 `storyboardReadOnlyLocked` 로 락 유지.
+          readOnly={flow.storyboardReadOnlyLocked}
         />
       )}
 

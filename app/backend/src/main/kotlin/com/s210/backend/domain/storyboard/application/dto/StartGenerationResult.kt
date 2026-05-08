@@ -1,5 +1,7 @@
 package com.s210.backend.domain.storyboard.application.dto
 
+import com.s210.backend.common.codec.JobId
+
 /**
  * `POST /api/stories/{storyId}/storyboard/story` 의 202 Accepted 응답 payload.
  * API 명세 #28 (비동기 작업 공통 응답 포맷 `{ jobId, jobType, status }`).
@@ -8,8 +10,8 @@ package com.s210.backend.domain.storyboard.application.dto
  * FE 는 `GET /api/generation-jobs/{jobId}` 로 상태를 polling 한다.
  */
 data class StartGenerationResult(
-    /** `story_generation_jobs.id` (DB PK). */
-    val jobId: Long,
+    /** `story_generation_jobs.id` (DB PK) — Sqids 토큰으로 인코딩되어 응답. */
+    val jobId: JobId,
     /** 작업 종류 — 이번 생성은 "STORYBOARD_STORY" 고정. */
     val jobType: String,
     /** 초기 상태. 보통 "PENDING". */

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { AlertCircle, Lock } from 'lucide-react'
 import { ApiError } from '../../../../shared/api'
+import type { StoryId } from '../../../../shared/types'
 import type { StoryChild, StoryProject } from '../../model/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -25,7 +26,7 @@ import '../../styles/creation-paper.css'
 
 interface BasicInfoStepProps {
   data: StoryProject['step1']
-  storyId: number | null
+  storyId: StoryId | null
   onUpdate: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   onChildUpdate: (index: number, patch: Partial<StoryChild>) => void
   onChildAdd: () => void
@@ -33,7 +34,7 @@ interface BasicInfoStepProps {
   onChildRemove: (index: number) => void
   readOnly?: boolean
   onBack: () => void
-  onStoryCreated: (storyId: number) => void
+  onStoryCreated: (storyId: StoryId) => void
   onStaleStoryIdReset?: () => void
 }
 
@@ -207,7 +208,7 @@ export function BasicInfoStep({
                     ? '최종삽화가 생성되어 이 단계는 읽기 전용이에요.'
                     : '본문이 생성되어 이 단계는 읽기 전용이에요.'}
                 </strong>
-                <span style={{ fontSize: 16, opacity: 0.9 }}>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
                   {readOnly && !isSummaryLocked
                     ? '가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 진행하면 최종 작업을 이어갈 수 있어요.'
                     : '가족/여행 정보를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 본문/이미지를 이어 작업할 수 있어요.'}

@@ -1,3 +1,4 @@
+import type { StoryId, VoiceProfileId } from '../../../../shared/types'
 import { post, get, patch, deleteRequest } from '../../../../shared/api/client'
 
 const VOICE_PROFILE_ENDPOINT = '/voice-profiles'
@@ -10,7 +11,7 @@ export interface VoicePresignDto {
 }
 
 export interface VoiceProfileDto {
-  voiceProfileId: number
+  voiceProfileId: VoiceProfileId
   userId: number
   title: string
   audioUrl: string | null
@@ -52,8 +53,8 @@ export async function commitVoiceProfile(
  * `voice_profile_id IS NULL` 가드(409 INVALID_STORY_STATE)에 걸린다.
  */
 export async function attachVoiceProfileToStory(
-  storyId: number,
-  voiceProfileId: number,
+  storyId: StoryId,
+  voiceProfileId: VoiceProfileId,
 ): Promise<void> {
   await patch<unknown>(`/stories/${storyId}/voice-profile`, { voiceProfileId })
 }
@@ -64,7 +65,7 @@ export async function getVoiceProfiles(): Promise<VoiceProfileDto[]> {
 }
 
 /** DELETE /api/voice-profiles/{id} */
-export async function deleteVoiceProfile(voiceProfileId: number): Promise<void> {
+export async function deleteVoiceProfile(voiceProfileId: VoiceProfileId): Promise<void> {
   return deleteRequest<void>(`${VOICE_PROFILE_ENDPOINT}/${voiceProfileId}`)
 }
 
@@ -76,7 +77,7 @@ export interface VoicePreviewJobDto {
 
 /** POST /api/voice-profiles/{id}/preview — TTS 미리듣기 비동기 작업 시작 (202 Accepted) */
 export async function postVoicePreview(
-  voiceProfileId: number,
+  voiceProfileId: VoiceProfileId,
   text: string,
   language: string = 'ko-KR',
 ): Promise<VoicePreviewJobDto> {
@@ -106,7 +107,7 @@ interface RecordingScriptResponse {
 }
 
 /** GET /api/voice-recording-script?storyId={id} — 아이 이름이 주입된 녹음 스크립트 */
-export async function getRecordingScript(storyId?: number | null): Promise<string> {
+export async function getRecordingScript(storyId?: StoryId | null): Promise<string> {
   const query = storyId ? `?storyId=${storyId}` : ''
   const res = await get<RecordingScriptResponse>(`${VOICE_RECORDING_SCRIPT_ENDPOINT}${query}`)
   return res.script

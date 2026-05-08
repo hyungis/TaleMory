@@ -1,5 +1,6 @@
 package com.s210.backend.domain.story.presentation.request
 
+import com.s210.backend.common.codec.PhotoId
 import com.s210.backend.domain.story.application.dto.CreatePhotoCommand
 import com.s210.backend.domain.story.application.dto.ModifyPhotoCommand
 import com.s210.backend.domain.story.model.PhotoPurpose
@@ -89,5 +90,5 @@ data class ModifyPhotoRequest(
  */
 data class PhotoOrderRequest(
     @field:NotEmpty(message = "photoIds 는 비어있을 수 없습니다.")
-    val photoIds: List<Long> = emptyList(),
+    val photoIds: List<PhotoId> = emptyList(),
 )

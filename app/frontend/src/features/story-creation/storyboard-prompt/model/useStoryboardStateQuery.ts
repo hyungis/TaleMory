@@ -2,6 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
 import { getStoryboardState } from '../api/getStoryboardState'
 import type { StoryboardStateResponse } from '../api/types'
+import type { StoryId } from '../../../../shared/types'
 
 /**
  * 본문(STORY) 잡 상태 1회 조회 훅 — `GET /storyboard/state`.
@@ -19,11 +20,11 @@ import type { StoryboardStateResponse } from '../api/types'
  *  - Step 3 (PromptStep) — 본문 잡 진행 중인 동안 줄거리 락 회복 (proactive lock)
  */
 export function useStoryboardStateQuery(
-  storyId: number | null,
+  storyId: StoryId | null,
 ): UseQueryResult<StoryboardStateResponse, ApiError> {
   return useQuery<StoryboardStateResponse, ApiError>({
     queryKey: ['storyboard-state', storyId],
-    queryFn: () => getStoryboardState(storyId as number),
+    queryFn: () => getStoryboardState(storyId as StoryId),
     enabled: storyId !== null,
     staleTime: 0,
     retry: 1,

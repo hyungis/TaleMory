@@ -1,3 +1,4 @@
+import type { StoryId } from '../../../shared/types'
 import type { StoryView } from '../model/types'
 import { MOCK_STORY_VIEW } from './mockStoryView'
 import { apiClient } from '../../../shared/api'
@@ -9,7 +10,7 @@ import { apiClient } from '../../../shared/api'
 
 const USE_MOCK = import.meta.env.VITE_VIEWER_USE_MOCK === 'true'
 
-export async function getStoryView(storyId: number): Promise<StoryView> {
+export async function getStoryView(storyId: StoryId): Promise<StoryView> {
   if (USE_MOCK) {
     await new Promise(resolve => setTimeout(resolve, 200))
     return { ...MOCK_STORY_VIEW, storyId }

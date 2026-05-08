@@ -2,13 +2,14 @@
  * 동화책 도메인 타입.
  * 현재는 책장 표시에 필요한 필드만 정의. 추후 백엔드 스펙 맞춰 확장 예정.
  */
+import type { StoryId } from '../../shared/types'
 
 export type StoryLevel = '초급' | '중급' | '고급'
 
 export type StoryBadgeType = 'mic' | 'music'
 
 export interface Story {
-  id: number
+  id: StoryId
   title: string
   /** 표시용 ISO date string (YYYY-MM-DD). 정렬 정밀도는 createdAt 사용. */
   date: string

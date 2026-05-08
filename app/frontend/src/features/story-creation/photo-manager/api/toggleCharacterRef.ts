@@ -1,4 +1,5 @@
 import { put } from '../../../../shared/api'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import type { CharacterRefToggleRequest, PhotoItemResponse } from './types'
 
 /**
@@ -15,8 +16,8 @@ import type { CharacterRefToggleRequest, PhotoItemResponse } from './types'
  *  - `STORY_003` 등: 잘못된 photoId / purpose
  */
 export function toggleCharacterRef(
-  storyId: number,
-  photoId: number,
+  storyId: StoryId,
+  photoId: PhotoId,
   body: CharacterRefToggleRequest,
 ): Promise<PhotoItemResponse> {
   return put<PhotoItemResponse>(

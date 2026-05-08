@@ -29,10 +29,22 @@ export function mapApiToStory(api: StoryApiResponse): Story {
     level: DIFFICULTY_MAP[api.difficulty] ?? '초급',
     badgeType: 'mic',
     badgeText: 'AI 음성',
-    bgClass: BG_CLASSES[api.id % BG_CLASSES.length],
+    bgClass: BG_CLASSES[hashStringToIndex(api.id, BG_CLASSES.length)],
     publishedAt: api.publishedAt,
     status: api.status,
     shareToken: api.shareToken,
     coverImageUrl: api.coverImageUrl,
   }
+}
+
+/**
+ * Sqids 토큰(string) 을 0..modulo-1 범위의 안정적 인덱스로 매핑.
+ * BE id 가 number 였을 때의 `api.id % BG_CLASSES.length` 와 의미적 등가성 유지.
+ */
+function hashStringToIndex(str: string, modulo: number): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash) % modulo
 }

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiError } from '../../../../shared/api'
+import type { PhotoId, StoryId } from '../../../../shared/types'
 import { orderPhotos } from '../api/orderPhotos'
 import type { PhotoItemResponse } from '../api/types'
 
@@ -15,11 +16,11 @@ import type { PhotoItemResponse } from '../api/types'
  * invalidate 가 아닌 setQueryData 사용: 새 presigned URL 들이 다시 발급되며 `<img>` 가
  * 깜빡일 수 있어 피함 — 서버가 내려준 imageUrl 그대로 캐시에 박는다.
  */
-export function useReorderPhotos(storyId: number | null) {
+export function useReorderPhotos(storyId: StoryId | null) {
   const queryClient = useQueryClient()
 
-  return useMutation<PhotoItemResponse[], ApiError, number[], { previous?: PhotoItemResponse[] }>({
-    mutationFn: (photoIds: number[]) => {
+  return useMutation<PhotoItemResponse[], ApiError, PhotoId[], { previous?: PhotoItemResponse[] }>({
+    mutationFn: (photoIds: PhotoId[]) => {
       if (storyId === null) {
         return Promise.reject(new Error('storyId 가 없습니다.'))
       }

@@ -1,6 +1,8 @@
+import type { StoryId } from '../../../shared/types'
+
 /** GET /api/stories 응답 아이템 */
 export interface StoryApiResponse {
-  id: number
+  id: StoryId
   title: string | null
   difficulty: string
   status: string

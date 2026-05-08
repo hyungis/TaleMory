@@ -1,5 +1,7 @@
 package com.s210.backend.domain.story.application
 
+import com.s210.backend.common.codec.SceneId
+import com.s210.backend.common.codec.SentenceId
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.s3.S3Service
@@ -162,12 +164,12 @@ class HighlightOutroService(
 
         return scenes.map { scene ->
             SceneResponse(
-                id = scene.id,
+                id = SceneId(scene.id),
                 pageNumber = scene.pageNumber,
                 illustrationUrl = scene.illustrationUrl,
                 sentences = sentencesByScene[scene.id].orEmpty().map { s ->
                     SentenceResponse(
-                        id = s.id,
+                        id = SentenceId(s.id),
                         sentenceOrder = s.sentenceOrder,
                         englishText = s.englishText,
                         koreanText = s.koreanText,
@@ -220,7 +222,7 @@ class HighlightOutroService(
 
         return HighlightVoiceResponse(
             highlightVoiceId = voice.id,
-            sentenceId = sentenceId,
+            sentenceId = SentenceId(sentenceId),
             audioUrl = audioUrl,
         )
     }

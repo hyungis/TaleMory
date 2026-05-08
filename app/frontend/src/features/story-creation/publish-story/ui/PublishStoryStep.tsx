@@ -6,10 +6,11 @@ import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { publishStory, getShareLink } from '../../../bookshelf'
 import { ROUTES } from '../../../../shared/constants'
+import type { StoryId } from '../../../../shared/types'
 import '../../styles/creation-paper.css'
 
 interface PublishStoryStepProps {
-  storyId: number | null
+  storyId: StoryId | null
   onBack: () => void
   /** "내 책장 보관하기" — publish 완료 후 책장으로 이동. */
   onSaveToBookshelf: () => void

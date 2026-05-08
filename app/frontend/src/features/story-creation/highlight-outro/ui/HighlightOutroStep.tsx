@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ImageOff,
   Loader2,
+  Lock,
   Mic,
   Pause,
   Play,
@@ -14,6 +15,7 @@ import {
   MessageSquareHeart,
 } from 'lucide-react'
 import type { StoryProject } from '../../model/types'
+import type { JobId, SentenceId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
@@ -35,17 +37,17 @@ import { useStoryboardConfirm } from '../model/useStoryboardConfirm'
 import '../../styles/creation-paper.css'
 
 interface HighlightOutroStepProps {
-  storyId?: number | null
+  storyId?: StoryId | null
   projectData: StoryProject
   onBack: () => void
   onNext: () => void
-  setStoryGenerationJobId: (jobId: number | null) => void
+  setStoryGenerationJobId: (jobId: JobId | null) => void
   /**
    * confirm 응답에 finalIllustrationJobId 가 들어 있으면 store 동기화.
    * Step 5 에서 이미 set 된 값과 보통 같지만, 새로고침 등으로 store 가 비어있을
    * 때를 위한 보정 경로.
    */
-  setFinalIllustrationJobId: (jobId: number | null) => void
+  setFinalIllustrationJobId: (jobId: JobId | null) => void
   /**
    * 단방향 잠금 트리거 — confirmStoryboard 성공 직후 호출하여 step 6/7 을 영구 잠금.
    * 사용자가 step 8 에서 뒤로 돌아와 입력을 바꾸는 걸 차단.
@@ -59,7 +61,7 @@ interface HighlightOutroStepProps {
 }
 
 interface HighlightSentence {
-  sentenceId: number
+  sentenceId: SentenceId
   pageIndex: number
   sentenceIndex: number
   text: string
@@ -147,7 +149,7 @@ export function HighlightOutroStep({
     pageIndex: number
     pageLabel: number
     imageUrl: string | null
-    sentences: Array<{ sentenceId: number | null; en: string; ko: string | null }>
+    sentences: Array<{ sentenceId: string | null; en: string; ko: string | null }>
   }> = scenes
     ? scenes.flatMap((scene, idx) =>
         scene.pageNumber === 0
@@ -261,7 +263,7 @@ export function HighlightOutroStep({
     })
 
   const uploadHighlightVoice = useCallback(
-    async (pageIndex: number, sentenceIndex: number, sentenceId: number, blob: Blob) => {
+    async (pageIndex: number, sentenceIndex: number, sentenceId: SentenceId, blob: Blob) => {
       if (!storyId) return
       setHighlights(prev =>
         prev.map(h =>
@@ -379,7 +381,7 @@ export function HighlightOutroStep({
   }, [])
 
   const toggleHighlight = useCallback(
-    (pageIndex: number, sentenceIndex: number, sentenceId: number | null, text: string) => {
+    (pageIndex: number, sentenceIndex: number, sentenceId: SentenceId | null, text: string) => {
       if (readOnly) return
       setHighlights(prev => {
         const exists = prev.find(h => h.pageIndex === pageIndex && h.sentenceIndex === sentenceIndex)
@@ -391,7 +393,7 @@ export function HighlightOutroStep({
         }
         return [
           ...prev,
-          { pageIndex, sentenceIndex, sentenceId: sentenceId ?? 0, text, audioUrl: null, uploading: false },
+          { pageIndex, sentenceIndex, sentenceId: sentenceId ?? ('' as SentenceId), text, audioUrl: null, uploading: false },
         ]
       })
     },
@@ -488,30 +490,19 @@ export function HighlightOutroStep({
           <StepTitleBlock
             stepNumber={7}
             title="특별한 문장을 직접 읽어주세요"
-            subtitle={
-              readOnly
-                ? '동화책이 만들어진 뒤라 더 이상 강조 문장이나 마무리 멘트를 바꿀 수 없어요.'
-                : '각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요'
-            }
+            subtitle="각 페이지에서 강조할 문장을 골라 부모님 목소리로 녹음하고, 마지막 아웃트로 멘트도 녹음해 주세요"
           />
 
+          {/* 락 안내 — step 1/2/3/5/6 와 동일한 노란 cr-banner 톤. */}
           {readOnly && (
-            <div
-              role="status"
-              style={{
-                marginBottom: 18,
-                padding: '14px 18px',
-                borderRadius: 14,
-                background: '#fbf2da',
-                border: '2px dashed var(--cr-caramel)',
-                color: 'var(--cr-caramel-deep)',
-                fontFamily: 'var(--cr-font-gaegu)',
-                fontWeight: 700,
-                fontSize: 17,
-              }}
-            >
-              이 단계는 잠겨 있어요. 동화책이 이미 만들어지고 있어 강조 녹음·마무리 멘트는
-              변경할 수 없어요.
+            <div className="cr-banner" role="status">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+              <div>
+                <strong>강조 녹음·마무리 멘트가 확정되어 이 단계는 읽기 전용이에요.</strong>
+                <span style={{ fontSize: 18, opacity: 0.9 }}>
+                  강조 문장이나 마무리 멘트를 바꾸려면 새 동화책을 만들어주세요. 다음 단계로 넘어가면 최종 작업을 이어갈 수 있어요.
+                </span>
+              </div>
             </div>
           )}
 
@@ -540,7 +531,7 @@ export function HighlightOutroStep({
                 <Star className="w-4 h-4" />
               </span>
               <div>
-                <div className="cr-step-label" style={{ marginBottom: 2 }}>
+                <div className="cr-step-label" style={{ marginBottom: 2, fontSize: 20 }}>
                   강조 문장
                 </div>
                 <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 24, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
@@ -594,7 +585,7 @@ export function HighlightOutroStep({
 
                     {/* Right: Sentences */}
                     <div style={{ flex: 1, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
-                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 15, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
+                      <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 18, fontWeight: 700, color: 'var(--cr-ink-soft)', margin: 0 }}>
                         문장을 탭하여 강조 선택 후 녹음하세요
                       </p>
 
@@ -606,13 +597,14 @@ export function HighlightOutroStep({
                         return (
                           <div
                             key={sIdx}
-                            onClick={() => { if (!isRecording) toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en) }}
+                            onClick={() => { if (!isRecording && !readOnly) toggleHighlight(pageIndex, sIdx, sentence.sentenceId, sentence.en) }}
                             style={{
                               borderRadius: 14,
                               border: `2px solid ${isSelected ? 'var(--cr-sage-deep)' : 'var(--cr-caramel)'}`,
                               background: isSelected ? '#dceec8' : 'var(--cr-paper)',
                               padding: '12px 14px',
-                              cursor: isRecording ? 'default' : 'pointer',
+                              // readOnly = step7 confirm 후 잠긴 상태 → 막힘 커서로 시각 피드백.
+                              cursor: readOnly ? 'not-allowed' : isRecording ? 'default' : 'pointer',
                               transition: 'all 0.2s ease',
                             }}
                           >

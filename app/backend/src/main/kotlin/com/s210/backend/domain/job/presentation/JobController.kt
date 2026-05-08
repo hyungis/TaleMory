@@ -1,5 +1,6 @@
 package com.s210.backend.domain.job.presentation
 
+import com.s210.backend.common.codec.JobId
 import com.s210.backend.common.response.ApiResponse
 import com.s210.backend.domain.auth.entity.CustomUser
 import com.s210.backend.domain.job.application.JobService
@@ -24,9 +25,9 @@ class JobController(
     @GetMapping("/{jobId}")
     fun jobDetails(
         @AuthenticationPrincipal user: CustomUser,
-        @PathVariable jobId: Long,
+        @PathVariable jobId: JobId,
     ): ResponseEntity<ApiResponse<JobResponse>> {
-        val response = jobService.findJob(user.userId, jobId)
+        val response = jobService.findJob(user.userId, jobId.value)
         return ResponseEntity.ok(ApiResponse(data = response))
     }
 }
