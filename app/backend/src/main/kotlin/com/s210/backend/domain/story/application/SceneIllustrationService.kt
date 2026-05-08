@@ -104,7 +104,10 @@ class SceneIllustrationService(
         val status: String,
     )
 
-    /** TTS / FINAL_ILLUSTRATION 같이 동화 단위(스토리 단위) 잡 — sceneId 없음. */
+    /**
+     * TTS / FINAL_ILLUSTRATION 같이 동화 단위(스토리 단위) 잡 — sceneId 없음.
+     * 새로고침 후 FE polling 컨텍스트(effectiveTtsJobId / effectiveFinalJobId) 복원 시 사용.
+     */
     data class ActiveStoryJobView(
         val jobId: Long,
         val status: String,
