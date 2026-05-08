@@ -58,6 +58,7 @@ class Settings(BaseModel):
     GEMINI_API_KEY: str | None = getenv("GEMINI_API_KEY", getenv("GOOGLE_API_KEY"))
     REPLICATE_API_TOKEN: str | None = getenv("REPLICATE_API_TOKEN")
     STORYBOARD_MODEL: str = getenv("STORYBOARD_MODEL", "gpt-4o-mini")
+    WEBTOON_STORYBOARD_MODEL: str = getenv("WEBTOON_STORYBOARD_MODEL", "gemini-2.5-flash-lite")
     STORYBOARD_SUMMARY_MODEL: str = getenv("STORYBOARD_SUMMARY_MODEL", "gpt-5-nano")
     STORYBOARD_SUMMARY_REASONING_EFFORT: str = getenv(
         "STORYBOARD_SUMMARY_REASONING_EFFORT",

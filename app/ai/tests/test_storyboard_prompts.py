@@ -2,6 +2,8 @@ from app.schemas.storyboard import StoryboardGenerateRequest
 from app.core.config import settings
 from app.services.storyboard_prompt import STORYBOARD_SYSTEM_PROMPT, WEBTOON_STORYBOARD_SYSTEM_PROMPT
 from app.services.storyboard_service import (
+    _build_openai_webtoon_input_content,
+    _to_gemini_json_schema,
     generate_storyboard,
     generate_webtoon_storyboard,
 )
@@ -9,6 +11,7 @@ from app.services.storyboard_service import (
 
 def setup_function() -> None:
     settings.OPENAI_API_KEY = None
+    settings.GEMINI_API_KEY = None
 
 
 def test_storyboard_system_prompt_requires_rough_sketch_image_prompt() -> None:
@@ -19,6 +22,45 @@ def test_storyboard_system_prompt_requires_rough_sketch_image_prompt() -> None:
 def test_webtoon_prompt_requires_multiple_sentences_per_page() -> None:
     assert "Each page must contain at least 3 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
     assert "Never return a page with only one sentence" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+
+
+def test_gemini_schema_inlines_defs_for_structured_output() -> None:
+    schema = _to_gemini_json_schema(StoryboardGenerateRequest.model_json_schema())
+
+    assert "$defs" not in schema
+    assert "$ref" not in str(schema)
+    assert "title" not in schema
+    assert schema["properties"]["children"]["items"]["type"] == "object"
+
+
+def test_gemini_webtoon_input_can_omit_image_blocks() -> None:
+    request = StoryboardGenerateRequest.model_validate(
+        {
+            "storyId": 1,
+            "children": [{"name": "Lina", "age": 5, "gender": "FEMALE"}],
+            "companions": ["Mom"],
+            "travel": {"place": "Tokyo", "startDate": None, "endDate": None},
+            "photos": [
+                {
+                    "photoId": 101,
+                    "s3Key": "stories/test/1.jpg",
+                    "imageUrl": "https://example.com/photo.jpg",
+                    "description": "A family trip photo",
+                    "hashtags": ["family"],
+                    "displayOrder": 1,
+                }
+            ],
+            "difficulty": "BEGINNER",
+        }
+    )
+
+    content = _build_openai_webtoon_input_content(
+        request,
+        request.model_dump(mode="json"),
+        include_images=False,
+    )
+
+    assert all(block["type"] != "input_image" for block in content)
 
 
 def test_local_storyboard_generation_uses_rough_sketch_image_prompt() -> None:

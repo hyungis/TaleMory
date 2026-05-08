@@ -31,6 +31,7 @@ class FakePublisher:
 
 def setup_function() -> None:
     settings.OPENAI_API_KEY = None
+    settings.GEMINI_API_KEY = None
 
 
 def test_handle_generate_message_publishes_completed_envelope() -> None:

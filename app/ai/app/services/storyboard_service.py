@@ -4,6 +4,9 @@ import logging
 import mimetypes
 from functools import lru_cache
 from itertools import cycle, islice
+from urllib import error as url_error
+from urllib import parse as url_parse
+from urllib import request as url_request
 
 import boto3
 
@@ -41,47 +44,129 @@ FIXED_VISION_DETAIL = "low"
 
 
 def generate_storyboard(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:GEN] service entry — useOpenAI=%s, photos=%d, children=%d, place=%s",
-        use_openai, len(request.photos), len(request.children), request.travel.place,
+        "[STORY:GEN] service entry — provider=%s, photos=%d, children=%d, place=%s",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.photos), len(request.children), request.travel.place,
     )
+    if use_gemini:
+        return _generate_with_gemini(request)
     if use_openai:
         return _generate_with_openai(request)
     return _generate_locally(request)
 
 
 def generate_webtoon_storyboard(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.WEBTOON_STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:WEBTOON:GEN] service entry ??useOpenAI=%s, photos=%d, children=%d, place=%s",
-        use_openai, len(request.photos), len(request.children), request.travel.place,
+        "[STORY:WEBTOON:GEN] service entry — provider=%s, photos=%d, children=%d, place=%s",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.photos), len(request.children), request.travel.place,
     )
+    if use_gemini:
+        return _generate_webtoon_with_gemini(request)
     if use_openai:
         return _generate_webtoon_with_openai(request)
     return _generate_webtoon_locally(request)
 
 
 def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:REGEN] service entry — useOpenAI=%s, feedbackLen=%d",
-        use_openai, len(request.feedbackInstruction or ""),
+        "[STORY:REGEN] service entry — provider=%s, feedbackLen=%d",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.feedbackInstruction or ""),
     )
+    if use_gemini:
+        return _regenerate_with_gemini(request)
     if use_openai:
         return _regenerate_with_openai(request)
     return _generate_locally(_build_regenerate_fallback_request(request))
 
 
 def regenerate_webtoon_storyboard(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.WEBTOON_STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:WEBTOON:REGEN] service entry — useOpenAI=%s, feedbackLen=%d",
-        use_openai, len(request.feedbackInstruction or ""),
+        "[STORY:WEBTOON:REGEN] service entry — provider=%s, feedbackLen=%d",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.feedbackInstruction or ""),
     )
+    if use_gemini:
+        return _regenerate_webtoon_with_gemini(request)
     if use_openai:
         return _regenerate_webtoon_with_openai(request)
     return _generate_webtoon_locally(_build_webtoon_regenerate_fallback_request(request))
+
+
+def _use_gemini_storyboard_model(model: str) -> bool:
+    return model.startswith("gemini") and bool(settings.GEMINI_API_KEY)
+
+
+def _storyboard_provider_label(use_gemini: bool, use_openai: bool) -> str:
+    if use_gemini:
+        return "gemini"
+    if use_openai:
+        return "openai"
+    return "local"
+
+
+def _generate_with_gemini(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
+    payload = request.model_dump(mode="json")
+    input_content = _build_openai_input_content(request, payload, include_images=False)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.STORYBOARD_MODEL,
+        system_prompt=STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=StoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = StoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.STORYBOARD_MODEL)
+    return parsed
+
+
+def _generate_webtoon_with_gemini(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    payload = request.model_dump(mode="json")
+    input_content = _build_openai_webtoon_input_content(request, payload, include_images=False)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.WEBTOON_STORYBOARD_MODEL,
+        system_prompt=WEBTOON_STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=WebtoonStoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_webtoon_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.WEBTOON_STORYBOARD_MODEL)
+    return parsed
+
+
+def _regenerate_with_gemini(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+    input_content = _build_openai_regenerate_input_content(request, include_images=False)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.STORYBOARD_MODEL,
+        system_prompt=STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=StoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = StoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.STORYBOARD_MODEL)
+    return parsed
+
+
+def _regenerate_webtoon_with_gemini(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    input_content = _build_openai_webtoon_regenerate_input_content(request, include_images=False)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.WEBTOON_STORYBOARD_MODEL,
+        system_prompt=WEBTOON_STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=WebtoonStoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_webtoon_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.WEBTOON_STORYBOARD_MODEL)
+    return parsed
 
 
 def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
@@ -97,7 +182,7 @@ def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> Webtoon
     input_content = _build_openai_webtoon_input_content(request, payload)
     logger.info(
         "[STORY:WEBTOON:GEN] OpenAI call start ??model=%s, contentBlocks=%d",
-        settings.STORYBOARD_MODEL, len(input_content),
+        model, len(input_content),
     )
 
     try:
@@ -286,7 +371,11 @@ def _regenerate_with_openai(request: StoryboardRegenerateRequest) -> StoryboardG
     return parsed
 
 
-def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dict) -> list[dict[str, str]]:
+def _build_openai_input_content(
+    request: StoryboardGenerateRequest,
+    payload: dict,
+    include_images: bool = True,
+) -> list[dict[str, str]]:
     photo_count = len(request.photos)
     min_pages = FIXED_PAGE_MIN
     max_pages = FIXED_PAGE_MAX
@@ -306,7 +395,7 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
             "text": json.dumps(payload, ensure_ascii=False),
         },
     ]
-    if not FIXED_USE_VISION:
+    if not include_images or not FIXED_USE_VISION:
         return content
 
     for photo in sorted(request.photos, key=lambda item: item.displayOrder):
@@ -323,7 +412,11 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
     return content
 
 
-def _build_openai_webtoon_input_content(request: StoryboardGenerateRequest, payload: dict) -> list[dict[str, str]]:
+def _build_openai_webtoon_input_content(
+    request: StoryboardGenerateRequest,
+    payload: dict,
+    include_images: bool = True,
+) -> list[dict[str, str]]:
     character_keys = _webtoon_character_keys(request)
     character_directive = {
         "availableCharacters": character_keys,
@@ -342,7 +435,7 @@ def _build_openai_webtoon_input_content(request: StoryboardGenerateRequest, payl
         "Each page must include charactersInScene with sceneRole and expectedPosition for later image generation "
         "and final illustration coordinate extraction."
     )
-    content = _build_openai_input_content(request, payload)
+    content = _build_openai_input_content(request, payload, include_images=include_images)
     content.insert(1, {"type": "input_text", "text": webtoon_directive})
     content.insert(
         2,
@@ -356,6 +449,7 @@ def _build_openai_webtoon_input_content(request: StoryboardGenerateRequest, payl
 
 def _build_openai_regenerate_input_content(
     request: StoryboardRegenerateRequest,
+    include_images: bool = True,
 ) -> list[dict[str, str]]:
     original_request = request.originalRequest.model_copy(deep=True)
     if request.storyId is not None:
@@ -397,7 +491,7 @@ def _build_openai_regenerate_input_content(
             ),
         },
     ]
-    if not FIXED_USE_VISION:
+    if not include_images or not FIXED_USE_VISION:
         return content
 
     for photo in sorted(original_request.photos, key=lambda item: item.displayOrder):
@@ -416,13 +510,14 @@ def _build_openai_regenerate_input_content(
 
 def _build_openai_webtoon_regenerate_input_content(
     request: WebtoonStoryboardRegenerateRequest,
+    include_images: bool = True,
 ) -> list[dict[str, str]]:
     original_request = request.originalRequest.model_copy(deep=True)
     if request.storyId is not None:
         original_request.storyId = request.storyId
 
     payload = original_request.model_dump(mode="json")
-    content = _build_openai_webtoon_input_content(original_request, payload)
+    content = _build_openai_webtoon_input_content(original_request, payload, include_images=include_images)
     content.extend(
         [
             {
@@ -516,6 +611,229 @@ def _reconcile_webtoon_derived_counts(parsed: WebtoonStoryboardGenerateResponse)
         page.wordCount = _count_words(page.englishText)
     parsed.pageCount = len(parsed.pages)
     parsed.totalWordCount = sum(page.wordCount for page in parsed.pages)
+
+
+def _call_gemini_storyboard_api(
+    *,
+    model: str,
+    system_prompt: str,
+    input_content: list[dict[str, str]],
+    response_schema: dict,
+) -> dict:
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+
+    api_url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={url_parse.quote(settings.GEMINI_API_KEY)}"
+    )
+    payload = {
+        "systemInstruction": {
+            "parts": [{"text": system_prompt}],
+        },
+        "contents": [
+            {
+                "role": "user",
+                "parts": _build_gemini_parts(input_content),
+            }
+        ],
+        "generationConfig": {
+            "maxOutputTokens": 65536,
+            "responseMimeType": "application/json",
+            "responseJsonSchema": _to_gemini_json_schema(response_schema),
+            "thinkingConfig": {
+                "thinkingBudget": 0,
+            },
+        },
+    }
+    req = url_request.Request(
+        api_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    logger.info(
+        "[STORY:GEMINI] call start — model=%s, contentBlocks=%d",
+        settings.STORYBOARD_MODEL, len(input_content),
+    )
+    try:
+        with url_request.urlopen(req, timeout=180) as response:
+            response_json = json.loads(response.read().decode("utf-8"))
+    except url_error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        logger.exception("[STORY:GEMINI] call failed")
+        raise ValueError(f"Gemini storyboard generation failed: {exc.code} {body}") from exc
+    except url_error.URLError as exc:
+        logger.exception("[STORY:GEMINI] network error")
+        raise RuntimeError(f"Gemini storyboard generation network error: {exc.reason}") from exc
+
+    usage = _extract_gemini_token_usage(response_json)
+    logger.info(
+        "[STORY:GEMINI] call done — inputTok=%s, outputTok=%s, totalTok=%s",
+        usage["input_tokens"], usage["output_tokens"], usage["total_tokens"],
+    )
+    return response_json
+
+
+def _build_gemini_parts(input_content: list[dict[str, str]]) -> list[dict]:
+    parts: list[dict] = []
+    for block in input_content:
+        block_type = block.get("type")
+        if block_type == "input_text":
+            parts.append({"text": block.get("text", "")})
+            continue
+        if block_type == "input_image":
+            image_part = _build_gemini_image_part(block.get("image_url", ""))
+            if image_part is not None:
+                parts.append(image_part)
+    return parts
+
+
+def _build_gemini_image_part(image_ref: str) -> dict | None:
+    if not image_ref:
+        return None
+    if image_ref.startswith("data:"):
+        header, encoded = image_ref.split(",", 1)
+        mime_type = header.removeprefix("data:").split(";", 1)[0] or "image/png"
+        return {"inlineData": {"mimeType": mime_type, "data": encoded}}
+
+    try:
+        with url_request.urlopen(image_ref, timeout=30) as response:
+            raw_bytes = response.read()
+            mime_type = response.headers.get_content_type()
+            if mime_type == "application/octet-stream":
+                mime_type = mimetypes.guess_type(image_ref)[0] or "image/png"
+    except Exception:
+        logger.warning("[STORY:GEMINI] skipped unreadable image reference")
+        return None
+    return {
+        "inlineData": {
+            "mimeType": mime_type,
+            "data": base64.b64encode(raw_bytes).decode("ascii"),
+        }
+    }
+
+
+def _extract_gemini_text(response_json: dict) -> str:
+    text_parts: list[str] = []
+    for candidate in response_json.get("candidates", []):
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            text_value = part.get("text")
+            if text_value:
+                text_parts.append(text_value)
+    text = "".join(text_parts).strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+        if text.startswith("json"):
+            text = text[4:].strip()
+    if not text:
+        raise ValueError(f"Gemini storyboard generation returned empty text: {_gemini_empty_text_debug(response_json)}")
+    return text
+
+
+def _gemini_empty_text_debug(response_json: dict) -> str:
+    candidates = response_json.get("candidates", [])
+    finish_reasons = [
+        candidate.get("finishReason") or candidate.get("finish_reason")
+        for candidate in candidates
+    ]
+    safety_ratings = [
+        candidate.get("safetyRatings") or candidate.get("safety_ratings")
+        for candidate in candidates
+    ]
+    prompt_feedback = response_json.get("promptFeedback") or response_json.get("prompt_feedback")
+    usage = response_json.get("usageMetadata") or response_json.get("usage_metadata")
+    return (
+        f"finishReasons={finish_reasons}, "
+        f"promptFeedback={prompt_feedback}, "
+        f"safetyRatings={safety_ratings}, "
+        f"usageMetadata={usage}"
+    )
+
+
+def _apply_gemini_usage(usage: UsageInfo, response_json: dict, prompt_template_version: str, model: str) -> None:
+    token_usage = _extract_gemini_token_usage(response_json)
+    usage.model = model
+    usage.inputTokens = token_usage["input_tokens"]
+    usage.outputTokens = token_usage["output_tokens"]
+    usage.totalTokens = token_usage["total_tokens"]
+    usage.costUsd = _estimate_cost_usd(
+        input_tokens=token_usage["input_tokens"],
+        output_tokens=token_usage["output_tokens"],
+    )
+    usage.promptTemplateVersion = prompt_template_version
+
+
+def _extract_gemini_token_usage(response_json: dict) -> dict[str, int | None]:
+    usage_metadata = response_json.get("usageMetadata", {})
+    input_tokens = _optional_int(usage_metadata.get("promptTokenCount"))
+    output_tokens = _optional_int(usage_metadata.get("candidatesTokenCount"))
+    total_tokens = _optional_int(usage_metadata.get("totalTokenCount"))
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def _optional_int(value: object) -> int | None:
+    return int(value) if value is not None else None
+
+
+def _to_gemini_json_schema(schema: dict) -> dict:
+    raw = json.loads(json.dumps(schema))
+    definitions = raw.pop("$defs", {})
+    return _normalize_gemini_schema(raw, definitions)
+
+
+def _normalize_gemini_schema(node: object, definitions: dict) -> object:
+    if isinstance(node, list):
+        return [_normalize_gemini_schema(item, definitions) for item in node]
+    if not isinstance(node, dict):
+        return node
+
+    if "$ref" in node:
+        ref_name = node["$ref"].rsplit("/", 1)[-1]
+        ref_schema = definitions.get(ref_name, {})
+        merged = json.loads(json.dumps(ref_schema))
+        merged.update({key: value for key, value in node.items() if key != "$ref"})
+        return _normalize_gemini_schema(merged, definitions)
+
+    any_of = node.pop("anyOf", None)
+    if isinstance(any_of, list):
+        non_null = [item for item in any_of if item.get("type") != "null"]
+        has_null = len(non_null) != len(any_of)
+        if len(non_null) == 1:
+            normalized = _normalize_gemini_schema(non_null[0], definitions)
+            if isinstance(normalized, dict) and has_null:
+                normalized_type = normalized.get("type")
+                if isinstance(normalized_type, str):
+                    normalized["type"] = [normalized_type, "null"]
+            node.update(normalized)
+
+    for key in (
+        "$defs",
+        "default",
+        "description",
+        "examples",
+        "maxLength",
+        "minLength",
+        "title",
+    ):
+        node.pop(key, None)
+
+    for key, value in list(node.items()):
+        if key == "properties" and isinstance(value, dict):
+            node[key] = {
+                property_name: _normalize_gemini_schema(property_schema, definitions)
+                for property_name, property_schema in value.items()
+            }
+            continue
+        node[key] = _normalize_gemini_schema(value, definitions)
+    return node
 
 
 def _count_words(text: str) -> int:
