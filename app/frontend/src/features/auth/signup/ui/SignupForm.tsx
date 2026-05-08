@@ -45,7 +45,7 @@ const PHONE_PATTERN = /^[0-9\-+\s]{7,}$/
 const WITHDRAWN_ACCOUNT_CODE = 'AUTH_007'
 const MIN_LOGIN_ID_LENGTH = 4
 const MIN_PASSWORD_LENGTH = 6
-const NICKNAME_TOO_LONG_LENGTH = 45
+const MAX_NICKNAME_LENGTH = 45
 
 type AvailabilityCheckStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
 
@@ -193,9 +193,9 @@ function getNicknameFormatFeedback(
     return options.showRequired ? { message: '닉네임을 입력해주세요.' } : null
   }
 
-  if (Array.from(nickname).length >= NICKNAME_TOO_LONG_LENGTH) {
+  if (Array.from(nickname).length > MAX_NICKNAME_LENGTH) {
     return {
-      message: `닉네임은 ${NICKNAME_TOO_LONG_LENGTH}자 미만으로 입력해주세요.`,
+      message: `닉네임은 ${MAX_NICKNAME_LENGTH}자 이하로 입력해주세요.`,
     }
   }
 
