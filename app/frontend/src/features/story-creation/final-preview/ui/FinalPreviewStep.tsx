@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 import {
   BookOpen,
@@ -49,8 +49,6 @@ export function FinalPreviewStep({
   onBack,
   onNext,
 }: FinalPreviewStepProps) {
-  const ttsJobQuery = useGenerationJobQuery(storyGenerationJobId)
-  const finalJobQuery = useGenerationJobQuery(finalIllustrationJobId)
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [loadingScenes, setLoadingScenes] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +56,27 @@ export function FinalPreviewStep({
 
   const [activeRegen, setActiveRegen] = useState<{ sceneId: SceneId; jobId: JobId } | null>(null)
   const regenJobQuery = useGenerationJobQuery(activeRegen?.jobId ?? null)
+  /**
+   * 이번 세션에서 이미 종결(SUCCESS/FAILED/CANCELLED) 처리한 잡 id 집합.
+   * recovery effect 가 stale `regenStatus.activeJob` (BE 응답이 아직 갱신 안 됨)을 보고
+   * 같은 잡을 다시 살리는 cleanup ↔ recovery 무한 루프 차단용.
+   * Step 4 의 `finishedImageJobIdsRef` 와 동일 패턴.
+   */
+  const finishedRegenJobIdsRef = useRef<Set<JobId>>(new Set())
   const [regenStatus, setRegenStatus] = useState<IllustrationRegenStatusResponse | null>(null)
+
+  // ── BE 진실 기반 effective jobId ──────────────────────────────────────
+  // props 의 storyGenerationJobId / finalIllustrationJobId 는 sessionStorage persist 라
+  // 크롬 종료 후 "이어 만들기" 진입 시 둘 다 null 로 시작한다. 그대로 두면 ttsReady/finalReady
+  // 가 즉시 true 로 평가돼 잡이 진행 중인데도 책 펼침이 노출됨.
+  // → BE 의 regenStatus.active*Job 을 fallback 으로 사용해 polling 컨텍스트 복원.
+  const effectiveTtsJobId =
+    storyGenerationJobId ?? regenStatus?.activeTtsJob?.jobId ?? null
+  const effectiveFinalJobId =
+    finalIllustrationJobId ?? regenStatus?.activeFinalIllustrationJob?.jobId ?? null
+
+  const ttsJobQuery = useGenerationJobQuery(effectiveTtsJobId)
+  const finalJobQuery = useGenerationJobQuery(effectiveFinalJobId)
   const [openPromptScene, setOpenPromptScene] = useState<SceneId | null>(null)
   const [promptText, setPromptText] = useState('')
   const [regenError, setRegenError] = useState<string | null>(null)
@@ -67,9 +85,13 @@ export function FinalPreviewStep({
   const [versionReloadKey, setVersionReloadKey] = useState(0)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
 
-  const ttsReady = !storyGenerationJobId || ttsJobQuery.data?.status === 'SUCCESS'
-  const finalReady = !finalIllustrationJobId || finalJobQuery.data?.status === 'SUCCESS'
-  const shouldFetch = ttsReady && finalReady
+  // regenStatus 가 null 이면 = BE 응답 도착 전. 이 시점에 effectiveTtsJobId 가 null 인 게
+  // "진짜 잡 없음" 인지 "BE 진실 확인 전" 인지 알 수 없으므로, 응답 도착까지는 fetch 보류해
+  // 잡 진행 중인데 책 펼침이 노출되는 race 를 막는다.
+  const regenStatusReady = regenStatus !== null
+  const ttsReady = !effectiveTtsJobId || ttsJobQuery.data?.status === 'SUCCESS'
+  const finalReady = !effectiveFinalJobId || finalJobQuery.data?.status === 'SUCCESS'
+  const shouldFetch = regenStatusReady && ttsReady && finalReady
 
   useEffect(() => {
     if (!storyId) {
@@ -118,6 +140,8 @@ export function FinalPreviewStep({
     if (!activeRegen) return
     const status = regenJobQuery.data?.status
     if (status === 'SUCCESS') {
+      // 종결 표식 — recovery effect 가 stale BE 응답으로 같은 잡을 다시 살리는 것을 차단.
+      finishedRegenJobIdsRef.current.add(activeRegen.jobId)
       if (storyId) {
         getScenes(storyId)
           .then(updated => setScenes(updated))
@@ -131,6 +155,7 @@ export function FinalPreviewStep({
         setActiveRegen(null)
       })
     } else if (status === 'FAILED' || status === 'CANCELLED') {
+      finishedRegenJobIdsRef.current.add(activeRegen.jobId)
       refreshRegenStatus()
       queueMicrotask(() => {
         setRegenError('재생성에 실패했습니다. 잠시 후 다시 시도해주세요.')
@@ -138,6 +163,26 @@ export function FinalPreviewStep({
       })
     }
   }, [regenJobQuery.data?.status, activeRegen, storyId, refreshRegenStatus])
+
+  /**
+   * 새로고침 후 polling 컨텍스트 복원 effect — Step 4 의 activeImageRegenerateJob 복구와 동일 패턴.
+   *
+   * 사용자가 "다시 그리기" 후 새로고침하면 in-memory `activeRegen` 이 null 로 초기화돼
+   * 로딩 오버레이가 사라지고 polling 도 멈춘다. BE 의 진실(`regenStatus.activeJob`) 을 보고
+   * 활성 잡이 있으면 자동으로 setActiveRegen → polling 재개 → 오버레이 다시 표시 → 잡 종결 시
+   * 기존 cleanup effect 가 정상 동작.
+   *
+   * 가드:
+   *  - activeRegen 이미 set → 같은 잡으로 중복 polling 방지
+   *  - finishedRegenJobIdsRef 에 있으면 → 종결된 잡 (BE 응답 갱신 전 stale state 방어)
+   */
+  useEffect(() => {
+    if (activeRegen !== null) return
+    const active = regenStatus?.activeJob
+    if (!active) return
+    if (finishedRegenJobIdsRef.current.has(active.jobId)) return
+    setActiveRegen({ sceneId: active.sceneId, jobId: active.jobId })
+  }, [regenStatus?.activeJob, activeRegen])
 
   const coverScene = scenes.find(scene => scene.pageNumber === 0) ?? null
   const bodyScenes = coverScene ? scenes.filter(scene => scene.pageNumber !== 0) : scenes

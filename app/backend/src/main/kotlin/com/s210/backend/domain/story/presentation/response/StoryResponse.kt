@@ -228,6 +228,32 @@ data class IllustrationRegenStatusResponse(
     val used: Int,
     val limit: Int,
     val remaining: Int,
+    /**
+     * 현재 PENDING/RUNNING 인 페이지 재생성 잡 정보 (JobType.ILLUSTRATION = 단일 페이지 재생성).
+     */
+    val activeJob: ActiveIllustrationJobView? = null,
+    /**
+     * Step 7→8 confirmStoryboard 로 발행된 TTS 잡이 PENDING/RUNNING 이면 그 정보.
+     * 크롬 종료 후 "이어 만들기" 진입 시 props jobId 가 비어도 BE 진실로 polling 재개.
+     */
+    val activeTtsJob: ActiveStoryJobView? = null,
+    /**
+     * Step 5 PATCH /style 또는 Step 8 다시그리기로 발행된 FINAL_ILLUSTRATION 잡 정보.
+     * activeJob (페이지 재생성)과 별도로 동화 단위 batch 잡 추적.
+     */
+    val activeFinalIllustrationJob: ActiveStoryJobView? = null,
+)
+
+data class ActiveIllustrationJobView(
+    val jobId: JobId,
+    val sceneId: SceneId,
+    val status: String,
+)
+
+/** 동화 단위 잡(TTS / FINAL_ILLUSTRATION) — sceneId 없음. */
+data class ActiveStoryJobView(
+    val jobId: JobId,
+    val status: String,
 )
 
 data class ConfirmStoryboardResponse(
