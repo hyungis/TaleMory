@@ -269,7 +269,15 @@ export function FinalPreviewStep({
         setRegenError('이 동화의 다시 그리기 횟수를 모두 사용했습니다.')
         setRegenStatus(prev => prev
           ? { ...prev, used: prev.limit, remaining: 0 }
-          : { storyId, used: REGEN_LIMIT_TOTAL, limit: REGEN_LIMIT_TOTAL, remaining: 0 })
+          : {
+              storyId,
+              used: REGEN_LIMIT_TOTAL,
+              limit: REGEN_LIMIT_TOTAL,
+              remaining: 0,
+              activeJob: null,
+              activeTtsJob: null,
+              activeFinalIllustrationJob: null,
+            })
       } else if (isApiError(err)) {
         setRegenError(err.message ?? '재생성 요청에 실패했습니다.')
       } else {
