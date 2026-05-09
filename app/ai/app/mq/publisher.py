@@ -23,7 +23,7 @@ from app.schemas.mq_storyboard_image import (
     StoryboardImageSuccessEnvelope,
     StoryboardImageSuccessPayload,
 )
-from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
+from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StoryMode, StorySuccessEnvelope
 from app.schemas.mq_story_sentence_translation import (
     StorySentenceTranslationFailureEnvelope,
     StorySentenceTranslationSuccessEnvelope,
@@ -40,7 +40,7 @@ from app.schemas.mq_tts_preview import (
     PreviewTtsResultPayload,
     PreviewTtsSuccessEnvelope,
 )
-from app.schemas.storyboard import StoryboardGenerateResponse
+from app.schemas.storyboard import StoryboardGenerateResponse, WebtoonStoryboardGenerateResponse
 from app.schemas.storyboard import StorySentenceTranslationResponse
 from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
@@ -57,12 +57,14 @@ class StoryResultPublisher:
         self,
         job_id: str,
         story_id: int | None,
-        payload: StoryboardGenerateResponse,
+        payload: StoryboardGenerateResponse | WebtoonStoryboardGenerateResponse,
         action: StoryAction,
+        story_mode: StoryMode = "VIEWER",
     ) -> None:
         envelope = StorySuccessEnvelope(
             jobId=job_id,
             type=_completed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             payload=payload,
         )
@@ -77,10 +79,12 @@ class StoryResultPublisher:
         story_id: int | None,
         error: StoryError,
         action: StoryAction,
+        story_mode: StoryMode = "VIEWER",
     ) -> None:
         envelope = StoryFailureEnvelope(
             jobId=job_id,
             type=_failed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             error=error,
         )
