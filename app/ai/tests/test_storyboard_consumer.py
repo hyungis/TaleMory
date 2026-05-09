@@ -1,6 +1,11 @@
 from app.core.config import settings
-from app.consumers.storyboard_consumer import handle_generate_message, handle_regenerate_message
+from app.consumers.storyboard_consumer import (
+    handle_generate_message,
+    handle_regenerate_message,
+    handle_summary_generate_message,
+)
 from app.schemas.storyboard import StoryboardGenerateResponse
+from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 
 
 class FakePublisher:
@@ -25,6 +30,42 @@ class FakePublisher:
                 "story_id": story_id,
                 "error": error,
                 "action": action,
+            }
+        )
+
+    def publish_summary_result(
+        self,
+        job_id: str,
+        story_id: int | None,
+        payload: StoryboardSummaryGenerateResponse,
+        action: str,
+        story_mode: str = "VIEWER",
+    ) -> None:
+        self.published_results.append(
+            {
+                "job_id": job_id,
+                "story_id": story_id,
+                "payload": payload,
+                "action": action,
+                "story_mode": story_mode,
+            }
+        )
+
+    def publish_summary_failure(
+        self,
+        job_id: str,
+        story_id: int | None,
+        error,
+        action: str = "GENERATE",
+        story_mode: str = "VIEWER",
+    ) -> None:
+        self.published_failures.append(
+            {
+                "job_id": job_id,
+                "story_id": story_id,
+                "error": error,
+                "action": action,
+                "story_mode": story_mode,
             }
         )
 
@@ -163,4 +204,47 @@ def test_handle_regenerate_message_publishes_completed_envelope() -> None:
     assert published["story_id"] == 1
     assert published["action"] == "REGENERATE"
     assert 10 <= published["payload"].pageCount <= 20
+
+
+def test_handle_webtoon_summary_generate_message_uses_webtoon_summary_mode() -> None:
+    publisher = FakePublisher()
+    body = """
+    {
+      "jobId": "job-webtoon-summary-1",
+      "jobType": "STORY_SUMMARY",
+      "storyMode": "WEBTOON",
+      "storyId": 1,
+      "payload": {
+        "storyId": 1,
+        "children": [{"name": "Haesol", "age": 7, "gender": "FEMALE"}],
+        "companions": ["Mom", "Dad"],
+        "travel": {
+          "place": "Waikiki",
+          "startDate": "2026-01-10",
+          "endDate": "2026-01-14"
+        },
+        "photos": [
+          {
+            "photoId": 101,
+            "s3Key": "stories/1/photos/101.png",
+            "description": "Haesol put her feet in the ocean for the first time.",
+            "hashtags": ["beach", "first_time"],
+            "displayOrder": 1
+          }
+        ],
+        "difficulty": "BEGINNER"
+      }
+    }
+    """.encode("utf-8")
+
+    handle_summary_generate_message(body=body, publisher=publisher)
+
+    assert not publisher.published_failures
+    assert len(publisher.published_results) == 1
+    published = publisher.published_results[0]
+    assert published["job_id"] == "job-webtoon-summary-1"
+    assert published["story_id"] == 1
+    assert published["action"] == "GENERATE"
+    assert published["story_mode"] == "WEBTOON"
+    assert published["payload"].usage.promptTemplateVersion == "storyboard_summary_webtoon_v1"
 

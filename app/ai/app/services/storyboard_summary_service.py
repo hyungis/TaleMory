@@ -14,6 +14,8 @@ from app.schemas.storyboard_summary import (
 from app.services.storyboard_prompt import (
     STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
     STORYBOARD_SUMMARY_SYSTEM_PROMPT,
+    WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
+    WEBTOON_STORYBOARD_SUMMARY_SYSTEM_PROMPT,
 )
 from app.services.storyboard_service import (
     FIXED_USE_VISION,
@@ -50,11 +52,45 @@ def regenerate_storyboard_summary(
     return _generate_locally(request)
 
 
+def generate_webtoon_storyboard_summary(
+    request: StoryboardSummaryGenerateRequest,
+) -> StoryboardSummaryGenerateResponse:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[SUMMARY:WEBTOON:GEN] service entry ??useOpenAI=%s, photos=%d, children=%d, place=%s",
+        use_openai, len(request.photos), len(request.children), request.travel.place,
+    )
+    if use_openai:
+        return _generate_webtoon_with_openai(request)
+    return _generate_locally(
+        request,
+        prompt_template_version=WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
+    )
+
+
+def regenerate_webtoon_storyboard_summary(
+    request: StoryboardSummaryRegenerateRequest,
+) -> StoryboardSummaryGenerateResponse:
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[SUMMARY:WEBTOON:REGEN] service entry ??useOpenAI=%s, userPromptLen=%d",
+        use_openai, len(request.userPrompt or ""),
+    )
+    if use_openai:
+        return _regenerate_webtoon_with_openai(request)
+    return _generate_locally(
+        request,
+        prompt_template_version=WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
+    )
+
+
 def _generate_with_openai(
     request: StoryboardSummaryGenerateRequest,
 ) -> StoryboardSummaryGenerateResponse:
     return _request_summary_with_openai(
         input_content=_build_openai_input_content(request),
+        system_prompt=STORYBOARD_SUMMARY_SYSTEM_PROMPT,
+        prompt_template_version=STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
         schema_name="storyboard_summary_generation_response",
         error_label="generation",
     )
@@ -65,14 +101,42 @@ def _regenerate_with_openai(
 ) -> StoryboardSummaryGenerateResponse:
     return _request_summary_with_openai(
         input_content=_build_openai_regenerate_input_content(request),
+        system_prompt=STORYBOARD_SUMMARY_SYSTEM_PROMPT,
+        prompt_template_version=STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
         schema_name="storyboard_summary_regeneration_response",
         error_label="regeneration",
+    )
+
+
+def _generate_webtoon_with_openai(
+    request: StoryboardSummaryGenerateRequest,
+) -> StoryboardSummaryGenerateResponse:
+    return _request_summary_with_openai(
+        input_content=_build_openai_webtoon_input_content(request),
+        system_prompt=WEBTOON_STORYBOARD_SUMMARY_SYSTEM_PROMPT,
+        prompt_template_version=WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
+        schema_name="webtoon_storyboard_summary_generation_response",
+        error_label="webtoon generation",
+    )
+
+
+def _regenerate_webtoon_with_openai(
+    request: StoryboardSummaryRegenerateRequest,
+) -> StoryboardSummaryGenerateResponse:
+    return _request_summary_with_openai(
+        input_content=_build_openai_webtoon_regenerate_input_content(request),
+        system_prompt=WEBTOON_STORYBOARD_SUMMARY_SYSTEM_PROMPT,
+        prompt_template_version=WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
+        schema_name="webtoon_storyboard_summary_regeneration_response",
+        error_label="webtoon regeneration",
     )
 
 
 def _request_summary_with_openai(
     *,
     input_content: list[dict[str, str]],
+    system_prompt: str,
+    prompt_template_version: str,
     schema_name: str,
     error_label: str,
 ) -> StoryboardSummaryGenerateResponse:
@@ -87,7 +151,7 @@ def _request_summary_with_openai(
     request_args = {
         "model": settings.STORYBOARD_SUMMARY_MODEL,
         "input": [
-            {"role": "system", "content": STORYBOARD_SUMMARY_SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": input_content},
         ],
         "text": {
@@ -114,7 +178,7 @@ def _request_summary_with_openai(
         raise ValueError(f"OpenAI storyboard summary {error_label} failed: {exc}") from exc
 
     parsed = StoryboardSummaryGenerateResponse.model_validate_json(response.output_text)
-    parsed_with_usage = _apply_usage(parsed, response.usage)
+    parsed_with_usage = _apply_usage(parsed, response.usage, prompt_template_version)
     logger.info(
         "[SUMMARY] OpenAI call done — label=%s, summaryKoLen=%d, inputTok=%s, outputTok=%s, costUsd=%s",
         error_label, len(parsed_with_usage.summaryKo),
@@ -127,6 +191,7 @@ def _request_summary_with_openai(
 def _apply_usage(
     parsed: StoryboardSummaryGenerateResponse,
     usage: object,
+    prompt_template_version: str,
 ) -> StoryboardSummaryGenerateResponse:
     token_usage = _extract_token_usage(usage)
     parsed.usage.model = settings.STORYBOARD_SUMMARY_MODEL
@@ -137,7 +202,7 @@ def _apply_usage(
         input_tokens=token_usage["input_tokens"],
         output_tokens=token_usage["output_tokens"],
     )
-    parsed.usage.promptTemplateVersion = STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION
+    parsed.usage.promptTemplateVersion = prompt_template_version
     return parsed
 
 
@@ -158,6 +223,23 @@ def _build_openai_input_content(
         },
     ]
     return _append_images(content, request.photos)
+
+
+def _build_openai_webtoon_input_content(
+    request: StoryboardSummaryGenerateRequest,
+) -> list[dict[str, str]]:
+    content = _build_openai_input_content(request)
+    content.insert(
+        1,
+        {
+            "type": "input_text",
+            "text": (
+                "WEBTOON SUMMARY MODE: This summary will feed a later webtoon storyboard step. "
+                "Make the emotional plan panel-friendly, dialogue-friendly, and useful for character staging."
+            ),
+        },
+    )
+    return content
 
 
 def _build_openai_regenerate_input_content(
@@ -196,6 +278,23 @@ def _build_openai_regenerate_input_content(
         },
     ]
     return _append_images(content, request.photos)
+
+
+def _build_openai_webtoon_regenerate_input_content(
+    request: StoryboardSummaryRegenerateRequest,
+) -> list[dict[str, str]]:
+    content = _build_openai_regenerate_input_content(request)
+    content.insert(
+        1,
+        {
+            "type": "input_text",
+            "text": (
+                "WEBTOON SUMMARY MODE: Revise this as the story plan for later webtoon storyboard generation. "
+                "Keep it panel-friendly and dialogue-friendly while preserving the requested revision."
+            ),
+        },
+    )
+    return content
 
 
 def _append_images(
@@ -247,6 +346,7 @@ def _to_generate_request(
 
 def _generate_locally(
     request: StoryboardSummaryGenerateRequest | StoryboardSummaryRegenerateRequest,
+    prompt_template_version: str = STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
 ) -> StoryboardSummaryGenerateResponse:
     if isinstance(request, StoryboardSummaryRegenerateRequest):
         draft = _revise_locally(request.previousSummary, request.userPrompt)
@@ -261,7 +361,7 @@ def _generate_locally(
             outputTokens=0,
             totalTokens=0,
             costUsd=0.0,
-            promptTemplateVersion=STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION,
+            promptTemplateVersion=prompt_template_version,
         ),
     )
 

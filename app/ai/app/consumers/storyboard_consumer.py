@@ -18,7 +18,9 @@ from app.schemas.storyboard_summary import (
 )
 from app.services.storyboard_summary_service import (
     generate_storyboard_summary,
+    generate_webtoon_storyboard_summary,
     regenerate_storyboard_summary,
+    regenerate_webtoon_storyboard_summary,
 )
 from app.services.storyboard_service import generate_storyboard, regenerate_storyboard
 from app.services.story_sentence_translation_service import translate_story_sentences
@@ -177,11 +179,11 @@ def _create_summary_generate_job(body: bytes) -> ApiJob:
     request = _merge_story_id_summary(message.storyId, message.payload)
     story_id = _story_id_from_summary(message.storyId, request)
     logger.info(
-        "[SUMMARY:GEN] received ??jobId=%s, storyId=%s, photos=%d, children=%d",
-        message.jobId, story_id, len(request.photos), len(request.children),
+        "[SUMMARY:GEN] received ??jobId=%s, storyId=%s, storyMode=%s, photos=%d, children=%d",
+        message.jobId, story_id, message.storyMode, len(request.photos), len(request.children),
     )
     return ApiJob(
-        task=lambda: generate_storyboard_summary(request),
+        task=lambda: _generate_summary_for_mode(message.storyMode, request),
         on_success=lambda result: _publish_summary_result(message, story_id, result, "GENERATE"),
         on_error=lambda exc: _publish_summary_failure(message, story_id, exc, "GENERATE"),
     )
@@ -220,14 +222,32 @@ def _create_summary_regenerate_job(body: bytes) -> ApiJob:
     request = _merge_story_id_summary_regenerate(message.storyId, message.payload)
     story_id = _story_id_from_summary_regenerate(message.storyId, request)
     logger.info(
-        "[SUMMARY:REGEN] received ??jobId=%s, storyId=%s, userPromptLen=%d",
-        message.jobId, story_id, len(request.userPrompt or ""),
+        "[SUMMARY:REGEN] received ??jobId=%s, storyId=%s, storyMode=%s, userPromptLen=%d",
+        message.jobId, story_id, message.storyMode, len(request.userPrompt or ""),
     )
     return ApiJob(
-        task=lambda: regenerate_storyboard_summary(request),
+        task=lambda: _regenerate_summary_for_mode(message.storyMode, request),
         on_success=lambda result: _publish_summary_result(message, story_id, result, "REGENERATE"),
         on_error=lambda exc: _publish_summary_failure(message, story_id, exc, "REGENERATE"),
     )
+
+
+def _generate_summary_for_mode(
+    story_mode: str,
+    request: StoryboardSummaryGenerateRequest,
+):
+    if story_mode == "WEBTOON":
+        return generate_webtoon_storyboard_summary(request)
+    return generate_storyboard_summary(request)
+
+
+def _regenerate_summary_for_mode(
+    story_mode: str,
+    request: StoryboardSummaryRegenerateRequest,
+):
+    if story_mode == "WEBTOON":
+        return regenerate_webtoon_storyboard_summary(request)
+    return regenerate_storyboard_summary(request)
 
 
 def _process_generate_message(body: bytes) -> bool:
@@ -330,6 +350,7 @@ def _publish_summary_result(
             story_id=story_id,
             payload=result,
             action=action,
+            story_mode=message.storyMode,
         )
     logger.info(
         "[SUMMARY:%s] published result ??jobId=%s, summaryKoLen=%d, costUsd=%s",
@@ -394,7 +415,13 @@ def _publish_summary_failure(
         with publisher_channel() as channel:
             publisher = StoryResultPublisher(channel)
             return _publish_unexpected_summary_failure(
-                body=json.dumps({"jobId": message.jobId, "storyId": story_id}).encode("utf-8"),
+                body=json.dumps(
+                    {
+                        "jobId": message.jobId,
+                        "storyId": story_id,
+                        "storyMode": message.storyMode,
+                    }
+                ).encode("utf-8"),
                 publisher=publisher,
                 action=action,
                 exc=exc,
@@ -407,6 +434,7 @@ def _publish_summary_failure(
             story_id=story_id,
             error=StoryError(code=code, message=str(exc)),
             action=action,
+            story_mode=message.storyMode,
         )
     return True
 
@@ -461,12 +489,13 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
     )
 
     try:
-        result = generate_storyboard_summary(request)
+        result = _generate_summary_for_mode(message.storyMode, request)
     except ValueError as exc:
         publisher.publish_summary_failure(
             job_id=message.jobId,
             story_id=story_id,
             error=StoryError(code="GENERATE_STORY_SUMMARY_ERROR", message=str(exc)),
+            story_mode=message.storyMode,
         )
         return
     except RuntimeError as exc:
@@ -474,6 +503,7 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
             job_id=message.jobId,
             story_id=story_id,
             error=StoryError(code="GENERATE_STORY_SUMMARY_RUNTIME_ERROR", message=str(exc)),
+            story_mode=message.storyMode,
         )
         return
 
@@ -482,6 +512,7 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
         story_id=story_id,
         payload=result,
         action="GENERATE",
+        story_mode=message.storyMode,
     )
     logger.info(
         "[SUMMARY:GEN] published result — jobId=%s, summaryKoLen=%d, costUsd=%s",
@@ -499,13 +530,14 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
     )
 
     try:
-        result = regenerate_storyboard_summary(request)
+        result = _regenerate_summary_for_mode(message.storyMode, request)
     except ValueError as exc:
         publisher.publish_summary_failure(
             job_id=message.jobId,
             story_id=story_id,
             error=StoryError(code="REGENERATE_STORY_SUMMARY_ERROR", message=str(exc)),
             action="REGENERATE",
+            story_mode=message.storyMode,
         )
         return
     except RuntimeError as exc:
@@ -514,6 +546,7 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
             story_id=story_id,
             error=StoryError(code="REGENERATE_STORY_SUMMARY_RUNTIME_ERROR", message=str(exc)),
             action="REGENERATE",
+            story_mode=message.storyMode,
         )
         return
 
@@ -522,6 +555,7 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
         story_id=story_id,
         payload=result,
         action="REGENERATE",
+        story_mode=message.storyMode,
     )
     logger.info(
         "[SUMMARY:REGEN] published result — jobId=%s, summaryKoLen=%d, costUsd=%s",
@@ -626,6 +660,7 @@ def _publish_unexpected_summary_failure(
         return False
 
     story_id = payload.get("storyId")
+    story_mode = payload.get("storyMode")
     publisher.publish_summary_failure(
         job_id=job_id,
         story_id=story_id if isinstance(story_id, int) else None,
@@ -634,6 +669,7 @@ def _publish_unexpected_summary_failure(
             message=str(exc),
         ),
         action=action,
+        story_mode=story_mode if story_mode in ("VIEWER", "WEBTOON") else "VIEWER",
     )
     return True
 
@@ -645,6 +681,7 @@ def _extract_job_context(body: bytes) -> dict[str, Any]:
     return {
         "jobId": parsed.get("jobId"),
         "storyId": parsed.get("storyId"),
+        "storyMode": parsed.get("storyMode"),
     }
 
 

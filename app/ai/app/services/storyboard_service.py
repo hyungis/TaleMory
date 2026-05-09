@@ -128,7 +128,7 @@ def _generate_with_gemini(request: StoryboardGenerateRequest) -> StoryboardGener
 
 def _generate_webtoon_with_gemini(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
     payload = request.model_dump(mode="json")
-    input_content = _build_openai_webtoon_input_content(request, payload, include_images=False)
+    input_content = _build_openai_webtoon_input_content(request, payload, include_images=True)
     response_json = _call_gemini_storyboard_api(
         model=settings.WEBTOON_STORYBOARD_MODEL,
         system_prompt=WEBTOON_STORYBOARD_SYSTEM_PROMPT,
@@ -156,7 +156,7 @@ def _regenerate_with_gemini(request: StoryboardRegenerateRequest) -> StoryboardG
 
 
 def _regenerate_webtoon_with_gemini(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
-    input_content = _build_openai_webtoon_regenerate_input_content(request, include_images=False)
+    input_content = _build_openai_webtoon_regenerate_input_content(request, include_images=True)
     response_json = _call_gemini_storyboard_api(
         model=settings.WEBTOON_STORYBOARD_MODEL,
         system_prompt=WEBTOON_STORYBOARD_SYSTEM_PROMPT,
@@ -182,12 +182,12 @@ def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> Webtoon
     input_content = _build_openai_webtoon_input_content(request, payload)
     logger.info(
         "[STORY:WEBTOON:GEN] OpenAI call start ??model=%s, contentBlocks=%d",
-        model, len(input_content),
+        settings.WEBTOON_STORYBOARD_MODEL, len(input_content),
     )
 
     try:
         response = client.responses.create(
-            model=settings.STORYBOARD_MODEL,
+            model=settings.WEBTOON_STORYBOARD_MODEL,
             input=[
                 {"role": "system", "content": WEBTOON_STORYBOARD_SYSTEM_PROMPT},
                 {"role": "user", "content": input_content},
@@ -208,7 +208,7 @@ def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> Webtoon
     parsed = WebtoonStoryboardGenerateResponse.model_validate_json(response.output_text)
     _reconcile_webtoon_derived_counts(parsed)
     token_usage = _extract_token_usage(response.usage)
-    parsed.usage.model = settings.STORYBOARD_MODEL
+    parsed.usage.model = settings.WEBTOON_STORYBOARD_MODEL
     parsed.usage.inputTokens = token_usage["input_tokens"]
     parsed.usage.outputTokens = token_usage["output_tokens"]
     parsed.usage.totalTokens = token_usage["total_tokens"]
@@ -294,7 +294,7 @@ def _regenerate_webtoon_with_openai(request: WebtoonStoryboardRegenerateRequest)
 
     try:
         response = client.responses.create(
-            model=settings.STORYBOARD_MODEL,
+            model=settings.WEBTOON_STORYBOARD_MODEL,
             input=[
                 {"role": "system", "content": WEBTOON_STORYBOARD_SYSTEM_PROMPT},
                 {"role": "user", "content": input_content},
@@ -314,7 +314,7 @@ def _regenerate_webtoon_with_openai(request: WebtoonStoryboardRegenerateRequest)
     parsed = WebtoonStoryboardGenerateResponse.model_validate_json(response.output_text)
     _reconcile_webtoon_derived_counts(parsed)
     token_usage = _extract_token_usage(response.usage)
-    parsed.usage.model = settings.STORYBOARD_MODEL
+    parsed.usage.model = settings.WEBTOON_STORYBOARD_MODEL
     parsed.usage.inputTokens = token_usage["input_tokens"]
     parsed.usage.outputTokens = token_usage["output_tokens"]
     parsed.usage.totalTokens = token_usage["total_tokens"]

@@ -28,7 +28,11 @@ from app.schemas.mq_story_sentence_translation import (
     StorySentenceTranslationFailureEnvelope,
     StorySentenceTranslationSuccessEnvelope,
 )
-from app.schemas.mq_storyboard_summary import StorySummaryFailureEnvelope, StorySummarySuccessEnvelope
+from app.schemas.mq_storyboard_summary import (
+    StorySummaryFailureEnvelope,
+    StorySummaryMode,
+    StorySummarySuccessEnvelope,
+)
 from app.schemas.mq_tts import StoryTtsResultPayload, TtsError, TtsFailureEnvelope, TtsSuccessEnvelope
 from app.schemas.mq_tts_preview import (
     PreviewTtsError,
@@ -91,10 +95,12 @@ class StoryResultPublisher:
         story_id: int | None,
         payload: StoryboardSummaryGenerateResponse,
         action: StoryAction = "GENERATE",
+        story_mode: StorySummaryMode = "VIEWER",
     ) -> None:
         envelope = StorySummarySuccessEnvelope(
             jobId=job_id,
             type=_summary_completed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             payload=payload,
         )
@@ -109,10 +115,12 @@ class StoryResultPublisher:
         story_id: int | None,
         error: StoryError,
         action: StoryAction = "GENERATE",
+        story_mode: StorySummaryMode = "VIEWER",
     ) -> None:
         envelope = StorySummaryFailureEnvelope(
             jobId=job_id,
             type=_summary_failed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             error=error,
         )

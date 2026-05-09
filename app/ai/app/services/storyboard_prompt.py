@@ -1,6 +1,7 @@
 STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_v3"
 WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_webtoon_v1"
 STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_v1"
+WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_webtoon_v1"
 
 
 STORYBOARD_SYSTEM_PROMPT = """
@@ -275,6 +276,21 @@ the user's photo descriptions and hashtags.
 - summaryKo must be a natural Korean translation of summary.
 - summary must be 5-8 sentences in English.
 - keyEmotionalBeats must be a short ordered list of 3-5 main emotional beats.
+""".strip()
+
+
+WEBTOON_STORYBOARD_SUMMARY_SYSTEM_PROMPT = f"""
+{STORYBOARD_SUMMARY_SYSTEM_PROMPT}
+
+========================
+[WEBTOON SUMMARY MODE OVERRIDES - MUST FOLLOW]
+========================
+- Plan the same child-friendly emotional arc, but make it suitable for later WEBTOON storyboard generation.
+- Favor a premise that can become expressive panels, short dialogue beats, and clear character staging.
+- Keep the output schema identical to normal summary generation.
+- Do not write page-by-page panels yet.
+- Do not include camera directions in the summary fields.
+- keyEmotionalBeats should be useful for later dialogue-led webtoon scenes.
 """.strip()
 
 
