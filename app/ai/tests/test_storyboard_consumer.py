@@ -134,6 +134,63 @@ def test_handle_generate_message_publishes_completed_envelope() -> None:
     assert published["payload"].usage.promptTemplateVersion == "storyboard_v3"
 
 
+def test_handle_webtoon_generate_message_uses_webtoon_story_mode() -> None:
+    publisher = FakePublisher()
+    body = """
+    {
+      "jobId": "job-webtoon-generate-1",
+      "jobType": "STORY",
+      "storyMode": "WEBTOON",
+      "storyId": 1,
+      "payload": {
+        "storyId": 1,
+        "children": [{"name": "Haesol", "age": 7, "gender": "FEMALE"}],
+        "companions": ["Mom", "Dad"],
+        "travel": {
+          "place": "Waikiki",
+          "startDate": "2026-01-10",
+          "endDate": "2026-01-14"
+        },
+        "photos": [
+          {
+            "photoId": 101,
+            "s3Key": "stories/1/photos/101.png",
+            "description": "Haesol put her feet in the ocean for the first time.",
+            "hashtags": ["beach", "first_time"],
+            "displayOrder": 1
+          }
+        ],
+        "difficulty": "BEGINNER",
+        "approvedSummary": {
+          "title": "Haesol's Little Journey to Waikiki",
+          "summary": "Haesol travels to Waikiki with her family. She wonders what makes the trip special. Small memories begin to connect. She learns that love makes the journey warm. The family shares a bright ending.",
+          "summaryKo": "Haesol travels to Waikiki with her family.",
+          "moralTheme": "Small loving moments become the heart of a family adventure.",
+          "storyQuest": "Find what makes the family trip feel truly special.",
+          "recurringMotif": "A gentle ribbon of sunlight.",
+          "keyEmotionalBeats": [
+            "The child arrives with a question.",
+            "Joyful moments appear.",
+            "Family memories connect."
+          ]
+        }
+      }
+    }
+    """.encode("utf-8")
+
+    handle_generate_message(body=body, publisher=publisher)
+
+    assert not publisher.published_failures
+    assert len(publisher.published_results) == 1
+    published = publisher.published_results[0]
+    assert published["job_id"] == "job-webtoon-generate-1"
+    assert published["story_id"] == 1
+    assert published["action"] == "GENERATE"
+    assert published["story_mode"] == "WEBTOON"
+    assert published["payload"].usage.promptTemplateVersion == "storyboard_webtoon_v1"
+    assert all(hasattr(page, "charactersInScene") for page in published["payload"].pages)
+
+
 def test_handle_regenerate_message_publishes_completed_envelope() -> None:
     publisher = FakePublisher()
     body = """
