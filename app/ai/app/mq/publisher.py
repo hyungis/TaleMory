@@ -334,10 +334,12 @@ class StoryboardImageJobPublisher:
         seed: int,
         result: StoryboardImageGenerateResult,
         action: StoryboardImageAction,
+        story_mode: str = "VIEWER",
     ) -> None:
         envelope = StoryboardImageSuccessEnvelope(
             jobId=job_id,
             type=_image_completed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             pageNumber=result.pageNumber,
             payload=StoryboardImageSuccessPayload(seed=seed, result=result),
@@ -355,10 +357,12 @@ class StoryboardImageJobPublisher:
         error: StoryboardImageError,
         action: StoryboardImageAction,
         page_number: int | None = None,
+        story_mode: str = "VIEWER",
     ) -> None:
         envelope = StoryboardImageFailureEnvelope(
             jobId=job_id,
             type=_image_failed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             pageNumber=page_number,
             error=error,
