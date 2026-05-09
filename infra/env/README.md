@@ -175,6 +175,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | — | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | — | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | — | `gemini-2.5-flash-image` |
+| `ENV_DEV_APP_WEBTOON_STORYBOARD_IMAGE_MODEL` | — | `gemini-2.5-flash-image` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_PUBLIC_BASE_URL` | no | optional CDN/public base URL |
@@ -208,6 +209,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_APP_VERSION` | — | `0.1.0` |
 | `ENV_DEV_APP_ENVIRONMENT` | — | `local` |
 | `ENV_DEV_APP_STORYBOARD_MODEL` | — | `gpt-4o-mini` |
+| `ENV_DEV_APP_WEBTOON_STORYBOARD_MODEL` | — | `gpt-4o-mini` |
 | `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` | — | `0.15` |
 | `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` | — | `0.60` |
 | `ENV_DEV_APP_STORYBOARD_SUMMARY_INPUT_COST_PER_1M` | no | `0.05` |
@@ -362,6 +364,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_APP_VERSION` | no | `0.1.0` |
 | `ENV_DEV_APP_ENVIRONMENT` | no | `local` |
 | `ENV_DEV_APP_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
+| `ENV_DEV_APP_WEBTOON_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
 | `ENV_DEV_APP_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
 | `ENV_DEV_APP_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
 | `ENV_DEV_APP_STORYBOARD_SUMMARY_INPUT_COST_PER_1M` | no | `0.05` |
@@ -383,6 +386,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.failed` |
 | `ENV_DEV_APP_GEMINI_API_KEY` | yes | (Gemini API 키 — storyboard 이미지 생성) |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
+| `ENV_DEV_APP_WEBTOON_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
 | `ENV_DEV_APP_STORYBOARD_IMAGE_PUBLIC_BASE_URL` | no | optional CDN/public base URL |
@@ -432,6 +436,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_APP_VERSION` | no | `0.1.0` |
 | `ENV_MASTER_APP_ENVIRONMENT` | no | `master` |
 | `ENV_MASTER_APP_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
+| `ENV_MASTER_APP_WEBTOON_STORYBOARD_MODEL` | no | `gpt-4o-mini` |
 | `ENV_MASTER_APP_STORYBOARD_INPUT_COST_PER_1M` | no | `0.15` |
 | `ENV_MASTER_APP_STORYBOARD_OUTPUT_COST_PER_1M` | no | `0.60` |
 | `ENV_MASTER_APP_STORYBOARD_SUMMARY_INPUT_COST_PER_1M` | no | `0.05` |
@@ -453,6 +458,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_SENTENCE_TRANSLATE_FAILED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.failed` |
 | `ENV_MASTER_APP_GEMINI_API_KEY` | yes | (prod Gemini API 키 — storyboard 이미지 생성) |
 | `ENV_MASTER_APP_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
+| `ENV_MASTER_APP_WEBTOON_STORYBOARD_IMAGE_MODEL` | no | `gemini-2.5-flash-image` |
 | `ENV_MASTER_APP_STORYBOARD_IMAGE_INPUT_COST_PER_1M` | no | `0.30` |
 | `ENV_MASTER_APP_STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE` | no | `0.039` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_GENERATE_QUEUE` | no | `ai.image.generate.request.queue` |
