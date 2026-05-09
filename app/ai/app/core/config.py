@@ -65,6 +65,7 @@ class Settings(BaseModel):
         "high",
     )
     STORYBOARD_IMAGE_MODEL: str = getenv("STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
+    WEBTOON_STORYBOARD_IMAGE_MODEL: str = getenv("WEBTOON_STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
     STORYBOARD_IMAGE_INPUT_COST_PER_1M: float = float(
         getenv("STORYBOARD_IMAGE_INPUT_COST_PER_1M", "0.30")
     )

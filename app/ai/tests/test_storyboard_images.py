@@ -18,45 +18,43 @@ def setup_function() -> None:
     settings.STORYBOARD_IMAGE_S3_ACCESS_KEY_ID = None
     settings.STORYBOARD_IMAGE_S3_SECRET_ACCESS_KEY = None
     settings.STORYBOARD_IMAGE_S3_ENDPOINT_URL = None
-    # 환경 prefix 비활성화 — 테스트 assertion 이 환경 격리에 영향 없이 결정적으로 동작.
     settings.AWS_S3_ENV_PREFIX = ""
+
+
+def _storyboard() -> dict:
+    return {
+        "title": "Lina's Waikiki Adventure",
+        "synopsis": "A warm family trip story.",
+        "moralTheme": "Family matters.",
+        "recurringMotif": "Sunset moments.",
+    }
+
+
+def _page(page_number: int = 1) -> dict:
+    return {
+        "pageNumber": page_number,
+        "sceneSummary": "Lina arrives at Waikiki.",
+        "englishText": "Lina arrived at Waikiki with her family.",
+        "koreanText": "Lina arrived at Waikiki with her family.",
+        "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
+    }
+
+
+def _item(page_number: int = 1) -> dict:
+    return {
+        "pageNumber": page_number,
+        "storyboard": _storyboard(),
+        "page": _page(page_number),
+        "children": [{"name": "Lina", "age": 7, "gender": "FEMALE"}],
+        "companions": ["Mom", "Dad"],
+        "referenceImageUrls": [],
+    }
 
 
 def test_generate_storyboard_images_uses_local_fallback_when_gemini_key_missing() -> None:
     response = client.post(
         "/internal/storyboard-images/generate",
-        json={
-            "storyId": 1,
-            "seed": 1234,
-            "items": [
-                {
-                    "pageNumber": 1,
-                    "storyboard": {
-                        "title": "리나의 와이키키 모험",
-                        "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                        "moralTheme": "가족의 소중함",
-                        "recurringMotif": "노을 속에서의 순간들",
-                    },
-                    "page": {
-                        "pageNumber": 1,
-                        "sceneSummary": "리나가 와이키키에 도착한 장면",
-                        "englishText": "Lina arrived at Waikiki with her family.",
-                        "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                        "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                    },
-                    "children": [
-                        {
-                            "name": "리나",
-                            "age": 7,
-                            "gender": "FEMALE",
-                        }
-                    ],
-                    "companions": ["엄마", "아빠"],
-                    "referenceImageUrls": [],
-                    "additionalInstruction": "따뜻한 동화책 느낌",
-                }
-            ],
-        },
+        json={"storyId": 1, "seed": 1234, "items": [_item()]},
     )
 
     assert response.status_code == 200
@@ -102,13 +100,59 @@ def test_call_gemini_image_api_sends_requested_seed() -> None:
     assert generation_config["seed"] == 987654321
 
 
+def test_standard_storyboard_image_prompt_ignores_webtoon_character_staging() -> None:
+    item_data = _item()
+    item_data["page"]["charactersInScene"] = [
+        {
+            "characterKey": "child:Lina",
+            "sceneRole": "main speaker pointing at the tower",
+            "expectedPosition": "foreground left",
+        },
+        {
+            "characterKey": "companion:Mom",
+            "sceneRole": "watching Lina warmly",
+            "expectedPosition": "background right",
+        },
+    ]
+    item = storyboard_image_service.StoryboardImageGenerateItemRequest.model_validate(item_data)
+
+    prompt = storyboard_image_service._build_final_prompt(item)
+
+    assert "## Webtoon Character Staging" not in prompt
+    assert "foreground left" not in prompt
+
+
+def test_webtoon_storyboard_image_prompt_includes_webtoon_character_staging() -> None:
+    item_data = _item()
+    item_data["page"]["charactersInScene"] = [
+        {
+            "characterKey": "child:Lina",
+            "sceneRole": "main speaker pointing at the tower",
+            "expectedPosition": "foreground left",
+        },
+        {
+            "characterKey": "companion:Mom",
+            "sceneRole": "watching Lina warmly",
+            "expectedPosition": "background right",
+        },
+    ]
+    item = storyboard_image_service.StoryboardImageGenerateItemRequest.model_validate(item_data)
+
+    prompt = storyboard_image_service._build_final_prompt(item, webtoon_mode=True)
+
+    assert "## Webtoon Character Staging" in prompt
+    assert "child:Lina: main speaker pointing at the tower; expected position: foreground left" in prompt
+    assert "companion:Mom: watching Lina warmly; expected position: background right" in prompt
+
+
 def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() -> None:
     settings.GEMINI_API_KEY = "test-key"
     captured_seeds: list[int] = []
 
-    def fake_generate_item_with_gemini(story_id, item, seed, output_version=None):
+    def fake_generate_item_with_gemini(story_id, item, seed, output_version=None, webtoon_mode=False):
         del story_id
         assert output_version is None
+        assert webtoon_mode is False
         captured_seeds.append(seed)
         return storyboard_image_service.StoryboardImageGenerateResult(
             pageNumber=item.pageNumber,
@@ -147,50 +191,7 @@ def test_generate_storyboard_images_reuses_one_generated_seed_for_all_items() ->
     try:
         response = storyboard_image_service.generate_storyboard_images(
             storyboard_image_service.StoryboardImageGenerateRequest.model_validate(
-                {
-                    "storyId": 1,
-                    "seed": 555777999,
-                    "items": [
-                        {
-                            "pageNumber": 1,
-                            "storyboard": {
-                                "title": "리나의 와이키키 모험",
-                                "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                                "moralTheme": "가족의 소중함",
-                                "recurringMotif": "노을 속에서의 순간들",
-                            },
-                            "page": {
-                                "pageNumber": 1,
-                                "sceneSummary": "리나가 와이키키에 도착한 장면",
-                                "englishText": "Lina arrived at Waikiki with her family.",
-                                "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                                "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                            },
-                            "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                            "companions": ["엄마", "아빠"],
-                            "referenceImageUrls": [],
-                        },
-                        {
-                            "pageNumber": 2,
-                            "storyboard": {
-                                "title": "리나의 와이키키 모험",
-                                "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                                "moralTheme": "가족의 소중함",
-                                "recurringMotif": "노을 속에서의 순간들",
-                            },
-                            "page": {
-                                "pageNumber": 2,
-                                "sceneSummary": "리나가 해변을 거니는 장면",
-                                "englishText": "Lina walked along the beach.",
-                                "koreanText": "리나는 해변을 걸었다.",
-                                "imagePrompt": "Warm storybook sketch of a child walking on Waikiki beach",
-                            },
-                            "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                            "companions": ["엄마", "아빠"],
-                            "referenceImageUrls": [],
-                        },
-                    ],
-                }
+                {"storyId": 1, "seed": 555777999, "items": [_item(1), _item(2)]}
             )
         )
     finally:
@@ -225,6 +226,8 @@ def test_generate_storyboard_images_uses_top_level_character_source_images() -> 
     original_generate_character_reference = storyboard_image_service.generate_storyboard_character_reference
     storyboard_image_service.generate_storyboard_character_reference = fake_generate_storyboard_character_reference
     try:
+        item_data = _item()
+        item_data["referenceImageS3Keys"] = ["stories/1/page-scene/ignored-for-character.jpg"]
         items = storyboard_image_service.ensure_storyboard_character_reference(
             story_id=1,
             seed=1234,
@@ -233,27 +236,7 @@ def test_generate_storyboard_images_uses_top_level_character_source_images() -> 
                 "stories/1/character-source/child-closeup.jpg",
                 "stories/1/character-source/family-photo.jpg",
             ],
-            items=[
-                storyboard_image_service.StoryboardImageGenerateItemRequest.model_validate(
-                    {
-                        "pageNumber": 1,
-                        "storyboard": {
-                            "title": "리나의 와이키키 모험",
-                            "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                        },
-                        "page": {
-                            "pageNumber": 1,
-                            "sceneSummary": "리나가 와이키키에 도착한 장면",
-                            "englishText": "Lina arrived at Waikiki with her family.",
-                            "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                            "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                        },
-                        "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                        "companions": ["엄마", "아빠"],
-                        "referenceImageS3Keys": ["stories/1/page-scene/ignored-for-character.jpg"],
-                    }
-                )
-            ],
+            items=[storyboard_image_service.StoryboardImageGenerateItemRequest.model_validate(item_data)],
         )
     finally:
         storyboard_image_service.generate_storyboard_character_reference = original_generate_character_reference
@@ -270,71 +253,22 @@ def test_generate_storyboard_images_uses_top_level_character_source_images() -> 
 
 
 def test_generate_storyboard_images_requires_seed() -> None:
-    response = client.post(
-        "/internal/storyboard-images/generate",
-        json={
-            "storyId": 1,
-            "items": [
-                {
-                    "pageNumber": 1,
-                    "storyboard": {
-                        "title": "리나의 와이키키 모험",
-                        "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                        "moralTheme": "가족의 소중함",
-                        "recurringMotif": "노을 속에서의 순간들",
-                    },
-                    "page": {
-                        "pageNumber": 1,
-                        "sceneSummary": "리나가 와이키키에 도착한 장면",
-                        "englishText": "Lina arrived at Waikiki with her family.",
-                        "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                        "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                    },
-                    "children": [
-                        {
-                            "name": "리나",
-                            "age": 7,
-                            "gender": "FEMALE",
-                        }
-                    ],
-                    "companions": ["엄마", "아빠"],
-                    "referenceImageUrls": [],
-                }
-            ],
-        },
-    )
+    response = client.post("/internal/storyboard-images/generate", json={"storyId": 1, "items": [_item()]})
 
     assert response.status_code == 422
 
 
 def test_regenerate_storyboard_image_uses_local_fallback_when_gemini_key_missing() -> None:
+    item = _item()
+    item["additionalInstruction"] = "Warm storybook feeling"
     response = client.post(
         "/internal/storyboard-images/regenerate",
         json={
             "storyId": 1,
             "seed": 1234,
             "outputVersion": 2,
-            "userPrompt": "리나가 더 환하게 웃도록 바꿔줘",
-            "item": {
-                "pageNumber": 1,
-                "storyboard": {
-                    "title": "리나의 와이키키 모험",
-                    "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                    "moralTheme": "가족의 소중함",
-                    "recurringMotif": "노을 속에서의 순간들",
-                },
-                "page": {
-                    "pageNumber": 1,
-                    "sceneSummary": "리나가 와이키키에 도착한 장면",
-                    "englishText": "Lina arrived at Waikiki with her family.",
-                    "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                    "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                },
-                "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                "companions": ["엄마", "아빠"],
-                "referenceImageUrls": [],
-                "additionalInstruction": "따뜻한 동화책 느낌",
-            },
+            "userPrompt": "Make Lina smile more brightly.",
+            "item": item,
         },
     )
 
@@ -359,7 +293,9 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
         reference_image_urls: list[str],
         reference_image_s3_keys: list[str],
         seed: int,
+        model: str | None = None,
     ) -> dict:
+        assert model == settings.STORYBOARD_IMAGE_MODEL
         captured_prompt["value"] = final_prompt
         assert character_reference_image_urls == []
         assert character_reference_image_s3_keys == ["stories/1/storyboard-character/reference.png"]
@@ -386,33 +322,17 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
     original_call = storyboard_image_service._call_gemini_image_api
     storyboard_image_service._call_gemini_image_api = fake_call_gemini_image_api
     try:
+        item = _item()
+        item["referenceImageUrls"] = ["https://example.com/reference.png"]
+        item["additionalInstruction"] = "Warm storybook feeling"
         response = storyboard_image_service.regenerate_storyboard_image(
             storyboard_image_service.StoryboardImageRegenerateRequest.model_validate(
                 {
                     "storyId": 1,
                     "seed": 4321,
                     "outputVersion": 3,
-                    "userPrompt": "리나 표정을 더 신나게 바꿔줘",
-                    "item": {
-                        "pageNumber": 1,
-                        "storyboard": {
-                            "title": "리나의 와이키키 모험",
-                            "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                            "moralTheme": "가족의 소중함",
-                            "recurringMotif": "노을 속에서의 순간들",
-                        },
-                        "page": {
-                            "pageNumber": 1,
-                            "sceneSummary": "리나가 와이키키에 도착한 장면",
-                            "englishText": "Lina arrived at Waikiki with her family.",
-                            "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                            "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                        },
-                        "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                        "companions": ["엄마", "아빠"],
-                        "referenceImageUrls": ["https://example.com/reference.png"],
-                        "additionalInstruction": "따뜻한 동화책 느낌",
-                    },
+                    "userPrompt": "Make Lina more excited.",
+                    "item": item,
                 }
             )
         )
@@ -424,8 +344,8 @@ def test_regenerate_storyboard_image_appends_user_prompt_to_existing_instruction
     assert response.result.pageNumber == 1
     assert response.result.imageUrl == "https://cdn.example.com/storyboards/stories/1/storyboard-image/1/v3.png"
     assert "## Additional Instruction" in captured_prompt["value"]
-    assert "- 따뜻한 동화책 느낌" in captured_prompt["value"]
-    assert "User regeneration request: 리나 표정을 더 신나게 바꿔줘" in captured_prompt["value"]
+    assert "- Warm storybook feeling" in captured_prompt["value"]
+    assert "User regeneration request: Make Lina more excited." in captured_prompt["value"]
 
 
 def test_regenerate_storyboard_image_uses_default_character_reference_when_missing() -> None:
@@ -439,7 +359,9 @@ def test_regenerate_storyboard_image_uses_default_character_reference_when_missi
         reference_image_urls: list[str],
         reference_image_s3_keys: list[str],
         seed: int,
+        model: str | None = None,
     ) -> dict:
+        assert model == settings.STORYBOARD_IMAGE_MODEL
         del final_prompt, reference_image_urls, reference_image_s3_keys, seed
         captured_character_refs["urls"] = character_reference_image_urls
         captured_character_refs["s3_keys"] = character_reference_image_s3_keys
@@ -463,30 +385,16 @@ def test_regenerate_storyboard_image_uses_default_character_reference_when_missi
     original_call = storyboard_image_service._call_gemini_image_api
     storyboard_image_service._call_gemini_image_api = fake_call_gemini_image_api
     try:
+        item = _item()
+        item["referenceImageUrls"] = ["https://example.com/reference.png"]
         storyboard_image_service.regenerate_storyboard_image(
             storyboard_image_service.StoryboardImageRegenerateRequest.model_validate(
                 {
                     "storyId": 1,
                     "seed": 4321,
                     "outputVersion": 2,
-                    "userPrompt": "리나 표정을 더 신나게 바꿔줘",
-                    "item": {
-                        "pageNumber": 1,
-                        "storyboard": {
-                            "title": "리나의 와이키키 모험",
-                            "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                        },
-                        "page": {
-                            "pageNumber": 1,
-                            "sceneSummary": "리나가 와이키키에 도착한 장면",
-                            "englishText": "Lina arrived at Waikiki with her family.",
-                            "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                            "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                        },
-                        "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                        "companions": ["엄마", "아빠"],
-                        "referenceImageUrls": ["https://example.com/reference.png"],
-                    },
+                    "userPrompt": "Make Lina more excited.",
+                    "item": item,
                 }
             )
         )
@@ -500,30 +408,7 @@ def test_regenerate_storyboard_image_uses_default_character_reference_when_missi
 def test_regenerate_storyboard_image_requires_user_prompt() -> None:
     response = client.post(
         "/internal/storyboard-images/regenerate",
-        json={
-            "storyId": 1,
-            "seed": 1234,
-            "outputVersion": 2,
-            "item": {
-                "pageNumber": 1,
-                "storyboard": {
-                    "title": "리나의 와이키키 모험",
-                    "synopsis": "가족과 함께한 따뜻한 여행 이야기",
-                    "moralTheme": "가족의 소중함",
-                    "recurringMotif": "노을 속에서의 순간들",
-                },
-                "page": {
-                    "pageNumber": 1,
-                    "sceneSummary": "리나가 와이키키에 도착한 장면",
-                    "englishText": "Lina arrived at Waikiki with her family.",
-                    "koreanText": "리나는 가족과 함께 와이키키에 도착했다.",
-                    "imagePrompt": "Warm storybook illustration of a family arriving at Waikiki beach",
-                },
-                "children": [{"name": "리나", "age": 7, "gender": "FEMALE"}],
-                "companions": ["엄마", "아빠"],
-                "referenceImageUrls": [],
-            },
-        },
+        json={"storyId": 1, "seed": 1234, "outputVersion": 2, "item": _item()},
     )
 
     assert response.status_code == 422
