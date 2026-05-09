@@ -89,7 +89,7 @@ def _dispatch_generate_message(
     body: bytes,
 ) -> None:
     logger.info(
-        "[STORY:GEN] dispatch ??deliveryTag=%d, queue=%s, bytes=%d",
+        "[STORY:GEN] dispatch - deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_GENERATE_QUEUE, len(body),
     )
     submit_story_api_message(
@@ -106,7 +106,7 @@ def _dispatch_summary_generate_message(
     body: bytes,
 ) -> None:
     logger.info(
-        "[SUMMARY:GEN] dispatch ??deliveryTag=%d, queue=%s, bytes=%d",
+        "[SUMMARY:GEN] dispatch - deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_SUMMARY_GENERATE_QUEUE, len(body),
     )
     submit_story_api_message(
@@ -123,7 +123,7 @@ def _dispatch_regenerate_message(
     body: bytes,
 ) -> None:
     logger.info(
-        "[STORY:REGEN] dispatch ??deliveryTag=%d, queue=%s, bytes=%d",
+        "[STORY:REGEN] dispatch - deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_REGENERATE_QUEUE, len(body),
     )
     submit_story_api_message(
@@ -157,7 +157,7 @@ def _dispatch_summary_regenerate_message(
     body: bytes,
 ) -> None:
     logger.info(
-        "[SUMMARY:REGEN] dispatch ??deliveryTag=%d, queue=%s, bytes=%d",
+        "[SUMMARY:REGEN] dispatch - deliveryTag=%d, queue=%s, bytes=%d",
         delivery_tag, settings.RABBITMQ_SUMMARY_REGENERATE_QUEUE, len(body),
     )
     submit_story_api_message(
@@ -173,7 +173,7 @@ def _create_generate_job(body: bytes) -> ApiJob:
     request = _merge_story_id_generate(message.storyId, message.payload)
     story_id = _story_id_from_generate(message.storyId, request)
     logger.info(
-        "[STORY:GEN] received ??jobId=%s, storyId=%s, storyMode=%s, photos=%d, children=%d",
+        "[STORY:GEN] received - jobId=%s, storyId=%s, storyMode=%s, photos=%d, children=%d",
         message.jobId, story_id, message.storyMode, len(request.photos), len(request.children),
     )
     return ApiJob(
@@ -188,7 +188,7 @@ def _create_summary_generate_job(body: bytes) -> ApiJob:
     request = _merge_story_id_summary(message.storyId, message.payload)
     story_id = _story_id_from_summary(message.storyId, request)
     logger.info(
-        "[SUMMARY:GEN] received ??jobId=%s, storyId=%s, storyMode=%s, photos=%d, children=%d",
+        "[SUMMARY:GEN] received - jobId=%s, storyId=%s, storyMode=%s, photos=%d, children=%d",
         message.jobId, story_id, message.storyMode, len(request.photos), len(request.children),
     )
     return ApiJob(
@@ -216,7 +216,7 @@ def _create_regenerate_job(body: bytes) -> ApiJob:
     request = _merge_story_id_regenerate(message.storyId, message.payload)
     story_id = _story_id_from_regenerate(message.storyId, request)
     logger.info(
-        "[STORY:REGEN] received ??jobId=%s, storyId=%s, storyMode=%s",
+        "[STORY:REGEN] received - jobId=%s, storyId=%s, storyMode=%s",
         message.jobId, story_id, message.storyMode,
     )
     return ApiJob(
@@ -250,7 +250,7 @@ def _create_summary_regenerate_job(body: bytes) -> ApiJob:
     request = _merge_story_id_summary_regenerate(message.storyId, message.payload)
     story_id = _story_id_from_summary_regenerate(message.storyId, request)
     logger.info(
-        "[SUMMARY:REGEN] received ??jobId=%s, storyId=%s, storyMode=%s, userPromptLen=%d",
+        "[SUMMARY:REGEN] received - jobId=%s, storyId=%s, storyMode=%s, userPromptLen=%d",
         message.jobId, story_id, message.storyMode, len(request.userPrompt or ""),
     )
     return ApiJob(
@@ -331,12 +331,12 @@ def _publish_story_result(
         )
     if action == "GENERATE":
         logger.info(
-            "[STORY:GEN] published result ??jobId=%s, pages=%d, totalWords=%s, costUsd=%s",
+            "[STORY:GEN] published result - jobId=%s, pages=%d, totalWords=%s, costUsd=%s",
             message.jobId, len(result.pages), result.totalWordCount, result.usage.costUsd,
         )
     else:
         logger.info(
-            "[STORY:REGEN] published result ??jobId=%s, pages=%d, costUsd=%s",
+            "[STORY:REGEN] published result - jobId=%s, pages=%d, costUsd=%s",
             message.jobId, len(result.pages), result.usage.costUsd,
         )
     return True
@@ -383,7 +383,7 @@ def _publish_summary_result(
             story_mode=message.storyMode,
         )
     logger.info(
-        "[SUMMARY:%s] published result ??jobId=%s, summaryKoLen=%d, costUsd=%s",
+        "[SUMMARY:%s] published result - jobId=%s, summaryKoLen=%d, costUsd=%s",
         "GEN" if action == "GENERATE" else "REGEN",
         message.jobId, len(result.summaryKo), result.usage.costUsd,
     )
@@ -507,7 +507,7 @@ def handle_generate_message(body: bytes, publisher: StoryResultPublisher) -> Non
         story_mode=message.storyMode,
     )
     logger.info(
-        "[STORY:GEN] published result ??jobId=%s, pages=%d, totalWords=%s, costUsd=%s",
+        "[STORY:GEN] published result - jobId=%s, pages=%d, totalWords=%s, costUsd=%s",
         message.jobId, len(result.pages), result.totalWordCount, result.usage.costUsd,
     )
 
@@ -517,7 +517,7 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
     request = _merge_story_id_summary(message.storyId, message.payload)
     story_id = _story_id_from_summary(message.storyId, request)
     logger.info(
-        "[SUMMARY:GEN] received ??jobId=%s, storyId=%s, photos=%d, children=%d",
+        "[SUMMARY:GEN] received - jobId=%s, storyId=%s, photos=%d, children=%d",
         message.jobId, story_id, len(request.photos), len(request.children),
     )
 
@@ -548,7 +548,7 @@ def handle_summary_generate_message(body: bytes, publisher: StoryResultPublisher
         story_mode=message.storyMode,
     )
     logger.info(
-        "[SUMMARY:GEN] published result ??jobId=%s, summaryKoLen=%d, costUsd=%s",
+        "[SUMMARY:GEN] published result - jobId=%s, summaryKoLen=%d, costUsd=%s",
         message.jobId, len(result.summaryKo), result.usage.costUsd,
     )
 
@@ -558,7 +558,7 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
     request = _merge_story_id_summary_regenerate(message.storyId, message.payload)
     story_id = _story_id_from_summary_regenerate(message.storyId, request)
     logger.info(
-        "[SUMMARY:REGEN] received ??jobId=%s, storyId=%s, userPromptLen=%d",
+        "[SUMMARY:REGEN] received - jobId=%s, storyId=%s, userPromptLen=%d",
         message.jobId, story_id, len(request.userPrompt or ""),
     )
 
@@ -591,7 +591,7 @@ def handle_summary_regenerate_message(body: bytes, publisher: StoryResultPublish
         story_mode=message.storyMode,
     )
     logger.info(
-        "[SUMMARY:REGEN] published result ??jobId=%s, summaryKoLen=%d, costUsd=%s",
+        "[SUMMARY:REGEN] published result - jobId=%s, summaryKoLen=%d, costUsd=%s",
         message.jobId, len(result.summaryKo), result.usage.costUsd,
     )
 
@@ -672,7 +672,7 @@ def handle_regenerate_message(body: bytes, publisher: StoryResultPublisher) -> N
         story_mode=message.storyMode,
     )
     logger.info(
-        "[STORY:REGEN] published result ??jobId=%s, pages=%d, costUsd=%s",
+        "[STORY:REGEN] published result - jobId=%s, pages=%d, costUsd=%s",
         message.jobId, len(result.pages), result.usage.costUsd,
     )
 

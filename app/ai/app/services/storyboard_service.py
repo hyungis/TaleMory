@@ -47,7 +47,7 @@ def generate_storyboard(request: StoryboardGenerateRequest) -> StoryboardGenerat
     use_gemini = _use_gemini_storyboard_model(settings.STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:GEN] service entry — provider=%s, photos=%d, children=%d, place=%s",
+        "[STORY:GEN] service entry - provider=%s, photos=%d, children=%d, place=%s",
         _storyboard_provider_label(use_gemini, use_openai), len(request.photos), len(request.children), request.travel.place,
     )
     if use_gemini:
@@ -61,7 +61,7 @@ def generate_webtoon_storyboard(request: StoryboardGenerateRequest) -> WebtoonSt
     use_gemini = _use_gemini_storyboard_model(settings.WEBTOON_STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:WEBTOON:GEN] service entry — provider=%s, photos=%d, children=%d, place=%s",
+        "[STORY:WEBTOON:GEN] service entry - provider=%s, photos=%d, children=%d, place=%s",
         _storyboard_provider_label(use_gemini, use_openai), len(request.photos), len(request.children), request.travel.place,
     )
     if use_gemini:
@@ -75,7 +75,7 @@ def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGen
     use_gemini = _use_gemini_storyboard_model(settings.STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:REGEN] service entry — provider=%s, feedbackLen=%d",
+        "[STORY:REGEN] service entry - provider=%s, feedbackLen=%d",
         _storyboard_provider_label(use_gemini, use_openai), len(request.feedbackInstruction or ""),
     )
     if use_gemini:
@@ -89,7 +89,7 @@ def regenerate_webtoon_storyboard(request: WebtoonStoryboardRegenerateRequest) -
     use_gemini = _use_gemini_storyboard_model(settings.WEBTOON_STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:WEBTOON:REGEN] service entry — provider=%s, feedbackLen=%d",
+        "[STORY:WEBTOON:REGEN] service entry - provider=%s, feedbackLen=%d",
         _storyboard_provider_label(use_gemini, use_openai), len(request.feedbackInstruction or ""),
     )
     if use_gemini:
@@ -181,7 +181,7 @@ def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> Webtoon
     payload = request.model_dump(mode="json")
     input_content = _build_openai_webtoon_input_content(request, payload)
     logger.info(
-        "[STORY:WEBTOON:GEN] OpenAI call start ??model=%s, contentBlocks=%d",
+        "[STORY:WEBTOON:GEN] OpenAI call start - model=%s, contentBlocks=%d",
         settings.WEBTOON_STORYBOARD_MODEL, len(input_content),
     )
 
@@ -218,7 +218,7 @@ def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> Webtoon
     )
     parsed.usage.promptTemplateVersion = WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION
     logger.info(
-        "[STORY:WEBTOON:GEN] OpenAI call done ??pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        "[STORY:WEBTOON:GEN] OpenAI call done - pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
         len(parsed.pages), parsed.totalWordCount,
         token_usage["input_tokens"], token_usage["output_tokens"], parsed.usage.costUsd,
     )
@@ -237,7 +237,7 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
     payload = request.model_dump(mode="json")
     input_content = _build_openai_input_content(request, payload)
     logger.info(
-        "[STORY:GEN] OpenAI call start — model=%s, contentBlocks=%d",
+        "[STORY:GEN] OpenAI call start - model=%s, contentBlocks=%d",
         settings.STORYBOARD_MODEL, len(input_content),
     )
 
@@ -274,7 +274,7 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
     )
     parsed.usage.promptTemplateVersion = STORYBOARD_PROMPT_TEMPLATE_VERSION
     logger.info(
-        "[STORY:GEN] OpenAI call done — pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        "[STORY:GEN] OpenAI call done - pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
         len(parsed.pages), parsed.totalWordCount,
         token_usage["input_tokens"], token_usage["output_tokens"], parsed.usage.costUsd,
     )
@@ -653,7 +653,7 @@ def _call_gemini_storyboard_api(
         method="POST",
     )
     logger.info(
-        "[STORY:GEMINI] call start — model=%s, contentBlocks=%d",
+        "[STORY:GEMINI] call start - model=%s, contentBlocks=%d",
         settings.STORYBOARD_MODEL, len(input_content),
     )
     try:
@@ -669,7 +669,7 @@ def _call_gemini_storyboard_api(
 
     usage = _extract_gemini_token_usage(response_json)
     logger.info(
-        "[STORY:GEMINI] call done — inputTok=%s, outputTok=%s, totalTok=%s",
+        "[STORY:GEMINI] call done - inputTok=%s, outputTok=%s, totalTok=%s",
         usage["input_tokens"], usage["output_tokens"], usage["total_tokens"],
     )
     return response_json

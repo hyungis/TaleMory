@@ -31,7 +31,7 @@ def generate_storyboard_summary(
 ) -> StoryboardSummaryGenerateResponse:
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[SUMMARY:GEN] service entry — useOpenAI=%s, photos=%d, children=%d, place=%s",
+        "[SUMMARY:GEN] service entry - useOpenAI=%s, photos=%d, children=%d, place=%s",
         use_openai, len(request.photos), len(request.children), request.travel.place,
     )
     if use_openai:
@@ -44,7 +44,7 @@ def regenerate_storyboard_summary(
 ) -> StoryboardSummaryGenerateResponse:
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[SUMMARY:REGEN] service entry — useOpenAI=%s, userPromptLen=%d",
+        "[SUMMARY:REGEN] service entry - useOpenAI=%s, userPromptLen=%d",
         use_openai, len(request.userPrompt or ""),
     )
     if use_openai:
@@ -57,7 +57,7 @@ def generate_webtoon_storyboard_summary(
 ) -> StoryboardSummaryGenerateResponse:
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[SUMMARY:WEBTOON:GEN] service entry ??useOpenAI=%s, photos=%d, children=%d, place=%s",
+        "[SUMMARY:WEBTOON:GEN] service entry - useOpenAI=%s, photos=%d, children=%d, place=%s",
         use_openai, len(request.photos), len(request.children), request.travel.place,
     )
     if use_openai:
@@ -73,7 +73,7 @@ def regenerate_webtoon_storyboard_summary(
 ) -> StoryboardSummaryGenerateResponse:
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[SUMMARY:WEBTOON:REGEN] service entry ??useOpenAI=%s, userPromptLen=%d",
+        "[SUMMARY:WEBTOON:REGEN] service entry - useOpenAI=%s, userPromptLen=%d",
         use_openai, len(request.userPrompt or ""),
     )
     if use_openai:
@@ -168,7 +168,7 @@ def _request_summary_with_openai(
         request_args["reasoning"] = reasoning
 
     logger.info(
-        "[SUMMARY] OpenAI call start — model=%s, contentBlocks=%d, label=%s",
+        "[SUMMARY] OpenAI call start - model=%s, contentBlocks=%d, label=%s",
         settings.STORYBOARD_SUMMARY_MODEL, len(input_content), error_label,
     )
     try:
@@ -180,7 +180,7 @@ def _request_summary_with_openai(
     parsed = StoryboardSummaryGenerateResponse.model_validate_json(response.output_text)
     parsed_with_usage = _apply_usage(parsed, response.usage, prompt_template_version)
     logger.info(
-        "[SUMMARY] OpenAI call done — label=%s, summaryKoLen=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        "[SUMMARY] OpenAI call done - label=%s, summaryKoLen=%d, inputTok=%s, outputTok=%s, costUsd=%s",
         error_label, len(parsed_with_usage.summaryKo),
         parsed_with_usage.usage.inputTokens, parsed_with_usage.usage.outputTokens,
         parsed_with_usage.usage.costUsd,
