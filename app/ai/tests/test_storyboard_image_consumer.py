@@ -199,4 +199,6 @@ def test_webtoon_image_regenerate_uses_webtoon_service(monkeypatch) -> None:
     handle_regenerate_message(body=body, publisher=publisher)
 
     assert called["webtoon"] is True
+    assert publisher.published_results[0]["action"] == "REGENERATE"
     assert publisher.published_results[0]["story_mode"] == "WEBTOON"
+    assert publisher.published_results[0]["result"].pageNumber == 1
