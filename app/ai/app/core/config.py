@@ -58,12 +58,14 @@ class Settings(BaseModel):
     GEMINI_API_KEY: str | None = getenv("GEMINI_API_KEY", getenv("GOOGLE_API_KEY"))
     REPLICATE_API_TOKEN: str | None = getenv("REPLICATE_API_TOKEN")
     STORYBOARD_MODEL: str = getenv("STORYBOARD_MODEL", "gpt-4o-mini")
+    WEBTOON_STORYBOARD_MODEL: str = getenv("WEBTOON_STORYBOARD_MODEL", "gpt-4o-mini")
     STORYBOARD_SUMMARY_MODEL: str = getenv("STORYBOARD_SUMMARY_MODEL", "gpt-5-nano")
     STORYBOARD_SUMMARY_REASONING_EFFORT: str = getenv(
         "STORYBOARD_SUMMARY_REASONING_EFFORT",
         "high",
     )
     STORYBOARD_IMAGE_MODEL: str = getenv("STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
+    WEBTOON_STORYBOARD_IMAGE_MODEL: str = getenv("WEBTOON_STORYBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
     STORYBOARD_IMAGE_INPUT_COST_PER_1M: float = float(
         getenv("STORYBOARD_IMAGE_INPUT_COST_PER_1M", "0.30")
     )

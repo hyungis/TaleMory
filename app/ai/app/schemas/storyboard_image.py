@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.schemas.storyboard import ChildInfo
+from app.schemas.storyboard import ChildInfo, WebtoonCharacterInScene
 
 
 class StoryboardImageContext(BaseModel):
@@ -14,6 +14,7 @@ class StoryboardImagePageInput(BaseModel):
     englishText: str | None = Field(default=None, max_length=4000)
     koreanText: str | None = Field(default=None, max_length=4000)
     imagePrompt: str | None = Field(default=None, max_length=2000)
+    charactersInScene: list[WebtoonCharacterInScene] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def validate_page_text(self) -> "StoryboardImagePageInput":

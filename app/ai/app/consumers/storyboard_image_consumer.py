@@ -15,6 +15,7 @@ from app.services.storyboard_image_service import (
     ensure_storyboard_character_reference,
     generate_storyboard_image_item,
     regenerate_storyboard_image,
+    regenerate_webtoon_storyboard_image,
 )
 from app.worker_async import ApiJob, publisher_channel, submit_gemini_image_api_message, submit_message
 
@@ -93,6 +94,7 @@ def _create_generate_item_job(body: bytes) -> ApiJob:
             page_number,
             exc,
             "GENERATE",
+            message.storyMode,
         ),
     )
 
@@ -114,6 +116,7 @@ def _create_regenerate_job(body: bytes) -> ApiJob:
             page_number,
             exc,
             "REGENERATE",
+            message.storyMode,
         ),
     )
 
@@ -121,26 +124,30 @@ def _create_regenerate_job(body: bytes) -> ApiJob:
 def _generate_storyboard_image_item_with_log(message: StoryboardImageGenerateItemJobMessage) -> Any:
     page_number = message.payload.item.pageNumber
     logger.info(
-        "[IMAGE:GEN] start jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
-        message.jobId, message.storyId, page_number, message.payload.seed,
+        "[IMAGE:GEN] start jobId=%s, storyId=%s, storyMode=%s, pageNumber=%s, seed=%s",
+        message.jobId, message.storyId, message.storyMode, page_number, message.payload.seed,
     )
     return generate_storyboard_image_item(
         story_id=message.storyId,
         item=message.payload.item,
         seed=message.payload.seed,
+        webtoon_mode=_is_webtoon_mode(message.storyMode),
     )
 
 
 def _regenerate_storyboard_image_with_log(message: StoryboardImageRegenerateJobMessage) -> Any:
     page_number = message.payload.item.pageNumber
     logger.info(
-        "[IMAGE:REGEN] start jobId=%s, storyId=%s, pageNumber=%s, seed=%s, outputVersion=%s",
+        "[IMAGE:REGEN] start jobId=%s, storyId=%s, storyMode=%s, pageNumber=%s, seed=%s, outputVersion=%s",
         message.jobId,
         message.storyId,
+        message.storyMode,
         page_number,
         message.payload.seed,
         message.payload.outputVersion,
     )
+    if _is_webtoon_mode(message.storyMode):
+        return regenerate_webtoon_storyboard_image(message.payload)
     return regenerate_storyboard_image(message.payload)
 
 
@@ -193,6 +200,7 @@ def _publish_image_result(
             seed=seed,
             result=result,
             action=action,
+            story_mode=message.storyMode,
         )
     logger.info(
         "[IMAGE:%s] done jobId=%s, storyId=%s, pageNumber=%s, seed=%s",
@@ -211,6 +219,7 @@ def _publish_image_failure(
     page_number: int,
     exc: BaseException,
     action: str,
+    story_mode: str = "VIEWER",
 ) -> bool:
     if isinstance(exc, ValueError):
         code = f"{action}_STORYBOARD_IMAGE_ERROR"
@@ -231,6 +240,7 @@ def _publish_image_failure(
             page_number=page_number,
             error=StoryboardImageError(code=code, message=message),
             action=action,
+            story_mode=story_mode,
         )
     logger.warning(
         "[IMAGE:%s] failed jobId=%s, storyId=%s, pageNumber=%s, code=%s, message=%s",
@@ -247,8 +257,8 @@ def _publish_image_failure(
 def handle_generate_batch_message(body: bytes, publisher: StoryboardImageJobPublisher) -> None:
     message = StoryboardImageGenerateJobMessage.model_validate_json(body)
     logger.info(
-        "[IMAGE:BATCH] start jobId=%s, storyId=%s, itemCount=%d, seed=%s",
-        message.jobId, message.storyId, len(message.payload.items), message.payload.seed,
+        "[IMAGE:BATCH] start jobId=%s, storyId=%s, storyMode=%s, itemCount=%d, seed=%s",
+        message.jobId, message.storyId, message.storyMode, len(message.payload.items), message.payload.seed,
     )
     # BE 가 보낸 사용자 선택 character source 사진(`characterSourceImageS3Keys`)을 helper 로 전달.
     # 누락 시 helper 가 fallback 으로 페이지별 referenceImage 들을 pool 해서 사용 (= 사용자 선택 무시).
@@ -265,6 +275,7 @@ def handle_generate_batch_message(body: bytes, publisher: StoryboardImageJobPubl
         publisher.publish_generate_item_job(
             StoryboardImageGenerateItemJobMessage(
                 jobId=message.jobId,
+                storyMode=message.storyMode,
                 storyId=message.storyId,
                 payload=StoryboardImageGenerateItemJobPayload(
                     seed=message.payload.seed,
@@ -287,6 +298,7 @@ def handle_generate_item_message(body: bytes, publisher: StoryboardImageJobPubli
             story_id=message.storyId,
             item=message.payload.item,
             seed=message.payload.seed,
+            webtoon_mode=_is_webtoon_mode(message.storyMode),
         )
     except ValueError as exc:
         publisher.publish_failure(
@@ -295,6 +307,7 @@ def handle_generate_item_message(body: bytes, publisher: StoryboardImageJobPubli
             page_number=page_number,
             error=StoryboardImageError(code="GENERATE_STORYBOARD_IMAGE_ERROR", message=str(exc)),
             action="GENERATE",
+            story_mode=message.storyMode,
         )
         return
     except RuntimeError as exc:
@@ -304,6 +317,7 @@ def handle_generate_item_message(body: bytes, publisher: StoryboardImageJobPubli
             page_number=page_number,
             error=StoryboardImageError(code="GENERATE_STORYBOARD_IMAGE_RUNTIME_ERROR", message=str(exc)),
             action="GENERATE",
+            story_mode=message.storyMode,
         )
         return
 
@@ -313,6 +327,7 @@ def handle_generate_item_message(body: bytes, publisher: StoryboardImageJobPubli
         seed=message.payload.seed,
         result=result,
         action="GENERATE",
+        story_mode=message.storyMode,
     )
 
 
@@ -321,7 +336,10 @@ def handle_regenerate_message(body: bytes, publisher: StoryboardImageJobPublishe
     page_number = message.payload.item.pageNumber
 
     try:
-        response = regenerate_storyboard_image(message.payload)
+        if _is_webtoon_mode(message.storyMode):
+            response = regenerate_webtoon_storyboard_image(message.payload)
+        else:
+            response = regenerate_storyboard_image(message.payload)
     except ValueError as exc:
         publisher.publish_failure(
             job_id=message.jobId,
@@ -329,6 +347,7 @@ def handle_regenerate_message(body: bytes, publisher: StoryboardImageJobPublishe
             page_number=page_number,
             error=StoryboardImageError(code="REGENERATE_STORYBOARD_IMAGE_ERROR", message=str(exc)),
             action="REGENERATE",
+            story_mode=message.storyMode,
         )
         return
     except RuntimeError as exc:
@@ -338,6 +357,7 @@ def handle_regenerate_message(body: bytes, publisher: StoryboardImageJobPublishe
             page_number=page_number,
             error=StoryboardImageError(code="REGENERATE_STORYBOARD_IMAGE_RUNTIME_ERROR", message=str(exc)),
             action="REGENERATE",
+            story_mode=message.storyMode,
         )
         return
 
@@ -347,6 +367,7 @@ def handle_regenerate_message(body: bytes, publisher: StoryboardImageJobPublishe
         seed=response.seed,
         result=response.result,
         action="REGENERATE",
+        story_mode=message.storyMode,
     )
 
 
@@ -371,8 +392,13 @@ def _publish_unexpected_failure(
                 message="Unexpected worker error",
             ),
             action=action,
+            story_mode=payload.get("storyMode", "VIEWER"),
         )
         return True
     except Exception:
         logger.exception("Failed to publish unexpected storyboard image failure event")
         return False
+
+
+def _is_webtoon_mode(story_mode: str) -> bool:
+    return story_mode == "WEBTOON"

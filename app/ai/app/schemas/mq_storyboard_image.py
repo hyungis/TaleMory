@@ -11,6 +11,7 @@ from app.schemas.storyboard_image import (
 
 
 StoryboardImageJobType = Literal["STORYBOARD_IMAGE"]
+StoryboardImageMode = Literal["VIEWER", "WEBTOON"]
 StoryboardImageEventStatus = Literal["COMPLETED", "FAILED"]
 StoryboardImageSuccessType = Literal[
     "GENERATE_STORYBOARD_IMAGE_COMPLETED",
@@ -25,6 +26,7 @@ StoryboardImageFailureType = Literal[
 class StoryboardImageGenerateJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: StoryboardImageJobType = "STORYBOARD_IMAGE"
+    storyMode: StoryboardImageMode = "VIEWER"
     storyId: int = Field(..., ge=1)
     payload: StoryboardImageGenerateRequest
 
@@ -37,6 +39,7 @@ class StoryboardImageGenerateItemJobPayload(BaseModel):
 class StoryboardImageGenerateItemJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: StoryboardImageJobType = "STORYBOARD_IMAGE"
+    storyMode: StoryboardImageMode = "VIEWER"
     storyId: int = Field(..., ge=1)
     payload: StoryboardImageGenerateItemJobPayload
 
@@ -44,6 +47,7 @@ class StoryboardImageGenerateItemJobMessage(BaseModel):
 class StoryboardImageRegenerateJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: StoryboardImageJobType = "STORYBOARD_IMAGE"
+    storyMode: StoryboardImageMode = "VIEWER"
     storyId: int = Field(..., ge=1)
     payload: StoryboardImageRegenerateRequest
 
@@ -61,6 +65,7 @@ class StoryboardImageSuccessPayload(BaseModel):
 class StoryboardImageSuccessEnvelope(BaseModel):
     jobId: str
     type: StoryboardImageSuccessType
+    storyMode: StoryboardImageMode = "VIEWER"
     storyId: int
     pageNumber: int = Field(..., ge=0)
     status: Literal["COMPLETED"] = "COMPLETED"
@@ -70,6 +75,7 @@ class StoryboardImageSuccessEnvelope(BaseModel):
 class StoryboardImageFailureEnvelope(BaseModel):
     jobId: str
     type: StoryboardImageFailureType
+    storyMode: StoryboardImageMode = "VIEWER"
     storyId: int
     pageNumber: int | None = Field(default=None, ge=0)
     status: Literal["FAILED"] = "FAILED"

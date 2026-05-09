@@ -11,6 +11,7 @@ from app.schemas.storyboard_summary import (
 
 
 StorySummaryJobType = Literal["STORY_SUMMARY", "STORY_SUMMARY_REGENERATE"]
+StorySummaryMode = Literal["VIEWER", "WEBTOON"]
 StorySummaryEventStatus = Literal["COMPLETED", "FAILED"]
 StorySummarySuccessType = Literal[
     "GENERATE_STORY_SUMMARY_COMPLETED",
@@ -25,6 +26,7 @@ StorySummaryFailureType = Literal[
 class StorySummaryGenerateJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: StorySummaryJobType = "STORY_SUMMARY"
+    storyMode: StorySummaryMode = "VIEWER"
     storyId: int | None = Field(default=None, ge=1)
     payload: StoryboardSummaryGenerateRequest
 
@@ -32,6 +34,7 @@ class StorySummaryGenerateJobMessage(BaseModel):
 class StorySummaryRegenerateJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: StorySummaryJobType = "STORY_SUMMARY_REGENERATE"
+    storyMode: StorySummaryMode = "VIEWER"
     storyId: int | None = Field(default=None, ge=1)
     payload: StoryboardSummaryRegenerateRequest
 
@@ -39,6 +42,7 @@ class StorySummaryRegenerateJobMessage(BaseModel):
 class StorySummarySuccessEnvelope(BaseModel):
     jobId: str
     type: StorySummarySuccessType = "GENERATE_STORY_SUMMARY_COMPLETED"
+    storyMode: StorySummaryMode = "VIEWER"
     storyId: int | None = None
     status: Literal["COMPLETED"] = "COMPLETED"
     payload: StoryboardSummaryGenerateResponse
@@ -47,6 +51,7 @@ class StorySummarySuccessEnvelope(BaseModel):
 class StorySummaryFailureEnvelope(BaseModel):
     jobId: str
     type: StorySummaryFailureType = "GENERATE_STORY_SUMMARY_FAILED"
+    storyMode: StorySummaryMode = "VIEWER"
     storyId: int | None = None
     status: Literal["FAILED"] = "FAILED"
     error: StoryError

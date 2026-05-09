@@ -23,12 +23,16 @@ from app.schemas.mq_storyboard_image import (
     StoryboardImageSuccessEnvelope,
     StoryboardImageSuccessPayload,
 )
-from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StorySuccessEnvelope
+from app.schemas.mq_storyboard import StoryError, StoryFailureEnvelope, StoryMode, StorySuccessEnvelope
 from app.schemas.mq_story_sentence_translation import (
     StorySentenceTranslationFailureEnvelope,
     StorySentenceTranslationSuccessEnvelope,
 )
-from app.schemas.mq_storyboard_summary import StorySummaryFailureEnvelope, StorySummarySuccessEnvelope
+from app.schemas.mq_storyboard_summary import (
+    StorySummaryFailureEnvelope,
+    StorySummaryMode,
+    StorySummarySuccessEnvelope,
+)
 from app.schemas.mq_tts import StoryTtsResultPayload, TtsError, TtsFailureEnvelope, TtsSuccessEnvelope
 from app.schemas.mq_tts_preview import (
     PreviewTtsError,
@@ -36,7 +40,7 @@ from app.schemas.mq_tts_preview import (
     PreviewTtsResultPayload,
     PreviewTtsSuccessEnvelope,
 )
-from app.schemas.storyboard import StoryboardGenerateResponse
+from app.schemas.storyboard import StoryboardGenerateResponse, WebtoonStoryboardGenerateResponse
 from app.schemas.storyboard import StorySentenceTranslationResponse
 from app.schemas.storyboard_summary import StoryboardSummaryGenerateResponse
 from app.schemas.storyboard_image import StoryboardImageGenerateResult
@@ -53,12 +57,14 @@ class StoryResultPublisher:
         self,
         job_id: str,
         story_id: int | None,
-        payload: StoryboardGenerateResponse,
+        payload: StoryboardGenerateResponse | WebtoonStoryboardGenerateResponse,
         action: StoryAction,
+        story_mode: StoryMode = "VIEWER",
     ) -> None:
         envelope = StorySuccessEnvelope(
             jobId=job_id,
             type=_completed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             payload=payload,
         )
@@ -73,10 +79,12 @@ class StoryResultPublisher:
         story_id: int | None,
         error: StoryError,
         action: StoryAction,
+        story_mode: StoryMode = "VIEWER",
     ) -> None:
         envelope = StoryFailureEnvelope(
             jobId=job_id,
             type=_failed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             error=error,
         )
@@ -91,10 +99,12 @@ class StoryResultPublisher:
         story_id: int | None,
         payload: StoryboardSummaryGenerateResponse,
         action: StoryAction = "GENERATE",
+        story_mode: StorySummaryMode = "VIEWER",
     ) -> None:
         envelope = StorySummarySuccessEnvelope(
             jobId=job_id,
             type=_summary_completed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             payload=payload,
         )
@@ -109,10 +119,12 @@ class StoryResultPublisher:
         story_id: int | None,
         error: StoryError,
         action: StoryAction = "GENERATE",
+        story_mode: StorySummaryMode = "VIEWER",
     ) -> None:
         envelope = StorySummaryFailureEnvelope(
             jobId=job_id,
             type=_summary_failed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             error=error,
         )
@@ -322,10 +334,12 @@ class StoryboardImageJobPublisher:
         seed: int,
         result: StoryboardImageGenerateResult,
         action: StoryboardImageAction,
+        story_mode: str = "VIEWER",
     ) -> None:
         envelope = StoryboardImageSuccessEnvelope(
             jobId=job_id,
             type=_image_completed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             pageNumber=result.pageNumber,
             payload=StoryboardImageSuccessPayload(seed=seed, result=result),
@@ -343,10 +357,12 @@ class StoryboardImageJobPublisher:
         error: StoryboardImageError,
         action: StoryboardImageAction,
         page_number: int | None = None,
+        story_mode: str = "VIEWER",
     ) -> None:
         envelope = StoryboardImageFailureEnvelope(
             jobId=job_id,
             type=_image_failed_type_for_action(action),
+            storyMode=story_mode,
             storyId=story_id,
             pageNumber=page_number,
             error=error,

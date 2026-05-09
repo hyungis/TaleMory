@@ -1,11 +1,66 @@
 from app.schemas.storyboard import StoryboardGenerateRequest
-from app.services.storyboard_prompt import STORYBOARD_SYSTEM_PROMPT
-from app.services.storyboard_service import generate_storyboard
+from app.core.config import settings
+from app.services.storyboard_prompt import STORYBOARD_SYSTEM_PROMPT, WEBTOON_STORYBOARD_SYSTEM_PROMPT
+from app.services.storyboard_service import (
+    _build_openai_webtoon_input_content,
+    _to_gemini_json_schema,
+    generate_storyboard,
+    generate_webtoon_storyboard,
+)
+
+
+def setup_function() -> None:
+    settings.OPENAI_API_KEY = None
+    settings.GEMINI_API_KEY = None
 
 
 def test_storyboard_system_prompt_requires_rough_sketch_image_prompt() -> None:
     assert "rough pre-coloring storyboard sketch" in STORYBOARD_SYSTEM_PROMPT
     assert "not a polished final illustration" in STORYBOARD_SYSTEM_PROMPT
+
+
+def test_webtoon_prompt_requires_multiple_sentences_per_page() -> None:
+    assert "Each page must contain at least 3 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "Never return a page with only one sentence" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+
+
+def test_gemini_schema_inlines_defs_for_structured_output() -> None:
+    schema = _to_gemini_json_schema(StoryboardGenerateRequest.model_json_schema())
+
+    assert "$defs" not in schema
+    assert "$ref" not in str(schema)
+    assert "title" not in schema
+    assert schema["properties"]["children"]["items"]["type"] == "object"
+
+
+def test_gemini_webtoon_input_can_omit_image_blocks() -> None:
+    request = StoryboardGenerateRequest.model_validate(
+        {
+            "storyId": 1,
+            "children": [{"name": "Lina", "age": 5, "gender": "FEMALE"}],
+            "companions": ["Mom"],
+            "travel": {"place": "Tokyo", "startDate": None, "endDate": None},
+            "photos": [
+                {
+                    "photoId": 101,
+                    "s3Key": "stories/test/1.jpg",
+                    "imageUrl": "https://example.com/photo.jpg",
+                    "description": "A family trip photo",
+                    "hashtags": ["family"],
+                    "displayOrder": 1,
+                }
+            ],
+            "difficulty": "BEGINNER",
+        }
+    )
+
+    content = _build_openai_webtoon_input_content(
+        request,
+        request.model_dump(mode="json"),
+        include_images=False,
+    )
+
+    assert all(block["type"] != "input_image" for block in content)
 
 
 def test_local_storyboard_generation_uses_rough_sketch_image_prompt() -> None:
@@ -36,4 +91,33 @@ def test_local_storyboard_generation_uses_rough_sketch_image_prompt() -> None:
 
     assert "rough pre-coloring children's book storyboard sketch" in image_prompt
     assert "no polished final rendering" in image_prompt
+
+
+def test_local_webtoon_storyboard_uses_multiple_sentences_per_page() -> None:
+    request = StoryboardGenerateRequest.model_validate(
+        {
+            "storyId": 1,
+            "children": [{"name": "Haesol", "age": 7, "gender": "FEMALE"}],
+            "companions": ["Mom", "Dad"],
+            "travel": {
+                "place": "Waikiki",
+                "startDate": "2026-01-10",
+                "endDate": "2026-01-14",
+            },
+            "photos": [
+                {
+                    "photoId": 101,
+                    "description": "Haesol put her feet in the ocean for the first time.",
+                    "hashtags": ["beach", "arrival"],
+                    "displayOrder": 1,
+                }
+            ],
+            "difficulty": "BEGINNER",
+        }
+    )
+
+    response = generate_webtoon_storyboard(request)
+
+    assert response.pages
+    assert all(page.sentenceCount >= 3 for page in response.pages)
 
