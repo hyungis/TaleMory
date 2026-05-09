@@ -749,6 +749,10 @@
   text-align: center;
   font-weight: 700;
   letter-spacing: 0.04em;
+  /* 한국어 어절(공백) 단위로 줄바꿈 — '제목 없는 동화' 가 글자 단위로 어색하게 깨지지 않게.
+     공백 없는 매우 긴 토큰(영어 등) 은 break-word 로 컨테이너 넘침 방지. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* ===== 뒷표지 + 편지지 ===== */

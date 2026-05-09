@@ -20,6 +20,8 @@ import com.s210.backend.domain.story.presentation.request.ProgressRequest
 import com.s210.backend.domain.story.presentation.request.SelectIllustrationVersionRequest
 import com.s210.backend.domain.story.presentation.request.StyleModifyRequest
 import com.s210.backend.domain.story.presentation.request.VoiceProfileModifyRequest
+import com.s210.backend.domain.story.presentation.response.ActiveIllustrationJobView
+import com.s210.backend.domain.story.presentation.response.ActiveStoryJobView
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.HighlightVoicesExistsResponse
 import com.s210.backend.domain.story.presentation.response.IllustrationRegenStatusResponse
@@ -109,6 +111,20 @@ class SceneController(
                 used = result.used,
                 limit = result.limit,
                 remaining = result.remaining,
+                // 활성 잡 정보 (Step 4 의 useStoryboardStateQuery 와 동일 패턴) — 새로고침 후 FE polling 복원용.
+                activeJob = result.activeJob?.let {
+                    ActiveIllustrationJobView(
+                        jobId = JobId(it.jobId),
+                        sceneId = SceneId(it.sceneId),
+                        status = it.status,
+                    )
+                },
+                activeTtsJob = result.activeTtsJob?.let {
+                    ActiveStoryJobView(jobId = JobId(it.jobId), status = it.status)
+                },
+                activeFinalIllustrationJob = result.activeFinalIllustrationJob?.let {
+                    ActiveStoryJobView(jobId = JobId(it.jobId), status = it.status)
+                },
             ))
         )
     }

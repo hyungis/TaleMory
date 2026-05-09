@@ -79,6 +79,38 @@ class SceneIllustrationService(
         val used: Int,
         val limit: Int,
         val remaining: Int,
+        /**
+         * 현재 PENDING/RUNNING 인 페이지 재생성 잡 정보.
+         * 새로고침 시 FE 가 polling 컨텍스트(activeRegen)를 BE 진실 기반으로 복원하기 위함.
+         */
+        val activeJob: ActiveRegenJobView? = null,
+        /**
+         * Step 7→8 confirmStoryboard 로 발행된 TTS 잡이 PENDING/RUNNING 이면 그 정보.
+         * 크롬 종료 후 "이어 만들기" 진입 시 FE 가 props jobId 가 비어있어도 BE 진실로
+         * polling 을 재개해 로딩 화면을 유지하도록 함.
+         */
+        val activeTtsJob: ActiveStoryJobView? = null,
+        /**
+         * Step 5 PATCH /style 또는 Step 8 다시그리기로 발행된 FINAL_ILLUSTRATION 잡이
+         * PENDING/RUNNING 이면 그 정보. activeJob (페이지 재생성 = JobType.ILLUSTRATION) 과
+         * 별도 — FINAL 은 동화 단위 batch 잡.
+         */
+        val activeFinalIllustrationJob: ActiveStoryJobView? = null,
+    )
+
+    data class ActiveRegenJobView(
+        val jobId: Long,
+        val sceneId: Long,
+        val status: String,
+    )
+
+    /**
+     * TTS / FINAL_ILLUSTRATION 같이 동화 단위(스토리 단위) 잡 — sceneId 없음.
+     * 새로고침 후 FE polling 컨텍스트(effectiveTtsJobId / effectiveFinalJobId) 복원 시 사용.
+     */
+    data class ActiveStoryJobView(
+        val jobId: Long,
+        val status: String,
     )
 
     fun regenerateIllustration(
@@ -289,11 +321,42 @@ class SceneIllustrationService(
             JobType.ILLUSTRATION,
             listOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCESS, JobStatus.FAILED),
         ).toInt()
+        // 활성 잡(PENDING/RUNNING) 조회 — 새로고침 후 FE 가 polling 컨텍스트 복원에 사용.
+        // Step 4 의 useStoryboardStateQuery 와 동일 패턴 (BE 가 진실의 출처).
+        val activeJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId = storyId,
+            jobType = JobType.ILLUSTRATION,
+            statuses = listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )?.let { job ->
+            val activeSceneId = job.sceneId
+                ?: return@let null  // 페이지 단위 잡이 아니면(=sceneId 미설정) 복원 불가 — skip
+            ActiveRegenJobView(
+                jobId = job.id,
+                sceneId = activeSceneId,
+                status = job.status.name,
+            )
+        }
+        // 동화 단위 TTS 잡 (Step 7→8 confirmStoryboard 발행). 크롬 종료 후 이어만들기 시
+        // FE props 의 storyGenerationJobId 가 비어있어도 BE 진실로 polling 재개.
+        val activeTtsJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId = storyId,
+            jobType = JobType.TTS,
+            statuses = listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )?.let { ActiveStoryJobView(jobId = it.id, status = it.status.name) }
+        // 동화 단위 FINAL_ILLUSTRATION 잡 (Step 5 PATCH /style + Step 8 재생성 후속).
+        val activeFinalIllustrationJob = jobRepository.findFirstByStoryIdAndJobTypeAndStatusInOrderByIdDesc(
+            storyId = storyId,
+            jobType = JobType.FINAL_ILLUSTRATION,
+            statuses = listOf(JobStatus.PENDING, JobStatus.RUNNING),
+        )?.let { ActiveStoryJobView(jobId = it.id, status = it.status.name) }
         return RegenStatusResult(
             storyId = storyId,
             used = used,
             limit = STORY_REGEN_LIMIT,
             remaining = (STORY_REGEN_LIMIT - used).coerceAtLeast(0),
+            activeJob = activeJob,
+            activeTtsJob = activeTtsJob,
+            activeFinalIllustrationJob = activeFinalIllustrationJob,
         )
     }
 
