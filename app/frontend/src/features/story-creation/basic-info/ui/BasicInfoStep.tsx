@@ -11,7 +11,7 @@ import { clearCreationProgressSnapshot } from '../../lib/progressStorage'
 import { LevelPicker } from './LevelPicker'
 import { ChildrenList } from './ChildrenList'
 import { TravelDatePicker } from './TravelDatePicker'
-import type { PersonResponse } from '../api/types'
+import type { PersonResponse, StoryModeApi } from '../api/types'
 import { usePersonsQuery } from '../model/usePersonsQuery'
 import { usePersonPost } from '../model/usePersonPost'
 import { useStoryPost } from '../model/useStoryPost'
@@ -27,6 +27,12 @@ import '../../styles/creation-paper.css'
 interface BasicInfoStepProps {
   data: StoryProject['step1']
   storyId: StoryId | null
+  /**
+   * 동화 생성 모드 (VIEWER / WEBTOON). POST /api/stories body 에 그대로 전달.
+   * useStoryCreationFlow 가 mount 시 결정한 값이 내려오며 플로우 내에서 변경되지 않는다.
+   * PATCH 시에는 보내지 않음 — 모드는 생성 시 한 번만 결정.
+   */
+  mode: StoryModeApi
   onUpdate: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   onChildUpdate: (index: number, patch: Partial<StoryChild>) => void
   onChildAdd: () => void
@@ -48,6 +54,7 @@ interface BasicInfoStepProps {
 export function BasicInfoStep({
   data,
   storyId,
+  mode,
   onUpdate,
   onChildUpdate,
   onChildAdd,
@@ -152,12 +159,15 @@ export function BasicInfoStep({
       }
 
       if (storyId !== null) {
+        // PATCH 는 mode 를 보내지 않음 — 모드는 최초 POST 때 한 번만 결정 후 영속화.
+        // ModifyStoryRequest 타입에도 mode 필드 없음 → 컴파일 시점 보호.
         await storyUpdate.mutateAsync({ id: storyId, body: storyBody })
         onStoryCreated(storyId)
         return
       }
 
-      const response = await storyPost.mutateAsync(storyBody)
+      // 신규 POST 만 mode 를 함께 전달 → BE 가 stories.mode 컬럼에 저장.
+      const response = await storyPost.mutateAsync({ ...storyBody, mode })
       onStoryCreated(response.storyId)
     } catch (err) {
       if (storyId !== null && err instanceof ApiError && err.status === 404) {
@@ -176,6 +186,7 @@ export function BasicInfoStep({
     firstDate,
     lastDate,
     isReadOnly,
+    mode,
     onChildUpdate,
     onStaleStoryIdReset,
     onStoryCreated,

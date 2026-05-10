@@ -46,6 +46,7 @@ class StoryController(
                 storyId = StoryId(it.id),
                 title = it.title,
                 difficulty = it.difficulty.name,
+                mode = it.mode.name,
                 companionsJson = it.companionsJson,
                 mainCharacterJson = it.mainCharacterJson,
                 travelPlace = it.travelPlace,

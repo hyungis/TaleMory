@@ -29,6 +29,9 @@ export { useStoryboardRegenStatusQuery } from './model/useStoryboardRegenStatusQ
 export type {
   StoryboardPageItem,
   StoryboardPagesResponse,
+  StoryboardSentenceItem,
+  WebtoonCharacterInScene,
+  WebtoonSentenceType,
   UpdateStoryboardPageRequest,
   UpdateStoryboardPageResponse,
   RegenerateStoryboardImageRequest,
@@ -38,3 +41,6 @@ export type {
   SelectStoryboardImageVersionRequest,
   StoryboardRegenStatusResponse,
 } from './api/types'
+
+export { WebtoonDialoguePreview } from './ui/WebtoonDialoguePreview'
+export { WebtoonSentenceEditor } from './ui/WebtoonSentenceEditor'

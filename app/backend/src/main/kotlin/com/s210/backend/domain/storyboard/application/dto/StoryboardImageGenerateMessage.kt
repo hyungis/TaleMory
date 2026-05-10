@@ -14,6 +14,8 @@ data class StoryboardImageGenerateMessage(
     val jobId: String,
     val jobType: String = "STORYBOARD_IMAGE",
     val storyId: Long,
+    /** 동화 생성 모드 — VIEWER / WEBTOON. AI 워커가 webtoon image prompt 분기에 사용. */
+    val storyMode: String = "VIEWER",
     val payload: StoryboardImageGeneratePayload,
 )
 
@@ -84,6 +86,8 @@ data class StoryboardImageRegenerateMessage(
     val jobId: String,
     val jobType: String = "STORYBOARD_IMAGE",
     val storyId: Long,
+    /** 동화 생성 모드 — VIEWER / WEBTOON. AI 워커가 webtoon image regenerate prompt 분기에 사용. */
+    val storyMode: String = "VIEWER",
     val payload: StoryboardImageRegeneratePayload,
 )
 

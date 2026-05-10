@@ -272,8 +272,17 @@ class StoryboardResultListener(
         val requestedKoreanText = job.requestPayload
             ?.let { runCatching { objectMapper.readValue(it, StorySentenceTranslationRequestPayload::class.java) }.getOrNull() }
             ?.koreanText
-        val currentKoreanText = page.pageTexts(objectMapper).koreanText
-        if (requestedKoreanText != null && currentKoreanText != requestedKoreanText) {
+        // stale check 의 비교는 publish 시 보낸 본문 (`request_payload.koreanText`) 와
+        // 현재 페이지의 sentences[].koreanText 를 동일 형식으로 join 한 결과 사이에서 한다.
+        //
+        // ⚠ 옛 코드는 `page.pageTexts().koreanText` 를 비교했으나, X2 패치 이후 webtoon 페이지의
+        //   `pageTexts()` 는 sentence 별 prefix(`이름: `) 가 박힌 합본을 반환한다. 반면 publish 시점에는
+        //   prefix 가 빠진 clean 본문을 request_payload 로 저장하기 때문에 두 값이 항상 다르게 평가되어
+        //   stale check 가 무조건 발동 → `replaceTranslatedSentences` 호출이 누락되고 영어가 갱신되지 않는
+        //   회귀가 발생한다. clean 본문끼리 비교해야 정상.
+        val currentCleanKoreanText = page.parseSentencesList(objectMapper)
+            .joinToString("\n") { it.koreanText.trim() }
+        if (requestedKoreanText != null && currentCleanKoreanText != requestedKoreanText) {
             log.info(
                 "Skip stale sentence translation jobId={}, storyId={}, pageNumber={}",
                 job.id,
@@ -696,6 +705,12 @@ class StoryboardResultListener(
         //    - sceneSummary / imagePrompt 까지 함께 보존해야 이후 이미지 생성 단계에서
         //      storyboard_pages 단일 소스로 페이로드를 조립할 수 있다 (옵션 D').
         //    - bulk DELETE (flushAutomatically=true) 로 UK(storyBoardId, pageNumber) 충돌 회피.
+        //
+        //    WEBTOON 모드 영속화 (Phase 2):
+        //     - sentences JSON 자체엔 추가 컬럼이 필요 없음 — DTO 에 type/speakerKey 가 추가되어
+        //       writeValueAsString 결과에 자동 포함됨. VIEWER 페이로드(필드 없음) 는 두 키 미존재 → null 폴백.
+        //     - charactersInScene 은 별도 JSON 컬럼(characters_in_scene_json) 으로 분리 영속화.
+        //       null/empty 는 그대로 null 저장 (VIEWER 모드).
         storyboardPageRepository.deleteAllByStoryBoardId(storyBoard.id)
         storyboardPageRepository.saveAll(
             payload.pages.map { p ->
@@ -705,6 +720,9 @@ class StoryboardResultListener(
                     sceneSummary = p.sceneSummary,
                     imagePrompt = p.imagePrompt,
                     sentences = objectMapper.writeValueAsString(p.sentences),
+                    charactersInSceneJson = p.charactersInScene
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { objectMapper.writeValueAsString(it) },
                     imageUrl = null,
                 )
             },

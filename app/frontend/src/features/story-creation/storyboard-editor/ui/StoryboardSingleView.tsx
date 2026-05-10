@@ -2,6 +2,11 @@ import { BookOpen, ChevronLeft, ChevronRight, Image as ImageIcon, Quote, Refresh
 import type { StoryboardPageDraft } from '../../model/types'
 import { SketchCard } from './SketchCard'
 import { MAX_PER_PAGE_REFINE } from '../lib/defaults'
+import {
+  WebtoonDialoguePreview,
+  type StoryboardSentenceItem,
+  type WebtoonCharacterInScene,
+} from '../../storyboard-pages'
 
 interface StoryboardSingleViewProps {
   pages: StoryboardPageDraft[]
@@ -11,6 +16,15 @@ interface StoryboardSingleViewProps {
   onPageUpdate: (idx: number, patch: Partial<StoryboardPageDraft>) => void
   pageRefineRemaining: number[]
   onRegenerate: (idx: number) => void
+  /**
+   * WEBTOON 모드 한정 — 페이지별 sentences (type/speakerKey 포함).
+   * BE `StoryboardPageItem.sentences` 를 그대로 pageNumber 로 매핑해서 전달하면 됨.
+   * 미제공/null 이거나 sentence 가 webtoon meta 없으면 preview 컴포넌트 자체가 null 렌더 → VIEWER 안전.
+   * 배열 인덱스는 props.pages 와 1:1 (= 0-based 페이지 순서).
+   */
+  webtoonSentencesByPage?: (StoryboardSentenceItem[] | null | undefined)[]
+  /** WEBTOON 모드 한정 — 페이지별 등장 캐릭터 메타. 미제공이면 캐릭터 헤더 미표시. */
+  webtoonCharactersByPage?: (WebtoonCharacterInScene[] | null | undefined)[]
 }
 
 /**
@@ -25,12 +39,17 @@ export function StoryboardSingleView({
   onPageUpdate,
   pageRefineRemaining,
   onRegenerate,
+  webtoonSentencesByPage,
+  webtoonCharactersByPage,
 }: StoryboardSingleViewProps) {
   const page = pages[index]
   if (!page) return null
 
   const pageLeft = pageRefineRemaining[index] ?? 0
   const disabled = pageLeft <= 0
+  // WEBTOON 모드 데이터 — 옛 데이터/VIEWER 모드면 모두 undefined → preview 자체가 null 렌더.
+  const webtoonSentences = webtoonSentencesByPage?.[index] ?? null
+  const webtoonCharacters = webtoonCharactersByPage?.[index] ?? null
 
   return (
     <>
@@ -95,8 +114,8 @@ export function StoryboardSingleView({
                 </div>
               </div>
 
-              {/* 오른쪽: 텍스트 (en / ko) */}
-              <div className="w-full lg:w-1/2 flex flex-col justify-center">
+              {/* 오른쪽: 텍스트 (en / ko) + (WEBTOON 모드 한정) 화자/대사 미리보기 */}
+              <div className="w-full lg:w-1/2 flex flex-col justify-center gap-4">
                 <div className="bg-[#e8ddb4] p-6 md:p-8 rounded-3xl border-2 border-[#8b7a52]/40 relative">
                   <Quote className="absolute top-4 left-4 w-8 h-8 text-[#b4dc8c] opacity-50" />
                   <textarea
@@ -114,6 +133,13 @@ export function StoryboardSingleView({
                     />
                   </div>
                 </div>
+
+                {/* WEBTOON 모드 한정 — sentence/charactersInScene 미리보기.
+                    VIEWER 모드면 컴포넌트가 자체적으로 null 렌더 → 마크업 변동 없음. */}
+                <WebtoonDialoguePreview
+                  sentences={webtoonSentences}
+                  charactersInScene={webtoonCharacters}
+                />
               </div>
             </div>
           </div>
