@@ -51,7 +51,10 @@ export function WebtoonSentenceEditor({
     setRows(prev => prev.map((r, i) => (i === idx ? { ...r, koreanText } : r)))
   }
 
+  const hasEmptyRow = rows.some(r => !r.koreanText.trim())
+
   const handleSave = () => {
+    if (hasEmptyRow) return
     const combined = rowsToKoreanText(rows).trim()
     if (combined.length === 0) return
     onSave(combined)
@@ -67,6 +70,7 @@ export function WebtoonSentenceEditor({
             key={idx}
             row={row}
             disabled={isReadOnly}
+            isEmpty={!row.koreanText.trim()}
             onChange={text => updateRow(idx, text)}
           />
         ))}
@@ -76,6 +80,14 @@ export function WebtoonSentenceEditor({
           </p>
         )}
       </div>
+
+      {/* 빈 row 안내 — 빈 본문이 하나라도 있으면 저장 막힘. */}
+      {hasEmptyRow && (
+        <p className="text-sm text-[#B0473F] font-bold inline-flex items-start gap-1 px-1">
+          <span aria-hidden="true">⚠️</span>
+          <span>비어있는 문장이 있어요. 본문을 채워주세요. (문장은 삭제할 수 없어요.)</span>
+        </p>
+      )}
 
       {/* 저장/취소 */}
       <div className="mt-2 flex justify-end gap-2">
@@ -90,7 +102,7 @@ export function WebtoonSentenceEditor({
         <button
           type="button"
           onClick={handleSave}
-          disabled={isSubmitting || disabled || rows.length === 0 || rows.every(r => !r.koreanText.trim())}
+          disabled={isSubmitting || disabled || rows.length === 0 || hasEmptyRow}
           className="inline-flex items-center justify-center rounded-lg border border-[#3F6B2E]/35 bg-[#3F6B2E] px-3 py-1.5 text-sm font-bold text-[#FFF8E0] transition-colors hover:bg-[#4F7B3E] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? '저장 중…' : '확인'}
@@ -140,6 +152,8 @@ function rowsToKoreanText(rows: EditorRow[]): string {
 interface SentenceRowProps {
   row: EditorRow
   disabled: boolean
+  /** 본문이 비어있는 row — 시각적으로 빨간 border + 배경으로 강조해 사용자 인지 유도. */
+  isEmpty: boolean
   onChange: (text: string) => void
 }
 
@@ -149,10 +163,13 @@ interface SentenceRowProps {
  * 의도된 제약:
  *  - 삭제 버튼 없음 — sentence 갯수 임의 감소 방지.
  *  - 화자 chip 잠금 — speakerKey 변경 불가, 시스템 truth 보존.
- *  - 본문 input 만 자유 편집 가능.
+ *  - 본문 input 만 자유 편집 가능 — 단, 빈 본문은 저장 차단 (상위에서 [확인] disable).
  */
-function SentenceRow({ row, disabled, onChange }: SentenceRowProps) {
+function SentenceRow({ row, disabled, isEmpty, onChange }: SentenceRowProps) {
   const isDialogue = row.type === 'DIALOGUE'
+  const textareaClass = isEmpty
+    ? 'flex-1 min-h-[2.5rem] bg-[#FCE9E5] text-[#3E2A18] text-base leading-relaxed font-medium focus:outline-none resize-none placeholder-[#B0473F]/60 border-2 border-[#B0473F] rounded-lg p-2 disabled:cursor-not-allowed disabled:opacity-60'
+    : 'flex-1 min-h-[2.5rem] bg-[#FFF8E0] text-[#3E2A18] text-base leading-relaxed font-medium focus:outline-none resize-none placeholder-[#9A7548]/60 border border-[#9A7548]/30 rounded-lg p-2 disabled:cursor-not-allowed disabled:opacity-60'
   return (
     <div className="flex items-start gap-2">
       <span
@@ -180,7 +197,7 @@ function SentenceRow({ row, disabled, onChange }: SentenceRowProps) {
         onChange={e => onChange(e.target.value)}
         disabled={disabled}
         rows={2}
-        className="flex-1 min-h-[2.5rem] bg-[#FFF8E0] text-[#3E2A18] text-base leading-relaxed font-medium focus:outline-none resize-none placeholder-[#9A7548]/60 border border-[#9A7548]/30 rounded-lg p-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className={textareaClass}
         placeholder={isDialogue ? '대사 본문' : '나레이션 본문'}
       />
     </div>
