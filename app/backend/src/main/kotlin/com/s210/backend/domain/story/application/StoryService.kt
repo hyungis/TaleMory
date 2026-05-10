@@ -93,6 +93,7 @@ class StoryService(
                 userId = command.userId,
                 title = command.title,
                 difficulty = command.difficulty,
+                mode = command.mode,
                 status = StoryStatus.DRAFT,
                 companionsJson = command.companionsJson,
                 mainCharacterJson = command.mainCharacterJson,

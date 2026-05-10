@@ -27,6 +27,14 @@ class StoryboardPage(
     @Column(name = "sentences", columnDefinition = "JSON")
     var sentences: String? = null,
 
+    /**
+     * WEBTOON 모드 한정. 페이지 등장 캐릭터 메타 (characterKey/sceneRole/expectedPosition) JSON.
+     * AI 의 WebtoonStoryboardPage.charactersInScene 를 그대로 직렬화.
+     * VIEWER 모드 row 는 항상 null — 응답 DTO 가 nullable 로 노출.
+     */
+    @Column(name = "characters_in_scene_json", columnDefinition = "JSON")
+    var charactersInSceneJson: String? = null,
+
     @Column(name = "image_url", length = 500)
     var imageUrl: String? = null
 ) : BaseTimeEntity()

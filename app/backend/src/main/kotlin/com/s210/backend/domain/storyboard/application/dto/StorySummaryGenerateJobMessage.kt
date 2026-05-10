@@ -19,5 +19,7 @@ data class StorySummaryGenerateJobMessage(
     val jobType: String = "STORY_SUMMARY",
     val action: String = "GENERATE",
     val storyId: Long,
+    /** 동화 생성 모드 — VIEWER / WEBTOON. AI 측 storyMode 와 1:1 매칭. */
+    val storyMode: String = "VIEWER",
     val payload: StoryGeneratePayload,
 )

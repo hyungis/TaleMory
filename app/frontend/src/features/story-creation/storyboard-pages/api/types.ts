@@ -18,13 +18,48 @@ export interface StoryboardPageItem {
   imageUrl: string | null
   translationJobId?: JobId | null
   sentences: StoryboardSentenceItem[] | null
+  /**
+   * WEBTOON 모드 한정. 페이지에 등장하는 캐릭터 메타.
+   * VIEWER 모드 페이지는 null 또는 빈 배열.
+   * AI worker `WebtoonStoryboardPage.charactersInScene` ↔ BE `WebtoonCharacterInSceneDto` 와 1:1.
+   */
+  charactersInScene?: WebtoonCharacterInScene[] | null
 }
 
+/**
+ * 한 페이지 안의 문장 1개.
+ *
+ * - `emotion` 은 TTS 톤 제어용.
+ * - **`type` / `speakerKey` 는 WEBTOON 모드 한정** —
+ *   VIEWER 모드 응답에는 두 필드가 없거나 null. WEBTOON 모드 응답에선:
+ *     - `type = "DIALOGUE"`   → 캐릭터 대사. `speakerKey` 는 캐릭터 키 (인물 이름 기반).
+ *     - `type = "NARRATION"`  → 나레이터 문장. `speakerKey === "narrator"`.
+ */
 export interface StoryboardSentenceItem {
   sentenceOrder: number
   englishText: string
   koreanText: string
   emotion: string
+  /** WEBTOON 모드 한정 — 'DIALOGUE' / 'NARRATION'. VIEWER 면 없음/null. */
+  type?: WebtoonSentenceType | null
+  /** WEBTOON 모드 한정 — 화자 키. VIEWER 면 없음/null. */
+  speakerKey?: string | null
+}
+
+export type WebtoonSentenceType = 'DIALOGUE' | 'NARRATION'
+
+/**
+ * WEBTOON 모드 페이지 등장 캐릭터 메타.
+ *
+ * - `characterKey`     : `speakerKey` 와 같은 도메인. 동화 캐릭터 키 (이름 기반).
+ * - `sceneRole`        : 이 페이지에서 캐릭터의 역할 (자유 텍스트, FE 도우미 표시용).
+ * - `expectedPosition` : "left" / "center" / "right" / "top-left" / "bottom-right" 등 컷 구도 힌트.
+ *                        FE 가 말풍선/캐릭터 배치 시 참고.
+ */
+export interface WebtoonCharacterInScene {
+  characterKey: string
+  sceneRole: string
+  expectedPosition: string
 }
 
 /** GET 응답. 줄거리 미생성 상태에서도 200 으로 빈 배열 응답. */

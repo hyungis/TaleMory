@@ -17,6 +17,7 @@ import {
 import type {
   UseStoryCreationFlowInit,
   StoryDraftResponse,
+  StoryModeApi,
 } from '../../features/story-creation'
 import { ROUTES, buildViewerPath } from '../../shared/constants'
 // bookshelf 모달과 동일 테마(step-forest-modal / bookshelf-scroll / bookshelf-fade-in)를 재사용하므로
@@ -46,13 +47,25 @@ export function CreationPage() {
    * 시나리오에서 Step 5/6/7 락이 누락되는 버그를 막기 위해 BE 진실 기반으로 주입한다.
    */
   const init = useMemo<UseStoryCreationFlowInit | undefined>(() => {
-    const state = location.state as { draft?: StoryDraftResponse | null } | null
+    const state = location.state as {
+      draft?: StoryDraftResponse | null
+      /** BookstoreScene "새 동화책 만들기" 모달에서 사용자가 선택한 모드 (신규 플로우 한정). */
+      mode?: StoryModeApi
+    } | null
     const draft = state?.draft
-    if (!draft) return undefined
+    // 신규 진입(state 없음 또는 mode 만 있음): mode 만 init 으로 전달, 나머지는 default state.
+    if (!draft) {
+      if (state?.mode) {
+        return { mode: state.mode }
+      }
+      return undefined
+    }
     const progress = rehydrateProgress(draft)
     return {
       storyId: draft.storyId,
       step1: rehydrateStep1(draft),
+      // "이어서 작성하기" — 서버 DRAFT 의 mode 를 그대로 복원하여 플로우 일관성 유지.
+      mode: draft.mode,
       stylePresetLocked: progress.stylePresetLocked,
       confirmedReadOnly: progress.confirmedReadOnly,
       voiceProfileId: progress.voiceProfileId,
@@ -96,6 +109,7 @@ export function CreationPage() {
         <BasicInfoStep
           data={flow.projectData.step1}
           storyId={flow.storyId}
+          mode={flow.mode}
           onUpdate={flow.updateStep1}
           onChildUpdate={flow.updateChildAt}
           onChildAdd={flow.addChild}

@@ -62,6 +62,8 @@ data class StoryDraftResponse(
     val storyId: StoryId,
     val title: String?,
     val difficulty: String,
+    /** 동화 생성 모드 — VIEWER (기본 narration) / WEBTOON (대화). 이어서 작성 시 FE 가 모드 복원에 사용. */
+    val mode: String,
     val companionsJson: String,
     val mainCharacterJson: String,
     val travelPlace: String?,

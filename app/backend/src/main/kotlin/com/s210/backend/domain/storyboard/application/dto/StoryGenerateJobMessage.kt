@@ -18,6 +18,12 @@ data class StoryGenerateJobMessage(
     val jobType: String = "STORY",
     val action: String = "GENERATE",
     val storyId: Long,
+    /**
+     * 동화 생성 모드 — "VIEWER" (기본 narration) / "WEBTOON" (대화).
+     * AI 측 `Literal["VIEWER", "WEBTOON"]` 와 1:1. AI 워커가 이 값을 보고
+     * `generate_storyboard` ↔ `generate_webtoon_storyboard` 분기.
+     */
+    val storyMode: String = "VIEWER",
     val payload: StoryGeneratePayload,
 )
 
