@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.storyboard import ChildInfo
@@ -129,3 +131,61 @@ class FinalIllustrationReviseResponse(BaseModel):
     storyId: int
     seed: int
     result: FinalIllustrationGenerateResult
+
+
+class LayoutSentenceInput(BaseModel):
+    sentenceOrder: int = Field(..., ge=1)
+    englishText: str | None = Field(default=None, max_length=4000)
+    koreanText: str | None = Field(default=None, max_length=4000)
+    speakerKey: str | None = Field(default=None, max_length=50)
+
+
+class LayoutBoundingBox(BaseModel):
+    x: float = Field(..., ge=0, le=1)
+    y: float = Field(..., ge=0, le=1)
+    width: float = Field(..., ge=0, le=1)
+    height: float = Field(..., ge=0, le=1)
+
+
+class LayoutAnchor(BaseModel):
+    x: float = Field(..., ge=0, le=1)
+    y: float = Field(..., ge=0, le=1)
+
+
+class CharacterAnchorCandidate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    bbox: LayoutBoundingBox
+    anchor: LayoutAnchor
+    confidence: float = Field(..., ge=0, le=1)
+
+
+class FinalIllustrationLayoutAnalysisRequest(BaseModel):
+    pageNumber: int = Field(..., ge=0)
+    imageUrl: str | None = Field(default=None, max_length=2000)
+    imageS3Key: str | None = Field(default=None, max_length=1000)
+    sceneSummary: str | None = Field(default=None, max_length=1000)
+    imagePrompt: str | None = Field(default=None, max_length=2000)
+    children: list[ChildInfo] = Field(default_factory=list)
+    charactersInScene: list[dict[str, Any]] = Field(default_factory=list)
+    companions: list[str] = Field(default_factory=list)
+    sentences: list[LayoutSentenceInput] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_image_reference(self) -> "FinalIllustrationLayoutAnalysisRequest":
+        if self.imageUrl or self.imageS3Key:
+            return self
+        raise ValueError("imageUrl or imageS3Key is required")
+
+
+class FinalIllustrationLayoutAnalysisResponse(BaseModel):
+    pageNumber: int = Field(..., ge=0)
+    model: str
+    characters: list[CharacterAnchorCandidate] = Field(default_factory=list)
+
+
+class FinalIllustrationLayoutAnalysisBatchRequest(BaseModel):
+    items: list[FinalIllustrationLayoutAnalysisRequest] = Field(..., min_length=1, max_length=20)
+
+
+class FinalIllustrationLayoutAnalysisBatchResponse(BaseModel):
+    results: list[FinalIllustrationLayoutAnalysisResponse]

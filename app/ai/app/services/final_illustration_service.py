@@ -259,19 +259,73 @@ def _collect_reference_images(item: FinalIllustrationGenerateItemRequest) -> lis
 
 
 def _resolve_reference_string(image_url: str | None, s3_key: str | None) -> str | None:
+    if s3_key:
+        return _resolve_s3_reference_string(s3_key)
+
     if image_url:
+        extracted_s3_key = _extract_s3_key_from_url(image_url)
+        if extracted_s3_key:
+            resolved = _resolve_s3_reference_string(extracted_s3_key)
+            if resolved:
+                return resolved
         return image_url
-    if not s3_key:
+
+    return None
+
+
+def _resolve_s3_reference_string(s3_key: str) -> str | None:
+    normalized_key = s3_key.strip().lstrip("/")
+    if not normalized_key:
         return None
 
-    downloaded = _download_reference_image_from_s3(s3_key)
-    if downloaded is not None:
-        mime_type, raw_bytes = downloaded
-        return f"data:{mime_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
+    for candidate_key in _s3_key_candidates(normalized_key):
+        downloaded = _download_reference_image_from_s3(candidate_key)
+        if downloaded is not None:
+            mime_type, raw_bytes = downloaded
+            return f"data:{mime_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
 
-    public_url = _resolve_story_asset_url(s3_key)
-    if public_url:
-        return public_url
+    for candidate_key in _s3_key_candidates(normalized_key):
+        public_url = _resolve_story_asset_url(candidate_key)
+        if public_url:
+            return public_url
+
+    return None
+
+
+def _s3_key_candidates(s3_key: str) -> list[str]:
+    normalized_key = s3_key.strip().lstrip("/")
+    known_env_prefixes = ("local/", "dev/", "master/", "prod/")
+    if normalized_key.startswith(known_env_prefixes):
+        return [normalized_key]
+    env_prefixed_key = _apply_env_prefix(normalized_key)
+    if env_prefixed_key == normalized_key:
+        return [normalized_key]
+    return [normalized_key, env_prefixed_key]
+
+
+def _extract_s3_key_from_url(image_url: str) -> str | None:
+    public_base_url = (settings.STORYBOARD_IMAGE_PUBLIC_BASE_URL or "").rstrip("/")
+    if public_base_url and image_url.startswith(f"{public_base_url}/"):
+        return image_url.removeprefix(f"{public_base_url}/").lstrip("/")
+
+    parsed = parse.urlparse(image_url)
+    host = parsed.netloc.lower()
+    path = parse.unquote(parsed.path).lstrip("/")
+    bucket = (settings.STORYBOARD_IMAGE_S3_BUCKET or "").lower()
+    if not path:
+        return None
+
+    if bucket and path.lower().startswith(f"{bucket}/"):
+        return path[len(bucket) + 1 :]
+
+    is_known_s3_host = bool(bucket and (host == bucket or host.startswith(f"{bucket}.")))
+    is_aws_s3_host = "amazonaws.com" in host and ".s3" in host
+    is_configured_endpoint = bool(
+        settings.STORYBOARD_IMAGE_S3_ENDPOINT_URL
+        and host == parse.urlparse(settings.STORYBOARD_IMAGE_S3_ENDPOINT_URL).netloc.lower()
+    )
+    if is_known_s3_host or is_aws_s3_host or is_configured_endpoint:
+        return path
 
     return None
 
