@@ -10,6 +10,7 @@ data class StoryTtsJobMessage(
     val jobId: String,
     val jobType: String = "TTS",
     val action: String = "GENERATE",
+    val storyMode: String = "VIEWER",
     val storyId: Long,
     val payload: StoryTtsPayload,
 )

@@ -182,6 +182,7 @@ export function CreationPage() {
       {flow.currentStep === 6 && (
         <VoiceCloneStep
           storyId={flow.storyId}
+          mode={flow.mode}
           onBack={handleBack}
           onNext={flow.handleNext}
           onVoiceSaved={flow.updateVoiceModel}
