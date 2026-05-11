@@ -406,6 +406,88 @@ export function VoiceCloneStep({
             )}
           </section>
 
+          {/* Section 2: TTS 미리듣기 */}
+          <section className="cr-card">
+            <span className="cr-tape" aria-hidden="true" />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 14,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'var(--cr-sage-darker)',
+                  color: '#fdf6dc',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Volume2 className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="cr-step-label" style={{ marginBottom: 2 }}>
+                  STEP 2 · 변환된 음성 듣기
+                </div>
+                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                  보이스 클론으로 변환된 음성 듣기
+                </h3>
+              </div>
+            </div>
+
+            <div className="cr-field">
+              <label className="cr-label" style={{ fontSize: 18 }}>
+                TTS 로 들어볼 문장
+              </label>
+              <textarea
+                value={vc.ttsText}
+                onChange={e => vc.setTtsText(e.target.value)}
+                rows={3}
+                placeholder="동화 속 문장을 입력해 주세요."
+                className="cr-textarea"
+                disabled={readOnly}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => void vc.previewTts()}
+                disabled={!vc.recordedAudioUrl || vc.isTtsLoading || readOnly}
+                className="cr-btn-next"
+                style={{
+                  justifySelf: 'auto',
+                  opacity: readOnly ? 0.4 : undefined,
+                  cursor: readOnly ? 'not-allowed' : undefined,
+                }}
+              >
+                <Wand2 className="w-4 h-4" />
+                <span>{vc.isTtsLoading ? 'TTS 생성 중…' : 'TTS 들어보기'}</span>
+              </button>
+              <p
+                style={{
+                  fontFamily: 'var(--cr-font-gaegu)',
+                  fontSize: 16,
+                  color: 'var(--cr-ink-soft)',
+                  margin: 0,
+                  flex: 1,
+                  minWidth: 200,
+                }}
+              >
+                {vc.ttsStatusText}
+              </p>
+            </div>
+
+            {vc.ttsAudioUrl && <TtsPreviewPlayer src={vc.ttsAudioUrl} />}
+          </section>
+
           {isWebtoon && (
             <section className="cr-card">
               <span className="cr-tape" aria-hidden="true" />
@@ -497,88 +579,6 @@ export function VoiceCloneStep({
               )}
             </section>
           )}
-
-          {/* Section 2: TTS 미리듣기 */}
-          <section className="cr-card">
-            <span className="cr-tape" aria-hidden="true" />
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                marginBottom: 14,
-                flexWrap: 'wrap',
-              }}
-            >
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '50%',
-                  background: 'var(--cr-sage-darker)',
-                  color: '#fdf6dc',
-                  display: 'grid',
-                  placeItems: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Volume2 className="w-4 h-4" />
-              </span>
-              <div>
-                <div className="cr-step-label" style={{ marginBottom: 2 }}>
-                  STEP 2 · 변환된 음성 듣기
-                </div>
-                <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
-                  보이스 클론으로 변환된 음성 듣기
-                </h3>
-              </div>
-            </div>
-
-            <div className="cr-field">
-              <label className="cr-label" style={{ fontSize: 18 }}>
-                TTS 로 들어볼 문장
-              </label>
-              <textarea
-                value={vc.ttsText}
-                onChange={e => vc.setTtsText(e.target.value)}
-                rows={3}
-                placeholder="동화 속 문장을 입력해 주세요."
-                className="cr-textarea"
-                disabled={readOnly}
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => void vc.previewTts()}
-                disabled={!vc.recordedAudioUrl || vc.isTtsLoading || readOnly}
-                className="cr-btn-next"
-                style={{
-                  justifySelf: 'auto',
-                  opacity: readOnly ? 0.4 : undefined,
-                  cursor: readOnly ? 'not-allowed' : undefined,
-                }}
-              >
-                <Wand2 className="w-4 h-4" />
-                <span>{vc.isTtsLoading ? 'TTS 생성 중…' : 'TTS 들어보기'}</span>
-              </button>
-              <p
-                style={{
-                  fontFamily: 'var(--cr-font-gaegu)',
-                  fontSize: 16,
-                  color: 'var(--cr-ink-soft)',
-                  margin: 0,
-                  flex: 1,
-                  minWidth: 200,
-                }}
-              >
-                {vc.ttsStatusText}
-              </p>
-            </div>
-
-            {vc.ttsAudioUrl && <TtsPreviewPlayer src={vc.ttsAudioUrl} />}
-          </section>
         </main>
       </div>
 
