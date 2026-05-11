@@ -27,7 +27,8 @@
   /* 폰트 — 시스템 한글 fallback 은 FOUT 심해 의도적 제외 */
   --sb-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
   --sb-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
-  --sb-font-serif: 'Nanum Myeongjo', serif;
+  /* 옛 Nanum Myeongjo serif 톤을 손글씨 톤(Gaegu)으로 일괄 교체. */
+  --sb-font-serif: 'Gaegu', 'Nanum Pen Script', cursive;
 
   position: relative;
   height: 100vh;
