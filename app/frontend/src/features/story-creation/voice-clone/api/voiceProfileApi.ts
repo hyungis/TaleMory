@@ -1,5 +1,5 @@
 import type { StoryId, VoiceProfileId } from '../../../../shared/types'
-import { post, get, patch, deleteRequest } from '../../../../shared/api/client'
+import { post, get, put, patch, deleteRequest } from '../../../../shared/api/client'
 
 const VOICE_PROFILE_ENDPOINT = '/voice-profiles'
 const VOICE_RECORDING_SCRIPT_ENDPOINT = '/voice-recording-script'
@@ -62,6 +62,31 @@ export async function attachVoiceProfileToStory(
 /** GET /api/voice-profiles — 내 보이스 프로필 목록 */
 export async function getVoiceProfiles(): Promise<VoiceProfileDto[]> {
   return get<VoiceProfileDto[]>(VOICE_PROFILE_ENDPOINT)
+}
+
+export interface StoryVoiceAssignmentDto {
+  speakerKey: string
+  speakerName: string | null
+  voiceProfileId: VoiceProfileId
+}
+
+export interface StoryVoiceAssignmentItemRequest {
+  speakerKey: string
+  speakerName?: string | null
+  voiceProfileId: VoiceProfileId
+}
+
+export async function getStoryVoiceAssignments(
+  storyId: StoryId,
+): Promise<StoryVoiceAssignmentDto[]> {
+  return get<StoryVoiceAssignmentDto[]>(`/stories/${storyId}/voice-assignments`)
+}
+
+export async function putStoryVoiceAssignments(
+  storyId: StoryId,
+  assignments: StoryVoiceAssignmentItemRequest[],
+): Promise<StoryVoiceAssignmentDto[]> {
+  return put<StoryVoiceAssignmentDto[]>(`/stories/${storyId}/voice-assignments`, { assignments })
 }
 
 /** DELETE /api/voice-profiles/{id} */

@@ -206,13 +206,19 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | — | `ai.final-illustration.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | — | `ai.final-illustration.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | — | `ai.final-illustration.revise.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE` | — | `ai.final-illustration.layout.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE` | — | `ai.final-illustration.layout.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY` | — | `ai.image.final-illustration.generate` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY` | — | `ai.image.final-illustration.generate.item` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY` | — | `ai.image.final-illustration.revise` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY` | — | `ai.image.final-illustration.layout` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY` | — | `ai.image.final-illustration.layout.item` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.final-illustration.generate.completed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY` | — | `ai.result.final-illustration.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | — | `ai.result.final-illustration.revise.completed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | — | `ai.result.final-illustration.revise.failed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY` | — | `ai.result.final-illustration.layout.completed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY` | — | `ai.result.final-illustration.layout.failed` |
 | `ENV_DEV_APP_PROJECT_NAME` | — | `S210 AI API` |
 | `ENV_DEV_APP_APP_VERSION` | — | `0.1.0` |
 | `ENV_DEV_APP_ENVIRONMENT` | — | `local` |
@@ -241,7 +247,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
 | `ENV_DEV_APP_AI_GEMINI_IMAGE_API_CONCURRENCY` | no | `10` |
 | `ENV_DEV_APP_AI_REPLICATE_IMAGE_API_CONCURRENCY` | no | `5` |
-| `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
+| `ENV_DEV_APP_AI_LAYOUT_API_CONCURRENCY` | no | `20` |
+| `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `20` |
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_QUEUE` | no | `ai.cpu.story.sentences.translate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_ROUTING_KEY` | no | `ai.cpu.story.sentences.translate` |
 | `ENV_DEV_APP_RABBITMQ_SENTENCE_TRANSLATE_COMPLETED_ROUTING_KEY` | no | `ai.result.story.sentences.translate.completed` |
@@ -300,7 +307,8 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `AI_IMAGE_API_CONCURRENCY` | `20` | `20` |
 | `AI_GEMINI_IMAGE_API_CONCURRENCY` | `10` | `10` |
 | `AI_REPLICATE_IMAGE_API_CONCURRENCY` | `5` | `5` |
-| `RABBITMQ_PREFETCH_COUNT` | `10` | `10` |
+| `AI_LAYOUT_API_CONCURRENCY` | `20` | `20` |
+| `RABBITMQ_PREFETCH_COUNT` | `20` | `20` |
 | `AWS_S3_ENV_PREFIX` | `dev` | `prod` |
 | `APP_ID_CODEC_ALPHABET` | (dev 전용 alphabet) | (master 전용 alphabet, **절대 dev와 공유 금지**) |
 
@@ -417,13 +425,19 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | no | `ai.final-illustration.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | no | `ai.final-illustration.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | no | `ai.final-illustration.revise.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE` | no | `ai.final-illustration.layout.request.queue` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE` | no | `ai.final-illustration.layout.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY` | no | `ai.image.final-illustration.generate` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY` | no | `ai.image.final-illustration.generate.item` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY` | no | `ai.image.final-illustration.revise` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY` | no | `ai.image.final-illustration.layout` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY` | no | `ai.image.final-illustration.layout.item` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.completed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.failed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.completed` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.failed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.layout.completed` |
+| `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.layout.failed` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_DEV_APP_AI_WORKER_REPLICAS` | no | `1` |
@@ -434,7 +448,8 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
 | `ENV_DEV_APP_AI_GEMINI_IMAGE_API_CONCURRENCY` | no | `10` |
 | `ENV_DEV_APP_AI_REPLICATE_IMAGE_API_CONCURRENCY` | no | `5` |
-| `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
+| `ENV_DEV_APP_AI_LAYOUT_API_CONCURRENCY` | no | `20` |
+| `ENV_DEV_APP_RABBITMQ_PREFETCH_COUNT` | no | `20` |
 
 ### MASTER APP (AI 출처)
 
@@ -483,13 +498,19 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | no | `ai.final-illustration.generate.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | no | `ai.final-illustration.generate.item.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | no | `ai.final-illustration.revise.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE` | no | `ai.final-illustration.layout.request.queue` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE` | no | `ai.final-illustration.layout.item.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY` | no | `ai.image.final-illustration.generate` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_ROUTING_KEY` | no | `ai.image.final-illustration.generate.item` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY` | no | `ai.image.final-illustration.revise` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY` | no | `ai.image.final-illustration.layout` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY` | no | `ai.image.final-illustration.layout.item` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.generate.failed` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.completed` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.revise.failed` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY` | no | `ai.result.final-illustration.layout.completed` |
+| `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY` | no | `ai.result.final-illustration.layout.failed` |
 | `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_QUEUE` | no | `ai.gpu.preview.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_TTS_PREVIEW_ROUTING_KEY` | no | `ai.gpu.tts.preview` |
 | `ENV_MASTER_APP_AI_WORKER_REPLICAS` | no | `2` |
@@ -500,4 +521,5 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_AI_IMAGE_API_CONCURRENCY` | no | `20` |
 | `ENV_MASTER_APP_AI_GEMINI_IMAGE_API_CONCURRENCY` | no | `10` |
 | `ENV_MASTER_APP_AI_REPLICATE_IMAGE_API_CONCURRENCY` | no | `5` |
-| `ENV_MASTER_APP_RABBITMQ_PREFETCH_COUNT` | no | `10` |
+| `ENV_MASTER_APP_AI_LAYOUT_API_CONCURRENCY` | no | `20` |
+| `ENV_MASTER_APP_RABBITMQ_PREFETCH_COUNT` | no | `20` |

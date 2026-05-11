@@ -24,7 +24,8 @@
      드문 글자 깨짐은 트레이드오프로 수용. */
   --cr-font-gaegu: 'Gaegu', 'Nanum Pen Script', cursive;
   --cr-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
-  --cr-font-serif: 'Nanum Myeongjo', serif;
+  /* 옛 Nanum Myeongjo serif 톤을 손글씨 톤(Gaegu)으로 일괄 교체. */
+  --cr-font-serif: 'Gaegu', 'Nanum Pen Script', cursive;
   --cr-font-script: 'Caveat', cursive;
 
   height: 100%;
@@ -211,14 +212,16 @@
   text-transform: uppercase;
 }
 .cr-step-title {
+  /* --cr-font-serif 가 손글씨 톤(Gaegu)으로 변경됨에 따라 letter-spacing 도 0 으로 조정. */
   font-family: var(--cr-font-serif);
   font-weight: 800;
   font-size: 40px;
   color: var(--cr-ink);
   margin: 0 0 8px;
-  letter-spacing: -1px;
+  letter-spacing: 0;
   line-height: 1.15;
 }
+
 .cr-step-sub {
   font-family: var(--cr-font-gaegu);
   font-size: 19px;

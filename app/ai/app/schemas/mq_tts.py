@@ -6,6 +6,7 @@ from app.schemas.tts import StoryTtsRequest
 
 
 TtsJobType = Literal["TTS"]
+TtsStoryMode = Literal["VIEWER", "WEBTOON"]
 TtsEventStatus = Literal["COMPLETED", "FAILED"]
 TtsSuccessType = Literal["GENERATE_TTS_COMPLETED"]
 TtsFailureType = Literal["GENERATE_TTS_FAILED"]
@@ -15,6 +16,7 @@ class StoryTtsGenerateJobMessage(BaseModel):
     jobId: str = Field(..., min_length=1)
     jobType: TtsJobType = "TTS"
     action: str | None = None  # Optional — BE may include GENERATE/REGENERATE
+    storyMode: TtsStoryMode = "VIEWER"
     storyId: int | None = Field(default=None, ge=1)
     payload: StoryTtsRequest
 
@@ -38,6 +40,8 @@ class TtsAudioAsset(BaseModel):
 
 class TtsSentenceItem(BaseModel):
     sentenceId: int
+    speakerKey: str | None = None
+    voiceId: str | None = None
     appliedStyle: TtsAppliedStyle
     audio: TtsAudioAsset
 
@@ -63,6 +67,7 @@ class TtsUsage(BaseModel):
 
 class StoryTtsResultPayload(BaseModel):
     storyId: int
+    storyMode: TtsStoryMode = "VIEWER"
     voiceId: str
     items: list[TtsSentenceItem]
     sceneSentenceUpdates: list[TtsSentenceUpdate]
