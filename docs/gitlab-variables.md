@@ -198,6 +198,8 @@ RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY=ai.result.final-illustrati
 - [x] `ENV_DEV_APP_JWT_ACCESS_SECRET` — JWT access token 서명 키 (Base64-safe 32자+ 권장)
 - [x] `ENV_DEV_APP_JWT_REFRESH_SECRET` — access 와 반드시 다른 값
 - [x] `ENV_DEV_APP_KAKAO_CLIENT_SECRET` — dev Kakao client secret
+- [x] `ENV_DEV_APP_MAIL_USERNAME` — dev SMTP 로그인 계정
+- [x] `ENV_DEV_APP_MAIL_PASSWORD` — dev SMTP 앱 비밀번호
 - [x] `ENV_DEV_APP_AWS_ACCESS_KEY_ID` — `s210-backend-s3` IAM user Access Key ID
 - [x] `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` — `s210-backend-s3` IAM user Secret Access Key
 - [ ] `ENV_DEV_APP_STORYBOARD_IMAGE_S3_ACCESS_KEY_ID` — storyboard image S3 access key override
@@ -398,6 +400,8 @@ RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY=ai.result.final-illustrati
 - [x] `ENV_MASTER_APP_JWT_ACCESS_SECRET` — dev 와 반드시 다른 값
 - [x] `ENV_MASTER_APP_JWT_REFRESH_SECRET` — access 와 반드시 다른 값
 - [x] `ENV_MASTER_APP_KAKAO_CLIENT_SECRET` — prod Kakao client secret
+- [x] `ENV_MASTER_APP_MAIL_USERNAME` — prod SMTP 로그인 계정
+- [x] `ENV_MASTER_APP_MAIL_PASSWORD` — prod SMTP 앱 비밀번호
 - [x] `ENV_MASTER_APP_AWS_ACCESS_KEY_ID` — prod 전용 IAM user (dev 와 분리 권장)
 - [x] `ENV_MASTER_APP_AWS_SECRET_ACCESS_KEY`
 - [ ] `ENV_MASTER_APP_STORYBOARD_IMAGE_S3_ACCESS_KEY_ID` — prod storyboard image S3 access key override

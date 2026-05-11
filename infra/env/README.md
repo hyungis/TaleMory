@@ -151,6 +151,14 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_KAKAO_CLIENT_ID` | — | dev Kakao REST API key |
 | `ENV_DEV_APP_VITE_KAKAO_CLIENT_ID` | — | dev Kakao REST API key (Vite build-time 주입) |
 | `ENV_DEV_APP_KAKAO_CLIENT_SECRET` | ✅ | dev Kakao client secret |
+| `ENV_DEV_APP_MAIL_HOST` | — | SMTP host (`smtp.gmail.com`) |
+| `ENV_DEV_APP_MAIL_PORT` | — | SMTP port (`587`) |
+| `ENV_DEV_APP_MAIL_USERNAME` | ✅ | SMTP 로그인 계정 |
+| `ENV_DEV_APP_MAIL_PASSWORD` | ✅ | SMTP 앱 비밀번호 |
+| `ENV_DEV_APP_MAIL_FROM` | — | 이메일 인증 발신자 주소 |
+| `ENV_DEV_APP_MAIL_FROM_NAME` | — | 이메일 인증 발신자 표시 이름 |
+| `ENV_DEV_APP_EMAIL_VERIFICATION_CODE_TTL_SECONDS` | — | 인증번호 유효 시간(초). 기본 `300` |
+| `ENV_DEV_APP_EMAIL_VERIFICATION_VERIFIED_TTL_SECONDS` | — | 인증 완료 상태 유지 시간(초). 기본 `1800` |
 | `ENV_DEV_APP_AWS_ACCESS_KEY_ID` | ✅ | `s210-backend-s3` IAM user Access Key ID (S3 presign / 소프트삭제용) |
 | `ENV_DEV_APP_AWS_SECRET_ACCESS_KEY` | ✅ | `s210-backend-s3` IAM user Secret Access Key |
 | `ENV_DEV_APP_AWS_REGION` | — | `ap-northeast-2` (AWS SDK 표준 env 이름 — region 자동 인식용) |

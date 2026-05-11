@@ -33,6 +33,8 @@ class SecurityConfig(
                     "/api/auth/signup",
                     "/api/auth/login-id/check",
                     "/api/auth/nickname/check",
+                    "/api/auth/email-verification/send",
+                    "/api/auth/email-verification/verify",
                     "/api/auth/login",
                     "/api/auth/kakao/callback",
                     "/api/auth/kakao/signup",
