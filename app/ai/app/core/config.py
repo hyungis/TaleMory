@@ -73,6 +73,10 @@ class Settings(BaseModel):
         getenv("STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE", "0.039")
     )
     FINAL_ILLUSTRATION_MODEL: str = getenv("FINAL_ILLUSTRATION_MODEL", "black-forest-labs/flux-2-klein-9b")
+    FINAL_ILLUSTRATION_LAYOUT_MODEL: str = getenv(
+        "FINAL_ILLUSTRATION_LAYOUT_MODEL",
+        "gemini-3-flash-preview",
+    )
     STORYBOARD_IMAGE_S3_BUCKET: str | None = getenv("STORYBOARD_IMAGE_S3_BUCKET", getenv("AWS_S3_BUCKET"))
     STORYBOARD_IMAGE_S3_REGION: str | None = getenv("STORYBOARD_IMAGE_S3_REGION", getenv("AWS_REGION"))
     STORYBOARD_IMAGE_S3_ACCESS_KEY_ID: str | None = getenv(

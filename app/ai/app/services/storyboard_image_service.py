@@ -280,6 +280,7 @@ def _generate_item_with_gemini(
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
+        imageS3Key=_storyboard_image_object_path(story_id, item.pageNumber, output_version),
         usage=usage,
     )
 
@@ -294,6 +295,7 @@ def _generate_item_locally(
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
+        imageS3Key=_storyboard_image_object_path(story_id, item.pageNumber, output_version),
         usage=StoryboardImageUsage(
             provider="local",
             model=settings.WEBTOON_STORYBOARD_IMAGE_MODEL if webtoon_mode else settings.STORYBOARD_IMAGE_MODEL,
