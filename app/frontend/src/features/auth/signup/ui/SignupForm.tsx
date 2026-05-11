@@ -13,6 +13,7 @@ import {
 import type { LoginResponse } from '../../login'
 import { useKakaoSignupPost } from '../../oauth/model/useKakaoSignupPost'
 import type { KakaoSignupProfile, KakaoSignupRequest } from '../../oauth/types'
+import { postEmailVerificationSend, postEmailVerificationVerify } from '../api/emailVerification'
 import { useSignupPost } from '../model/useSignupPost'
 import type { SignupRequest } from '../types'
 
@@ -48,10 +49,18 @@ const MIN_PASSWORD_LENGTH = 6
 const MAX_NICKNAME_LENGTH = 45
 
 type AvailabilityCheckStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
+type EmailVerificationStatus = 'idle' | 'sending' | 'sent' | 'verifying' | 'verified' | 'error'
 
 interface AvailabilityCheckState {
   status: AvailabilityCheckStatus
   value: string
+}
+
+interface EmailVerificationState {
+  status: EmailVerificationStatus
+  email: string
+  message?: string
+  tone?: 'error' | 'neutral' | 'success'
 }
 
 interface FieldValidationFeedback {
@@ -83,8 +92,17 @@ const INITIAL_AVAILABILITY_CHECK: AvailabilityCheckState = {
   value: '',
 }
 
+const INITIAL_EMAIL_VERIFICATION: EmailVerificationState = {
+  status: 'idle',
+  email: '',
+}
+
 function isAvailabilityConfirmed(state: AvailabilityCheckState, value: string): boolean {
   return state.status === 'available' && state.value === value.trim()
+}
+
+function isEmailVerificationConfirmed(state: EmailVerificationState, value: string): boolean {
+  return state.status === 'verified' && state.email === value.trim()
 }
 
 function getAvailabilityFeedback(
@@ -124,6 +142,48 @@ function getAvailabilityFeedback(
   }
 
   return { message: `${label} 중복 확인에 실패했어요. 잠시 후 다시 시도해주세요.`, tone: 'error' }
+}
+
+function getEmailVerificationFeedback(
+  state: EmailVerificationState,
+  currentEmail: string,
+  options: { showPrompt?: boolean } = {},
+): AvailabilityFeedback | null {
+  const email = currentEmail.trim()
+
+  if (!email) {
+    return options.showPrompt
+      ? { message: '이메일을 입력한 뒤 인증번호 발송 버튼을 눌러주세요.', tone: 'neutral' }
+      : null
+  }
+
+  if (state.status === 'idle') {
+    return options.showPrompt
+      ? { message: '이메일 인증을 완료해주세요.', tone: 'neutral' }
+      : null
+  }
+
+  if (state.email !== email) {
+    return { message: '이메일이 변경되어 인증을 다시 진행해주세요.', tone: 'neutral' }
+  }
+
+  if (state.status === 'sending') {
+    return { message: '인증번호를 보내고 있어요.', tone: 'neutral' }
+  }
+
+  if (state.status === 'verifying') {
+    return { message: '인증번호를 확인하고 있어요.', tone: 'neutral' }
+  }
+
+  if (state.status === 'verified') {
+    return { message: '이메일 인증이 완료됐어요.', tone: 'success' }
+  }
+
+  if (state.message) {
+    return { message: state.message, tone: state.tone ?? 'neutral' }
+  }
+
+  return { message: '이메일 인증에 실패했어요. 잠시 후 다시 시도해주세요.', tone: 'error' }
 }
 
 function getLoginIdFormatFeedback(
@@ -267,7 +327,22 @@ function getSignupErrorMessage(error: unknown): string {
   }
   if (error.code === 'AUTH_001') return '이미 사용 중인 아이디입니다.'
   if (error.code === 'AUTH_002') return '이미 사용 중인 이메일입니다.'
+  if (error.code === 'AUTH_011') return '이메일 인증을 완료해주세요.'
+  if (error.code === 'AUTH_012') return '이메일 인증번호가 올바르지 않습니다.'
   if (error.code === 'USER_002') return '이미 사용 중인 닉네임입니다.'
+  if (error.code === 'NETWORK_ERROR') return '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.'
+  if (error.code === 'REQUEST_TIMEOUT') return '응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.'
+  return error.message
+}
+
+function getEmailVerificationErrorMessage(error: unknown): string {
+  if (!isApiError(error)) {
+    return '이메일 인증 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (error.code === 'AUTH_002') return '이미 사용 중인 이메일입니다.'
+  if (error.code === 'AUTH_012') return '이메일 인증번호가 올바르지 않습니다.'
+  if (error.code === 'AUTH_013') return '이메일 발송에 실패했어요. 잠시 후 다시 시도해주세요.'
   if (error.code === 'NETWORK_ERROR') return '서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.'
   if (error.code === 'REQUEST_TIMEOUT') return '응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.'
   return error.message
@@ -382,6 +457,10 @@ export function SignupForm({
   const [error, setError] = useState('')
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
   const [nicknameCheck, setNicknameCheck] = useState<AvailabilityCheckState>(INITIAL_AVAILABILITY_CHECK)
+  const [emailVerification, setEmailVerification] =
+    useState<EmailVerificationState>(INITIAL_EMAIL_VERIFICATION)
+  const [emailVerificationCode, setEmailVerificationCode] = useState('')
+  const [hasEmailVerificationTriggered, setHasEmailVerificationTriggered] = useState(false)
   const [restoreRequest, setRestoreRequest] = useState<SignupRequest | null>(null)
   const [kakaoRestoreRequest, setKakaoRestoreRequest] = useState<KakaoSignupRequest | null>(null)
   const [kakaoRestorePassword, setKakaoRestorePassword] = useState('')
@@ -437,6 +516,75 @@ export function SignupForm({
     }
   }, [values.nickname])
 
+  const handleEmailVerificationSend = useCallback(async () => {
+    const email = values.email.trim()
+    setHasEmailVerificationTriggered(true)
+    setEmailVerificationCode('')
+
+    if (getEmailFormatFeedback(email, { showRequired: true })) {
+      return
+    }
+
+    setEmailVerification({ status: 'sending', email })
+
+    try {
+      const result = await postEmailVerificationSend(email)
+      const min = Math.max(1, Math.floor(result.expiresInSeconds / 60))
+      setEmailVerification({
+        status: 'sent',
+        email,
+        message: `인증번호를 보냈어요. ${min}분 안에 입력해주세요.`,
+        tone: 'success',
+      })
+    } catch (sendError) {
+      setEmailVerification({
+        status: 'error',
+        email,
+        message: getEmailVerificationErrorMessage(sendError),
+        tone: 'error',
+      })
+    }
+  }, [values.email])
+
+  const handleEmailVerificationVerify = useCallback(async () => {
+    const email = values.email.trim()
+    const code = emailVerificationCode.trim()
+    setHasEmailVerificationTriggered(true)
+
+    if (getEmailFormatFeedback(email, { showRequired: true })) {
+      return
+    }
+
+    if (!code) {
+      setEmailVerification({
+        status: 'sent',
+        email,
+        message: '인증번호를 입력해주세요.',
+        tone: 'error',
+      })
+      return
+    }
+
+    setEmailVerification({ status: 'verifying', email })
+
+    try {
+      const result = await postEmailVerificationVerify(email, code)
+      setEmailVerification({
+        status: result.verified ? 'verified' : 'sent',
+        email,
+        message: result.verified ? '이메일 인증이 완료됐어요.' : '이메일 인증번호가 올바르지 않습니다.',
+        tone: result.verified ? 'success' : 'error',
+      })
+    } catch (verifyError) {
+      setEmailVerification({
+        status: 'sent',
+        email,
+        message: getEmailVerificationErrorMessage(verifyError),
+        tone: 'error',
+      })
+    }
+  }, [emailVerificationCode, values.email])
+
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault()
@@ -447,6 +595,11 @@ export function SignupForm({
       const validationError = validate(values, { isKakaoSignup })
       if (validationError) {
         setError(validationError)
+        return
+      }
+
+      if (!isKakaoSignup && !isEmailVerificationConfirmed(emailVerification, values.email)) {
+        setError('이메일 인증을 완료해주세요.')
         return
       }
 
@@ -536,6 +689,7 @@ export function SignupForm({
     [
       isKakaoSignup,
       isSubmitting,
+      emailVerification,
       kakaoSignup,
       kakaoSignupPost,
       loginIdCheck,
@@ -616,7 +770,19 @@ export function SignupForm({
     ? null
     : getPasswordFormatFeedback(values.password, { showRequired: hasSubmitted })
   const passwordCheckFeedback = isKakaoSignup ? null : getPasswordCheckFeedback(values.password, values.passwordCheck)
-  const emailFormatFeedback = getEmailFormatFeedback(values.email, { showRequired: hasSubmitted })
+  const emailFormatFeedback = getEmailFormatFeedback(values.email, {
+    showRequired: hasSubmitted || hasEmailVerificationTriggered,
+  })
+  const emailVerificationFeedback =
+    isKakaoSignup || emailFormatFeedback
+      ? null
+      : getEmailVerificationFeedback(emailVerification, values.email, {
+          showPrompt: hasSubmitted || hasEmailVerificationTriggered,
+        })
+  const shouldShowEmailCodeInput =
+    !isKakaoSignup &&
+    emailVerification.email === values.email.trim() &&
+    (emailVerification.status === 'sent' || emailVerification.status === 'verifying')
   const nameRequiredFeedback =
     hasSubmitted && !values.name.trim() ? { message: '실명을 입력해주세요.' } : null
   const nicknameFormatFeedback = getNicknameFormatFeedback(values.nickname, {
@@ -724,15 +890,60 @@ export function SignupForm({
               style={readonlyInputStyle}
             />
           ) : (
-            <input
-              type="email"
-              value={values.email}
-              disabled={isSubmitting}
-              onChange={e => handleChange('email', e.target.value)}
-              autoComplete="email"
-              placeholder="example@email.com"
-              style={inputStyle}
-            />
+            <div style={fieldActionRowStyle}>
+              <input
+                type="email"
+                value={values.email}
+                disabled={isSubmitting}
+                onChange={e => {
+                  setEmailVerification(INITIAL_EMAIL_VERIFICATION)
+                  setEmailVerificationCode('')
+                  setHasEmailVerificationTriggered(false)
+                  handleChange('email', e.target.value)
+                }}
+                autoComplete="email"
+                placeholder="example@email.com"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                disabled={isSubmitting || emailVerification.status === 'sending'}
+                onClick={handleEmailVerificationSend}
+                style={{
+                  ...checkButtonStyle,
+                  cursor: isSubmitting || emailVerification.status === 'sending' ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting || emailVerification.status === 'sending' ? 0.6 : 1,
+                }}
+              >
+                {emailVerification.status === 'sending' ? '발송 중' : '인증번호 발송'}
+              </button>
+            </div>
+          )}
+          {shouldShowEmailCodeInput && (
+            <div style={{ ...fieldActionRowStyle, marginTop: 8 }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={emailVerificationCode}
+                disabled={isSubmitting}
+                onChange={e => setEmailVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                autoComplete="one-time-code"
+                placeholder="인증번호 6자리"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                disabled={isSubmitting || emailVerification.status === 'verifying'}
+                onClick={handleEmailVerificationVerify}
+                style={{
+                  ...checkButtonStyle,
+                  cursor: isSubmitting || emailVerification.status === 'verifying' ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting || emailVerification.status === 'verifying' ? 0.6 : 1,
+                }}
+              >
+                {emailVerification.status === 'verifying' ? '확인 중' : '인증 확인'}
+              </button>
+            </div>
           )}
           {isKakaoSignup && (
             <p
@@ -745,6 +956,12 @@ export function SignupForm({
             </p>
           )}
           {emailFormatFeedback && <FieldFeedback feedback={emailFormatFeedback} />}
+          {emailVerificationFeedback && (
+            <FieldFeedback
+              feedback={{ message: emailVerificationFeedback.message }}
+              tone={emailVerificationFeedback.tone}
+            />
+          )}
         </div>
         <div>
           <label style={labelStyle}>실명 {required}</label>

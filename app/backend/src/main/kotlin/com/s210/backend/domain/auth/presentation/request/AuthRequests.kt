@@ -40,8 +40,17 @@ data class LoginRequest(
             loginId = loginId.trim(),
             password = password,
             restoreConfirmed = restoreConfirmed,
-        )
+    )
 }
+
+data class EmailVerificationSendRequest(
+    val email: String,
+)
+
+data class EmailVerificationVerifyRequest(
+    val email: String,
+    val code: String,
+)
 
 data class KakaoCallbackRequest(
     val code: String,

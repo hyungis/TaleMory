@@ -17,6 +17,19 @@ spring:
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
 
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -52,6 +65,12 @@ aws:
 # min-length 는 8 정도면 시각적으로 충분히 의도가 드러나면서도 URL 이 짧음.
 # log-conversions: 디버깅 시 true. 운영 default false (토큰 평문 로그 노출 방지).
 app:
+  email-verification:
+    sender: ${MAIL_FROM:no-reply@talemory.local}
+    sender-name: ${MAIL_FROM_NAME:Talemory}
+    code-ttl-seconds: ${EMAIL_VERIFICATION_CODE_TTL_SECONDS:300}
+    verified-ttl-seconds: ${EMAIL_VERIFICATION_VERIFIED_TTL_SECONDS:1800}
+
   id-codec:
     alphabet: ${APP_ID_CODEC_ALPHABET:Hf3xN8YwQa2ZRu7TgBVe5KcLJpDvy1MEnUbi9mWoXrSC4qzAjPsd6FOhk0lI}
     min-length: ${APP_ID_CODEC_MIN_LENGTH:8}
