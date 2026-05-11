@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircle2,
   FolderOpen,
@@ -19,14 +19,21 @@ import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import { formatAudioTime, useVoiceClone } from '../model/useVoiceClone'
-import type { VoiceProfileDto } from '../api/voiceProfileApi'
+import {
+  getStoryVoiceAssignments,
+  putStoryVoiceAssignments,
+  type VoiceProfileDto,
+} from '../api/voiceProfileApi'
 import { VoiceSaveModal } from './VoiceSaveModal'
 import { VoiceLoadModal } from './VoiceLoadModal'
-import type { StoryId } from '../../../../shared/types'
+import { useStoryboardPagesQuery } from '../../storyboard-pages'
+import type { StoryModeApi } from '../../basic-info/api/types'
+import type { StoryId, VoiceProfileId } from '../../../../shared/types'
 import '../../styles/creation-paper.css'
 
 interface VoiceCloneStepProps {
   storyId?: StoryId | null
+  mode?: StoryModeApi
   onBack: () => void
   onNext: () => void
   onVoiceSaved?: (voiceModel: string) => void
@@ -44,14 +51,21 @@ interface VoiceCloneStepProps {
  */
 export function VoiceCloneStep({
   storyId,
+  mode = 'VIEWER',
   onBack,
   onNext,
   onVoiceSaved,
   readOnly = false,
 }: VoiceCloneStepProps) {
   const vc = useVoiceClone(storyId)
+  const isWebtoon = mode === 'WEBTOON'
+  const storyboardPagesQuery = useStoryboardPagesQuery(isWebtoon ? storyId ?? null : null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showLoadModal, setShowLoadModal] = useState(false)
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfileDto[]>([])
+  const [speakerAssignments, setSpeakerAssignments] = useState<Record<string, VoiceProfileId>>({})
+  const [assignmentStatusText, setAssignmentStatusText] = useState('')
+  const [isAssignmentSaving, setIsAssignmentSaving] = useState(false)
 
   const StatusIcon =
     vc.status === 'recording' ? Mic : vc.status === 'ready' ? CheckCircle2 : Radio
@@ -64,6 +78,59 @@ export function VoiceCloneStep({
         : 'cr-vc-status'
 
   const progressPercent = vc.audioDuration > 0 ? (vc.audioCurrentTime / vc.audioDuration) * 100 : 0
+
+  const webtoonSpeakers = useMemo(() => {
+    const speakers = new Map<string, string>()
+    storyboardPagesQuery.data?.pages.forEach(page => {
+      page.sentences?.forEach(sentence => {
+        const speakerKey = sentence.speakerKey?.trim()
+        if (!speakerKey) return
+        if (!speakers.has(speakerKey)) {
+          speakers.set(speakerKey, speakerKey === 'narrator' ? 'narrator' : speakerKey)
+        }
+      })
+    })
+    return Array.from(speakers, ([speakerKey, speakerName]) => ({ speakerKey, speakerName }))
+  }, [storyboardPagesQuery.data])
+
+  useEffect(() => {
+    if (!isWebtoon) return
+
+    let cancelled = false
+    vc.fetchVoiceProfiles()
+      .then(profiles => {
+        if (!cancelled) setVoiceProfiles(profiles)
+      })
+      .catch(() => {
+        if (!cancelled) setAssignmentStatusText('Failed to load voice profiles.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isWebtoon, vc.fetchVoiceProfiles, vc.savedProfileId])
+
+  useEffect(() => {
+    if (!isWebtoon || !storyId) return
+
+    let cancelled = false
+    getStoryVoiceAssignments(storyId)
+      .then(assignments => {
+        if (cancelled) return
+        const nextAssignments: Record<string, VoiceProfileId> = {}
+        assignments.forEach(assignment => {
+          nextAssignments[assignment.speakerKey] = assignment.voiceProfileId
+        })
+        setSpeakerAssignments(nextAssignments)
+      })
+      .catch(() => {
+        if (!cancelled) setAssignmentStatusText('Failed to load speaker assignments.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isWebtoon, storyId])
 
   /**
    * 저장 모달의 onSubmit — 제목을 hook 으로 넘기고 성공 시 모달 닫음 + onVoiceSaved 콜백.
@@ -85,6 +152,50 @@ export function VoiceCloneStep({
     await vc.loadVoiceProfile(profile)
     setShowLoadModal(false)
     if (onVoiceSaved) onVoiceSaved(profile.title)
+  }
+
+  const handleAssignmentChange = (speakerKey: string, voiceProfileId: string) => {
+    setSpeakerAssignments(current => {
+      const next = { ...current }
+      if (voiceProfileId) {
+        next[speakerKey] = voiceProfileId
+      } else {
+        delete next[speakerKey]
+      }
+      return next
+    })
+    setAssignmentStatusText('')
+  }
+
+  const handleAssignmentsSave = async () => {
+    if (!storyId) return
+
+    setIsAssignmentSaving(true)
+    setAssignmentStatusText('')
+    try {
+      const assignments = webtoonSpeakers.flatMap(speaker => {
+        const voiceProfileId = speakerAssignments[speaker.speakerKey]
+        return voiceProfileId
+          ? [{
+              speakerKey: speaker.speakerKey,
+              speakerName: speaker.speakerName,
+              voiceProfileId,
+            }]
+          : []
+      })
+      const savedAssignments = await putStoryVoiceAssignments(storyId, assignments)
+      const nextAssignments: Record<string, VoiceProfileId> = {}
+      savedAssignments.forEach(assignment => {
+        nextAssignments[assignment.speakerKey] = assignment.voiceProfileId
+      })
+      setSpeakerAssignments(nextAssignments)
+      setAssignmentStatusText('Speaker voice assignments saved.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save speaker assignments.'
+      setAssignmentStatusText(message)
+    } finally {
+      setIsAssignmentSaving(false)
+    }
   }
 
   return (
@@ -294,6 +405,98 @@ export function VoiceCloneStep({
               </div>
             )}
           </section>
+
+          {isWebtoon && (
+            <section className="cr-card">
+              <span className="cr-tape" aria-hidden="true" />
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginBottom: 14,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div>
+                  <div className="cr-step-label" style={{ marginBottom: 2 }}>
+                    WEBTOON
+                  </div>
+                  <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
+                    Speaker voice assignments
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleAssignmentsSave()}
+                  disabled={readOnly || !storyId || isAssignmentSaving || webtoonSpeakers.length === 0}
+                  className="cr-btn-next"
+                  style={{
+                    justifySelf: 'auto',
+                    opacity: readOnly || !storyId || isAssignmentSaving || webtoonSpeakers.length === 0 ? 0.5 : 1,
+                    cursor: readOnly || !storyId || isAssignmentSaving || webtoonSpeakers.length === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isAssignmentSaving ? 'Saving...' : 'Save assignments'}</span>
+                </button>
+              </div>
+
+              {storyboardPagesQuery.isLoading && (
+                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 17, color: 'var(--cr-ink-soft)', margin: 0 }}>
+                  Loading storyboard speakers...
+                </p>
+              )}
+
+              {!storyboardPagesQuery.isLoading && webtoonSpeakers.length === 0 && (
+                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 17, color: 'var(--cr-rust)', margin: 0 }}>
+                  No webtoon speakers were found yet. Generate storyboard pages first.
+                </p>
+              )}
+
+              {webtoonSpeakers.length > 0 && (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {webtoonSpeakers.map(speaker => (
+                    <label
+                      key={speaker.speakerKey}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(120px, 1fr) minmax(180px, 2fr)',
+                        gap: 10,
+                        alignItems: 'center',
+                        fontFamily: 'var(--cr-font-gaegu)',
+                        fontSize: 18,
+                        color: 'var(--cr-ink)',
+                      }}
+                    >
+                      <span style={{ fontWeight: 800 }}>{speaker.speakerName}</span>
+                      <select
+                        value={speakerAssignments[speaker.speakerKey] ?? ''}
+                        onChange={e => handleAssignmentChange(speaker.speakerKey, e.target.value)}
+                        disabled={readOnly}
+                        className="cr-input"
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">Use default story voice</option>
+                        {voiceProfiles.map(profile => (
+                          <option key={profile.voiceProfileId} value={profile.voiceProfileId}>
+                            {profile.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {assignmentStatusText && (
+                <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 16, color: 'var(--cr-ink-soft)', margin: '12px 0 0' }}>
+                  {assignmentStatusText}
+                </p>
+              )}
+            </section>
+          )}
 
           {/* Section 2: TTS 미리듣기 */}
           <section className="cr-card">

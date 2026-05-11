@@ -18,7 +18,10 @@ import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepo
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryOutroRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.story.infrastructure.repository.StoryVoiceAssignmentRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.story.model.BubbleSlot
+import com.s210.backend.domain.story.model.StoryMode
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.tts.application.TtsCacheService
 import com.s210.backend.domain.tts.application.TtsService
@@ -26,6 +29,7 @@ import com.s210.backend.domain.tts.application.dto.StoryTtsJobMessage
 import com.s210.backend.domain.tts.application.dto.StoryTtsPayload
 import com.s210.backend.domain.tts.application.dto.TtsOptions
 import com.s210.backend.domain.tts.application.dto.TtsSentenceItem
+import com.s210.backend.domain.tts.application.dto.TtsVoiceReference
 import com.s210.backend.domain.voice.infrastructure.repository.VoiceProfileRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -58,6 +62,7 @@ class StoryConfirmService(
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val objectMapper: ObjectMapper,
     private val voiceProfileRepository: VoiceProfileRepository,
+    private val storyVoiceAssignmentRepository: StoryVoiceAssignmentRepository,
     private val ttsCacheService: TtsCacheService,
     private val ttsService: TtsService,
     private val jobStatusRedisRepo: JobStatusRedisRepository,
@@ -125,7 +130,12 @@ class StoryConfirmService(
             ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
 
         // page_number → sentences[] 매핑
-        data class SentenceInput(val englishText: String, val koreanText: String?)
+        data class SentenceInput(
+            val englishText: String,
+            val koreanText: String?,
+            val speakerKey: String?,
+            val bubbleSlot: BubbleSlot?,
+        )
         val pageToSentences: Map<Int, List<SentenceInput>> = pagesNode.associate { node ->
             val pageNumber = node.get("pageNumber").asInt()
             val sentencesArr = node.get("sentences")
@@ -136,6 +146,9 @@ class StoryConfirmService(
                         SentenceInput(
                             englishText = it.get("englishText")?.asText() ?: "",
                             koreanText = it.get("koreanText")?.asText(),
+                            speakerKey = it.get("speakerKey")?.asText()?.takeIf(String::isNotBlank),
+                            bubbleSlot = it.get("bubbleSlot")?.asText()?.takeIf(String::isNotBlank)
+                                ?.let { slot -> runCatching { BubbleSlot.valueOf(slot.uppercase()) }.getOrNull() },
                         )
                     )
                 }
@@ -192,8 +205,8 @@ class StoryConfirmService(
                             englishText = s.englishText,
                             koreanText = s.koreanText,
                             ttsAudioUrl = null,
-                            speakerKey = null,
-                            bubbleSlot = null,
+                            speakerKey = s.speakerKey,
+                            bubbleSlot = s.bubbleSlot,
                             hasHighlighted = false,
                         )
                     )
@@ -237,12 +250,26 @@ class StoryConfirmService(
         }
 
         // 11) TTS 사전 캐시 조회 — 모든 SceneSentence 에 대해
-        val voiceProfileId = story.voiceProfileId!!
-        val voiceProfile = voiceProfileRepository.findById(voiceProfileId).orElseThrow {
+        val defaultVoiceProfileId = story.voiceProfileId!!
+        val defaultVoiceProfile = voiceProfileRepository.findById(defaultVoiceProfileId).orElseThrow {
             BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
-        val referenceSource = voiceProfile.audioUrl
+        val defaultReferenceSource = defaultVoiceProfile.audioUrl
             ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        val assignments = if (story.mode == StoryMode.WEBTOON) {
+            storyVoiceAssignmentRepository.findAllByStoryIdOrderBySpeakerKeyAsc(storyId)
+                .associateBy { it.speakerKey }
+        } else {
+            emptyMap()
+        }
+        val voiceProfileIds = assignments.values
+            .map { it.voiceProfileId }
+            .plus(defaultVoiceProfileId)
+            .distinct()
+        val voiceProfilesById = voiceProfileRepository.findAllById(voiceProfileIds).associateBy { it.id }
+
+        fun voiceProfileIdFor(sentence: SceneSentence): Long =
+            sentence.speakerKey?.let { assignments[it]?.voiceProfileId } ?: defaultVoiceProfileId
 
         val allSentences = createdScenes.flatMap { scene ->
             sceneSentenceRepository.findAllBySceneId(scene.id)
@@ -251,8 +278,9 @@ class StoryConfirmService(
         val missSentences = mutableListOf<TtsSentenceItem>()
 
         allSentences.forEach { sentence ->
+            val sentenceVoiceProfileId = voiceProfileIdFor(sentence)
             val cachedUrl = try {
-                ttsCacheService.lookup(voiceProfileId, sentence.englishText)
+                ttsCacheService.lookup(sentenceVoiceProfileId, sentence.englishText)
             } catch (e: Exception) {
                 log.warn("TTS cache lookup failed for sentence {}: {}", sentence.id, e.message)
                 null
@@ -265,6 +293,7 @@ class StoryConfirmService(
                     TtsSentenceItem(
                         sentenceId = sentence.id,
                         text = sentence.englishText,
+                        speakerKey = sentence.speakerKey,
                     )
                 )
             }
@@ -274,7 +303,7 @@ class StoryConfirmService(
         val cacheMisses = missSentences.size
         log.info(
             "[TTS:CONFIRM:CACHE] storyId={}, voiceProfileId={}, sentenceCount={}, cacheHits={}, cacheMisses={}",
-            storyId, voiceProfileId, sentenceCount, cacheHits, cacheMisses,
+            storyId, defaultVoiceProfileId, sentenceCount, cacheHits, cacheMisses,
         )
 
         // 12) Job status Redis HSET (best-effort) — operational sidecar (진행률 sidecar).
@@ -294,18 +323,35 @@ class StoryConfirmService(
         val finalStatus = if (cacheMisses > 0) {
             val publishStarted = System.nanoTime()
             log.info(
-                "[TTS:CONFIRM:PUBLISH:START] jobId={}, storyId={}, voiceProfileId={}, sentenceCount={}",
-                ttsJob.id, storyId, voiceProfileId, cacheMisses,
+                "[TTS:CONFIRM:PUBLISH:START] jobId={}, storyId={}, storyMode={}, voiceProfileId={}, sentenceCount={}",
+                ttsJob.id, storyId, story.mode, defaultVoiceProfileId, cacheMisses,
             )
+            val missSpeakerKeys = missSentences.map { it.speakerKey ?: DEFAULT_SPEAKER_KEY }.toSet()
+            val voiceRefs = missSpeakerKeys.map { speakerKey ->
+                val assignedVoiceId = assignments[speakerKey]?.voiceProfileId ?: defaultVoiceProfileId
+                val profile = voiceProfilesById[assignedVoiceId]
+                    ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+                val referenceSource = profile.audioUrl
+                    ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+                TtsVoiceReference(
+                    speakerKey = speakerKey,
+                    voiceId = assignedVoiceId.toString(),
+                    referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
+                    referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
+                )
+            }
             ttsService.publish(
                     StoryTtsJobMessage(
                         jobId = ttsJob.id.toString(),
+                        storyMode = story.mode.name,
                         storyId = storyId,
                         payload = StoryTtsPayload(
                             storyId = storyId,
-                            voiceId = voiceProfileId.toString(),
-                            referenceAudioUrl = referenceSource.takeUnless(::looksLikeS3Key),
-                            referenceAudioS3Key = referenceSource.takeIf(::looksLikeS3Key),
+                            storyMode = story.mode.name,
+                            voiceId = defaultVoiceProfileId.toString(),
+                            referenceAudioUrl = defaultReferenceSource.takeUnless(::looksLikeS3Key),
+                            referenceAudioS3Key = defaultReferenceSource.takeIf(::looksLikeS3Key),
+                            voiceRefs = voiceRefs,
                             options = TtsOptions(),
                             sentences = missSentences,
                         ),
@@ -421,5 +467,6 @@ class StoryConfirmService(
 
     companion object {
         private val S3_KEY_PATTERN = Regex("^([a-z][a-z0-9-]*/)?stories/")
+        private const val DEFAULT_SPEAKER_KEY = "narrator"
     }
 }

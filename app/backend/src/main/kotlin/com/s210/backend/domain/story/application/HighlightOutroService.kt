@@ -18,6 +18,7 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryOutroRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.story.model.BubbleSlot
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.OutroResponse
@@ -73,15 +74,47 @@ class HighlightOutroService(
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
+        val metadataStoryBoard = storyBoardRepository
+            .findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        val metadataPages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(metadataStoryBoard.id)
+        if (metadataPages.isEmpty()) {
+            throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        }
+        val sentenceMetadataByPageAndOrder = metadataPages.flatMap { page ->
+            val sentencesJson = page.sentences ?: return@flatMap emptyList()
+            val sentencesArr = runCatching { objectMapper.readTree(sentencesJson) }.getOrNull()
+            if (sentencesArr == null || !sentencesArr.isArray) return@flatMap emptyList()
+
+            sentencesArr.mapIndexed { idx, node ->
+                val sentenceOrder = node.get("sentenceOrder")?.asInt() ?: (idx + 1)
+                val speakerKey = node.get("speakerKey")?.asText()?.takeIf(String::isNotBlank)
+                val bubbleSlot = parseBubbleSlot(node.get("bubbleSlot")?.asText())
+                (page.pageNumber to sentenceOrder) to (speakerKey to bubbleSlot)
+            }
+        }.toMap()
+
         // 2) 멱등 가드 — 이미 scenes 가 있으면 INSERT 스킵. sentence 는 scene 에 매핑돼 있어 같이 카운트.
         val existingScenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(storyId)
         if (existingScenes.isNotEmpty()) {
             val sceneIds = existingScenes.map { it.id }
-            val existingSentenceCount = sceneSentenceRepository
-                .findAllBySceneIdIn(sceneIds).size
+            val existingSentences = sceneSentenceRepository.findAllBySceneIdIn(sceneIds)
+            val pageNumberBySceneId = existingScenes.associate { it.id to it.pageNumber }
+            existingSentences.forEach { sentence ->
+                val pageNumber = pageNumberBySceneId[sentence.sceneId] ?: return@forEach
+                val metadata = sentenceMetadataByPageAndOrder[pageNumber to sentence.sentenceOrder]
+                    ?: return@forEach
+                val (speakerKey, bubbleSlot) = metadata
+                if (sentence.speakerKey.isNullOrBlank()) {
+                    sentence.speakerKey = speakerKey
+                }
+                if (sentence.bubbleSlot == null) {
+                    sentence.bubbleSlot = bubbleSlot
+                }
+            }
             return ScenesPrepareResult(
                 sceneCount = existingScenes.size,
-                sentenceCount = existingSentenceCount,
+                sentenceCount = existingSentences.size,
                 alreadyPrepared = true,
             )
         }
@@ -115,6 +148,8 @@ class HighlightOutroService(
                 val sentenceOrder = node.get("sentenceOrder")?.asInt() ?: (idx + 1)
                 val englishText = node.get("englishText")?.asText().orEmpty()
                 val koreanText = node.get("koreanText")?.asText()
+                val speakerKey = node.get("speakerKey")?.asText()?.takeIf(String::isNotBlank)
+                val bubbleSlot = parseBubbleSlot(node.get("bubbleSlot")?.asText())
                 sceneSentenceRepository.save(
                     SceneSentence(
                         sceneId = scene.id,
@@ -122,8 +157,8 @@ class HighlightOutroService(
                         englishText = englishText,
                         koreanText = koreanText,
                         ttsAudioUrl = null,
-                        speakerKey = null,
-                        bubbleSlot = null,
+                        speakerKey = speakerKey,
+                        bubbleSlot = bubbleSlot,
                         hasHighlighted = false,
                     ),
                 )
@@ -139,6 +174,10 @@ class HighlightOutroService(
     }
 
     // ── 씬 목록 조회 ──
+
+    private fun parseBubbleSlot(value: String?): BubbleSlot? =
+        value?.takeIf(String::isNotBlank)
+            ?.let { runCatching { BubbleSlot.valueOf(it.uppercase()) }.getOrNull() }
 
     @Transactional(readOnly = true)
     fun findScenes(storyId: Long): List<SceneResponse> {
