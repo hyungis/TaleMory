@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.final_illustration import (
+    FinalIllustrationLayoutAnalysisBatchRequest,
+    FinalIllustrationLayoutAnalysisBatchResponse,
     FinalIllustrationLayoutAnalysisRequest,
     FinalIllustrationLayoutAnalysisResponse,
     FinalIllustrationGenerateRequest,
@@ -8,7 +10,10 @@ from app.schemas.final_illustration import (
     FinalIllustrationReviseRequest,
     FinalIllustrationReviseResponse,
 )
-from app.services.final_illustration_layout_service import analyze_final_illustration_layout
+from app.services.final_illustration_layout_service import (
+    analyze_final_illustration_layout,
+    analyze_final_illustration_layouts,
+)
 from app.services.final_illustration_service import (
     generate_final_illustrations,
     revise_final_illustration,
@@ -48,6 +53,18 @@ def analyze_final_illustration_layout_endpoint(
 ) -> FinalIllustrationLayoutAnalysisResponse:
     try:
         return analyze_final_illustration_layout(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/analyze-layout/batch", response_model=FinalIllustrationLayoutAnalysisBatchResponse)
+def analyze_final_illustration_layout_batch_endpoint(
+    request: FinalIllustrationLayoutAnalysisBatchRequest,
+) -> FinalIllustrationLayoutAnalysisBatchResponse:
+    try:
+        return analyze_final_illustration_layouts(request)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:

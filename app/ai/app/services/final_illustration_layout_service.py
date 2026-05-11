@@ -1,4 +1,5 @@
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import json
 from urllib import error, parse, request
 
@@ -6,6 +7,8 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.final_illustration import (
+    FinalIllustrationLayoutAnalysisBatchRequest,
+    FinalIllustrationLayoutAnalysisBatchResponse,
     FinalIllustrationLayoutAnalysisRequest,
     FinalIllustrationLayoutAnalysisResponse,
 )
@@ -32,6 +35,15 @@ def analyze_final_illustration_layout(
     except ValidationError as exc:
         raise ValueError(f"Gemini layout analysis returned invalid JSON: {exc}") from exc
     return parsed.model_copy(update={"model": model})
+
+
+def analyze_final_illustration_layouts(
+    request_model: FinalIllustrationLayoutAnalysisBatchRequest,
+) -> FinalIllustrationLayoutAnalysisBatchResponse:
+    max_workers = min(20, len(request_model.items))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(analyze_final_illustration_layout, request_model.items))
+    return FinalIllustrationLayoutAnalysisBatchResponse(results=results)
 
 
 def _call_gemini_layout_api(request_model: FinalIllustrationLayoutAnalysisRequest, model: str) -> dict:
