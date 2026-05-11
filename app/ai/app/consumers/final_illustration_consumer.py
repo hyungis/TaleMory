@@ -9,13 +9,22 @@ from app.schemas.mq_final_illustration import (
     FinalIllustrationGenerateItemJobMessage,
     FinalIllustrationGenerateItemJobPayload,
     FinalIllustrationGenerateJobMessage,
+    FinalIllustrationLayoutItemJobMessage,
+    FinalIllustrationLayoutJobMessage,
     FinalIllustrationReviseJobMessage,
 )
+from app.services.final_illustration_layout_service import analyze_final_illustration_layout
 from app.services.final_illustration_service import (
     generate_final_illustration_item,
     revise_final_illustration,
 )
-from app.worker_async import ApiJob, publisher_channel, submit_replicate_image_api_message, submit_message
+from app.worker_async import (
+    ApiJob,
+    publisher_channel,
+    submit_layout_api_message,
+    submit_replicate_image_api_message,
+    submit_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +45,18 @@ def register_final_illustration_consumers(channel: Any) -> None:
     channel.basic_consume(
         queue=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE,
         on_message_callback=lambda ch, method, properties, body: _dispatch_revise_message(
+            ch, method.delivery_tag, body
+        ),
+    )
+    channel.basic_consume(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE,
+        on_message_callback=lambda ch, method, properties, body: _dispatch_layout_batch_message(
+            ch, method.delivery_tag, body
+        ),
+    )
+    channel.basic_consume(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE,
+        on_message_callback=lambda ch, method, properties, body: _dispatch_layout_item_message(
             ch, method.delivery_tag, body
         ),
     )
@@ -65,6 +86,24 @@ def _dispatch_revise_message(channel: Any, delivery_tag: int, body: bytes) -> No
         delivery_tag=delivery_tag,
         job_factory=lambda: _create_revise_job(body),
         task_name="revise final illustration message",
+    )
+
+
+def _dispatch_layout_batch_message(channel: Any, delivery_tag: int, body: bytes) -> None:
+    submit_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        task=lambda: _process_layout_batch_message(body),
+        task_name="analyze final illustration layout batch message",
+    )
+
+
+def _dispatch_layout_item_message(channel: Any, delivery_tag: int, body: bytes) -> None:
+    submit_layout_api_message(
+        consumer_channel=channel,
+        delivery_tag=delivery_tag,
+        job_factory=lambda: _create_layout_item_job(body),
+        task_name="analyze final illustration layout item message",
     )
 
 
@@ -105,6 +144,21 @@ def _create_revise_job(body: bytes) -> ApiJob:
     )
 
 
+def _create_layout_item_job(body: bytes) -> ApiJob:
+    message = FinalIllustrationLayoutItemJobMessage.model_validate_json(body)
+    page_number = message.payload.pageNumber
+    return ApiJob(
+        task=lambda: _analyze_final_illustration_layout_with_log(message),
+        on_success=lambda result: _publish_layout_result(message, result),
+        on_error=lambda exc: _publish_layout_failure(
+            message.jobId,
+            message.storyId,
+            page_number,
+            exc,
+        ),
+    )
+
+
 def _generate_final_illustration_item_with_log(message: FinalIllustrationGenerateItemJobMessage) -> Any:
     page_number = message.payload.item.pageNumber
     logger.info(
@@ -128,6 +182,15 @@ def _revise_final_illustration_with_log(message: FinalIllustrationReviseJobMessa
     return revise_final_illustration(message.payload)
 
 
+def _analyze_final_illustration_layout_with_log(message: FinalIllustrationLayoutItemJobMessage) -> Any:
+    page_number = message.payload.pageNumber
+    logger.info(
+        "[FINAL_ILLUSTRATION:LAYOUT] start jobId=%s, storyId=%s, pageNumber=%s",
+        message.jobId, message.storyId, page_number,
+    )
+    return analyze_final_illustration_layout(message.payload)
+
+
 def _process_generate_batch_message(body: bytes) -> bool:
     with publisher_channel() as channel:
         publisher = FinalIllustrationJobPublisher(channel)
@@ -136,6 +199,28 @@ def _process_generate_batch_message(body: bytes) -> bool:
         except Exception:
             logger.exception("Unexpected error while processing generate final illustration batch message")
             return _publish_unexpected_failure(body, publisher, action="GENERATE")
+    return True
+
+
+def _process_layout_batch_message(body: bytes) -> bool:
+    with publisher_channel() as channel:
+        publisher = FinalIllustrationJobPublisher(channel)
+        try:
+            handle_layout_batch_message(body=body, publisher=publisher)
+        except Exception:
+            logger.exception("Unexpected error while processing final illustration layout batch message")
+            return _publish_unexpected_layout_failure(body, publisher)
+    return True
+
+
+def _process_layout_item_message(body: bytes) -> bool:
+    with publisher_channel() as channel:
+        publisher = FinalIllustrationJobPublisher(channel)
+        try:
+            handle_layout_item_message(body=body, publisher=publisher)
+        except Exception:
+            logger.exception("Unexpected error while processing final illustration layout item message")
+            return _publish_unexpected_layout_failure(body, publisher)
     return True
 
 
@@ -185,6 +270,59 @@ def _publish_final_illustration_result(
         message.storyId,
         message.payload.item.pageNumber,
         seed,
+    )
+    return True
+
+
+def _publish_layout_result(message: FinalIllustrationLayoutItemJobMessage, result: Any) -> bool:
+    with publisher_channel() as channel:
+        publisher = FinalIllustrationJobPublisher(channel)
+        publisher.publish_layout_result(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            result=result,
+        )
+    logger.info(
+        "[FINAL_ILLUSTRATION:LAYOUT] done jobId=%s, storyId=%s, pageNumber=%s",
+        message.jobId,
+        message.storyId,
+        result.pageNumber,
+    )
+    return True
+
+
+def _publish_layout_failure(
+    job_id: str,
+    story_id: int,
+    page_number: int,
+    exc: BaseException,
+) -> bool:
+    if isinstance(exc, ValueError):
+        code = "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_ERROR"
+        message = str(exc)
+    elif isinstance(exc, RuntimeError):
+        code = "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_RUNTIME_ERROR"
+        message = str(exc)
+    else:
+        logger.exception("Unexpected final illustration layout api error", exc_info=exc)
+        code = "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_UNEXPECTED_ERROR"
+        message = "Unexpected worker error"
+
+    with publisher_channel() as channel:
+        publisher = FinalIllustrationJobPublisher(channel)
+        publisher.publish_layout_failure(
+            job_id=job_id,
+            story_id=story_id,
+            page_number=page_number,
+            error=FinalIllustrationError(code=code, message=message),
+        )
+    logger.warning(
+        "[FINAL_ILLUSTRATION:LAYOUT] failed jobId=%s, storyId=%s, pageNumber=%s, code=%s, message=%s",
+        job_id,
+        story_id,
+        page_number,
+        code,
+        message,
     )
     return True
 
@@ -250,6 +388,60 @@ def handle_generate_batch_message(body: bytes, publisher: FinalIllustrationJobPu
     logger.info(
         "[FINAL_ILLUSTRATION:BATCH] done jobId=%s, storyId=%s, publishedItems=%d",
         message.jobId, message.storyId, len(message.payload.items),
+    )
+
+
+def handle_layout_batch_message(body: bytes, publisher: FinalIllustrationJobPublisher) -> None:
+    message = FinalIllustrationLayoutJobMessage.model_validate_json(body)
+    logger.info(
+        "[FINAL_ILLUSTRATION:LAYOUT_BATCH] start jobId=%s, storyId=%s, itemCount=%d",
+        message.jobId, message.storyId, len(message.payload.items),
+    )
+
+    for item in message.payload.items:
+        publisher.publish_layout_item_job(
+            FinalIllustrationLayoutItemJobMessage(
+                jobId=message.jobId,
+                storyId=message.storyId,
+                payload=item,
+            )
+        )
+    logger.info(
+        "[FINAL_ILLUSTRATION:LAYOUT_BATCH] done jobId=%s, storyId=%s, publishedItems=%d",
+        message.jobId, message.storyId, len(message.payload.items),
+    )
+
+
+def handle_layout_item_message(body: bytes, publisher: FinalIllustrationJobPublisher) -> None:
+    message = FinalIllustrationLayoutItemJobMessage.model_validate_json(body)
+    page_number = message.payload.pageNumber
+
+    try:
+        result = analyze_final_illustration_layout(message.payload)
+    except ValueError as exc:
+        publisher.publish_layout_failure(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            page_number=page_number,
+            error=FinalIllustrationError(code="ANALYZE_FINAL_ILLUSTRATION_LAYOUT_ERROR", message=str(exc)),
+        )
+        return
+    except RuntimeError as exc:
+        publisher.publish_layout_failure(
+            job_id=message.jobId,
+            story_id=message.storyId,
+            page_number=page_number,
+            error=FinalIllustrationError(
+                code="ANALYZE_FINAL_ILLUSTRATION_LAYOUT_RUNTIME_ERROR",
+                message=str(exc),
+            ),
+        )
+        return
+
+    publisher.publish_layout_result(
+        job_id=message.jobId,
+        story_id=message.storyId,
+        result=result,
     )
 
 
@@ -347,4 +539,27 @@ def _publish_unexpected_failure(body: bytes, publisher: FinalIllustrationJobPubl
         return True
     except Exception:
         logger.exception("Failed to publish unexpected final illustration failure event")
+        return False
+
+
+def _publish_unexpected_layout_failure(body: bytes, publisher: FinalIllustrationJobPublisher) -> bool:
+    try:
+        payload = json.loads(body.decode("utf-8"))
+        job_id = payload["jobId"]
+        story_id = payload["storyId"]
+        page_number = payload.get("pageNumber")
+        if page_number is None:
+            page_number = payload.get("payload", {}).get("pageNumber")
+        publisher.publish_layout_failure(
+            job_id=job_id,
+            story_id=story_id,
+            page_number=page_number,
+            error=FinalIllustrationError(
+                code="ANALYZE_FINAL_ILLUSTRATION_LAYOUT_UNEXPECTED_ERROR",
+                message="Unexpected worker error",
+            ),
+        )
+        return True
+    except Exception:
+        logger.exception("Failed to publish unexpected final illustration layout failure event")
         return False
