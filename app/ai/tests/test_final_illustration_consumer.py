@@ -1,7 +1,7 @@
 from app.consumers import final_illustration_consumer
 from app.consumers.final_illustration_consumer import (
+    _create_layout_item_job,
     handle_layout_batch_message,
-    handle_layout_item_message,
 )
 from app.schemas.final_illustration import (
     CharacterAnchorCandidate,
@@ -96,6 +96,7 @@ def test_final_illustration_layout_batch_publishes_item_jobs() -> None:
       "storyId": 101,
       "payload": {{
         "items": [
+          {_layout_item_json(0)},
           {_layout_item_json(1)},
           {_layout_item_json(2)}
         ]
@@ -113,11 +114,22 @@ def test_final_illustration_layout_batch_publishes_item_jobs() -> None:
 
 
 def test_final_illustration_layout_item_publishes_analysis_result(monkeypatch) -> None:
-    publisher = FakeFinalIllustrationPublisher()
+    published_results: list[dict] = []
     monkeypatch.setattr(
         final_illustration_consumer,
         "analyze_final_illustration_layout",
         lambda request: _layout_result(request.pageNumber),
+    )
+    monkeypatch.setattr(
+        final_illustration_consumer,
+        "_publish_layout_result",
+        lambda message, result: published_results.append(
+            {
+                "job_id": message.jobId,
+                "story_id": message.storyId,
+                "result": result,
+            }
+        ) or True,
     )
     body = f"""
     {{
@@ -128,9 +140,11 @@ def test_final_illustration_layout_item_publishes_analysis_result(monkeypatch) -
     }}
     """.encode("utf-8")
 
-    handle_layout_item_message(body=body, publisher=publisher)
+    job = _create_layout_item_job(body)
+    result = job.task()
+    should_ack = job.on_success(result)
 
-    assert publisher.published_layout_failures == []
-    assert publisher.published_layout_results[0]["job_id"] == "job-layout-item-1"
-    assert publisher.published_layout_results[0]["story_id"] == 101
-    assert publisher.published_layout_results[0]["result"].pageNumber == 10
+    assert should_ack is True
+    assert published_results[0]["job_id"] == "job-layout-item-1"
+    assert published_results[0]["story_id"] == 101
+    assert published_results[0]["result"].pageNumber == 10

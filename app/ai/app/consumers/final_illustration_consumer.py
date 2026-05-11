@@ -213,17 +213,6 @@ def _process_layout_batch_message(body: bytes) -> bool:
     return True
 
 
-def _process_layout_item_message(body: bytes) -> bool:
-    with publisher_channel() as channel:
-        publisher = FinalIllustrationJobPublisher(channel)
-        try:
-            handle_layout_item_message(body=body, publisher=publisher)
-        except Exception:
-            logger.exception("Unexpected error while processing final illustration layout item message")
-            return _publish_unexpected_layout_failure(body, publisher)
-    return True
-
-
 def _process_generate_item_message(body: bytes) -> bool:
     with publisher_channel() as channel:
         publisher = FinalIllustrationJobPublisher(channel)
@@ -393,12 +382,16 @@ def handle_generate_batch_message(body: bytes, publisher: FinalIllustrationJobPu
 
 def handle_layout_batch_message(body: bytes, publisher: FinalIllustrationJobPublisher) -> None:
     message = FinalIllustrationLayoutJobMessage.model_validate_json(body)
+    items = [item for item in message.payload.items if item.pageNumber != 0]
     logger.info(
-        "[FINAL_ILLUSTRATION:LAYOUT_BATCH] start jobId=%s, storyId=%s, itemCount=%d",
-        message.jobId, message.storyId, len(message.payload.items),
+        "[FINAL_ILLUSTRATION:LAYOUT_BATCH] start jobId=%s, storyId=%s, itemCount=%d, skippedCover=%d",
+        message.jobId,
+        message.storyId,
+        len(items),
+        len(message.payload.items) - len(items),
     )
 
-    for item in message.payload.items:
+    for item in items:
         publisher.publish_layout_item_job(
             FinalIllustrationLayoutItemJobMessage(
                 jobId=message.jobId,
@@ -408,40 +401,7 @@ def handle_layout_batch_message(body: bytes, publisher: FinalIllustrationJobPubl
         )
     logger.info(
         "[FINAL_ILLUSTRATION:LAYOUT_BATCH] done jobId=%s, storyId=%s, publishedItems=%d",
-        message.jobId, message.storyId, len(message.payload.items),
-    )
-
-
-def handle_layout_item_message(body: bytes, publisher: FinalIllustrationJobPublisher) -> None:
-    message = FinalIllustrationLayoutItemJobMessage.model_validate_json(body)
-    page_number = message.payload.pageNumber
-
-    try:
-        result = analyze_final_illustration_layout(message.payload)
-    except ValueError as exc:
-        publisher.publish_layout_failure(
-            job_id=message.jobId,
-            story_id=message.storyId,
-            page_number=page_number,
-            error=FinalIllustrationError(code="ANALYZE_FINAL_ILLUSTRATION_LAYOUT_ERROR", message=str(exc)),
-        )
-        return
-    except RuntimeError as exc:
-        publisher.publish_layout_failure(
-            job_id=message.jobId,
-            story_id=message.storyId,
-            page_number=page_number,
-            error=FinalIllustrationError(
-                code="ANALYZE_FINAL_ILLUSTRATION_LAYOUT_RUNTIME_ERROR",
-                message=str(exc),
-            ),
-        )
-        return
-
-    publisher.publish_layout_result(
-        job_id=message.jobId,
-        story_id=message.storyId,
-        result=result,
+        message.jobId, message.storyId, len(items),
     )
 
 
