@@ -203,6 +203,7 @@ ENV_DEV_INFRA_MYSQL_PASSWORD=xxx            → MYSQL_PASSWORD=xxx (infra.dev.en
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | — | `ai.result.image.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | — | `ai.result.image.regenerate.failed` |
 | `ENV_DEV_APP_FINAL_ILLUSTRATION_MODEL` | — | `black-forest-labs/flux-2-klein-9b` |
+| `ENV_DEV_APP_FINAL_ILLUSTRATION_LAYOUT_MODEL` | — | `gemini-3-flash-preview` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | — | `ai.final-illustration.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | — | `ai.final-illustration.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | — | `ai.final-illustration.revise.request.queue` |
@@ -422,6 +423,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.regenerate.completed` |
 | `ENV_DEV_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.regenerate.failed` |
 | `ENV_DEV_APP_FINAL_ILLUSTRATION_MODEL` | no | `black-forest-labs/flux-2-klein-9b` |
+| `ENV_DEV_APP_FINAL_ILLUSTRATION_LAYOUT_MODEL` | no | `gemini-3-flash-preview` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | no | `ai.final-illustration.generate.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | no | `ai.final-illustration.generate.item.request.queue` |
 | `ENV_DEV_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | no | `ai.final-illustration.revise.request.queue` |
@@ -495,6 +497,7 @@ AI 서비스가 사용하는 `ENV_DEV_APP_*` 변수 중 `OPENAI_API_KEY` 외 추
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_COMPLETED_ROUTING_KEY` | no | `ai.result.image.regenerate.completed` |
 | `ENV_MASTER_APP_RABBITMQ_IMAGE_REGENERATE_FAILED_ROUTING_KEY` | no | `ai.result.image.regenerate.failed` |
 | `ENV_MASTER_APP_FINAL_ILLUSTRATION_MODEL` | no | `black-forest-labs/flux-2-klein-9b` |
+| `ENV_MASTER_APP_FINAL_ILLUSTRATION_LAYOUT_MODEL` | no | `gemini-3-flash-preview` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_QUEUE` | no | `ai.final-illustration.generate.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ITEM_QUEUE` | no | `ai.final-illustration.generate.item.request.queue` |
 | `ENV_MASTER_APP_RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE` | no | `ai.final-illustration.revise.request.queue` |

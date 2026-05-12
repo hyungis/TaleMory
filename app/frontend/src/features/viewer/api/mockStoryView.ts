@@ -105,7 +105,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '하늘은 비밀 놀이터 같아!',
           ttsAudioUrl: null,
           speakerKey: '해솔',
-          bubbleSlot: 'MIDDLE_CENTER',
+          bubbleSlot: { x: 0.5, y: 0.5 },
         },
       ],
     },
@@ -123,7 +123,7 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '여러분, 환영합니다!',
           ttsAudioUrl: null,
           speakerKey: '기장님',
-          bubbleSlot: 'TOP_CENTER',
+          bubbleSlot: { x: 0.5, y: 0.05 },
         },
         {
           sentenceId: '1008',

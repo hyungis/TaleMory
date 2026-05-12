@@ -1,6 +1,10 @@
-import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { InvitationCard, StoryBookViewer, useStoryViewQuery } from '../../features/viewer'
+import {
+  InvitationCard,
+  StoryBookViewer,
+  StoryWebtoonViewer,
+  useStoryViewQuery,
+} from '../../features/viewer'
 import { ROUTES } from '../../shared/constants'
 import '../../features/viewer/invitation/styles/invitation.css'
 
@@ -20,8 +24,6 @@ export function ViewerPage() {
   // BE 가 Sqids 토큰으로 storyId 를 발급하므로 더 이상 Number() 코어션 불가 — 문자열 그대로 전달.
   const { status, data: story, error } = useStoryViewQuery(storyId)
 
-  const [showWebtoonNotice, setShowWebtoonNotice] = useState(false)
-
   if (status === 'loading' || status === 'idle') {
     return <ViewerLoadingState />
   }
@@ -29,9 +31,8 @@ export function ViewerPage() {
     return <ViewerErrorState message={error?.message ?? '동화를 불러오지 못했어요.'} onBack={() => navigate(ROUTES.main)} />
   }
 
-  const openBookMode = () => {
-    // 주소창/탭바 없는 전용 뷰어 창으로 띄움 — e-book 리더 몰입감.
-    const url = `${window.location.pathname}?mode=book`
+  const openInPopup = (target: 'book' | 'webtoon') => {
+    const url = `${window.location.pathname}?mode=${target}`
     const w = Math.min(1280, window.screen.availWidth - 100)
     const h = Math.min(860, window.screen.availHeight - 100)
     const left = Math.round((window.screen.availWidth - w) / 2)
@@ -43,12 +44,10 @@ export function ViewerPage() {
     )
     if (!popup) {
       // 브라우저가 팝업 차단 시 같은 탭에서 전환 fallback
-      setSearchParams({ mode: 'book' })
+      setSearchParams({ mode: target })
     }
   }
-  const openWebtoonMode = () => {
-    setShowWebtoonNotice(true)
-  }
+
   const closeViewer = () => {
     // 팝업으로 열린 창이면 닫고, 직접 URL 진입이면 청첩장으로 복귀
     if (window.opener) {
@@ -61,20 +60,18 @@ export function ViewerPage() {
   if (mode === 'book') {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
+  if (mode === 'webtoon') {
+    return <StoryWebtoonViewer story={story} isOwner onExit={closeViewer} />
+  }
 
   return (
-    <>
-      <InvitationCard
-        story={story}
-        isOwner
-        onOpenBook={openBookMode}
-        onOpenWebtoon={openWebtoonMode}
-        onBack={() => navigate(ROUTES.main)}
-      />
-      {showWebtoonNotice && (
-        <WebtoonNoticeModal onClose={() => setShowWebtoonNotice(false)} />
-      )}
-    </>
+    <InvitationCard
+      story={story}
+      isOwner
+      onOpenBook={() => openInPopup('book')}
+      onOpenWebtoon={() => openInPopup('webtoon')}
+      onBack={() => navigate(ROUTES.main)}
+    />
   )
 }
 
@@ -103,22 +100,3 @@ function ViewerErrorState({ message, onBack }: { message: string; onBack: () => 
   )
 }
 
-function WebtoonNoticeModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="iv-notice-overlay"
-      onClick={onClose}
-    >
-      <div className="iv-notice-card" onClick={e => e.stopPropagation()}>
-        <p className="iv-notice-emoji" aria-hidden="true">🚧</p>
-        <h3 className="iv-notice-title">아직 준비 중이에요</h3>
-        <p className="iv-notice-desc">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
-        <button type="button" onClick={onClose} className="iv-notice-btn">
-          알겠어요
-        </button>
-      </div>
-    </div>
-  )
-}

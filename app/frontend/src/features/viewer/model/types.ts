@@ -4,10 +4,18 @@
  */
 import type { PersonId, SceneId, SentenceId, StoryId } from '../../../shared/types'
 
-export type BubbleSlot =
-  | 'TOP_LEFT' | 'TOP_CENTER' | 'TOP_RIGHT'
-  | 'MIDDLE_LEFT' | 'MIDDLE_CENTER' | 'MIDDLE_RIGHT'
-  | 'BOTTOM_LEFT' | 'BOTTOM_CENTER' | 'BOTTOM_RIGHT'
+/**
+ * 정규화된 좌표 (0~1) — 이미지 전체에 대한 비율로 표현되는 anchor 점.
+ *
+ * BE `AnchorPoint` 와 1:1 매핑.
+ *  - WEBTOON 모드 sentence.bubbleSlot 위치 (말풍선 / 캡션).
+ *  - VIEWER 모드 또는 좌표 추출 실패 시 sentence.bubbleSlot 은 null —
+ *    FE 는 fallback 위치 (top center) 로 렌더 + 재시도 버튼 노출.
+ */
+export interface AnchorPoint {
+  x: number
+  y: number
+}
 
 export interface MainCharacterView {
   name: string | null
@@ -27,7 +35,11 @@ export interface SentenceView {
   koreanText: string | null
   ttsAudioUrl: string | null
   speakerKey: string | null
-  bubbleSlot: BubbleSlot | null
+  /**
+   * WEBTOON 모드 한정 — 말풍선/캡션 anchor 좌표 (정규화 0~1).
+   * VIEWER 모드 또는 좌표 추출 실패 시 null.
+   */
+  bubbleSlot: AnchorPoint | null
 }
 
 export interface SceneView {
