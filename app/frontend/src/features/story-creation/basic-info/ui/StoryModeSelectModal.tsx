@@ -57,6 +57,7 @@ export function StoryModeSelectModal({ onSelect, onClose }: StoryModeSelectModal
             icon={<BookOpen className="w-6 h-6" />}
             title="기본 모드 (그림책)"
             description="페이지마다 한 단락의 이야기로 잔잔하게 읽어주는 동화책이에요."
+            onboardingTarget="creation-mode-viewer"
             onSelect={onSelect}
           />
           <ModeOptionButton
@@ -87,6 +88,7 @@ interface ModeOptionButtonProps {
   icon: React.ReactNode
   title: string
   description: string
+  onboardingTarget?: string
   onSelect: (mode: StoryModeApi) => void
 }
 
@@ -95,11 +97,12 @@ interface ModeOptionButtonProps {
  * VIEWER / WEBTOON 두 카드는 동일한 톤이고, 선택 자체로 페이지 진입을 트리거하므로
  * 라디오 버튼 + 확인 버튼 같은 별도 단계를 두지 않는다.
  */
-function ModeOptionButton({ mode, icon, title, description, onSelect }: ModeOptionButtonProps) {
+function ModeOptionButton({ mode, icon, title, description, onboardingTarget, onSelect }: ModeOptionButtonProps) {
   return (
     <button
       type="button"
       onClick={() => onSelect(mode)}
+      data-onboarding-target={onboardingTarget}
       className="text-left bg-[#E9DBBE] border-2 border-[#9A7548]/30 rounded-2xl p-5 hover:bg-[#D9BE82] hover:border-[#9A7548]/60 hover:-translate-y-0.5 active:translate-y-0 shadow-[0_2px_0_#9A7548]/30 transition-all"
     >
       <div className="flex items-start gap-4">
