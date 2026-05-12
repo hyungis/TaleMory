@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { StoryBookViewer, usePublicStoryViewQuery } from '../../features/viewer'
-import { InvitationCard } from '../../features/viewer'
+import { StoryBookViewer, WebtoonViewer, usePublicStoryViewQuery, InvitationCard } from '../../features/viewer'
 import '../../features/viewer/invitation/styles/invitation.css'
 
 /**
@@ -14,8 +12,6 @@ export function SharedViewerPage() {
   const mode = searchParams.get('mode')
 
   const { status, data: story, error } = usePublicStoryViewQuery(shareToken)
-
-  const [showWebtoonNotice, setShowWebtoonNotice] = useState(false)
 
   if (status === 'loading' || status === 'idle') {
     return (
@@ -83,32 +79,31 @@ export function SharedViewerPage() {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
 
+  if (mode === 'webtoon') {
+    return <WebtoonViewer story={story} />
+  }
+
   return (
-    <>
-      <InvitationCard
-        story={story}
-        isOwner={false}
-        onOpenBook={openBookMode}
-        onOpenWebtoon={() => setShowWebtoonNotice(true)}
-        onBack={handleBack}
-      />
-      {showWebtoonNotice && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="iv-notice-overlay"
-          onClick={() => setShowWebtoonNotice(false)}
-        >
-          <div className="iv-notice-card" onClick={e => e.stopPropagation()}>
-            <p className="iv-notice-emoji" aria-hidden="true">🚧</p>
-            <h3 className="iv-notice-title">아직 준비 중이에요</h3>
-            <p className="iv-notice-desc">웹툰 모드는 다음 업데이트에서 만나보실 수 있어요.</p>
-            <button type="button" onClick={() => setShowWebtoonNotice(false)} className="iv-notice-btn">
-              알겠어요
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    <InvitationCard
+      story={story}
+      isOwner={false}
+      onOpenBook={openBookMode}
+      onOpenWebtoon={() => {
+        const url = `${window.location.pathname}?mode=webtoon`
+        const w = Math.min(1280, window.screen.availWidth - 100)
+        const h = Math.min(860, window.screen.availHeight - 100)
+        const left = Math.round((window.screen.availWidth - w) / 2)
+        const top = Math.round((window.screen.availHeight - h) / 2)
+        const popup = window.open(
+          url,
+          `TaleMoryWebtoon-shared`,
+          `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
+        )
+        if (!popup) {
+          setSearchParams({ mode: 'webtoon' })
+        }
+      }}
+      onBack={handleBack}
+    />
   )
 }

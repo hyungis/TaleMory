@@ -167,8 +167,6 @@ export function InvitationCard({
             type="button"
             className="iv-mode iv-mode-web"
             onClick={onOpenWebtoon}
-            disabled
-            aria-label="웹툰 모드 — 준비 중"
           >
             <span className="iv-mode-corner" aria-hidden="true" />
             <div className="iv-mode-icon-circle" aria-hidden="true">
@@ -195,11 +193,6 @@ export function InvitationCard({
               <div className="iv-pg" />
             </div>
 
-            {/* 준비중 오버레이 — 카드 전체 위에 어두운 막 + 텍스트만 */}
-            <div className="iv-mode-disabled-overlay" aria-hidden="true">
-              <p className="iv-mode-disabled-title">준비 중이에요</p>
-              <p className="iv-mode-disabled-sub">곧 만나보실 수 있어요</p>
-            </div>
           </button>
         </div>
       </div>
