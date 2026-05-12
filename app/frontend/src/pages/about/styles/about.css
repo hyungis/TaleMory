@@ -298,11 +298,8 @@
 .about-sample__viewer-wrapper .sb-body-translation {
   margin-top: 48px;
   padding-top: 28px;
-  font-family: 'Gaegu', 'Nanum Pen Script', cursive;
   font-size: 1.6rem;
-  font-weight: 700;
   line-height: 1.9;
-  letter-spacing: 0;
 }
 
 .about-sample__loading {
@@ -368,7 +365,6 @@
   --sb-rust: #c47254;
   --sb-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
   --sb-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
-  --sb-font-korean: 'Gaegu', 'Nanum Pen Script', cursive;
 
   position: relative;
   width: 100%;

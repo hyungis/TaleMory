@@ -2,12 +2,6 @@ import { BookHeart, ZoomIn } from 'lucide-react'
 import type { StoryboardPageDraft } from '../../model/types'
 import { SketchCard } from './SketchCard'
 
-const KOREAN_TEXT_STYLE = {
-  fontFamily: "'Gaegu', 'Nanum Pen Script', cursive",
-  fontWeight: 700,
-  letterSpacing: 0,
-} as const
-
 interface StoryboardGridViewProps {
   storySummary: string
   pages: StoryboardPageDraft[]
@@ -30,7 +24,7 @@ export function StoryboardGridView({ storySummary, pages, onPagePreview }: Story
           <h2 className="text-3xl text-[#2d5a27] font-bold">이 동화책은 어떤 이야기인가요?</h2>
         </div>
         <div className="bg-[#e8ddb4] p-6 rounded-2xl border-2 border-[#8b7a52]/40">
-          <p className="text-[#2d5a27] text-xl leading-relaxed whitespace-pre-wrap" style={KOREAN_TEXT_STYLE}>
+          <p className="text-[#2d5a27] text-xl leading-relaxed font-sans whitespace-pre-wrap">
             {storySummary}
           </p>
         </div>
