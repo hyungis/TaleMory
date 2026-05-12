@@ -310,16 +310,40 @@ WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
 - NARRATION sentences must use speakerKey="narrator".
 - DIALOGUE sentences must use the visible speaking character's key as speakerKey.
 - DIALOGUE must read like direct speech that the speaker could say aloud.
+- DIALOGUE englishText/koreanText must contain only the spoken words for a speech bubble.
+- Do not put narration or attribution inside DIALOGUE, such as "she says", "he said", "Yujin says",
+  "그녀는 말한다", "유진이 말했다", or similar speaker tags.
+- If attribution or action is needed, make it a separate NARRATION sentence with speakerKey="narrator".
 - If a sentence describes action, setting, emotion, page transition, or a character in third person,
   it is NARRATION, even when that character is visible in the panel.
 - Never label narrator/third-person prose as DIALOGUE.
 - Make dialogue the main reading experience: each page should usually contain more DIALOGUE sentences than
   NARRATION sentences.
+- Do not make the child the only active speaker across the whole storyboard.
+- The child should remain the primary speaker, but companions should speak in meaningful moments.
+- Across the whole storyboard, include companion dialogue on several pages, especially when a companion is
+  visible, comforting, guiding, asking a question, or reacting to the child.
+- For pages with a visible companion, prefer at least one companion DIALOGUE line unless the page is clearly
+  child-only or narration-focused.
+- Use companion dialogue for warm back-and-forth, reassurance, short reactions, questions, and encouragement.
+- Avoid making companions silent props.
 - Keep dialogue short, natural, and easy for child-friendly TTS.
 - Use narration sparingly for scene setup, emotional bridging, or page transitions.
 - WEBTOON mode still needs real page body text, not one-line captions.
-- Each page must contain at least 3 sentences and should usually contain 3-5 sentences total.
-- For most pages, use 1 short NARRATION sentence plus 2-4 short DIALOGUE sentences.
+- Use WEBTOON age+difficulty targets instead of the standard storybook age rules:
+  - Age 5-6 + BEGINNER: 4-5 sentences, 40-65 English words per page, very simple dialogue.
+  - Age 5-6 + INTERMEDIATE: 5-6 sentences, 55-80 English words per page, still simple but with warmer reactions.
+  - Age 5-6 + ADVANCED: 5-6 sentences, 65-95 English words per page, richer emotions without hard vocabulary.
+  - Age 7-9 + BEGINNER: 4-5 sentences, 50-75 English words per page.
+  - Age 7-9 + INTERMEDIATE: 5-6 sentences, 70-100 English words per page.
+  - Age 7-9 + ADVANCED: 6-7 sentences, 90-125 English words per page.
+  - Age 10-12 + BEGINNER: 5-6 sentences, 70-100 English words per page.
+  - Age 10-12 + INTERMEDIATE: 6-7 sentences, 90-130 English words per page.
+  - Age 10-12 + ADVANCED: 7-8 sentences, 120-170 English words per page.
+- For most pages, use 1-2 short NARRATION sentences and make the rest DIALOGUE.
+- Even though each dialogue line is short, the combined page text must feel substantial enough for a short
+  storybook page, not just isolated speech bubbles.
+- Korean page text should also feel like a short story page, not just a set of disconnected captions.
 - Never return a page with only one sentence unless the user explicitly requests a one-line page.
 - Every page should include at least one DIALOGUE sentence unless the page is clearly an opening, transition,
   or ending page where narration is more natural.
