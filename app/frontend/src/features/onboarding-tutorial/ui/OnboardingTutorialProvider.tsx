@@ -17,6 +17,7 @@ import {
   readOnboardingStatus,
   writeOnboardingStatus,
 } from '../model/onboardingStorage'
+import { OnboardingTutorialContext } from '../model/onboardingTutorialContext'
 
 interface TargetRect {
   top: number
@@ -80,6 +81,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   const auth = useAuthSession()
 
   const [isPromptOpen, setIsPromptOpen] = useState(false)
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
   const [isTutorialActive, setIsTutorialActive] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null)
@@ -102,7 +104,9 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     if (!isEligiblePath(location.pathname)) return
 
     markOnboardingPromptSeenThisSession(auth.user)
-    const timeoutId = window.setTimeout(() => setIsPromptOpen(true), 0)
+    const timeoutId = window.setTimeout(() => {
+      setIsPromptOpen(true)
+    }, 0)
     return () => window.clearTimeout(timeoutId)
   }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname])
 
@@ -135,6 +139,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
 
   const closeTutorialForSession = useCallback(() => {
     setIsPromptOpen(false)
+    setIsExitConfirmOpen(false)
     setIsTutorialActive(false)
     setActiveIndex(0)
     setTargetRect(null)
@@ -148,12 +153,34 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
 
   const startTutorial = useCallback(() => {
     setIsPromptOpen(false)
+    setIsExitConfirmOpen(false)
     setIsTutorialActive(true)
     setActiveIndex(0)
+    setTargetRect(null)
     if (location.pathname !== ROUTES.main) {
       navigate(ROUTES.main)
     }
   }, [location.pathname, navigate])
+
+  const openTutorialPrompt = useCallback(() => {
+    setIsExitConfirmOpen(false)
+    setIsPromptOpen(true)
+  }, [])
+
+  const requestExitTutorial = useCallback(() => {
+    setIsExitConfirmOpen(true)
+  }, [])
+
+  const cancelExitTutorial = useCallback(() => {
+    setIsExitConfirmOpen(false)
+  }, [])
+
+  const exitTutorialToMain = useCallback(() => {
+    closeTutorialForSession()
+    if (location.pathname !== ROUTES.main) {
+      navigate(ROUTES.main, { replace: true })
+    }
+  }, [closeTutorialForSession, location.pathname, navigate])
 
   const advanceTutorial = useCallback(() => {
     const next = activeIndex + 1
@@ -234,13 +261,24 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     return { width, left, top, maxHeight }
   }, [targetRect, viewport])
 
+  const contextValue = useMemo(
+    () => ({ openTutorialPrompt, isTutorialActive }),
+    [isTutorialActive, openTutorialPrompt],
+  )
+
   return (
-    <>
+    <OnboardingTutorialContext.Provider value={contextValue}>
       {children}
       {isPromptOpen && (
         <OnboardingPrompt
           onStart={startTutorial}
           onDismiss={closeTutorialForSession}
+        />
+      )}
+      {isExitConfirmOpen && (
+        <OnboardingExitConfirm
+          onCancel={cancelExitTutorial}
+          onConfirm={exitTutorialToMain}
         />
       )}
       {isTutorialActive && activeStep && targetRect && panelStyle && (
@@ -253,10 +291,10 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
           description={activeStep.description}
           isLastStep={activeIndex === ONBOARDING_STEPS.length - 1}
           onNext={advanceTutorial}
-          onSkip={closeTutorialForSession}
+          onSkip={requestExitTutorial}
         />
       )}
-    </>
+    </OnboardingTutorialContext.Provider>
   )
 }
 
@@ -267,6 +305,9 @@ function OnboardingPrompt({
   onStart: () => void
   onDismiss: () => void
 }) {
+  const title = '튜토리얼을 진행할까요?'
+  const description = '주요 화면과 기능을 처음부터 다시 안내해드리겠습니다.'
+
   return createPortal(
     <div
       role="dialog"
@@ -323,10 +364,10 @@ function OnboardingPrompt({
                 lineHeight: 1.25,
               }}
             >
-              처음이시네요. 튜토리얼을 진행할까요?
+              {title}
             </h2>
             <p style={{ margin: 0, color: '#5f4b34', fontSize: 17, lineHeight: 1.5 }}>
-              메인 화면, 책장, 동화책 만들기 흐름의 핵심 영역을 차례대로 보여드릴게요.
+              {description}
             </p>
           </div>
         </div>
@@ -345,7 +386,7 @@ function OnboardingPrompt({
               cursor: 'pointer',
             }}
           >
-            아니요
+            나중에 보기
           </button>
           <button
             type="button"
@@ -361,7 +402,98 @@ function OnboardingPrompt({
               boxShadow: '0 3px 0 #1a3a14',
             }}
           >
-            예, 진행할게요
+            네, 진행할게요
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function OnboardingExitConfirm({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="onboarding-exit-title"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9100,
+        display: 'grid',
+        placeItems: 'center',
+        padding: 20,
+        background: 'rgba(34, 26, 18, 0.5)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 380,
+          boxSizing: 'border-box',
+          background: '#fff9e8',
+          border: '2px solid #9a7548',
+          borderRadius: 8,
+          boxShadow: '0 18px 44px rgba(40, 28, 18, 0.32), 0 4px 0 #9a7548',
+          padding: '22px 24px',
+          color: '#33251a',
+          fontFamily: 'var(--font-display), system-ui, sans-serif',
+        }}
+      >
+        <h2
+          id="onboarding-exit-title"
+          style={{
+            margin: '0 0 10px',
+            fontSize: 23,
+            fontWeight: 800,
+            lineHeight: 1.25,
+          }}
+        >
+          튜토리얼을 나가시겠습니까?
+        </h2>
+        <p style={{ margin: 0, color: '#5f4b34', fontSize: 16, lineHeight: 1.5, fontWeight: 700 }}>
+          지금 나가면 현재 튜토리얼 진행은 중단됩니다. 나중에 햄버거 메뉴에서 다시 볼 수 있습니다.
+        </p>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              border: '2px solid #9a7548',
+              background: '#e9dbbe',
+              color: '#3e2a18',
+              borderRadius: 999,
+              padding: '10px 18px',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            계속 보기
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              border: '2px solid #2d5a27',
+              background: '#2d5a27',
+              color: '#fff9e8',
+              borderRadius: 999,
+              padding: '10px 18px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 3px 0 #1a3a14',
+            }}
+          >
+            나가기
           </button>
         </div>
       </div>
