@@ -433,8 +433,11 @@ def _build_openai_webtoon_input_content(
         "Do not show every available character on every page; include only the 1-2 visible characters "
         "that the page illustration actually needs, and reserve full-family staging for group or payoff moments. "
         "DIALOGUE should be frequent and short. NARRATION should be sparse and only bridge the scene. "
-        "Still make each page feel like a real short story page: usually 4-6 sentences total, "
-        "with enough combined text for roughly 45-75 English words on BEGINNER pages when the scene allows it. "
+        "Keep the child as the primary speaker, but do not make companions silent props. "
+        "Across the storyboard, give companions meaningful short dialogue on several pages, especially when "
+        "they are visible, comforting, guiding, asking questions, or reacting to the child. "
+        "Use the WEBTOON age+difficulty targets from the system prompt instead of the standard storybook "
+        "age rules, so harder levels use more dialogue turns and richer emotional detail. "
         "Each page must include charactersInScene with sceneRole and expectedPosition for later image generation "
         "and final illustration coordinate extraction."
     )
@@ -1073,6 +1076,8 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
 
 def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
     base = _generate_locally(request)
+    youngest_age = min(child.age for child in request.children)
+    reading_level = _webtoon_reading_level_for_age_and_difficulty(youngest_age, request.difficulty)
     character_keys = _webtoon_character_keys(request)
     dialogue_keys = [item["characterKey"] for item in character_keys if item["characterKey"] != "narrator"]
     fallback_speaker = dialogue_keys[0] if dialogue_keys else "character"
@@ -1135,6 +1140,20 @@ def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStor
                 emotion=last_sentence.emotion,
             ),
         ]
+        target_min_sentences = _min_sentences_from_range(reading_level.sentencesPerPage)
+        while len(sentences) < target_min_sentences:
+            next_order = len(sentences) + 1
+            speaker = secondary_speaker if next_order % 2 else primary_speaker
+            sentences.append(
+                WebtoonStorySentence(
+                    sentenceOrder=next_order,
+                    type="DIALOGUE",
+                    speakerKey=speaker,
+                    englishText=_local_dialogue_for_page(page.pageNumber + next_order, speaker),
+                    koreanText=_local_dialogue_for_page(page.pageNumber + next_order, speaker),
+                    emotion="WARM",
+                )
+            )
         english_text = " ".join(sentence.englishText for sentence in sentences)
         korean_text = " ".join(sentence.koreanText for sentence in sentences)
         pages.append(
@@ -1167,7 +1186,7 @@ def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStor
         recurringMotif=base.recurringMotif,
         pageCount=len(pages),
         pageCountReason=base.pageCountReason + " Webtoon mode adds dialogue-led sentence metadata.",
-        readingLevel=base.readingLevel,
+        readingLevel=reading_level,
         totalWordCount=sum(page.wordCount for page in pages),
         pages=pages,
         usage=UsageInfo(
@@ -1278,6 +1297,85 @@ def _reading_level_for_age(age: int) -> ReadingLevel:
         wordsPerSentence="10-20",
         reason="The youngest child is 10 or older, so each page uses richer final storybook narration.",
     )
+
+
+def _webtoon_reading_level_for_age_and_difficulty(age: int, difficulty: str) -> ReadingLevel:
+    normalized = difficulty.upper()
+    if age <= 6:
+        if normalized == "ADVANCED":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="5-6",
+                wordsPerSentence="8-14",
+                reason=(
+                    "Webtoon mode for age 5-6 with ADVANCED difficulty uses short dialogue turns "
+                    "plus richer emotions without hard vocabulary."
+                ),
+            )
+        if normalized == "INTERMEDIATE":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="5-6",
+                wordsPerSentence="7-12",
+                reason=(
+                    "Webtoon mode for age 5-6 with INTERMEDIATE difficulty keeps simple lines "
+                    "while adding warmer companion reactions."
+                ),
+            )
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="4-5",
+            wordsPerSentence="6-10",
+            reason="Webtoon mode for age 5-6 with BEGINNER difficulty uses very simple speech-bubble lines.",
+        )
+    if age <= 9:
+        if normalized == "ADVANCED":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="6-7",
+                wordsPerSentence="9-16",
+                reason="Webtoon mode for age 7-9 with ADVANCED difficulty uses more turns and layered emotions.",
+            )
+        if normalized == "INTERMEDIATE":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="5-6",
+                wordsPerSentence="8-14",
+                reason="Webtoon mode for age 7-9 with INTERMEDIATE difficulty uses varied dialogue and gentle detail.",
+            )
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="4-5",
+            wordsPerSentence="7-12",
+            reason="Webtoon mode for age 7-9 with BEGINNER difficulty keeps dialogue clear and direct.",
+        )
+    if normalized == "ADVANCED":
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="7-8",
+            wordsPerSentence="12-22",
+            reason="Webtoon mode for age 10+ with ADVANCED difficulty supports richer dialogue and emotion.",
+        )
+    if normalized == "INTERMEDIATE":
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="6-7",
+            wordsPerSentence="10-18",
+            reason="Webtoon mode for age 10+ with INTERMEDIATE difficulty uses fuller dialogue exchanges.",
+        )
+    return ReadingLevel(
+        basedOnAge=age,
+        sentencesPerPage="5-6",
+        wordsPerSentence="8-14",
+        reason="Webtoon mode for age 10+ with BEGINNER difficulty keeps wording accessible but fuller.",
+    )
+
+
+def _min_sentences_from_range(value: str) -> int:
+    try:
+        return int(value.split("-", 1)[0])
+    except (TypeError, ValueError):
+        return 4
 
 
 def _choose_page_count(photo_count: int, min_pages: int, max_pages: int) -> int:
