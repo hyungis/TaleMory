@@ -10,7 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { MousePointerClick, Sparkles, X } from 'lucide-react'
 import { useAuthSession } from '../../auth'
 import { ROUTES } from '../../../shared/constants'
-import { ONBOARDING_STEPS } from '../model/onboardingSteps'
+import { ONBOARDING_STEPS, type OnboardingStep } from '../model/onboardingSteps'
 import {
   hasSeenOnboardingPromptThisSession,
   markOnboardingPromptSeenThisSession,
@@ -30,8 +30,48 @@ interface ViewportSize {
   height: number
 }
 
+interface PanelStyle {
+  width: number
+  left: number
+  top: number
+  maxHeight: number
+}
+
+const PANEL_MARGIN = 16
+const PANEL_GAP = 14
+const PANEL_MIN_WIDTH = 280
+const PANEL_MAX_WIDTH = 360
+const PANEL_ESTIMATED_HEIGHT = 248
+
 function isEligiblePath(pathname: string): boolean {
   return pathname !== ROUTES.home && !pathname.startsWith('/auth/')
+}
+
+function isStepRoute(pathname: string, step: OnboardingStep): boolean {
+  const routeParts = step.route.split('/').filter(Boolean)
+  const pathParts = pathname.split('/').filter(Boolean)
+
+  if (routeParts.length !== pathParts.length) return false
+
+  return routeParts.every((part, index) => part.startsWith(':') || part === pathParts[index])
+}
+
+function getCreationPreviewStep(locationState: unknown): number | null {
+  if (typeof locationState !== 'object' || locationState === null) return null
+  if (!('onboardingPreviewStep' in locationState)) return null
+
+  const value = (locationState as { onboardingPreviewStep?: unknown }).onboardingPreviewStep
+  return typeof value === 'number' ? value : null
+}
+
+type ViewerPreviewMode = NonNullable<OnboardingStep['viewerPreviewMode']>
+
+function getViewerPreviewMode(locationState: unknown): ViewerPreviewMode | null {
+  if (typeof locationState !== 'object' || locationState === null) return null
+  if (!('onboardingViewerMode' in locationState)) return null
+
+  const value = (locationState as { onboardingViewerMode?: unknown }).onboardingViewerMode
+  return value === 'main' || value === 'book' || value === 'tools' ? value : null
 }
 
 export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
@@ -49,9 +89,11 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!auth.isAuthenticated || auth.user === null) {
-      setIsPromptOpen(false)
-      setIsTutorialActive(false)
-      return
+      const timeoutId = window.setTimeout(() => {
+        setIsPromptOpen(false)
+        setIsTutorialActive(false)
+      }, 0)
+      return () => window.clearTimeout(timeoutId)
     }
 
     if (isPromptOpen || isTutorialActive) return
@@ -60,14 +102,36 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     if (!isEligiblePath(location.pathname)) return
 
     markOnboardingPromptSeenThisSession(auth.user)
-    setIsPromptOpen(true)
+    const timeoutId = window.setTimeout(() => setIsPromptOpen(true), 0)
+    return () => window.clearTimeout(timeoutId)
   }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname])
 
   useEffect(() => {
     if (!isTutorialActive || activeStep === null) return
-    if (location.pathname === activeStep.route) return
-    navigate(activeStep.route)
-  }, [activeStep, isTutorialActive, location.pathname, navigate])
+    const previewStep = getCreationPreviewStep(location.state)
+    const viewerPreviewMode = getViewerPreviewMode(location.state)
+    const needsPreviewState =
+      activeStep.route === ROUTES.creation &&
+      activeStep.previewStep !== undefined &&
+      previewStep !== activeStep.previewStep
+    const needsViewerState =
+      activeStep.viewerPreviewMode !== undefined &&
+      viewerPreviewMode !== activeStep.viewerPreviewMode
+
+    if (isStepRoute(location.pathname, activeStep) && !needsPreviewState && !needsViewerState) return
+
+    const navigationOptions =
+      activeStep.route === ROUTES.creation
+        ? { replace: true, state: { onboardingPreview: true, onboardingPreviewStep: activeStep.previewStep } }
+        : activeStep.viewerPreviewMode !== undefined
+          ? { replace: true, state: { onboardingViewerMode: activeStep.viewerPreviewMode } }
+          : undefined
+
+    navigate(
+      activeStep.route,
+      navigationOptions,
+    )
+  }, [activeStep, isTutorialActive, location.pathname, location.state, navigate])
 
   const closeTutorialForSession = useCallback(() => {
     setIsPromptOpen(false)
@@ -79,7 +143,8 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   const completeTutorial = useCallback(() => {
     writeOnboardingStatus(auth.user, 'completed')
     closeTutorialForSession()
-  }, [auth.user, closeTutorialForSession])
+    navigate(ROUTES.mainBookshelf, { replace: true })
+  }, [auth.user, closeTutorialForSession, navigate])
 
   const startTutorial = useCallback(() => {
     setIsPromptOpen(false)
@@ -100,7 +165,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   }, [activeIndex, completeTutorial])
 
   const updateTargetRect = useCallback(() => {
-    if (!isTutorialActive || activeStep === null || location.pathname !== activeStep.route) {
+    if (!isTutorialActive || activeStep === null || !isStepRoute(location.pathname, activeStep)) {
       setTargetRect(null)
       return
     }
@@ -125,7 +190,6 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!isTutorialActive || activeStep === null) return
 
-    updateTargetRect()
     const rafId = window.requestAnimationFrame(updateTargetRect)
     const intervalId = window.setInterval(updateTargetRect, 400)
     const observer = new MutationObserver(updateTargetRect)
@@ -143,35 +207,31 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     }
   }, [activeStep, isTutorialActive, updateTargetRect])
 
-  useEffect(() => {
-    if (!isTutorialActive || activeStep === null) return
-
-    const handleTargetClick = (event: MouseEvent) => {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (target.closest('[data-onboarding-action]')) return
-      if (!target.closest(activeStep.selector)) return
-
-      window.setTimeout(advanceTutorial, 120)
-    }
-
-    document.addEventListener('click', handleTargetClick, true)
-    return () => document.removeEventListener('click', handleTargetClick, true)
-  }, [activeStep, advanceTutorial, isTutorialActive])
-
   const panelStyle = useMemo(() => {
     if (targetRect === null || viewport.width === 0 || viewport.height === 0) return null
 
-    const width = Math.min(360, Math.max(280, viewport.width - 32))
-    const left = Math.min(
-      Math.max(16, targetRect.left),
-      Math.max(16, viewport.width - width - 16),
+    const width = Math.min(
+      PANEL_MAX_WIDTH,
+      Math.max(PANEL_MIN_WIDTH, viewport.width - PANEL_MARGIN * 2),
     )
-    const belowTop = targetRect.top + targetRect.height + 14
-    const aboveTop = targetRect.top - 176
-    const top = belowTop + 156 <= viewport.height ? belowTop : Math.max(16, aboveTop)
+    const maxLeft = Math.max(PANEL_MARGIN, viewport.width - width - PANEL_MARGIN)
+    const left = Math.min(Math.max(PANEL_MARGIN, targetRect.left), maxLeft)
 
-    return { width, left, top }
+    const panelHeight = Math.min(PANEL_ESTIMATED_HEIGHT, viewport.height - PANEL_MARGIN * 2)
+    const maxTop = Math.max(PANEL_MARGIN, viewport.height - panelHeight - PANEL_MARGIN)
+    const belowTop = targetRect.top + targetRect.height + PANEL_GAP
+    const aboveTop = targetRect.top - panelHeight - PANEL_GAP
+    const hasRoomBelow = belowTop + panelHeight <= viewport.height - PANEL_MARGIN
+    const hasRoomAbove = aboveTop >= PANEL_MARGIN
+    const preferredTop = hasRoomBelow
+      ? belowTop
+      : hasRoomAbove
+        ? aboveTop
+        : belowTop
+    const top = Math.min(Math.max(PANEL_MARGIN, preferredTop), maxTop)
+    const maxHeight = Math.max(180, viewport.height - top - PANEL_MARGIN)
+
+    return { width, left, top, maxHeight }
   }, [targetRect, viewport])
 
   return (
@@ -191,6 +251,8 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
           totalSteps={ONBOARDING_STEPS.length}
           title={activeStep.title}
           description={activeStep.description}
+          isLastStep={activeIndex === ONBOARDING_STEPS.length - 1}
+          onNext={advanceTutorial}
           onSkip={closeTutorialForSession}
         />
       )}
@@ -225,6 +287,7 @@ function OnboardingPrompt({
         style={{
           width: '100%',
           maxWidth: 420,
+          boxSizing: 'border-box',
           background: '#fff9e8',
           border: '2px solid #9a7548',
           borderRadius: 8,
@@ -263,7 +326,7 @@ function OnboardingPrompt({
               처음이시네요. 튜토리얼을 진행할까요?
             </h2>
             <p style={{ margin: 0, color: '#5f4b34', fontSize: 17, lineHeight: 1.5 }}>
-              메인 화면, 동화책 목록, 동화책 만들기까지 핵심 버튼을 차례대로 눌러볼 수 있게 안내해드릴게요.
+              메인 화면, 책장, 동화책 만들기 흐름의 핵심 영역을 차례대로 보여드릴게요.
             </p>
           </div>
         </div>
@@ -314,14 +377,18 @@ function OnboardingSpotlight({
   totalSteps,
   title,
   description,
+  isLastStep,
+  onNext,
   onSkip,
 }: {
   rect: TargetRect
-  panelStyle: { width: number; left: number; top: number }
+  panelStyle: PanelStyle
   stepNumber: number
   totalSteps: number
   title: string
   description: string
+  isLastStep: boolean
+  onNext: () => void
   onSkip: () => void
 }) {
   return createPortal(
@@ -332,7 +399,7 @@ function OnboardingSpotlight({
           position: 'fixed',
           inset: 0,
           zIndex: 8800,
-          pointerEvents: 'none',
+          pointerEvents: 'auto',
         }}
       >
         <div
@@ -359,6 +426,9 @@ function OnboardingSpotlight({
           top: panelStyle.top,
           left: panelStyle.left,
           width: panelStyle.width,
+          maxHeight: panelStyle.maxHeight,
+          overflowY: 'auto',
+          boxSizing: 'border-box',
           background: '#fff9e8',
           border: '2px solid #9a7548',
           borderRadius: 8,
@@ -394,8 +464,27 @@ function OnboardingSpotlight({
               {description}
             </p>
             <p style={{ margin: '8px 0 0', fontSize: 15, fontWeight: 800, color: '#2d5a27' }}>
-              포커스된 영역을 눌러보세요.
+              확인했다면 다음으로 넘겨보세요.
             </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={onNext}
+                data-onboarding-action
+                style={{
+                  border: '2px solid #2d5a27',
+                  background: '#2d5a27',
+                  color: '#fff9e8',
+                  borderRadius: 999,
+                  padding: '8px 16px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 0 #1a3a14',
+                }}
+              >
+                {isLastStep ? '마치기' : '다음'}
+              </button>
+            </div>
           </div>
           <button
             type="button"

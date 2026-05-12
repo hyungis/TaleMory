@@ -19,7 +19,6 @@ interface InvitationCardProps {
  */
 export function InvitationCard({
   story,
-  isOwner: _isOwner,
   onOpenBook,
   onOpenWebtoon,
   onBack,
@@ -76,7 +75,7 @@ export function InvitationCard({
       </div>
 
       {/* 메인 영역 */}
-      <div className="iv-shell-inner">
+      <div className="iv-shell-inner" data-onboarding-target="viewer-main">
         {/* 표지 카드 */}
         <div className="iv-cover">
           <span className="iv-tape-l" aria-hidden="true" />
@@ -136,7 +135,12 @@ export function InvitationCard({
 
         {/* 모드 선택 */}
         <div className="iv-modes">
-          <button type="button" className="iv-mode iv-mode-book" onClick={onOpenBook}>
+          <button
+            type="button"
+            className="iv-mode iv-mode-book"
+            onClick={onOpenBook}
+            data-onboarding-target="viewer-open-book"
+          >
             <span className="iv-mode-corner" aria-hidden="true" />
             <div className="iv-mode-icon-circle" aria-hidden="true">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none">

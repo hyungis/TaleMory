@@ -16,6 +16,8 @@ import '../styles/story-book.css'
 interface StoryBookViewerProps {
   story: StoryView
   onExit: () => void
+  forceToolbarOpen?: boolean
+  initialPageIndex?: number
   /**
    * 'full' (기본): 일반 뷰어 — 사이드 툴바 / 전체화면 / 책갈피 / 글자크기 / 한글 토글 등 모든 도구 노출.
    * 'preview': About 페이지 미리보기 — 도구를 모두 숨기고 한글 해석은 항상 ON, localStorage 책갈피
@@ -69,7 +71,13 @@ const storageKeyBookmark = (storyId: StoryId) => `viewer-bookmark-${storyId}`
  * 책갈피·테마는 로그인 인프라 미완성이라 localStorage 에 저장. 추후 `/progress` API 연동 시
  * 별도 어댑터로 교체 가능.
  */
-export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewerProps) {
+export function StoryBookViewer({
+  story,
+  onExit,
+  forceToolbarOpen = false,
+  initialPageIndex,
+  mode = 'full',
+}: StoryBookViewerProps) {
   const isPreview = mode === 'preview'
   const pages: ViewerPage[] = useMemo(() => {
     /* BE 는 page_number=0(표지) + page_number=1..N(본문) scene 을 모두 내려준다.
@@ -112,6 +120,9 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
   /* pageIndex 도 책갈피 위치에서 시작. 책갈피 없으면 표지(0)부터.
      pages 길이 범위 체크 — 동화 내용이 변경돼 page 수가 줄었을 경우 안전. */
   const [pageIndex, setPageIndex] = useState(() => {
+    if (initialPageIndex !== undefined && initialPageIndex >= 0 && initialPageIndex < pages.length) {
+      return initialPageIndex
+    }
     if (bookmark !== null && bookmark >= 0 && bookmark < pages.length) {
       return bookmark
     }
@@ -157,7 +168,8 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
      storeBookmark 저장 effect 가 함께 발동해 localStorage 에서도 삭제. */
   useEffect(() => {
     if (pages[pageIndex]?.kind === 'backCover' && bookmark !== null) {
-      setBookmark(null)
+      const timeoutId = window.setTimeout(() => setBookmark(null), 0)
+      return () => window.clearTimeout(timeoutId)
     }
   }, [pageIndex, pages, bookmark])
 
@@ -259,6 +271,7 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
   }
 
   const current = pages[pageIndex]
+  const isToolbarVisible = forceToolbarOpen || isToolbarOpen
   const isCover = current.kind === 'cover'
   const isBackCover = current.kind === 'backCover'
   const shellClass = `sb-shell ${isCover ? 'is-cover' : ''} ${isBackCover ? 'is-back-cover' : ''}`.trim()
@@ -346,7 +359,7 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
         <>
           {/* 좌측 호버 트리거 — 사이드 탭 형태로 visible handle + pulse 애니메이션. */}
           <div
-            className={`sb-side-trigger${isToolbarOpen ? ' is-hidden' : ''}`}
+            className={`sb-side-trigger${isToolbarVisible ? ' is-hidden' : ''}`}
             onMouseEnter={openToolbar}
             onMouseLeave={scheduleToolbarClose}
             role="button"
@@ -360,7 +373,7 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
 
           {/* 사이드 툴바 */}
           <ViewerToolbar
-            isOpen={isToolbarOpen}
+            isOpen={isToolbarVisible}
             ttsMode={tts.status.mode}
             showTranslation={showTranslation}
             fontSize={fontSize}
@@ -391,6 +404,7 @@ export function StoryBookViewer({ story, onExit, mode = 'full' }: StoryBookViewe
       <div className={shellClass}>
         <div
           className="sb-spread"
+          data-onboarding-target="viewer-book"
           style={{
             opacity: isFading ? 0.35 : 1,
             transition: `opacity ${FADE_DURATION_MS}ms ease, border-radius ${FADE_DURATION_MS}ms ease, box-shadow ${FADE_DURATION_MS}ms ease`,
