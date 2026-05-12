@@ -3,9 +3,19 @@ from app.core.config import settings
 from app.services.storyboard_prompt import STORYBOARD_SYSTEM_PROMPT, WEBTOON_STORYBOARD_SYSTEM_PROMPT
 from app.services.storyboard_service import (
     _build_openai_webtoon_input_content,
+    _reconcile_webtoon_derived_counts,
     _to_gemini_json_schema,
+    _webtoon_reading_level_for_age_and_difficulty,
     generate_storyboard,
     generate_webtoon_storyboard,
+)
+from app.schemas.storyboard import (
+    ReadingLevel,
+    UsageInfo,
+    WebtoonCharacterInScene,
+    WebtoonStoryboardGenerateResponse,
+    WebtoonStoryboardPage,
+    WebtoonStorySentence,
 )
 
 
@@ -20,8 +30,22 @@ def test_storyboard_system_prompt_requires_rough_sketch_image_prompt() -> None:
 
 
 def test_webtoon_prompt_requires_multiple_sentences_per_page() -> None:
-    assert "Each page must contain at least 3 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "Use WEBTOON age+difficulty targets" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "Age 5-6 + BEGINNER: 4-5 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "Age 10-12 + ADVANCED: 7-8 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
     assert "Never return a page with only one sentence" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+
+
+def test_webtoon_prompt_rejects_dialogue_attribution_tags() -> None:
+    assert "must contain only the spoken words" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "she says" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "그녀는 말한다" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+
+
+def test_webtoon_prompt_requires_companion_dialogue_rhythm() -> None:
+    assert "The child should remain the primary speaker" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "include companion dialogue on several pages" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "Avoid making companions silent props" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
 
 
 def test_gemini_schema_inlines_defs_for_structured_output() -> None:
@@ -120,4 +144,108 @@ def test_local_webtoon_storyboard_uses_multiple_sentences_per_page() -> None:
 
     assert response.pages
     assert all(page.sentenceCount >= 3 for page in response.pages)
+
+
+def test_webtoon_reading_level_branches_by_age_and_difficulty() -> None:
+    beginner_young = _webtoon_reading_level_for_age_and_difficulty(5, "BEGINNER")
+    advanced_older = _webtoon_reading_level_for_age_and_difficulty(10, "ADVANCED")
+
+    assert beginner_young.sentencesPerPage == "4-5"
+    assert beginner_young.wordsPerSentence == "6-10"
+    assert advanced_older.sentencesPerPage == "7-8"
+    assert advanced_older.wordsPerSentence == "12-22"
+
+
+def test_local_webtoon_storyboard_uses_webtoon_reading_level() -> None:
+    request = StoryboardGenerateRequest.model_validate(
+        {
+            "storyId": 1,
+            "children": [{"name": "Haesol", "age": 10, "gender": "FEMALE"}],
+            "companions": ["Mom", "Dad"],
+            "travel": {
+                "place": "Waikiki",
+                "startDate": "2026-01-10",
+                "endDate": "2026-01-14",
+            },
+            "photos": [
+                {
+                    "photoId": 101,
+                    "description": "Haesol looked at the ocean during a family trip.",
+                    "hashtags": ["beach", "family"],
+                    "displayOrder": 1,
+                }
+            ],
+            "difficulty": "ADVANCED",
+        }
+    )
+
+    response = generate_webtoon_storyboard(request)
+
+    assert response.readingLevel.sentencesPerPage == "7-8"
+    assert response.readingLevel.wordsPerSentence == "12-22"
+    assert all(page.sentenceCount >= 7 for page in response.pages)
+
+
+def test_webtoon_reconcile_removes_dialogue_speaker_attribution() -> None:
+    response = WebtoonStoryboardGenerateResponse(
+        title="Test",
+        synopsis="Test",
+        moralTheme="bravery",
+        storyQuest="rest",
+        recurringMotif="family",
+        pageCount=1,
+        pageCountReason="test",
+        readingLevel=ReadingLevel(
+            basedOnAge=5,
+            sentencesPerPage="3-5",
+            wordsPerSentence="8-14",
+            reason="test",
+        ),
+        totalWordCount=0,
+        pages=[
+            WebtoonStoryboardPage(
+                pageNumber=1,
+                sourcePhotoIds=[105],
+                sceneSummary="Yujin needs rest.",
+                englishText="",
+                koreanText="",
+                imagePrompt="Yujin rests with Mom.",
+                charactersInScene=[
+                    WebtoonCharacterInScene(
+                        characterKey="이유진",
+                        sceneRole="resting",
+                        expectedPosition="center",
+                    )
+                ],
+                sentences=[
+                    WebtoonStorySentence(
+                        sentenceOrder=1,
+                        type="DIALOGUE",
+                        speakerKey="이유진",
+                        englishText="\"Mommy, I'm tired!\" she says.",
+                        koreanText="\"엄마, 쉬어야 해요!\" 그녀는 말한다.",
+                        emotion="SAD",
+                    )
+                ],
+                sentenceCount=1,
+                wordCount=0,
+            )
+        ],
+        usage=UsageInfo(
+            model="test",
+            inputTokens=0,
+            outputTokens=0,
+            totalTokens=0,
+            costUsd=0,
+            promptTemplateVersion="test",
+        ),
+    )
+
+    _reconcile_webtoon_derived_counts(response)
+
+    sentence = response.pages[0].sentences[0]
+    assert sentence.englishText == "Mommy, I'm tired!"
+    assert sentence.koreanText == "엄마, 쉬어야 해요!"
+    assert response.pages[0].englishText == "Mommy, I'm tired!"
+    assert response.pages[0].koreanText == "엄마, 쉬어야 해요!"
 
