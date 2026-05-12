@@ -2,6 +2,7 @@ import json
 import base64
 import logging
 import mimetypes
+import re
 from functools import lru_cache
 from itertools import cycle, islice
 from urllib import error as url_error
@@ -605,12 +606,42 @@ def _reconcile_webtoon_derived_counts(parsed: WebtoonStoryboardGenerateResponse)
                 sentence.type = "NARRATION"
             if sentence.type == "NARRATION":
                 sentence.speakerKey = "narrator"
+            if sentence.type == "DIALOGUE":
+                _normalize_webtoon_dialogue_sentence(sentence)
         page.sentenceCount = len(page.sentences)
         page.englishText = " ".join(sentence.englishText.strip() for sentence in page.sentences).strip()
         page.koreanText = " ".join(sentence.koreanText.strip() for sentence in page.sentences).strip()
         page.wordCount = _count_words(page.englishText)
     parsed.pageCount = len(parsed.pages)
     parsed.totalWordCount = sum(page.wordCount for page in parsed.pages)
+
+
+_ENGLISH_SPEAKER_TAG_RE = re.compile(
+    r"\s*,?\s*(?:she|he|they|mommy|mom|dad|daddy|mother|father|[A-Z][A-Za-z]*)\s+"
+    r"(?:says?|said|asks?|asked|whispers?|whispered|shouts?|shouted|cries?|cried|replies?|replied)\.?\s*$",
+    re.IGNORECASE,
+)
+_KOREAN_SPEAKER_TAG_RE = re.compile(
+    r"\s*(?:라고|하고)?\s*(?:그녀|그|그는|그녀는|엄마|아빠|[가-힣A-Za-z]+(?:이|가|은|는)?)\s*"
+    r"(?:말한다|말했다|말해요|말했어요|말하죠|묻는다|물었다|물어요|외친다|외쳤다|외쳐요|"
+    r"속삭인다|속삭였다|대답한다|대답했다)\.?\s*$"
+)
+_DOUBLE_QUOTED_TEXT_RE = re.compile(r"[\"“]([^\"“”]+)[\"”]")
+_SINGLE_QUOTED_TEXT_RE = re.compile(r"'([^']+)'")
+
+
+def _normalize_webtoon_dialogue_sentence(sentence: WebtoonStorySentence) -> None:
+    sentence.englishText = _spoken_text_only(sentence.englishText, korean=False)
+    sentence.koreanText = _spoken_text_only(sentence.koreanText, korean=True)
+
+
+def _spoken_text_only(text: str, *, korean: bool) -> str:
+    stripped = text.strip()
+    quoted = _DOUBLE_QUOTED_TEXT_RE.search(stripped) or _SINGLE_QUOTED_TEXT_RE.search(stripped)
+    if quoted:
+        return quoted.group(1).strip()
+    pattern = _KOREAN_SPEAKER_TAG_RE if korean else _ENGLISH_SPEAKER_TAG_RE
+    return pattern.sub("", stripped).strip()
 
 
 def _call_gemini_storyboard_api(
