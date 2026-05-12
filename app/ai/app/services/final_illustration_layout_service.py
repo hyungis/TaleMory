@@ -1,4 +1,6 @@
 import base64
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 import json
 from urllib import error, parse, request
@@ -18,6 +20,15 @@ from app.services.storyboard_image_service import (
     _resolve_public_url,
 )
 
+logger = logging.getLogger(__name__)
+
+# Gemini Vision 좌표 추출 자동 재시도 정책.
+# 대상: HTTP timeout / 5xx / network error / JSON 파싱 실패 같은 일시적 (transient) 실패.
+# 결정적 실패 (candidates=[]) 는 정상 응답이라 retry 효과 없음 — BE 의 _layoutFailed[] +
+# viewer owner 재시도 배너로 별도 cover.
+LAYOUT_MAX_ATTEMPTS = 3
+LAYOUT_RETRY_BASE_BACKOFF_SEC = 1.0  # 1s → 2s → 4s
+
 
 def analyze_final_illustration_layout(
     request_model: FinalIllustrationLayoutAnalysisRequest,
@@ -26,15 +37,45 @@ def analyze_final_illustration_layout(
         raise RuntimeError("GEMINI_API_KEY is not configured")
 
     model = settings.FINAL_ILLUSTRATION_LAYOUT_MODEL
-    response = _call_gemini_layout_api(request_model, model)
-    data = _extract_gemini_json(response)
-    data.setdefault("pageNumber", request_model.pageNumber)
-    data.setdefault("model", model)
-    try:
-        parsed = FinalIllustrationLayoutAnalysisResponse.model_validate(data)
-    except ValidationError as exc:
-        raise ValueError(f"Gemini layout analysis returned invalid JSON: {exc}") from exc
-    return parsed.model_copy(update={"model": model})
+    page_number = request_model.pageNumber
+    last_exc: Exception | None = None
+
+    for attempt in range(1, LAYOUT_MAX_ATTEMPTS + 1):
+        try:
+            response = _call_gemini_layout_api(request_model, model)
+            data = _extract_gemini_json(response)
+            data.setdefault("pageNumber", page_number)
+            data.setdefault("model", model)
+            try:
+                parsed = FinalIllustrationLayoutAnalysisResponse.model_validate(data)
+            except ValidationError as exc:
+                raise ValueError(f"Gemini layout analysis returned invalid JSON: {exc}") from exc
+
+            if attempt > 1:
+                logger.info(
+                    "[LAYOUT:RETRY:OK] page=%s attempt=%d/%d",
+                    page_number, attempt, LAYOUT_MAX_ATTEMPTS,
+                )
+            return parsed.model_copy(update={"model": model})
+
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= LAYOUT_MAX_ATTEMPTS:
+                logger.warning(
+                    "[LAYOUT:RETRY:GIVEUP] page=%s attempts=%d error=%s",
+                    page_number, attempt, exc,
+                )
+                raise
+            backoff = LAYOUT_RETRY_BASE_BACKOFF_SEC * (2 ** (attempt - 1))
+            logger.warning(
+                "[LAYOUT:RETRY] page=%s attempt=%d/%d error=%s backoff=%.1fs",
+                page_number, attempt, LAYOUT_MAX_ATTEMPTS, exc, backoff,
+            )
+            time.sleep(backoff)
+
+    # for 루프는 성공 return 또는 마지막 attempt 의 raise 로 빠져나가므로 도달 불가.
+    # 안전장치만.
+    raise last_exc if last_exc is not None else RuntimeError("layout analysis failed")
 
 
 def analyze_final_illustration_layouts(

@@ -105,7 +105,6 @@ data class SentenceResponse(
     val koreanText: String?,
     val ttsAudioUrl: String?,
     val speakerKey: String?,
-    val bubbleSlot: String?,
     val hasHighlighted: Boolean,
     /**
      * 사용자가 녹음한 강조 문장 audio URL (활성 row 기준).
@@ -175,7 +174,6 @@ data class SentenceViewResponse(
     val koreanText: String?,
     val ttsAudioUrl: String?,
     val speakerKey: String?,
-    val bubbleSlot: String?
 )
 
 data class OutroViewResponse(
@@ -188,11 +186,23 @@ data class MainCharacterView(
     val name: String?
 )
 
+/**
+ * scene.character_anchors JSON 배열 원소.
+ *
+ * WEBTOON 모드: WebtoonLayoutResultHandler 가 AI Vision 결과로 페이지별 캐릭터 anchor 를 채운다.
+ *  - `name`        : sentence.speakerKey 와 매칭되는 캐릭터 식별자 (FE lookup 키).
+ *  - `x`, `y`      : anchor 점 (정규화 0~1, 머리 위 살짝 위 지점).
+ *  - `confidence`  : AI Vision 신뢰도 (0~1).
+ *
+ * 레거시 필드 (`characterId`, `scale`) 는 사용처 없어 nullable 로 유지 — 후속 정리 lane.
+ */
 data class CharacterAnchorView(
-    val characterId: PersonId?,
-    val x: Double?,
-    val y: Double?,
-    val scale: Double?
+    val name: String? = null,
+    val x: Double? = null,
+    val y: Double? = null,
+    val confidence: Double? = null,
+    val characterId: PersonId? = null,
+    val scale: Double? = null,
 )
 
 /**

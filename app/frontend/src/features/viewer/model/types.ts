@@ -4,19 +4,37 @@
  */
 import type { PersonId, SceneId, SentenceId, StoryId } from '../../../shared/types'
 
-export type BubbleSlot =
-  | 'TOP_LEFT' | 'TOP_CENTER' | 'TOP_RIGHT'
-  | 'MIDDLE_LEFT' | 'MIDDLE_CENTER' | 'MIDDLE_RIGHT'
-  | 'BOTTOM_LEFT' | 'BOTTOM_CENTER' | 'BOTTOM_RIGHT'
+/**
+ * 정규화된 좌표 (0~1) — 이미지 전체에 대한 비율로 표현되는 anchor 점.
+ * BE `AnchorPoint` 와 1:1 매핑. NARRATION fallback / 임시 위치 표현용.
+ */
+export interface AnchorPoint {
+  x: number
+  y: number
+}
 
 export interface MainCharacterView {
   name: string | null
 }
 
+/**
+ * scene.character_anchors JSON 배열 원소 — 페이지별 캐릭터 anchor.
+ *
+ * 매칭 규약: FE 는 `sentence.speakerKey === characterAnchor.name` 으로 lookup.
+ * NARRATION (sentence.speakerKey == null) → fallback (top center).
+ *
+ * 레거시 필드 (`characterId`, `scale`) 는 BE 호환을 위해 nullable 로 유지.
+ */
 export interface CharacterAnchorView {
-  characterId: PersonId | null
+  /** sentence.speakerKey 와 매칭되는 키. WEBTOON 모드에서 채워짐. */
+  name: string | null
   x: number | null
   y: number | null
+  /** AI Vision 신뢰도 0~1. */
+  confidence: number | null
+  /** Legacy. 사용처 없음. */
+  characterId: PersonId | null
+  /** Legacy. 사용처 없음. */
   scale: number | null
 }
 
@@ -27,7 +45,6 @@ export interface SentenceView {
   koreanText: string | null
   ttsAudioUrl: string | null
   speakerKey: string | null
-  bubbleSlot: BubbleSlot | null
 }
 
 export interface SceneView {

@@ -184,6 +184,8 @@ RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY=ai.image.final-illustration.layou
 RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY=ai.image.final-illustration.layout.item
 RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY=ai.result.final-illustration.layout.completed
 RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY=ai.result.final-illustration.layout.failed
+
+FINAL_ILLUSTRATION_LAYOUT_MODEL=gemini-3-flash-preview
 ```
 
 - [x] `ENV_DEV_APP_ENV_FILE` 업로드 완료
@@ -386,6 +388,8 @@ RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY=ai.image.final-illustration.layou
 RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY=ai.image.final-illustration.layout.item
 RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY=ai.result.final-illustration.layout.completed
 RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY=ai.result.final-illustration.layout.failed
+
+FINAL_ILLUSTRATION_LAYOUT_MODEL=gemini-3-flash-preview
 ```
 
 - [x] `ENV_MASTER_APP_ENV_FILE` 업로드 완료

@@ -165,7 +165,6 @@ class StoryViewerService(
             koreanText = sentence.koreanText,
             ttsAudioUrl = highlightAudioMap[sentence.id] ?: sentence.ttsAudioUrl,
             speakerKey = sentence.speakerKey,
-            bubbleSlot = sentence.bubbleSlot?.name,
         )
     }
 

@@ -20,7 +20,6 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryOutroReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryVoiceAssignmentRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
-import com.s210.backend.domain.story.model.BubbleSlot
 import com.s210.backend.domain.story.model.StoryMode
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.tts.application.TtsCacheService
@@ -129,12 +128,15 @@ class StoryConfirmService(
         val pagesNode = payloadTree.get("pages")
             ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
 
-        // page_number → sentences[] 매핑
+        // page_number → sentences[] 매핑.
+        //
+        // 좌표는 storyboard JSON 에서 읽지 않는다 — WEBTOON 모드는 최종 삽화가 만들어진 후
+        // WebtoonLayoutResultListener 가 AI Vision 결과의 anchor 좌표를 scene.character_anchors 에
+        // 채우고, VIEWER 모드는 좌표를 사용하지 않는다. 여기서는 텍스트/스피커만 평탄화한다.
         data class SentenceInput(
             val englishText: String,
             val koreanText: String?,
             val speakerKey: String?,
-            val bubbleSlot: BubbleSlot?,
         )
         val pageToSentences: Map<Int, List<SentenceInput>> = pagesNode.associate { node ->
             val pageNumber = node.get("pageNumber").asInt()
@@ -147,8 +149,6 @@ class StoryConfirmService(
                             englishText = it.get("englishText")?.asText() ?: "",
                             koreanText = it.get("koreanText")?.asText(),
                             speakerKey = it.get("speakerKey")?.asText()?.takeIf(String::isNotBlank),
-                            bubbleSlot = it.get("bubbleSlot")?.asText()?.takeIf(String::isNotBlank)
-                                ?.let { slot -> runCatching { BubbleSlot.valueOf(slot.uppercase()) }.getOrNull() },
                         )
                     )
                 }
@@ -206,7 +206,6 @@ class StoryConfirmService(
                             koreanText = s.koreanText,
                             ttsAudioUrl = null,
                             speakerKey = s.speakerKey,
-                            bubbleSlot = s.bubbleSlot,
                             hasHighlighted = false,
                         )
                     )
