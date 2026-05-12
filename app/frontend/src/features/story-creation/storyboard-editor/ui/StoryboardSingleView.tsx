@@ -8,6 +8,12 @@ import {
   type WebtoonCharacterInScene,
 } from '../../storyboard-pages'
 
+const KOREAN_TEXT_STYLE = {
+  fontFamily: "'Gaegu', 'Nanum Pen Script', cursive",
+  fontWeight: 700,
+  letterSpacing: 0,
+} as const
+
 interface StoryboardSingleViewProps {
   pages: StoryboardPageDraft[]
   index: number
@@ -129,7 +135,8 @@ export function StoryboardSingleView({
                       value={page.ko}
                       onChange={e => onPageUpdate(index, { ko: e.target.value })}
                       rows={3}
-                      className="w-full text-[#8b7a52] text-lg bg-transparent border-none focus:outline-none resize-none font-sans"
+                      className="w-full text-[#8b7a52] text-lg bg-transparent border-none focus:outline-none resize-none"
+                      style={KOREAN_TEXT_STYLE}
                     />
                   </div>
                 </div>

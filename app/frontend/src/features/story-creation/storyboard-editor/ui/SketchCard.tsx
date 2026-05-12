@@ -2,6 +2,12 @@ import type { StoryboardPageDraft } from '../../model/types'
 import { getPageIcon } from '../../../../shared/lib'
 import { IllustrationMockup } from '../../../../shared/ui'
 
+const KOREAN_TEXT_STYLE = {
+  fontFamily: "'Gaegu', 'Nanum Pen Script', cursive",
+  fontWeight: 700,
+  letterSpacing: 0,
+} as const
+
 interface SketchCardProps {
   page: StoryboardPageDraft
   size?: 'sm' | 'lg'
@@ -46,7 +52,8 @@ export function SketchCard({ page, size = 'sm' }: SketchCardProps) {
           style={{ filter: 'drop-shadow(0 2px 3px rgba(0, 0, 0, 0.18))' }}
         />
         <p
-          className={`text-[#2d5a27] font-sans font-bold ${isLarge ? 'text-xl' : 'text-base'} leading-relaxed`}
+          className={`text-[#2d5a27] ${isLarge ? 'text-xl' : 'text-base'} leading-relaxed`}
+          style={KOREAN_TEXT_STYLE}
         >
           {page.sketch}
         </p>

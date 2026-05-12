@@ -1,6 +1,12 @@
 import { MessageCircle, MessageSquareText, Users } from 'lucide-react'
 import type { StoryboardSentenceItem, WebtoonCharacterInScene } from '../api/types'
 
+const KOREAN_TEXT_STYLE = {
+  fontFamily: "'Gaegu', 'Nanum Pen Script', cursive",
+  fontWeight: 700,
+  letterSpacing: 0,
+} as const
+
 interface WebtoonDialoguePreviewProps {
   /**
    * BE 응답의 sentences. 각 원소가 type/speakerKey 를 갖고 있을 때만 webtoon 모드로 인식.
@@ -86,6 +92,7 @@ function SentenceLine({ sentence, textLang }: SentenceLineProps) {
   const text = textLang === 'ko' ? sentence.koreanText : sentence.englishText
   const isDialogue = sentence.type === 'DIALOGUE'
   const speaker = sentence.speakerKey
+  const textStyle = textLang === 'ko' ? KOREAN_TEXT_STYLE : undefined
 
   if (isDialogue) {
     return (
@@ -94,7 +101,7 @@ function SentenceLine({ sentence, textLang }: SentenceLineProps) {
           <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
           {speaker ?? '?'}
         </span>
-        <p className="flex-1 text-[#2d5a27] text-lg leading-relaxed">
+        <p className="flex-1 text-[#2d5a27] text-lg leading-relaxed" style={textStyle}>
           {text}
         </p>
       </div>
@@ -108,7 +115,7 @@ function SentenceLine({ sentence, textLang }: SentenceLineProps) {
         <MessageSquareText className="w-3.5 h-3.5" aria-hidden="true" />
         나레이션
       </span>
-      <p className="flex-1 text-[#8b7a52] italic text-base leading-relaxed">
+      <p className="flex-1 text-[#8b7a52] italic text-base leading-relaxed" style={textStyle}>
         {text}
       </p>
     </div>

@@ -2,6 +2,12 @@ import { ArrowRight, X } from 'lucide-react'
 import type { StoryboardPageDraft } from '../../model/types'
 import { SketchCard } from './SketchCard'
 
+const KOREAN_TEXT_STYLE = {
+  fontFamily: "'Gaegu', 'Nanum Pen Script', cursive",
+  fontWeight: 700,
+  letterSpacing: 0,
+} as const
+
 interface PagePreviewModalProps {
   previewIndex: number | null
   pages: StoryboardPageDraft[]
@@ -53,7 +59,7 @@ export function PagePreviewModal({
         </div>
 
         <div className="bg-[#e8ddb4] p-5 rounded-2xl border-2 border-[#8b7a52]/40 mb-5">
-          <p className="text-[#2d5a27] text-lg font-sans leading-relaxed">{p.ko}</p>
+          <p className="text-[#2d5a27] text-lg leading-relaxed" style={KOREAN_TEXT_STYLE}>{p.ko}</p>
         </div>
 
         <div className="flex justify-end">
