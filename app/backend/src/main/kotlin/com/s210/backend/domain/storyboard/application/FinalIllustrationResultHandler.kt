@@ -8,6 +8,7 @@ import com.s210.backend.common.transaction.afterCommit
 import com.s210.backend.domain.job.entity.StoryGenerationJob
 import com.s210.backend.domain.job.infrastructure.repository.StoryGenerationJobRepository
 import com.s210.backend.domain.job.model.JobStatus
+import com.s210.backend.domain.story.application.HighlightOutroService
 import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.model.StoryMode
@@ -37,6 +38,7 @@ class FinalIllustrationResultHandler(
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val storyRepository: StoryRepository,
     private val webtoonLayoutPublisher: WebtoonLayoutPublisher,
+    private val highlightOutroService: HighlightOutroService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -85,6 +87,33 @@ class FinalIllustrationResultHandler(
             if (isWebtoon && !alreadyLayoutPublished) {
                 fullPayload[META_LAYOUT_PUBLISHED] = true
                 job.status = JobStatus.RUNNING
+
+                // 좌표 batch publish 직전에 scenes/scene_sentences 영속화 보장.
+                // 사용자가 Step 7(prepareScenes) 진입 전에 final illustration 결과가 모두 도착하면
+                // scenes 가 비어있어 layout 결과 핸들러가 `scene not found` 로 anchor 저장 못 하는
+                // race 가 발생. 여기서 같은 트랜잭션 안에 scenes 를 INSERT 해두면 afterCommit
+                // 으로 publish 된 layout 결과가 도착할 때 항상 scene lookup 성공.
+                // ensurePrepared 는 멱등 — Step 7 에서 이미 만들었어도 안전.
+                runCatching { highlightOutroService.ensurePrepared(job.storyId) }
+                    .onSuccess { result ->
+                        log.info(
+                            "[FINAL_ILLUST:RES] scenes ensured before layout publish — jobId={}, storyId={}, scenes={}, sentences={}, alreadyPrepared={}",
+                            job.id, job.storyId, result.sceneCount, result.sentenceCount, result.alreadyPrepared,
+                        )
+                    }
+                    .onFailure { e ->
+                        // scenes 영속화 실패 시 layout publish 도 의미 없음 — 잡을 RUNNING 유지하고
+                        // (사용자가 Step 7 수동 진입 시 prepareScenes 가 다시 시도) layout publish 만 스킵.
+                        log.error(
+                            "[FINAL_ILLUST:RES] ensurePrepared failed jobId={} storyId={}: {}",
+                            job.id, job.storyId, e.message, e,
+                        )
+                        job.resultPayload = objectMapper.writeValueAsString(fullPayload.also {
+                            it.remove(META_LAYOUT_PUBLISHED)
+                        })
+                        return
+                    }
+
                 // afterCommit 으로 미뤄 — DB 미반영 상태에서 publish 했다가 결과 envelope 가 빠르게
                 // 돌아와 lock 충돌 / 중복 publish 가능성을 닫는다. resultPayload 의 `_layoutPublished`
                 // 는 같은 tx 에서 commit 되므로 중복 success 콜백은 위 멱등 가드로 차단.
