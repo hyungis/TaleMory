@@ -132,6 +132,7 @@ class StoryConfirmService(
         // page_number → sentences[] 매핑
         data class SentenceInput(
             val englishText: String,
+            val ttsText: String?,
             val koreanText: String?,
             val speakerKey: String?,
             val bubbleSlot: BubbleSlot?,
@@ -145,6 +146,7 @@ class StoryConfirmService(
                     result.add(
                         SentenceInput(
                             englishText = it.get("englishText")?.asText() ?: "",
+                            ttsText = it.get("ttsText")?.asText()?.takeIf(String::isNotBlank),
                             koreanText = it.get("koreanText")?.asText(),
                             speakerKey = it.get("speakerKey")?.asText()?.takeIf(String::isNotBlank),
                             bubbleSlot = it.get("bubbleSlot")?.asText()?.takeIf(String::isNotBlank)
@@ -204,6 +206,7 @@ class StoryConfirmService(
                             sentenceOrder = idx + 1,
                             englishText = s.englishText,
                             koreanText = s.koreanText,
+                            ttsText = s.ttsText,
                             ttsAudioUrl = null,
                             speakerKey = s.speakerKey,
                             bubbleSlot = s.bubbleSlot,
@@ -287,13 +290,17 @@ class StoryConfirmService(
         fun voiceProfileIdFor(sentence: SceneSentence): Long =
             sentence.speakerKey?.let { assignments[it]?.voiceProfileId } ?: defaultVoiceProfileId
 
+        fun speechTextFor(sentence: SceneSentence): String =
+            sentence.ttsText?.takeIf { it.isNotBlank() } ?: sentence.englishText
+
         var cacheHits = 0
         val missSentences = mutableListOf<TtsSentenceItem>()
 
         allSentences.forEach { sentence ->
             val sentenceVoiceProfileId = voiceProfileIdFor(sentence)
+            val speechText = speechTextFor(sentence)
             val cachedUrl = try {
-                ttsCacheService.lookup(sentenceVoiceProfileId, sentence.englishText)
+                ttsCacheService.lookup(sentenceVoiceProfileId, speechText)
             } catch (e: Exception) {
                 log.warn("TTS cache lookup failed for sentence {}: {}", sentence.id, e.message)
                 null
@@ -306,6 +313,7 @@ class StoryConfirmService(
                     TtsSentenceItem(
                         sentenceId = sentence.id,
                         text = sentence.englishText,
+                        ttsText = sentence.ttsText,
                         speakerKey = sentence.speakerKey,
                     )
                 )

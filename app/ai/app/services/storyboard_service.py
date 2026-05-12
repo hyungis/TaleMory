@@ -590,6 +590,8 @@ def _reconcile_derived_counts(parsed: StoryboardGenerateResponse) -> None:
         page.pageNumber = page_index
         for sentence_index, sentence in enumerate(page.sentences, start=1):
             sentence.sentenceOrder = sentence_index
+            if not sentence.ttsText:
+                sentence.ttsText = sentence.englishText
         page.sentenceCount = len(page.sentences)
         page.wordCount = _count_words(page.englishText)
     parsed.pageCount = len(parsed.pages)
@@ -605,6 +607,8 @@ def _reconcile_webtoon_derived_counts(parsed: WebtoonStoryboardGenerateResponse)
                 sentence.type = "NARRATION"
             if sentence.type == "NARRATION":
                 sentence.speakerKey = "narrator"
+            if not sentence.ttsText:
+                sentence.ttsText = sentence.englishText
         page.sentenceCount = len(page.sentences)
         page.englishText = " ".join(sentence.englishText.strip() for sentence in page.sentences).strip()
         page.koreanText = " ".join(sentence.koreanText.strip() for sentence in page.sentences).strip()
@@ -1074,6 +1078,7 @@ def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStor
                 type="NARRATION",
                 speakerKey="narrator",
                 englishText=first_sentence.englishText,
+                ttsText=first_sentence.ttsText or first_sentence.englishText,
                 koreanText=first_sentence.koreanText,
                 emotion=first_sentence.emotion,
             ),
@@ -1082,6 +1087,7 @@ def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStor
                 type="DIALOGUE",
                 speakerKey=primary_speaker,
                 englishText=_local_dialogue_for_page(page.pageNumber, primary_speaker),
+                ttsText=_local_dialogue_for_page(page.pageNumber, primary_speaker),
                 koreanText=_local_dialogue_for_page(page.pageNumber, primary_speaker),
                 emotion="EXCITED" if page.pageNumber == 1 else "CURIOUS",
             ),
@@ -1090,6 +1096,7 @@ def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStor
                 type="DIALOGUE",
                 speakerKey=secondary_speaker,
                 englishText=middle_sentence.englishText,
+                ttsText=middle_sentence.ttsText or middle_sentence.englishText,
                 koreanText=middle_sentence.koreanText,
                 emotion=middle_sentence.emotion,
             ),
@@ -1098,6 +1105,7 @@ def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStor
                 type="DIALOGUE",
                 speakerKey=primary_speaker,
                 englishText=last_sentence.englishText,
+                ttsText=last_sentence.ttsText or last_sentence.englishText,
                 koreanText=last_sentence.koreanText,
                 emotion=last_sentence.emotion,
             ),
@@ -1352,7 +1360,7 @@ def _sentences_for_page(
         emotions = ["BRAVE", "CURIOUS", "CALM", "CURIOUS"]
 
     return [
-        StorySentence(sentenceOrder=index, englishText=en, koreanText=ko, emotion=emotion)
+        StorySentence(sentenceOrder=index, englishText=en, ttsText=en, koreanText=ko, emotion=emotion)
         for index, (en, ko, emotion) in enumerate(zip(english, korean, emotions), start=1)
     ]
 

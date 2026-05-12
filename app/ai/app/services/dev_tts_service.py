@@ -207,6 +207,13 @@ def _duration_ms_from_audio(audio_bytes: bytes, audio_format: str, fallback_text
     return int(max(1000, min(6000, len(fallback_text) * 80)))
 
 
+def _speech_text(sentence: dict[str, Any]) -> str:
+    tts_text = sentence.get("ttsText")
+    if isinstance(tts_text, str) and tts_text.strip():
+        return tts_text.strip()
+    return str(sentence["text"]).strip()
+
+
 def _audio_content_type(audio_format: str) -> str:
     if audio_format == "wav":
         return "audio/wav"
@@ -515,7 +522,7 @@ def generate_story_tts_result(
         )
         engine_started = perf_counter()
         audio_results = _synthesize_tts_batch(
-            texts=[sentence["text"] for sentence in group],
+            texts=[_speech_text(sentence) for sentence in group],
             prompt_wav_path=reference_path,
             audio_format=output_format,
             language=request.get("language"),
@@ -536,6 +543,7 @@ def generate_story_tts_result(
         emotion = sentence.get("emotion") or default_emotion
         style_prompt = sentence.get("stylePrompt") or default_style_prompt
         speaker_key = sentence.get("speakerKey")
+        speech_text = _speech_text(sentence)
         sentence_started = perf_counter()
         audio_bytes, resolved_format, sentence_voice_id, engine_elapsed = audio_by_sentence_id[sentence_id]
         sentence_path = (
@@ -558,7 +566,7 @@ def generate_story_tts_result(
             sentence_id,
             index,
             len(sentences),
-            len(sentence["text"]),
+            len(speech_text),
             len(audio_bytes),
             engine_elapsed,
             store_elapsed,
@@ -576,7 +584,7 @@ def generate_story_tts_result(
                 "audio": {
                     "audioUrl": stored_sentence.url,
                     "s3Key": stored_sentence.key,
-                    "durationMs": _duration_ms_from_audio(audio_bytes, resolved_format, sentence["text"]),
+                    "durationMs": _duration_ms_from_audio(audio_bytes, resolved_format, speech_text),
                     "format": resolved_format,
                 },
             }
