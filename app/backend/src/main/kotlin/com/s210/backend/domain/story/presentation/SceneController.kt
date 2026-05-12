@@ -10,6 +10,7 @@ import com.s210.backend.domain.story.application.HighlightOutroService
 import com.s210.backend.domain.story.application.SceneIllustrationService
 import com.s210.backend.domain.story.application.StoryProgressService
 import com.s210.backend.domain.story.application.StoryService
+import com.s210.backend.domain.storyboard.application.WebtoonLayoutRetryService
 import com.s210.backend.domain.story.presentation.request.BgmRequest
 import com.s210.backend.domain.story.presentation.request.HighlightVoiceCommitRequest
 import com.s210.backend.domain.story.presentation.request.IllustrationRegenerateRequest
@@ -47,6 +48,7 @@ class SceneController(
     private val storyService: StoryService,
     private val highlightOutroService: HighlightOutroService,
     private val sceneIllustrationService: SceneIllustrationService,
+    private val webtoonLayoutRetryService: WebtoonLayoutRetryService,
 ) {
 
     // 동화 씬(페이지) 목록 조회
@@ -377,5 +379,30 @@ class SceneController(
     ): ResponseEntity<Unit> {
         storyProgressService.removeProgress(user.username, storyId.value)
         return ResponseEntity.noContent().build()
+    }
+
+    /**
+     * WEBTOON 모드 한정 — 좌표 추출 실패 페이지 사용자 수동 재시도.
+     *
+     * 호출 시점: 뷰어에서 `sentence.bubbleSlot == null` 인 페이지의 [좌표 다시 추출] 버튼.
+     * 응답: 새로 발행된 (또는 재사용된) WEBTOON_LAYOUT_RETRY 잡의 jobId — FE 가 polling 으로 재시도 결과 추적.
+     */
+    @PostMapping("/webtoon-layout/retry")
+    fun webtoonLayoutRetry(
+        @PathVariable storyId: StoryId,
+        @RequestParam pageNumber: Int,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<IllustrationRegenerateResponse>> {
+        val result = webtoonLayoutRetryService.retryPage(
+            userId = user.userId,
+            storyId = storyId.value,
+            pageNumber = pageNumber,
+        )
+        return ResponseEntity.accepted().body(
+            ApiResponse(data = IllustrationRegenerateResponse(
+                jobId = JobId(result.jobId),
+                status = result.status,
+            ))
+        )
     }
 }

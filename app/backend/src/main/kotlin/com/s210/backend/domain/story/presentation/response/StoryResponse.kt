@@ -6,6 +6,7 @@ import com.s210.backend.common.codec.SceneId
 import com.s210.backend.common.codec.SentenceId
 import com.s210.backend.common.codec.StoryId
 import com.s210.backend.common.codec.VoiceProfileId
+import com.s210.backend.domain.story.model.AnchorPoint
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -105,7 +106,11 @@ data class SentenceResponse(
     val koreanText: String?,
     val ttsAudioUrl: String?,
     val speakerKey: String?,
-    val bubbleSlot: String?,
+    /**
+     * WEBTOON 모드 한정. 말풍선/캡션 anchor 좌표 `{"x": 0~1, "y": 0~1}`.
+     * VIEWER 모드 또는 좌표 추출 실패 시 null — FE 는 null 이면 기본 위치로 렌더하거나 재시도 버튼 노출.
+     */
+    val bubbleSlot: AnchorPoint?,
     val hasHighlighted: Boolean,
     /**
      * 사용자가 녹음한 강조 문장 audio URL (활성 row 기준).
@@ -175,7 +180,11 @@ data class SentenceViewResponse(
     val koreanText: String?,
     val ttsAudioUrl: String?,
     val speakerKey: String?,
-    val bubbleSlot: String?
+    /**
+     * WEBTOON 모드 한정. 말풍선/캡션 anchor 좌표 `{"x": 0~1, "y": 0~1}`.
+     * VIEWER 모드는 항상 null. WEBTOON 모드에서도 좌표 추출 실패 시 null 가능 → FE 는 fallback 위치 렌더 + 재시도 노출.
+     */
+    val bubbleSlot: AnchorPoint?,
 )
 
 data class OutroViewResponse(

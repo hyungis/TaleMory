@@ -32,4 +32,13 @@ enum class JobType {
 
     /** Storyboard page Korean text edit -> AI English sentence translation. */
     STORY_SENTENCE_TRANSLATION,
+
+    /**
+     * WEBTOON 모드 한정 — 사용자가 좌표 추출 실패 페이지를 수동 재시도할 때 발행되는 단건 잡.
+     *
+     * 정상 흐름의 layout 추출은 FINAL_ILLUSTRATION 잡 내에서 처리되어 별도 잡 row 가 없다 (Option A,
+     * 단일 jobId). 다만 페이지별 부분 실패가 발생해 SceneSentence.bubbleSlot 이 NULL 로 남은 경우
+     * 사용자가 [좌표 다시 추출] 버튼을 눌러 단일 페이지 재시도 큐에 publish — 그 추적용 잡.
+     */
+    WEBTOON_LAYOUT_RETRY,
 }

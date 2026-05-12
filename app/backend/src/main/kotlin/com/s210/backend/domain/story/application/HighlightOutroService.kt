@@ -18,7 +18,7 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryOutroRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
-import com.s210.backend.domain.story.model.BubbleSlot
+import com.s210.backend.domain.story.model.AnchorPoint
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.OutroResponse
@@ -81,6 +81,9 @@ class HighlightOutroService(
         if (metadataPages.isEmpty()) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
+        // bubbleSlot(좌표 JSON) 은 prepareScenes 단계에선 채우지 않는다 — WEBTOON 모드는
+        // 최종 삽화 생성 후 WebtoonLayoutResultListener 가 AI Vision 결과로 채우고,
+        // VIEWER 모드는 영구 null. 여기선 speakerKey 만 백필한다.
         val sentenceMetadataByPageAndOrder = metadataPages.flatMap { page ->
             val sentencesJson = page.sentences ?: return@flatMap emptyList()
             val sentencesArr = runCatching { objectMapper.readTree(sentencesJson) }.getOrNull()
@@ -89,8 +92,7 @@ class HighlightOutroService(
             sentencesArr.mapIndexed { idx, node ->
                 val sentenceOrder = node.get("sentenceOrder")?.asInt() ?: (idx + 1)
                 val speakerKey = node.get("speakerKey")?.asText()?.takeIf(String::isNotBlank)
-                val bubbleSlot = parseBubbleSlot(node.get("bubbleSlot")?.asText())
-                (page.pageNumber to sentenceOrder) to (speakerKey to bubbleSlot)
+                (page.pageNumber to sentenceOrder) to speakerKey
             }
         }.toMap()
 
@@ -102,14 +104,10 @@ class HighlightOutroService(
             val pageNumberBySceneId = existingScenes.associate { it.id to it.pageNumber }
             existingSentences.forEach { sentence ->
                 val pageNumber = pageNumberBySceneId[sentence.sceneId] ?: return@forEach
-                val metadata = sentenceMetadataByPageAndOrder[pageNumber to sentence.sentenceOrder]
+                val speakerKey = sentenceMetadataByPageAndOrder[pageNumber to sentence.sentenceOrder]
                     ?: return@forEach
-                val (speakerKey, bubbleSlot) = metadata
                 if (sentence.speakerKey.isNullOrBlank()) {
                     sentence.speakerKey = speakerKey
-                }
-                if (sentence.bubbleSlot == null) {
-                    sentence.bubbleSlot = bubbleSlot
                 }
             }
             return ScenesPrepareResult(
@@ -149,7 +147,6 @@ class HighlightOutroService(
                 val englishText = node.get("englishText")?.asText().orEmpty()
                 val koreanText = node.get("koreanText")?.asText()
                 val speakerKey = node.get("speakerKey")?.asText()?.takeIf(String::isNotBlank)
-                val bubbleSlot = parseBubbleSlot(node.get("bubbleSlot")?.asText())
                 sceneSentenceRepository.save(
                     SceneSentence(
                         sceneId = scene.id,
@@ -158,7 +155,9 @@ class HighlightOutroService(
                         koreanText = koreanText,
                         ttsAudioUrl = null,
                         speakerKey = speakerKey,
-                        bubbleSlot = bubbleSlot,
+                        // bubbleSlot 은 prepare 시점엔 항상 null. WEBTOON 모드는 최종 삽화 후 별도 layout
+                        // 잡이 anchor 좌표 JSON 으로 채우고, VIEWER 모드는 영구 null.
+                        bubbleSlot = null,
                         hasHighlighted = false,
                     ),
                 )
@@ -175,9 +174,14 @@ class HighlightOutroService(
 
     // ── 씬 목록 조회 ──
 
-    private fun parseBubbleSlot(value: String?): BubbleSlot? =
-        value?.takeIf(String::isNotBlank)
-            ?.let { runCatching { BubbleSlot.valueOf(it.uppercase()) }.getOrNull() }
+    /**
+     * `scene_sentences.bubble_slot` 컬럼의 raw JSON `{"x": 0~1, "y": 0~1}` 을
+     * [AnchorPoint] VO 로 역직렬화. 컬럼이 비었거나 형식이 어긋나면 null 반환.
+     */
+    private fun parseAnchorPoint(json: String?): AnchorPoint? {
+        if (json.isNullOrBlank()) return null
+        return runCatching { objectMapper.readValue(json, AnchorPoint::class.java) }.getOrNull()
+    }
 
     @Transactional(readOnly = true)
     fun findScenes(storyId: Long): List<SceneResponse> {
@@ -214,7 +218,7 @@ class HighlightOutroService(
                         koreanText = s.koreanText,
                         ttsAudioUrl = s.ttsAudioUrl,
                         speakerKey = s.speakerKey,
-                        bubbleSlot = s.bubbleSlot?.name,
+                        bubbleSlot = parseAnchorPoint(s.bubbleSlot),
                         hasHighlighted = s.hasHighlighted,
                         highlightVoiceUrl = highlightVoiceBySentenceId[s.id],
                     )

@@ -16,6 +16,7 @@ import com.s210.backend.domain.story.infrastructure.repository.SceneRepository
 import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryOutroRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
+import com.s210.backend.domain.story.model.AnchorPoint
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.story.presentation.response.CharacterAnchorView
 import com.s210.backend.domain.story.presentation.response.MainCharacterView
@@ -165,8 +166,17 @@ class StoryViewerService(
             koreanText = sentence.koreanText,
             ttsAudioUrl = highlightAudioMap[sentence.id] ?: sentence.ttsAudioUrl,
             speakerKey = sentence.speakerKey,
-            bubbleSlot = sentence.bubbleSlot?.name,
+            bubbleSlot = parseAnchorPoint(sentence.bubbleSlot),
         )
+    }
+
+    /**
+     * `scene_sentences.bubble_slot` raw JSON `{"x": 0~1, "y": 0~1}` 을 [AnchorPoint] 로 역직렬화.
+     * 컬럼이 비었거나 형식 오류면 null 반환 — FE 는 fallback 위치 렌더 + 재시도 노출.
+     */
+    private fun parseAnchorPoint(json: String?): AnchorPoint? {
+        if (json.isNullOrBlank()) return null
+        return runCatching { objectMapper.readValue(json, AnchorPoint::class.java) }.getOrNull()
     }
 
     private fun toOutroView(outro: StoryOutro): OutroViewResponse {
