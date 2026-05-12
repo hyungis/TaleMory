@@ -11,8 +11,9 @@ interface Props {
   onSave: (draft: PersonDraft) => void
 }
 
-const MIN_AGE = 0
-const MAX_AGE = 99
+const MIN_AGE = 1
+const MAX_AGE = 18
+const INTEGER_PATTERN = /^\d+$/
 
 /**
  * 주인공 추가/편집 모달 — paper-craft 톤.
@@ -33,8 +34,9 @@ export function PersonEditModal({ initial, onClose, onSave }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!gender) return
-    const parsedAge = Number.parseInt(age, 10)
-    if (!Number.isFinite(parsedAge) || parsedAge < MIN_AGE || parsedAge > MAX_AGE) return
+    if (!INTEGER_PATTERN.test(age.trim())) return
+    const parsedAge = Number(age.trim())
+    if (!Number.isInteger(parsedAge) || parsedAge < MIN_AGE || parsedAge > MAX_AGE) return
     onSave({
       name: name.trim(),
       age: parsedAge,
@@ -136,16 +138,23 @@ function AgeInput({
     onChange(String(next))
   }
 
+  const handleChange = (next: string) => {
+    if (next === '' || INTEGER_PATTERN.test(next)) {
+      onChange(next)
+    }
+  }
+
   return (
     <div className="mp-age-wrap">
       <input
         type="number"
         inputMode="numeric"
+        step={1}
         min={MIN_AGE}
         max={MAX_AGE}
         placeholder="예: 5"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         className="mp-input"
       />
       <div className="mp-age-steppers">
