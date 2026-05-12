@@ -45,12 +45,6 @@ export interface SentenceView {
   koreanText: string | null
   ttsAudioUrl: string | null
   speakerKey: string | null
-  /**
-   * @deprecated WEBTOON 좌표는 더 이상 sentence 레벨에 저장되지 않는다.
-   * `SceneView.characterAnchors` 에서 `speakerKey` 로 lookup 해서 사용.
-   * 본 필드는 BE 호환을 위해 남겨두되 FE 코드는 참조하지 않는다.
-   */
-  bubbleSlot: AnchorPoint | null
 }
 
 export interface SceneView {

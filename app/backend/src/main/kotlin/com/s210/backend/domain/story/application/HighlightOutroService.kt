@@ -18,7 +18,6 @@ import com.s210.backend.domain.story.infrastructure.repository.StoryBoardReposit
 import com.s210.backend.domain.story.infrastructure.repository.StoryOutroRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
-import com.s210.backend.domain.story.model.AnchorPoint
 import com.s210.backend.domain.story.model.StoryStatus
 import com.s210.backend.domain.story.presentation.response.HighlightVoiceResponse
 import com.s210.backend.domain.story.presentation.response.OutroResponse
@@ -73,7 +72,25 @@ class HighlightOutroService(
         if (story.status != StoryStatus.DRAFT) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
+        return prepareScenesInternal(storyId)
+    }
 
+    /**
+     * [prepareScenes] 의 검증(소유권/DRAFT) 빠진 internal 변형.
+     *
+     * 호출자: [FinalIllustrationResultHandler] — 최종 삽화 잡이 모든 페이지 도착해
+     *  좌표 추출 batch 를 publish 하기 직전, scenes/scene_sentences 가 없으면 만들어둔다.
+     *  사용자가 Step 7 진입(prepareScenes) 을 안 한 상태에서 layout 결과가 먼저 도착하는
+     *  race(`scene not found`) 를 원천 차단.
+     *
+     *  - jobId 로 이미 storyId 신뢰 컨텍스트가 확보된 호출 — 추가 검증 불필요.
+     *  - 멱등 동일: 이미 scenes 가 있으면 INSERT 스킵 + speakerKey 만 백필.
+     */
+    fun ensurePrepared(storyId: Long): ScenesPrepareResult {
+        return prepareScenesInternal(storyId)
+    }
+
+    private fun prepareScenesInternal(storyId: Long): ScenesPrepareResult {
         val metadataStoryBoard = storyBoardRepository
             .findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
             ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
@@ -81,9 +98,8 @@ class HighlightOutroService(
         if (metadataPages.isEmpty()) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
-        // bubbleSlot(좌표 JSON) 은 prepareScenes 단계에선 채우지 않는다 — WEBTOON 모드는
-        // 최종 삽화 생성 후 WebtoonLayoutResultListener 가 AI Vision 결과로 채우고,
-        // VIEWER 모드는 영구 null. 여기선 speakerKey 만 백필한다.
+        // 좌표는 sentence 레벨에 저장하지 않는다 — WEBTOON 모드는 scene.character_anchors JSON 에서
+        // speakerKey 로 lookup. 여기선 speakerKey 만 백필한다.
         val sentenceMetadataByPageAndOrder = metadataPages.flatMap { page ->
             val sentencesJson = page.sentences ?: return@flatMap emptyList()
             val sentencesArr = runCatching { objectMapper.readTree(sentencesJson) }.getOrNull()
@@ -155,9 +171,6 @@ class HighlightOutroService(
                         koreanText = koreanText,
                         ttsAudioUrl = null,
                         speakerKey = speakerKey,
-                        // bubbleSlot 은 prepare 시점엔 항상 null. WEBTOON 모드는 최종 삽화 후 별도 layout
-                        // 잡이 anchor 좌표 JSON 으로 채우고, VIEWER 모드는 영구 null.
-                        bubbleSlot = null,
                         hasHighlighted = false,
                     ),
                 )
@@ -173,15 +186,6 @@ class HighlightOutroService(
     }
 
     // ── 씬 목록 조회 ──
-
-    /**
-     * `scene_sentences.bubble_slot` 컬럼의 raw JSON `{"x": 0~1, "y": 0~1}` 을
-     * [AnchorPoint] VO 로 역직렬화. 컬럼이 비었거나 형식이 어긋나면 null 반환.
-     */
-    private fun parseAnchorPoint(json: String?): AnchorPoint? {
-        if (json.isNullOrBlank()) return null
-        return runCatching { objectMapper.readValue(json, AnchorPoint::class.java) }.getOrNull()
-    }
 
     @Transactional(readOnly = true)
     fun findScenes(storyId: Long): List<SceneResponse> {
@@ -218,7 +222,6 @@ class HighlightOutroService(
                         koreanText = s.koreanText,
                         ttsAudioUrl = s.ttsAudioUrl,
                         speakerKey = s.speakerKey,
-                        bubbleSlot = parseAnchorPoint(s.bubbleSlot),
                         hasHighlighted = s.hasHighlighted,
                         highlightVoiceUrl = highlightVoiceBySentenceId[s.id],
                     )

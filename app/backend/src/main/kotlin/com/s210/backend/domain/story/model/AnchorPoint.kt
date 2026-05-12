@@ -3,15 +3,10 @@ package com.s210.backend.domain.story.model
 /**
  * 정규화된 좌표 (0~1) — 이미지 전체에 대한 비율로 표현되는 anchor 점.
  *
- * 사용처:
- *   - SceneSentence.bubbleSlot (WEBTOON 모드 한정. 말풍선/캡션의 표시 위치).
- *     · NARRATION 문장: 백엔드가 (0.5, 0.05) 로 고정 주입 — top center.
- *     · DIALOGUE 문장: AI Vision 이 추출한 캐릭터 머리 위 anchor 좌표.
- *
- * VIEWER 모드 row 는 항상 null 로 유지된다.
- *
- * 영속화 형식: JSON `{"x": 0~1, "y": 0~1}` (scene_sentences.bubble_slot 컬럼).
- * 애플리케이션 레이어에서 ObjectMapper 로 직렬화/역직렬화.
+ * 사용처: WEBTOON 모드 layout 메시지 DTO 의 캐릭터 anchor 점 표현용.
+ * 페이지 단위 캐릭터 좌표는 `scene.character_anchors` JSON 배열 (CharacterAnchorView)
+ * 로 영속화되며, FE 가 sentence.speakerKey 로 lookup 해서 말풍선 위치를 결정한다.
+ * NARRATION (speakerKey 없음) 은 FE 측 fallback (top center) 으로 처리.
  */
 data class AnchorPoint(
     val x: Double,

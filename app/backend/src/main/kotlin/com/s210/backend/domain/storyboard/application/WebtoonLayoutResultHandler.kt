@@ -28,7 +28,7 @@ import java.time.LocalDateTime
  * 좌표 영속화 (data model):
  *  - 페이지 단위로 [scene.character_anchors] JSON 배열에 `[{name, x, y, confidence}, ...]` 저장.
  *    1 캐릭터 = 1 anchor — 같은 페이지에서 같은 캐릭터의 여러 문장은 같은 anchor 를 공유.
- *  - sentence 레벨엔 좌표를 박지 않는다 (sentence.bubble_slot 은 deprecated, 항상 null 유지).
+ *  - sentence 레벨엔 좌표를 박지 않는다 (구 sentence.bubble_slot 컬럼은 V23 에서 DROP).
  *  - FE 가 sentence.speakerKey 로 scene.character_anchors[].name 을 lookup 해서 위치 결정.
  *    NARRATION (speakerKey 없음) → FE fallback (top center).
  *
@@ -184,8 +184,8 @@ class WebtoonLayoutResultHandler(
      *  - `_layoutFailed` (List<Int>) : 좌표 추출 실패 페이지 — 사용자 수동 재시도 후보.
      *
      * 마감 정책: failed 페이지가 섞여있어도 잡 status 는 SUCCESS — 사용자에게 동화는 보여주되
-     * 부분 페이지만 재시도 가능하도록. 모두 실패하면 FE 가 SUCCESS+sentence.bubbleSlot=NULL 신호로
-     * 재시도 버튼을 모든 페이지에 노출.
+     * 부분 페이지만 재시도 가능하도록. 모두 실패하면 FE 가 scene.character_anchors 가 비어있는
+     * 신호로 재시도 버튼을 모든 페이지에 노출.
      */
     @Suppress("UNCHECKED_CAST")
     private fun markPageDone(job: StoryGenerationJob, pageNumber: Int, failed: Boolean) {

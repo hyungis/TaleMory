@@ -384,7 +384,7 @@ class SceneController(
     /**
      * WEBTOON 모드 한정 — 좌표 추출 실패 페이지 사용자 수동 재시도.
      *
-     * 호출 시점: 뷰어에서 `sentence.bubbleSlot == null` 인 페이지의 [좌표 다시 추출] 버튼.
+     * 호출 시점: 뷰어에서 scene.character_anchors 가 비거나 매칭 실패한 페이지의 [좌표 다시 추출] 버튼.
      * 응답: 새로 발행된 (또는 재사용된) WEBTOON_LAYOUT_RETRY 잡의 jobId — FE 가 polling 으로 재시도 결과 추적.
      */
     @PostMapping("/webtoon-layout/retry")

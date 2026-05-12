@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional
  * WEBTOON 모드 좌표 추출 사용자 수동 재시도 서비스.
  *
  * 트리거 시점:
- *  뷰어에서 특정 페이지의 sentence.bubbleSlot 이 NULL 이라 fallback 위치로 표시되는 경우,
- *  사용자가 [좌표 다시 추출] 버튼을 눌러 단일 페이지 재시도.
+ *  뷰어에서 특정 페이지의 scene.character_anchors 가 비거나 매칭 실패해 fallback 위치로 표시되는
+ *  경우, 사용자가 [좌표 다시 추출] 버튼을 눌러 단일 페이지 재시도.
  *
  * 정책:
  *  - 소유권 검증 (story.userId == userId).

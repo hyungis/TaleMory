@@ -17,7 +17,7 @@ interface StoryWebtoonViewerProps {
  * 레이아웃:
  *  - 세로 스크롤 피드 — 페이지 = 1장의 일러스트 + 말풍선/캡션 오버레이.
  *  - 페이지마다 [재생] 버튼 → useWebtoonAudio 가 sentence 순차 재생, 활성 sentence 강조.
- *  - sentence.bubbleSlot 이 null 인 페이지는 본인 동화일 때 [좌표 다시 추출] 배너 노출.
+ *  - scene.characterAnchors 매칭 실패한 페이지는 본인 동화일 때 [좌표 다시 추출] 배너 노출.
  *
  * 뷰어 진입은 ViewerPage 의 popup window 에서 ?mode=webtoon 로 호출.
  */

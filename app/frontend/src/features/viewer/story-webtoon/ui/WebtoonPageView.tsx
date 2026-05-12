@@ -63,7 +63,7 @@ export function WebtoonPageView({
     try {
       const result = await retryWebtoonLayout(storyId, scene.pageNumber)
       onRetryRequested(scene.sceneId, result.jobId as unknown as string)
-      // 잡은 방금 큐에 들어갔을 뿐 — 결과 envelope 가 도착해 sentence.bubbleSlot 이 채워지면
+      // 잡은 방금 큐에 들어갔을 뿐 — 결과 envelope 가 도착해 scene.characterAnchors 가 채워지면
       // 사용자가 페이지 새로고침해서 확인. 여기선 단순 토글만 처리.
       setRetryStatus('idle')
     } catch {

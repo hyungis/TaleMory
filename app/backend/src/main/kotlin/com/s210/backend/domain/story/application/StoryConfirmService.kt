@@ -130,9 +130,9 @@ class StoryConfirmService(
 
         // page_number → sentences[] 매핑.
         //
-        // bubbleSlot(좌표) 은 storyboard JSON 에서 읽지 않는다 — WEBTOON 모드는 최종 삽화가 만들어진 후
-        // WebtoonLayoutResultListener 가 AI Vision 결과의 anchor 좌표로 채우고,
-        // VIEWER 모드는 항상 null 이다. 여기서는 텍스트/스피커만 평탄화한다.
+        // 좌표는 storyboard JSON 에서 읽지 않는다 — WEBTOON 모드는 최종 삽화가 만들어진 후
+        // WebtoonLayoutResultListener 가 AI Vision 결과의 anchor 좌표를 scene.character_anchors 에
+        // 채우고, VIEWER 모드는 좌표를 사용하지 않는다. 여기서는 텍스트/스피커만 평탄화한다.
         data class SentenceInput(
             val englishText: String,
             val koreanText: String?,
@@ -206,9 +206,6 @@ class StoryConfirmService(
                             koreanText = s.koreanText,
                             ttsAudioUrl = null,
                             speakerKey = s.speakerKey,
-                            // bubbleSlot 은 confirm 시점엔 항상 null. WEBTOON 모드는 최종 삽화 생성 후
-                            // WebtoonLayoutResultListener 가 anchor 좌표 JSON 으로 채우고, VIEWER 모드는 영구 null.
-                            bubbleSlot = null,
                             hasHighlighted = false,
                         )
                     )

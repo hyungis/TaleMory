@@ -4,8 +4,8 @@ import type { AnchorPoint, SentenceView } from '../../model/types'
 interface WebtoonBubbleProps {
   sentence: SentenceView
   /**
-   * 좌표 — sentence.bubbleSlot 가 있으면 그 값, 없으면 fallback (top center).
-   * 이미지 box 기준 정규화 0~1.
+   * 좌표 — scene.characterAnchors 에서 sentence.speakerKey 로 lookup 한 값,
+   * 매칭 실패 또는 NARRATION 이면 fallback (top center). 이미지 box 기준 정규화 0~1.
    */
   position: AnchorPoint
   isActive: boolean
