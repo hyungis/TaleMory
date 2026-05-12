@@ -44,7 +44,7 @@ const PANEL_MAX_WIDTH = 360
 const PANEL_ESTIMATED_HEIGHT = 248
 
 function isEligiblePath(pathname: string): boolean {
-  return pathname !== ROUTES.home && !pathname.startsWith('/auth/')
+  return pathname !== '/auth' && !pathname.startsWith('/auth/')
 }
 
 function isStepRoute(pathname: string, step: OnboardingStep): boolean {

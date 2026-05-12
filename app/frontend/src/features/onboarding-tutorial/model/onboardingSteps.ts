@@ -106,7 +106,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'viewer-main',
-    route: '/viewer/onboarding-preview',
+    route: ROUTES.onboardingViewerPreview,
     viewerPreviewMode: 'main',
     selector: '[data-onboarding-target="viewer-main"]',
     title: '동화책 뷰어 시작',
@@ -114,7 +114,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'viewer-open-book',
-    route: '/viewer/onboarding-preview',
+    route: ROUTES.onboardingViewerPreview,
     viewerPreviewMode: 'main',
     selector: '[data-onboarding-target="viewer-open-book"]',
     title: '동화책 모드 열기',
@@ -122,7 +122,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'viewer-book',
-    route: '/viewer/onboarding-preview',
+    route: ROUTES.onboardingViewerPreview,
     viewerPreviewMode: 'book',
     selector: '[data-onboarding-target="viewer-book"]',
     title: '메인 동화책 뷰어',
@@ -130,7 +130,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'viewer-tools',
-    route: '/viewer/onboarding-preview',
+    route: ROUTES.onboardingViewerPreview,
     viewerPreviewMode: 'tools',
     selector: '[data-onboarding-target="viewer-tools"]',
     title: '읽기 도구 패널',

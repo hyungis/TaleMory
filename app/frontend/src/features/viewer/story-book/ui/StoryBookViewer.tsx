@@ -166,14 +166,14 @@ export function StoryBookViewer({
 
   /* 책을 다 읽으면(= 뒷표지 도달) 책갈피 자동 해제.
      storeBookmark 저장 effect 가 함께 발동해 localStorage 에서도 삭제. */
-  useEffect(() => {
-    if (pages[pageIndex]?.kind === 'backCover' && bookmark !== null) {
-      const timeoutId = window.setTimeout(() => setBookmark(null), 0)
-      return () => window.clearTimeout(timeoutId)
-    }
-  }, [pageIndex, pages, bookmark])
-
   const isBusy = flip !== null || coverFlip !== null || isFading
+
+  const moveToPage = (target: number) => {
+    if (pages[target]?.kind === 'backCover' && bookmark !== null) {
+      setBookmark(null)
+    }
+    setPageIndex(target)
+  }
 
   const goTo = (target: number) => {
     if (isBusy) return
@@ -204,7 +204,7 @@ export function StoryBookViewer({
       setCoverFlip({ kind, phase })
       // 표지가 edge-on 으로 보이지 않는 중간 시점에 underlying content 를 swap.
       swapTimerRef.current = window.setTimeout(() => {
-        setPageIndex(target)
+        moveToPage(target)
       }, FLIP_DURATION_MS / 2)
       return
     }
@@ -213,7 +213,7 @@ export function StoryBookViewer({
       // 그 외 (cover ↔ backCover) — 기본 fade
       setIsFading(true)
       window.setTimeout(() => {
-        setPageIndex(target)
+        moveToPage(target)
         window.setTimeout(() => setIsFading(false), FADE_DURATION_MS / 2)
       }, FADE_DURATION_MS / 2)
       return
@@ -221,7 +221,7 @@ export function StoryBookViewer({
 
     setFlip({ direction, fromPageIndex: pageIndex, toPageIndex: target })
     swapTimerRef.current = window.setTimeout(() => {
-      setPageIndex(target)
+      moveToPage(target)
     }, FLIP_DURATION_MS / 2)
   }
 

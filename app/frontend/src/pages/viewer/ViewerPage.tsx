@@ -76,7 +76,7 @@ export function ViewerPage() {
   const { storyId } = useParams<{ storyId: string }>()
   const location = useLocation()
 
-  if (storyId === 'onboarding-preview') {
+  if (location.pathname === ROUTES.onboardingViewerPreview) {
     return <OnboardingViewerPreview mode={getOnboardingViewerMode(location.state)} />
   }
 
