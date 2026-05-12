@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ImageIcon, Pause, Play, RefreshCw } from 'lucide-react'
 import type { SceneId, SentenceId, StoryId } from '../../../../shared/types'
 import type { AnchorPoint, SceneView } from '../../model/types'
@@ -16,14 +16,18 @@ interface WebtoonPageViewProps {
   onRetryRequested: (sceneId: SceneId, jobId: string | number) => void
 }
 
-/** sentence.bubbleSlot 이 null 일 때 사용할 fallback 좌표 — top-center. */
+/** NARRATION sentence 또는 매칭 실패 시 fallback 좌표 — top-center. */
 const FALLBACK_ANCHOR: AnchorPoint = { x: 0.5, y: 0.05 }
 
 /**
  * 단일 페이지 뷰 — 이미지 + 말풍선 오버레이 + 페이지 액션 (재생 / 재시도).
  *
- * 부분 실패 (sentence.bubbleSlot == null) 가 있는 페이지는 본인 동화일 때 한해
- * [좌표 다시 추출] 배너를 노출 — 공개 공유 링크 (isOwner=false) 에서는 숨김.
+ * 좌표 lookup 흐름:
+ *  - sentence.speakerKey == null (NARRATION)  → fallback (top center)
+ *  - sentence.speakerKey 가 scene.characterAnchors[].name 에 있음 → 해당 anchor
+ *  - sentence.speakerKey 매칭 실패 (DIALOGUE 인데 anchor 없음) → fallback + 재시도 배너 노출
+ *
+ * isOwner=true 인 경우만 재시도 배너 활성. 공개 공유 링크는 항상 숨김.
  */
 export function WebtoonPageView({
   storyId,
@@ -35,8 +39,23 @@ export function WebtoonPageView({
   onTogglePlay,
   onRetryRequested,
 }: WebtoonPageViewProps) {
-  const hasMissingAnchor =
-    scene.sentences.some(s => s.bubbleSlot == null && s.speakerKey)
+  // scene.characterAnchors[] → Map<name, AnchorPoint> 로 인덱싱 (sentence 마다 매번 find 안 하도록).
+  const anchorByName = useMemo(() => {
+    const map = new Map<string, AnchorPoint>()
+    for (const a of scene.characterAnchors) {
+      if (a.name && a.x != null && a.y != null) {
+        map.set(a.name, { x: a.x, y: a.y })
+      }
+    }
+    return map
+  }, [scene.characterAnchors])
+
+  // DIALOGUE 인데 anchor 매칭 실패한 sentence 가 하나라도 있으면 재시도 배너 노출.
+  const hasMissingAnchor = useMemo(
+    () => scene.sentences.some(s => s.speakerKey != null && !anchorByName.has(s.speakerKey)),
+    [scene.sentences, anchorByName],
+  )
+
   const [retryStatus, setRetryStatus] = useState<'idle' | 'pending' | 'failed'>('idle')
 
   const handleRetry = async () => {
@@ -86,7 +105,11 @@ export function WebtoonPageView({
         )}
 
         {scene.sentences.map(sentence => {
-          const position = sentence.bubbleSlot ?? FALLBACK_ANCHOR
+          // speakerKey 가 있으면 scene.characterAnchors 에서 lookup, 없으면(NARRATION) fallback.
+          // 매칭 실패 (DIALOGUE 인데 anchor 없음) 도 fallback — 재시도 배너로 사용자에게 알림.
+          const position = sentence.speakerKey
+            ? (anchorByName.get(sentence.speakerKey) ?? FALLBACK_ANCHOR)
+            : FALLBACK_ANCHOR
           return (
             <WebtoonBubble
               key={sentence.sentenceId}

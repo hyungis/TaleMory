@@ -2067,3 +2067,189 @@
   font-size: 21px;
   margin-bottom: 4px;
 }
+
+/* =====================================================================
+ * Step 8 WEBTOON 모드 — sentence 별 dialogue 카드
+ * VIEWER 모드는 영향 없음. WEBTOON 모드일 때 BookSpread 우측 페이지가
+ * 합본 텍스트 대신 sentence 카드 리스트로 분기됨.
+ * ===================================================================== */
+
+.cr-spread-webtoon {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 페이지 전체 순차 재생 바 — 카드 리스트 위에 살짝 떨어져서 노출. */
+.cr-spread-page-play-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.cr-spread-page-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #fdf6dc;
+  border: 2px solid var(--cr-sage-deep);
+  color: var(--cr-sage-deep);
+  border-radius: 999px;
+  font-family: var(--cr-font-pen);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+  box-shadow: 0 2px 0 var(--cr-sage-darker);
+}
+.cr-spread-page-play:hover { transform: translateY(-1px); }
+.cr-spread-page-play.is-active {
+  background: var(--cr-sage-deep);
+  color: #fdf6dc;
+}
+.cr-spread-page-stop {
+  font-family: var(--cr-font-pen);
+  font-size: 13px;
+  color: var(--cr-ink-soft);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.cr-spread-webtoon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  /* 우측 페이지 영역 안에서 자연스럽게 스크롤. 너무 많은 sentence 도 대응. */
+  max-height: clamp(360px, calc(100vh - 360px), 520px);
+  padding-right: 4px;
+}
+
+/* 개별 sentence 카드 — paper-craft 톤. is-active 면 sage glow 로 현재 재생 강조. */
+.cr-spread-webtoon-card {
+  position: relative;
+  background: #fdf6dc;
+  border: 2px solid var(--cr-caramel);
+  border-left-width: 6px;
+  border-radius: 14px;
+  padding: 10px 14px 12px;
+  box-shadow: 0 2px 0 rgba(155, 117, 72, 0.18);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.cr-spread-webtoon-card.is-active {
+  box-shadow: 0 0 0 3px rgba(63, 107, 46, 0.35), 0 2px 0 rgba(63, 107, 46, 0.4);
+  transform: translateY(-1px);
+}
+.cr-spread-webtoon-card.is-narration {
+  background: #f6efd6;
+  border-left-color: #b8a373;
+}
+
+.cr-spread-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* 화자 chip — palette 색은 [data-speaker-color] 로 모듈러 결정. */
+.cr-spread-speaker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--cr-font-pen);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  border: 1.5px solid currentColor;
+  /* default — narrator (data-speaker-color="-1"). character 는 아래 selector 가 override. */
+  background: #ece2bf;
+  color: #6b5638;
+}
+/* 캐릭터 6색 palette — paper-craft 톤과 어울리도록 deep bg + light fg 조합. */
+.cr-spread-webtoon-card[data-speaker-color="0"] .cr-spread-speaker-chip {
+  background: #2d5a27; color: #d8edb6; border-color: #1f3f1b;
+}
+.cr-spread-webtoon-card[data-speaker-color="1"] .cr-spread-speaker-chip {
+  background: #a3413f; color: #fbe1de; border-color: #732827;
+}
+.cr-spread-webtoon-card[data-speaker-color="2"] .cr-spread-speaker-chip {
+  background: #b8862e; color: #fbecc4; border-color: #835b1c;
+}
+.cr-spread-webtoon-card[data-speaker-color="3"] .cr-spread-speaker-chip {
+  background: #5b4a7e; color: #ddd1f0; border-color: #3d3157;
+}
+.cr-spread-webtoon-card[data-speaker-color="4"] .cr-spread-speaker-chip {
+  background: #2c5a5e; color: #c8e6e8; border-color: #1c3d3f;
+}
+.cr-spread-webtoon-card[data-speaker-color="5"] .cr-spread-speaker-chip {
+  background: #8a4358; color: #f1d7df; border-color: #5e2c3c;
+}
+
+/* sentence 단위 mini TTS 버튼 — 페이지 통합 player 보다 작게. */
+.cr-spread-mini-tts {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--cr-sage-deep);
+  border: 2px solid var(--cr-sage-darker);
+  color: #fdf6dc;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+  flex-shrink: 0;
+}
+.cr-spread-mini-tts:hover { transform: scale(1.06); }
+.cr-spread-mini-tts.is-active {
+  background: var(--cr-sage);
+  box-shadow: 0 0 0 3px rgba(63, 107, 46, 0.25);
+}
+.cr-spread-mini-tts.is-disabled {
+  background: var(--cr-ink-soft);
+  border-color: var(--cr-ink-soft);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 영문 / 한글 본문 — Gaegu 손글씨로 spread 합본 톤과 동일. */
+.cr-spread-card-en {
+  font-family: var(--cr-font-gaegu);
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #3E2A18;
+  margin: 0;
+}
+.cr-spread-card-en.is-narration {
+  font-style: italic;
+  color: #6B4A28;
+}
+.cr-spread-card-ko {
+  font-family: var(--cr-font-gaegu);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #6B4A28;
+  margin: 4px 0 0;
+}
+.cr-spread-card-ko.is-narration {
+  font-style: italic;
+  font-weight: 600;
+  color: #8b7a52;
+}
+
+/* 모바일 — 우측 페이지가 단일 컬럼이 되면 카드 리스트 max-height 해제. */
+@media (max-width: 880px) {
+  .cr-spread-webtoon-list {
+    max-height: none;
+  }
+}
