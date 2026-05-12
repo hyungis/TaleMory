@@ -64,6 +64,7 @@ export function VoiceCloneStep({
   const [showLoadModal, setShowLoadModal] = useState(false)
   const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfileDto[]>([])
   const [speakerAssignments, setSpeakerAssignments] = useState<Record<string, VoiceProfileId>>({})
+  const [savedSpeakerAssignments, setSavedSpeakerAssignments] = useState<Record<string, VoiceProfileId>>({})
   const [assignmentStatusText, setAssignmentStatusText] = useState('')
   const [isAssignmentSaving, setIsAssignmentSaving] = useState(false)
 
@@ -92,6 +93,22 @@ export function VoiceCloneStep({
     })
     return Array.from(speakers, ([speakerKey, speakerName]) => ({ speakerKey, speakerName }))
   }, [storyboardPagesQuery.data])
+
+  const allWebtoonSpeakersAssigned = useMemo(
+    () => webtoonSpeakers.length > 0
+      && webtoonSpeakers.every(speaker => Boolean(speakerAssignments[speaker.speakerKey])),
+    [speakerAssignments, webtoonSpeakers],
+  )
+
+  const webtoonAssignmentsSaved = useMemo(
+    () => webtoonSpeakers.length > 0
+      && webtoonSpeakers.every(speaker => {
+        const speakerKey = speaker.speakerKey
+        return Boolean(speakerAssignments[speakerKey])
+          && savedSpeakerAssignments[speakerKey] === speakerAssignments[speakerKey]
+      }),
+    [savedSpeakerAssignments, speakerAssignments, webtoonSpeakers],
+  )
 
   useEffect(() => {
     if (!isWebtoon) return
@@ -122,6 +139,7 @@ export function VoiceCloneStep({
           nextAssignments[assignment.speakerKey] = assignment.voiceProfileId
         })
         setSpeakerAssignments(nextAssignments)
+        setSavedSpeakerAssignments(nextAssignments)
       })
       .catch(() => {
         if (!cancelled) setAssignmentStatusText('Failed to load speaker assignments.')
@@ -169,6 +187,10 @@ export function VoiceCloneStep({
 
   const handleAssignmentsSave = async () => {
     if (!storyId) return
+    if (!allWebtoonSpeakersAssigned) {
+      setAssignmentStatusText('Select a voice for every speaker before saving.')
+      return
+    }
 
     setIsAssignmentSaving(true)
     setAssignmentStatusText('')
@@ -189,6 +211,7 @@ export function VoiceCloneStep({
         nextAssignments[assignment.speakerKey] = assignment.voiceProfileId
       })
       setSpeakerAssignments(nextAssignments)
+      setSavedSpeakerAssignments(nextAssignments)
       setAssignmentStatusText('Speaker voice assignments saved.')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save speaker assignments.'
@@ -512,12 +535,12 @@ export function VoiceCloneStep({
                 <button
                   type="button"
                   onClick={() => void handleAssignmentsSave()}
-                  disabled={readOnly || !storyId || isAssignmentSaving || webtoonSpeakers.length === 0}
+                  disabled={readOnly || !storyId || isAssignmentSaving || !allWebtoonSpeakersAssigned}
                   className="cr-btn-next"
                   style={{
                     justifySelf: 'auto',
-                    opacity: readOnly || !storyId || isAssignmentSaving || webtoonSpeakers.length === 0 ? 0.5 : 1,
-                    cursor: readOnly || !storyId || isAssignmentSaving || webtoonSpeakers.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: readOnly || !storyId || isAssignmentSaving || !allWebtoonSpeakersAssigned ? 0.5 : 1,
+                    cursor: readOnly || !storyId || isAssignmentSaving || !allWebtoonSpeakersAssigned ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <Save className="w-4 h-4" />
@@ -560,7 +583,7 @@ export function VoiceCloneStep({
                         className="cr-input"
                         style={{ width: '100%' }}
                       >
-                        <option value="">Use default story voice</option>
+                        <option value="">Select a voice</option>
                         {voiceProfiles.map(profile => (
                           <option key={profile.voiceProfileId} value={profile.voiceProfileId}>
                             {profile.title}
@@ -643,10 +666,20 @@ export function VoiceCloneStep({
             /* readOnly = step 7 confirm 이후 재진입한 상태 → BE 에 voice_profile_id 가 이미 박혀있어
                FE 의 savedProfileId / attachStatus 는 component 리마운트로 비어있어도 진행 가능.
                이 가드를 안 풀면 사용자가 잠금된 버튼들 때문에 재attach 도 못해서 stuck 됨. */
-            disabled={readOnly ? false : vc.savedProfileId === null || vc.attachStatus !== 'attached'}
+            disabled={
+              readOnly
+                ? false
+                : isWebtoon
+                  ? !webtoonAssignmentsSaved
+                  : vc.savedProfileId === null || vc.attachStatus !== 'attached'
+            }
             title={
               readOnly
                 ? undefined
+                : isWebtoon
+                  ? !webtoonAssignmentsSaved
+                    ? 'Select and save voice assignments for every speaker.'
+                    : undefined
                 : vc.savedProfileId === null
                   ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
                   : vc.attachStatus === 'attaching'
@@ -656,7 +689,7 @@ export function VoiceCloneStep({
                       : undefined
             }
           >
-            <span>마지막 녹음하기</span>
+            <span>{isWebtoon ? '목소리 배정 완료' : '마지막 녹음하기'}</span>
             <Sparkles className="w-4 h-4" />
           </button>
         }

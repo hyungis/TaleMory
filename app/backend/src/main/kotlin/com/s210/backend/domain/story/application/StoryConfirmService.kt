@@ -77,7 +77,7 @@ class StoryConfirmService(
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
         assertNoActiveTranslationJob(storyId)
-        if (story.voiceProfileId == null) {
+        if (story.mode != StoryMode.WEBTOON && story.voiceProfileId == null) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
 
@@ -250,18 +250,34 @@ class StoryConfirmService(
         }
 
         // 11) TTS 사전 캐시 조회 — 모든 SceneSentence 에 대해
-        val defaultVoiceProfileId = story.voiceProfileId!!
-        val defaultVoiceProfile = voiceProfileRepository.findById(defaultVoiceProfileId).orElseThrow {
-            BusinessException(StoryErrorCode.INVALID_STORY_STATE)
-        }
-        val defaultReferenceSource = defaultVoiceProfile.audioUrl
-            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         val assignments = if (story.mode == StoryMode.WEBTOON) {
             storyVoiceAssignmentRepository.findAllByStoryIdOrderBySpeakerKeyAsc(storyId)
                 .associateBy { it.speakerKey }
         } else {
             emptyMap()
         }
+        val allSentences = createdScenes.flatMap { scene ->
+            sceneSentenceRepository.findAllBySceneId(scene.id)
+        }
+
+        if (story.mode == StoryMode.WEBTOON) {
+            val requiredSpeakerKeys = allSentences
+                .map { it.speakerKey ?: DEFAULT_SPEAKER_KEY }
+                .toSet()
+            if (requiredSpeakerKeys.isEmpty() || !assignments.keys.containsAll(requiredSpeakerKeys)) {
+                throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+            }
+        }
+
+        val defaultVoiceProfileId = story.voiceProfileId
+            ?: assignments[DEFAULT_SPEAKER_KEY]?.voiceProfileId
+            ?: assignments.values.firstOrNull()?.voiceProfileId
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        val defaultVoiceProfile = voiceProfileRepository.findById(defaultVoiceProfileId).orElseThrow {
+            BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        }
+        val defaultReferenceSource = defaultVoiceProfile.audioUrl
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         val voiceProfileIds = assignments.values
             .map { it.voiceProfileId }
             .plus(defaultVoiceProfileId)
@@ -271,9 +287,6 @@ class StoryConfirmService(
         fun voiceProfileIdFor(sentence: SceneSentence): Long =
             sentence.speakerKey?.let { assignments[it]?.voiceProfileId } ?: defaultVoiceProfileId
 
-        val allSentences = createdScenes.flatMap { scene ->
-            sceneSentenceRepository.findAllBySceneId(scene.id)
-        }
         var cacheHits = 0
         val missSentences = mutableListOf<TtsSentenceItem>()
 
