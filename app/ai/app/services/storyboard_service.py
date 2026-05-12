@@ -433,6 +433,8 @@ def _build_openai_webtoon_input_content(
         "Do not show every available character on every page; include only the 1-2 visible characters "
         "that the page illustration actually needs, and reserve full-family staging for group or payoff moments. "
         "DIALOGUE should be frequent and short. NARRATION should be sparse and only bridge the scene. "
+        "Still make each page feel like a real short story page: usually 4-6 sentences total, "
+        "with enough combined text for roughly 45-75 English words on BEGINNER pages when the scene allows it. "
         "Each page must include charactersInScene with sceneRole and expectedPosition for later image generation "
         "and final illustration coordinate extraction."
     )

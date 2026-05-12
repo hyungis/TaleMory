@@ -29,7 +29,9 @@ def test_storyboard_system_prompt_requires_rough_sketch_image_prompt() -> None:
 
 
 def test_webtoon_prompt_requires_multiple_sentences_per_page() -> None:
-    assert "Each page must contain at least 3 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "Each page must contain at least 4 sentences" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "4-6 sentences total" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
+    assert "45-75 English words total" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
     assert "Never return a page with only one sentence" in WEBTOON_STORYBOARD_SYSTEM_PROMPT
 
 

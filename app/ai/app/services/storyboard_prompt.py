@@ -322,8 +322,12 @@ WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
 - Keep dialogue short, natural, and easy for child-friendly TTS.
 - Use narration sparingly for scene setup, emotional bridging, or page transitions.
 - WEBTOON mode still needs real page body text, not one-line captions.
-- Each page must contain at least 3 sentences and should usually contain 3-5 sentences total.
-- For most pages, use 1 short NARRATION sentence plus 2-4 short DIALOGUE sentences.
+- Each page must contain at least 4 sentences and should usually contain 4-6 sentences total.
+- For most pages, use 1-2 short NARRATION sentences plus 3-4 short DIALOGUE sentences.
+- Even though each dialogue line is short, the combined page text must feel substantial enough for a short
+  storybook page, not just isolated speech bubbles.
+- For BEGINNER webtoon pages, target about 45-75 English words total per page when the scene allows it.
+- Korean page text should also feel like a short story page, not just a set of disconnected captions.
 - Never return a page with only one sentence unless the user explicitly requests a one-line page.
 - Every page should include at least one DIALOGUE sentence unless the page is clearly an opening, transition,
   or ending page where narration is more natural.
