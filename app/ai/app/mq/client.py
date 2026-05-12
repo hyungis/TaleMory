@@ -150,3 +150,17 @@ def declare_ai_topology(channel: Any) -> None:
         exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
         routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY,
     )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY,
+    )

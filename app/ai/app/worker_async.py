@@ -28,6 +28,7 @@ _worker_executor = ThreadPoolExecutor(max_workers=settings.AI_WORKER_CONCURRENCY
 _story_api_executor = ThreadPoolExecutor(max_workers=settings.AI_STORY_API_CONCURRENCY)
 _gemini_image_api_executor = ThreadPoolExecutor(max_workers=settings.AI_GEMINI_IMAGE_API_CONCURRENCY)
 _replicate_image_api_executor = ThreadPoolExecutor(max_workers=settings.AI_REPLICATE_IMAGE_API_CONCURRENCY)
+_layout_api_executor = ThreadPoolExecutor(max_workers=settings.AI_LAYOUT_API_CONCURRENCY)
 
 
 def submit_message(
@@ -85,6 +86,22 @@ def submit_replicate_image_api_message(
         job_factory=job_factory,
         task_name=task_name,
         api_executor=_replicate_image_api_executor,
+    )
+
+
+def submit_layout_api_message(
+    *,
+    consumer_channel: Any,
+    delivery_tag: int,
+    job_factory: ApiJobFactory,
+    task_name: str,
+) -> None:
+    submit_api_message(
+        consumer_channel=consumer_channel,
+        delivery_tag=delivery_tag,
+        job_factory=job_factory,
+        task_name=task_name,
+        api_executor=_layout_api_executor,
     )
 
 
