@@ -2,6 +2,7 @@ import { useEffect, useState, type PropsWithChildren } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { initializeAuthSession } from '../../features/auth'
+import { OnboardingTutorialProvider } from '../../features/onboarding-tutorial'
 
 function AuthSessionBootstrap() {
   useEffect(() => {
@@ -41,7 +42,9 @@ export function AppProviders({ children }: PropsWithChildren) {
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AuthSessionBootstrap />
-        {children}
+        <OnboardingTutorialProvider>
+          {children}
+        </OnboardingTutorialProvider>
       </QueryClientProvider>
     </BrowserRouter>
   )
