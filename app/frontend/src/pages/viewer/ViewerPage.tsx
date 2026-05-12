@@ -1,8 +1,69 @@
 import { useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { InvitationCard, StoryBookViewer, useStoryViewQuery } from '../../features/viewer'
+import type { StoryView } from '../../features/viewer'
 import { ROUTES } from '../../shared/constants'
 import '../../features/viewer/invitation/styles/invitation.css'
+
+const ONBOARDING_VIEWER_STORY: StoryView = {
+  storyId: 'onboarding-preview',
+  title: '우리 가족의 여행 동화',
+  difficulty: 'BEGINNER',
+  mainCharacter: { name: '하린' },
+  coverIllustrationUrl: null,
+  publishedAt: null,
+  scenes: [
+    {
+      sceneId: 'onboarding-scene-1',
+      pageNumber: 1,
+      illustrationUrl: null,
+      characterAnchors: [],
+      sentences: [
+        {
+          sentenceId: 'onboarding-sentence-1',
+          sentenceOrder: 1,
+          englishText: 'Harin opened the family storybook and found a road made of stars.',
+          koreanText: '하린이는 가족 동화책을 펼치고 별빛으로 이어진 길을 발견했어요.',
+          ttsAudioUrl: null,
+          speakerKey: null,
+          bubbleSlot: null,
+        },
+      ],
+    },
+    {
+      sceneId: 'onboarding-scene-2',
+      pageNumber: 2,
+      illustrationUrl: null,
+      characterAnchors: [],
+      sentences: [
+        {
+          sentenceId: 'onboarding-sentence-2',
+          sentenceOrder: 1,
+          englishText: 'Every page remembered a warm moment from the trip.',
+          koreanText: '책장을 넘길 때마다 여행의 따뜻한 순간이 되살아났어요.',
+          ttsAudioUrl: null,
+          speakerKey: null,
+          bubbleSlot: null,
+        },
+      ],
+    },
+  ],
+  outro: {
+    outroText: '오늘의 추억은 오래도록 가족의 이야기로 남을 거예요.',
+    audioUrl: null,
+    signature: 'TaleMory',
+  },
+}
+
+type OnboardingViewerMode = 'main' | 'book' | 'tools'
+
+function getOnboardingViewerMode(locationState: unknown): OnboardingViewerMode {
+  if (typeof locationState !== 'object' || locationState === null) return 'main'
+  if (!('onboardingViewerMode' in locationState)) return 'main'
+
+  const value = (locationState as { onboardingViewerMode?: unknown }).onboardingViewerMode
+  return value === 'book' || value === 'tools' ? value : 'main'
+}
 
 /**
  * `/viewer/:storyId` 라우트.
@@ -13,6 +74,41 @@ import '../../features/viewer/invitation/styles/invitation.css'
  */
 export function ViewerPage() {
   const { storyId } = useParams<{ storyId: string }>()
+  const location = useLocation()
+
+  if (location.pathname === ROUTES.onboardingViewerPreview) {
+    return <OnboardingViewerPreview mode={getOnboardingViewerMode(location.state)} />
+  }
+
+  return <ViewerStoryPage storyId={storyId} />
+}
+
+function OnboardingViewerPreview({ mode }: { mode: OnboardingViewerMode }) {
+  const navigate = useNavigate()
+
+  if (mode === 'main') {
+    return (
+      <InvitationCard
+        story={ONBOARDING_VIEWER_STORY}
+        isOwner
+        onOpenBook={() => {}}
+        onOpenWebtoon={() => {}}
+        onBack={() => navigate(ROUTES.mainBookshelf)}
+      />
+    )
+  }
+
+  return (
+    <StoryBookViewer
+      story={ONBOARDING_VIEWER_STORY}
+      onExit={() => navigate(ROUTES.mainBookshelf)}
+      forceToolbarOpen={mode === 'tools'}
+      initialPageIndex={1}
+    />
+  )
+}
+
+function ViewerStoryPage({ storyId }: { storyId?: string }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const mode = searchParams.get('mode')
