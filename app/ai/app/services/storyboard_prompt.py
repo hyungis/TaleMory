@@ -1,4 +1,4 @@
-STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_v3"
+﻿STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_v3"
 WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_webtoon_v1"
 STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_v1"
 WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_webtoon_v1"
@@ -311,8 +311,9 @@ WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
 - DIALOGUE sentences must use the visible speaking character's key as speakerKey.
 - DIALOGUE must read like direct speech that the speaker could say aloud.
 - DIALOGUE englishText/koreanText must contain only the spoken words for a speech bubble.
+- Do not write dialogue tags inside DIALOGUE text, such as "Mijin said", "she asked", or "Dad replied".
 - Do not put narration or attribution inside DIALOGUE, such as "she says", "he said", "Yujin says",
-  "그녀는 말한다", "유진이 말했다", or similar speaker tags.
+  or similar speaker tags.
 - If attribution or action is needed, make it a separate NARRATION sentence with speakerKey="narrator".
 - If a sentence describes action, setting, emotion, page transition, or a character in third person,
   it is NARRATION, even when that character is visible in the panel.

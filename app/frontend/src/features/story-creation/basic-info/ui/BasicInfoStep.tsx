@@ -24,6 +24,18 @@ import {
 } from '../lib/mappers'
 import '../../styles/creation-paper.css'
 
+const MIN_CHILD_AGE = 1
+const MAX_CHILD_AGE = 18
+const INTEGER_PATTERN = /^\d+$/
+
+function parseChildAge(value: string): number | null {
+  const trimmed = value.trim()
+  if (!INTEGER_PATTERN.test(trimmed)) return null
+  const parsed = Number(trimmed)
+  if (!Number.isInteger(parsed) || parsed < MIN_CHILD_AGE || parsed > MAX_CHILD_AGE) return null
+  return parsed
+}
+
 interface BasicInfoStepProps {
   data: StoryProject['step1']
   storyId: StoryId | null
@@ -116,7 +128,13 @@ export function BasicInfoStep({
       return
     }
 
-    const validChildren = data.children.filter(c => c.name.trim() && c.age.trim())
+    const hasInvalidAge = data.children.some(c => c.age.trim() && parseChildAge(c.age) === null)
+    if (hasInvalidAge) {
+      setSubmitError('나이는 1~18 사이의 정수로 입력해주세요.')
+      return
+    }
+
+    const validChildren = data.children.filter(c => c.name.trim() && parseChildAge(c.age) !== null)
     if (validChildren.length === 0) {
       setSubmitError('아이 정보를 최소 한 명 이상 입력해주세요.')
       return
@@ -127,12 +145,13 @@ export function BasicInfoStep({
       const resolved: StoryChild[] = (
         await Promise.all(
           data.children.map(async (child, index) => {
-            if (!child.name.trim() || !child.age.trim()) return null
+            const parsedAge = parseChildAge(child.age)
+            if (!child.name.trim() || parsedAge === null) return null
             if (child.personId) return child
 
             const created = await personPost.mutateAsync({
               name: child.name.trim(),
-              age: Number.parseInt(child.age, 10) || 0,
+              age: parsedAge,
               gender: storyChildGenderToApi(child.gender),
               role: 'CHILD',
             })
@@ -145,7 +164,7 @@ export function BasicInfoStep({
       const mainCharactersPayload = resolved.map(c => ({
         personId: c.personId,
         name: c.name.trim(),
-        age: Number.parseInt(c.age, 10) || 0,
+        age: parseChildAge(c.age) ?? 0,
         gender: storyChildGenderToApi(c.gender),
       }))
       const storyBody = {
