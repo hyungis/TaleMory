@@ -135,7 +135,6 @@ class StoryConfirmService(
         // 채우고, VIEWER 모드는 좌표를 사용하지 않는다. 여기서는 텍스트/스피커만 평탄화한다.
         data class SentenceInput(
             val englishText: String,
-            val ttsText: String?,
             val koreanText: String?,
             val speakerKey: String?,
         )
@@ -148,7 +147,6 @@ class StoryConfirmService(
                     result.add(
                         SentenceInput(
                             englishText = it.get("englishText")?.asText() ?: "",
-                            ttsText = it.get("ttsText")?.asText()?.takeIf(String::isNotBlank),
                             koreanText = it.get("koreanText")?.asText(),
                             speakerKey = it.get("speakerKey")?.asText()?.takeIf(String::isNotBlank),
                         )
@@ -206,7 +204,6 @@ class StoryConfirmService(
                             sentenceOrder = idx + 1,
                             englishText = s.englishText,
                             koreanText = s.koreanText,
-                            ttsText = s.ttsText,
                             ttsAudioUrl = null,
                             speakerKey = s.speakerKey,
                             hasHighlighted = false,
@@ -289,17 +286,13 @@ class StoryConfirmService(
         fun voiceProfileIdFor(sentence: SceneSentence): Long =
             sentence.speakerKey?.let { assignments[it]?.voiceProfileId } ?: defaultVoiceProfileId
 
-        fun speechTextFor(sentence: SceneSentence): String =
-            sentence.ttsText?.takeIf { it.isNotBlank() } ?: sentence.englishText
-
         var cacheHits = 0
         val missSentences = mutableListOf<TtsSentenceItem>()
 
         allSentences.forEach { sentence ->
             val sentenceVoiceProfileId = voiceProfileIdFor(sentence)
-            val speechText = speechTextFor(sentence)
             val cachedUrl = try {
-                ttsCacheService.lookup(sentenceVoiceProfileId, speechText)
+                ttsCacheService.lookup(sentenceVoiceProfileId, sentence.englishText)
             } catch (e: Exception) {
                 log.warn("TTS cache lookup failed for sentence {}: {}", sentence.id, e.message)
                 null
@@ -312,7 +305,6 @@ class StoryConfirmService(
                     TtsSentenceItem(
                         sentenceId = sentence.id,
                         text = sentence.englishText,
-                        ttsText = sentence.ttsText,
                         speakerKey = sentence.speakerKey,
                     )
                 )

@@ -77,7 +77,6 @@ class StorySentenceRequest(BaseModel):
     pageNumber: int | None = None
     sentenceOrder: int | None = None
     text: str
-    ttsText: str | None = None
     speakerKey: str | None = None
     emotion: EmotionType | None = None
     stylePrompt: str | None = None

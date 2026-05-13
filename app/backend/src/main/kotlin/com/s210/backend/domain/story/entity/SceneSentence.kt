@@ -22,9 +22,6 @@ class SceneSentence(
     @Column(name = "korean_text", columnDefinition = "TEXT")
     var koreanText: String? = null,
 
-    @Column(name = "tts_text", columnDefinition = "TEXT")
-    var ttsText: String? = null,
-
     @Column(name = "tts_audio_url", length = 500)
     var ttsAudioUrl: String? = null,
 

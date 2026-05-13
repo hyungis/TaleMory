@@ -72,7 +72,6 @@ class ReadingLevel(BaseModel):
 class StorySentence(BaseModel):
     sentenceOrder: int
     englishText: str
-    ttsText: str | None = None
     koreanText: str
     emotion: SentenceEmotion
 
@@ -82,7 +81,6 @@ class WebtoonStorySentence(BaseModel):
     type: WebtoonSentenceType
     speakerKey: str
     englishText: str
-    ttsText: str | None = None
     koreanText: str
     emotion: SentenceEmotion
 

@@ -182,8 +182,7 @@ class TtsResultHandler(
                 ?: return@forEach
             val itemVoiceProfileId = (item.voiceId ?: payload.voiceId).toLongOrNull()
                 ?: return@forEach
-            val speechText = sentence.ttsText?.takeIf { it.isNotBlank() } ?: sentence.englishText
-            tryStoreCache(itemVoiceProfileId, speechText, audio.audioUrl)
+            tryStoreCache(itemVoiceProfileId, sentence.englishText, audio.audioUrl)
         }
 
         // 4) Redis job status (operational sidecar) + polling cache invalidate.

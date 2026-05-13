@@ -93,7 +93,6 @@ data class StoryboardPageDto(
 data class StorySentenceDto(
     val sentenceOrder: Int,
     val englishText: String,
-    val ttsText: String? = null,
     val koreanText: String,
     val emotion: String,
     /** WEBTOON 모드 한정 — "DIALOGUE" / "NARRATION". VIEWER 면 null. */

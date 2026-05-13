@@ -104,7 +104,6 @@ fun StoryboardPage.replaceKoreanText(objectMapper: ObjectMapper, koreanText: Str
                     englishText = if (parsedLines.size == existing.size) {
                         prevAtSameOrder?.englishText ?: ""
                     } else "",
-                    ttsText = prevAtSameOrder?.ttsText ?: prevAtSameOrder?.englishText,
                     koreanText = line.text,
                     emotion = prevAtSameOrder?.emotion ?: "NEUTRAL",
                     type = line.type,
@@ -115,14 +114,12 @@ fun StoryboardPage.replaceKoreanText(objectMapper: ObjectMapper, koreanText: Str
     } else {
         // VIEWER 페이지 — 기존 단일 sentence 합본 동작 유지.
         val englishText = existing.joinToString(" ") { it.englishText.trim() }.ifBlank { "" }
-        val ttsText = existing.joinToString(" ") { (it.ttsText ?: it.englishText).trim() }.ifBlank { englishText }
         val emotion = existing.firstOrNull()?.emotion ?: "NEUTRAL"
         objectMapper.writeValueAsString(
             listOf(
                 StorySentenceDto(
                     sentenceOrder = 1,
                     englishText = englishText,
-                    ttsText = ttsText,
                     koreanText = koreanText,
                     emotion = emotion,
                 ),
@@ -188,7 +185,6 @@ fun StoryboardPage.replaceTranslatedSentences(
             StorySentenceDto(
                 sentenceOrder = combined.size + 1,
                 englishText = stripWebtoonPrefix(s.englishText, resolvedSpeakerKey).trim(),
-                ttsText = stripWebtoonPrefix(s.ttsText ?: s.englishText, resolvedSpeakerKey).trim(),
                 koreanText = stripWebtoonPrefix(s.koreanText, resolvedSpeakerKey).trim(),
                 emotion = s.emotion.ifBlank { "NEUTRAL" },
                 type = s.type,
@@ -219,15 +215,11 @@ private fun buildMergedSentence(
     val joinedKorean = group
         .joinToString(" ") { stripWebtoonPrefix(it.koreanText, resolvedSpeakerKey).trim() }
         .trim()
-    val joinedTts = group
-        .joinToString(" ") { stripWebtoonPrefix(it.ttsText ?: it.englishText, resolvedSpeakerKey).trim() }
-        .trim()
     val emotion = group.firstOrNull { it.emotion.isNotBlank() }?.emotion
         ?: existing.emotion.ifBlank { "NEUTRAL" }
     return StorySentenceDto(
         sentenceOrder = newOrder,
         englishText = joinedEnglish,
-        ttsText = joinedTts.ifBlank { joinedEnglish },
         koreanText = joinedKorean,
         emotion = emotion,
         type = resolvedType,

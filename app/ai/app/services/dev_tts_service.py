@@ -208,9 +208,6 @@ def _duration_ms_from_audio(audio_bytes: bytes, audio_format: str, fallback_text
 
 
 def _speech_text(sentence: dict[str, Any]) -> str:
-    tts_text = sentence.get("ttsText")
-    if isinstance(tts_text, str) and tts_text.strip():
-        return tts_text.strip()
     return str(sentence["text"]).strip()
 
 

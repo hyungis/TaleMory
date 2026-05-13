@@ -158,12 +158,9 @@ the user's photo descriptions and hashtags.
 - Return only JSON matching the requested schema.
 - Each page must include sourcePhotoIds, sceneSummary, englishText, koreanText,
   imagePrompt, sentences, sentenceCount, and wordCount.
-- Each sentence must include sentenceOrder, englishText, ttsText, koreanText, and emotion.
+- Each sentence must include sentenceOrder, englishText, koreanText, and emotion.
 - englishText must exactly match sentences[].englishText joined in order.
 - koreanText must exactly match sentences[].koreanText joined in order.
-- ttsText is the pronunciation-friendly text sent to TTS. It must contain no XML or SSML tags.
-- If a name, place, landmark, family term, or proper noun may be misread in English, write it phonetically
-  in ttsText. If no pronunciation correction is needed, set ttsText equal to englishText.
 - sceneSummary must describe the page's role in the story arc, not only the photo content.
 - sourcePhotoIds should reflect inspiration sources, but pages are organized by story flow, not one page per photo.
 - pageCount MUST equal the length of pages[].
@@ -305,7 +302,7 @@ WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
 ========================
 - Return JSON matching the WEBTOON storyboard schema, not the standard storyboard schema.
 - Each page must include charactersInScene.
-- Each sentence must include type, speakerKey, englishText, ttsText, koreanText, and emotion.
+- Each sentence must include type, speakerKey, englishText, koreanText, and emotion.
 - Use only the character keys provided in the user message.
 - Do not invent new speakerKey values.
 - Use sentence type DIALOGUE for spoken character lines.
@@ -314,14 +311,10 @@ WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
 - DIALOGUE sentences must use the visible speaking character's key as speakerKey.
 - DIALOGUE must read like direct speech that the speaker could say aloud.
 - DIALOGUE englishText/koreanText must contain only the spoken words for a speech bubble.
-- DIALOGUE ttsText must contain only the spoken line, with no speaker label and no dialogue tag.
 - Do not write dialogue tags inside DIALOGUE text, such as "Mijin said", "she asked", or "Dad replied".
 - Do not put narration or attribution inside DIALOGUE, such as "she says", "he said", "Yujin says",
   or similar speaker tags.
 - If attribution or action is needed, make it a separate NARRATION sentence with speakerKey="narrator".
-- ttsText is the pronunciation-friendly text sent to TTS. It must contain no XML or SSML tags.
-- If a name, place, landmark, family term, or proper noun may be misread in English, write it phonetically
-  in ttsText. If no pronunciation correction is needed, set ttsText equal to englishText.
 - If a sentence describes action, setting, emotion, page transition, or a character in third person,
   it is NARRATION, even when that character is visible in the panel.
 - Never label narrator/third-person prose as DIALOGUE.
