@@ -45,6 +45,8 @@ export function SharedViewerPage() {
     )
   }
 
+  const storyViewerMode = story.mode === 'WEBTOON' ? 'webtoon' : 'book'
+
   const openInPopup = (target: 'book' | 'webtoon') => {
     const url = `${window.location.pathname}?mode=${target}`
     const w = Math.min(1280, window.screen.availWidth - 100)
@@ -70,7 +72,6 @@ export function SharedViewerPage() {
   }
 
   const handleBack = () => {
-    // 비로그인 공개 뷰어 — 직전 페이지가 있으면 뒤로, 없으면 닫기 시도 후 home 으로 fallback.
     if (window.history.length > 1) {
       window.history.back()
     } else if (window.opener) {
@@ -84,7 +85,6 @@ export function SharedViewerPage() {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
   if (mode === 'webtoon') {
-    // 비로그인 공개 뷰어 — isOwner=false 라 좌표 재시도 배너는 노출되지 않는다.
     return <StoryWebtoonViewer story={story} isOwner={false} onExit={closeViewer} />
   }
 
@@ -92,8 +92,7 @@ export function SharedViewerPage() {
     <InvitationCard
       story={story}
       isOwner={false}
-      onOpenBook={() => openInPopup('book')}
-      onOpenWebtoon={() => openInPopup('webtoon')}
+      onOpen={() => openInPopup(storyViewerMode)}
       onBack={handleBack}
     />
   )
