@@ -56,6 +56,7 @@ export function ViewerToolbar({
   return (
     <aside
       className={`sb-side-toolbar ${isOpen ? '' : 'is-collapsed'}`}
+      data-onboarding-target="viewer-tools"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       aria-hidden={!isOpen}

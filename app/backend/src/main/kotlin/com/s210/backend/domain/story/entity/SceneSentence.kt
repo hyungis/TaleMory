@@ -1,7 +1,6 @@
 package com.s210.backend.domain.story.entity
 
 import com.s210.backend.common.entity.BaseTimeEntity
-import com.s210.backend.domain.story.model.BubbleSlot
 import jakarta.persistence.*
 
 @Entity
@@ -31,10 +30,6 @@ class SceneSentence(
 
     @Column(name = "speaker_key", length = 50)
     var speakerKey: String? = null,
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "bubble_slot")
-    var bubbleSlot: BubbleSlot? = null,
 
     @Column(name = "has_highlighted", nullable = false)
     var hasHighlighted: Boolean = false
