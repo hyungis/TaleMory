@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
-import { ImageIcon, Pause, Play, RefreshCw } from 'lucide-react'
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 import type { SceneId, SentenceId, StoryId } from '../../../../shared/types'
-import type { AnchorPoint, SceneView } from '../../model/types'
+import type { AnchorPoint, SceneView, SentenceView } from '../../model/types'
 import { WebtoonBubble } from './WebtoonBubble'
 import { retryWebtoonLayout } from '../api/retryWebtoonLayout'
 
@@ -9,37 +9,29 @@ interface WebtoonPageViewProps {
   storyId: StoryId
   scene: SceneView
   isOwner: boolean
-  showKorean: boolean
-  isPlayingThisPage: boolean
   activeSentenceId: SentenceId | null
+  isPlayingThisPage: boolean
   onTogglePlay: (scene: SceneView) => void
+  pageIndex: number
   onRetryRequested: (sceneId: SceneId, jobId: string | number) => void
 }
 
-/** NARRATION sentence 또는 매칭 실패 시 fallback 좌표 — top-center. */
-const FALLBACK_ANCHOR: AnchorPoint = { x: 0.5, y: 0.05 }
+const FALLBACK_ANCHOR: AnchorPoint = { x: 0.5, y: 0.15 }
 
-/**
- * 단일 페이지 뷰 — 이미지 + 말풍선 오버레이 + 페이지 액션 (재생 / 재시도).
- *
- * 좌표 lookup 흐름:
- *  - sentence.speakerKey == null (NARRATION)  → fallback (top center)
- *  - sentence.speakerKey 가 scene.characterAnchors[].name 에 있음 → 해당 anchor
- *  - sentence.speakerKey 매칭 실패 (DIALOGUE 인데 anchor 없음) → fallback + 재시도 배너 노출
- *
- * isOwner=true 인 경우만 재시도 배너 활성. 공개 공유 링크는 항상 숨김.
- */
+function isNarration(sentence: SentenceView): boolean {
+  return !sentence.speakerKey || sentence.speakerKey === 'narrator' || sentence.speakerKey === 'narration'
+}
+
 export function WebtoonPageView({
   storyId,
   scene,
   isOwner,
-  showKorean,
-  isPlayingThisPage,
   activeSentenceId,
+  isPlayingThisPage,
   onTogglePlay,
+  pageIndex,
   onRetryRequested,
 }: WebtoonPageViewProps) {
-  // scene.characterAnchors[] → Map<name, AnchorPoint> 로 인덱싱 (sentence 마다 매번 find 안 하도록).
   const anchorByName = useMemo(() => {
     const map = new Map<string, AnchorPoint>()
     for (const a of scene.characterAnchors) {
@@ -50,11 +42,48 @@ export function WebtoonPageView({
     return map
   }, [scene.characterAnchors])
 
-  // DIALOGUE 인데 anchor 매칭 실패한 sentence 가 하나라도 있으면 재시도 배너 노출.
+  const narrations = useMemo(
+    () => scene.sentences.filter(s => isNarration(s)),
+    [scene.sentences],
+  )
+
   const hasMissingAnchor = useMemo(
-    () => scene.sentences.some(s => s.speakerKey != null && !anchorByName.has(s.speakerKey)),
+    () => scene.sentences.some(s => !isNarration(s) && s.speakerKey && !anchorByName.has(s.speakerKey)),
     [scene.sentences, anchorByName],
   )
+
+  /* ── 이미지 실제 렌더링 영역 추적 (object-fit: contain 보정) ── */
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [imgLayout, setImgLayout] = useState<{
+    offsetX: number; offsetY: number; width: number; height: number
+  } | null>(null)
+
+  const updateImgLayout = useCallback(() => {
+    const img = imgRef.current
+    const wrap = wrapRef.current
+    if (!img || !wrap || !img.naturalWidth) return
+    const wrapRect = wrap.getBoundingClientRect()
+    const imgRect = img.getBoundingClientRect()
+    setImgLayout({
+      offsetX: imgRect.left - wrapRect.left,
+      offsetY: imgRect.top - wrapRect.top,
+      width: imgRect.width,
+      height: imgRect.height,
+    })
+  }, [])
+
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img) return
+    img.addEventListener('load', updateImgLayout)
+    window.addEventListener('resize', updateImgLayout)
+    if (img.complete) updateImgLayout()
+    return () => {
+      img.removeEventListener('load', updateImgLayout)
+      window.removeEventListener('resize', updateImgLayout)
+    }
+  }, [updateImgLayout])
 
   const [retryStatus, setRetryStatus] = useState<'idle' | 'pending' | 'failed'>('idle')
 
@@ -63,85 +92,108 @@ export function WebtoonPageView({
     try {
       const result = await retryWebtoonLayout(storyId, scene.pageNumber)
       onRetryRequested(scene.sceneId, result.jobId as unknown as string)
-      // 잡은 방금 큐에 들어갔을 뿐 — 결과 envelope 가 도착해 scene.characterAnchors 가 채워지면
-      // 사용자가 페이지 새로고침해서 확인. 여기선 단순 토글만 처리.
       setRetryStatus('idle')
     } catch {
       setRetryStatus('failed')
     }
   }
 
+  const activeSentence = activeSentenceId
+    ? scene.sentences.find(s => s.sentenceId === activeSentenceId)
+    : null
+  const showBubble = activeSentence && !isNarration(activeSentence)
+
   return (
-    <article className="swt-page" aria-label={`Page ${scene.pageNumber}`}>
-      <header className="swt-page-header">
-        <span className="swt-page-num">Page {scene.pageNumber}</span>
-        <div className="swt-page-actions">
+    <div className="swt-page-snap" data-page-index={pageIndex}>
+      <div className="swt-scene-content">
+        {/* 이미지 + 말풍선 */}
+        <div className="swt-scene-img-wrap" ref={wrapRef}>
+          {scene.illustrationUrl ? (
+            <img
+              ref={imgRef}
+              className="swt-scene-img"
+              src={scene.illustrationUrl}
+              alt={`${scene.pageNumber}페이지 삽화`}
+              loading="lazy"
+            />
+          ) : (
+            <div className="swt-scene-placeholder">
+              <span className="swt-placeholder-text">{scene.pageNumber}페이지</span>
+            </div>
+          )}
+
+          {/* 이미지 실제 영역에 맞춘 오버레이 (말풍선 + 나레이션) */}
+          {imgLayout && (
+            <div
+              className="swt-img-overlay"
+              style={{
+                left: imgLayout.offsetX,
+                top: imgLayout.offsetY,
+                width: imgLayout.width,
+                height: imgLayout.height,
+              }}
+            >
+              {showBubble && activeSentence && (
+                <WebtoonBubble
+                  sentence={activeSentence}
+                  position={
+                    activeSentence.speakerKey
+                      ? (anchorByName.get(activeSentence.speakerKey) ?? FALLBACK_ANCHOR)
+                      : FALLBACK_ANCHOR
+                  }
+                />
+              )}
+
+              {narrations.length > 0 && (
+                <div className="swt-en-box">
+                  {narrations.map(sentence => (
+                    <p
+                      key={sentence.sentenceId}
+                      className={`swt-en-line ${activeSentenceId === sentence.sentenceId ? 'swt-en-line--playing' : ''}`}
+                    >
+                      {sentence.englishText}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 페이지별 재생 버튼 */}
           <button
             type="button"
-            className={`swt-action-btn${isPlayingThisPage ? ' is-active' : ''}`}
+            className={`swt-play-btn ${isPlayingThisPage ? 'swt-play-btn--active' : ''}`}
             onClick={() => onTogglePlay(scene)}
-            aria-label={isPlayingThisPage ? '페이지 재생 중지' : '페이지 재생'}
+            aria-label={isPlayingThisPage ? '정지' : '재생'}
           >
             {isPlayingThisPage ? (
-              <>
-                <Pause className="w-3 h-3" /> 정지
-              </>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
             ) : (
-              <>
-                <Play className="w-3 h-3" /> 재생
-              </>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6,4 L20,12 L6,20 Z" />
+              </svg>
             )}
           </button>
         </div>
-      </header>
 
-      <div className="swt-canvas">
-        {scene.illustrationUrl ? (
-          <img src={scene.illustrationUrl} alt={`Page ${scene.pageNumber} 삽화`} />
-        ) : (
-          <div className="swt-canvas-empty">
-            <ImageIcon className="w-8 h-8" strokeWidth={1.5} />
+        {/* 좌표 재시도 배너 */}
+        {hasMissingAnchor && isOwner && (
+          <div className={`swt-retry-banner${retryStatus === 'pending' ? ' is-busy' : ''}`} role="alert">
+            <span>
+              {retryStatus === 'failed'
+                ? '재시도 요청에 실패했어요. 잠시 후 다시 시도해주세요.'
+                : '말풍선 위치를 못 찾은 문장이 있어요.'}
+            </span>
+            <button type="button" onClick={handleRetry} disabled={retryStatus === 'pending'}>
+              <RefreshCw className="w-3 h-3" />{' '}
+              {retryStatus === 'pending' ? '요청 중...' : '좌표 다시 추출'}
+            </button>
           </div>
         )}
-
-        {scene.sentences.map(sentence => {
-          // speakerKey 가 있으면 scene.characterAnchors 에서 lookup, 없으면(NARRATION) fallback.
-          // 매칭 실패 (DIALOGUE 인데 anchor 없음) 도 fallback — 재시도 배너로 사용자에게 알림.
-          const position = sentence.speakerKey
-            ? (anchorByName.get(sentence.speakerKey) ?? FALLBACK_ANCHOR)
-            : FALLBACK_ANCHOR
-          return (
-            <WebtoonBubble
-              key={sentence.sentenceId}
-              sentence={sentence}
-              position={position}
-              isActive={activeSentenceId === sentence.sentenceId}
-              showKorean={showKorean}
-            />
-          )
-        })}
       </div>
-
-      {hasMissingAnchor && isOwner && (
-        <div
-          className={`swt-retry-banner${retryStatus === 'pending' ? ' is-busy' : ''}`}
-          role="alert"
-        >
-          <span>
-            {retryStatus === 'failed'
-              ? '재시도 요청에 실패했어요. 잠시 후 다시 시도해주세요.'
-              : '말풍선 위치를 못 찾은 문장이 있어요. 좌표를 다시 뽑아볼까요?'}
-          </span>
-          <button
-            type="button"
-            onClick={handleRetry}
-            disabled={retryStatus === 'pending'}
-          >
-            <RefreshCw className="w-3 h-3" />{' '}
-            {retryStatus === 'pending' ? '요청 중…' : '좌표 다시 추출'}
-          </button>
-        </div>
-      )}
-    </article>
+    </div>
   )
 }

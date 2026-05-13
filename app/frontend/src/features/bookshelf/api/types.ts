@@ -5,6 +5,8 @@ export interface StoryApiResponse {
   id: StoryId
   title: string | null
   difficulty: string
+  /** "VIEWER" | "WEBTOON" */
+  mode: string
   status: string
   isBookmarked: boolean
   travelPlace: string | null

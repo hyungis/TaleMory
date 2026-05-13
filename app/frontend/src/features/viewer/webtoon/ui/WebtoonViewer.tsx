@@ -252,26 +252,6 @@ export function WebtoonViewer({ story }: WebtoonViewerProps) {
                     </div>
                   )}
 
-                  {/* 디자인 프리뷰용 더미 말풍선 A/B/M 비교 (첫 페이지만) */}
-                  {index === 0 && (
-                    <>
-                      <div className="wv-bubble wv-bubble--top-left">
-                        <span className="wv-bubble-label">A. 기본</span>
-                        <span className="wv-bubble-speaker">토끼</span>
-                        <p className="wv-bubble-text">안녕! 오늘 숲에서 만나자!</p>
-                      </div>
-                      <div className="wv-bubble wv-bubble--top-right wv-bubble--style-cloud">
-                        <span className="wv-bubble-label">B. 구름형</span>
-                        <span className="wv-bubble-speaker">토끼</span>
-                        <p className="wv-bubble-text">안녕! 오늘 숲에서 만나자!</p>
-                      </div>
-                      <div className="wv-bubble wv-bubble--bottom-center wv-bubble--style-wavy">
-                        <span className="wv-bubble-label">M. 물결</span>
-                        <span className="wv-bubble-speaker">토끼</span>
-                        <p className="wv-bubble-text">안녕! 오늘 숲에서 만나자!</p>
-                      </div>
-                    </>
-                  )}
 
                   {/* 대사 말풍선 — 이미지 위에 absolute 배치 */}
                   {dialogues.map((sentence) => (

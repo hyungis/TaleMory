@@ -175,6 +175,7 @@ class StoryService(
                 id = StoryId(story.id),
                 title = story.title,
                 difficulty = story.difficulty.name,
+                mode = story.mode.name,
                 status = story.status.name,
                 isBookmarked = story.isBookmarked,
                 travelPlace = story.travelPlace,

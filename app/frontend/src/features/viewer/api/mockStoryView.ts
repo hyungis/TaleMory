@@ -24,6 +24,7 @@ export const MOCK_STORY_VIEW: StoryView = {
   storyId: '1',
   title: '해솔이의 첫 비행 이야기',
   difficulty: 'INTERMEDIATE',
+  mode: 'VIEWER',
   mainCharacter: { name: '해솔' },
   coverIllustrationUrl: COVER_URL,
   publishedAt: '2026-04-20T12:00:00',
