@@ -136,6 +136,7 @@ export function BookshelfModal({
                     type="button"
                     onClick={onCreateStory}
                     className="inline-flex items-center"
+                    data-onboarding-target="bookshelf-create"
                     style={{
                       background: '#7a9968',
                       color: '#fdfaf0',
@@ -197,6 +198,7 @@ export function BookshelfModal({
               {/* 필터/정렬 바 + 손그림 wavy 구분선 */}
               <div
                 className="flex items-center justify-between gap-4 bookshelf-fade-in relative"
+                data-onboarding-target="bookshelf-list"
                 style={{ marginBottom: 8, paddingBottom: 14, zIndex: 3 }}
               >
                 <StoryFilter

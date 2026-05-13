@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&family=Jua&family=Nanum+Pen+Script&family=Nanum+Myeongjo:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Jua&family=Nanum+Pen+Script&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -8,8 +8,11 @@
   --color-dark: #0a1a0a;
   --font-display: 'Gaegu', 'Jua', cursive;
   --font-display-pen: 'Nanum Pen Script', 'Gaegu', cursive;
-  --font-display-serif: 'Nanum Myeongjo', serif;
-  --font-body: 'Gowun Dodum', 'Gaegu', sans-serif;
+  /* 옛 Nanum Myeongjo serif 톤을 손글씨 톤(Gaegu)으로 일괄 교체.
+     다른 라벨/부제와 통일된 손글씨 느낌. fallback 으로 Nanum Pen Script. */
+  --font-display-serif: 'Gaegu', 'Nanum Pen Script', cursive;
+  /* 옛 Gowun Dodum body 톤도 손글씨 톤(Gaegu)으로 일괄 교체. fallback 으로 sans-serif. */
+  --font-body: 'Gaegu', 'Nanum Pen Script', sans-serif;
 
   font-family: var(--font-body);
   line-height: 1.5;

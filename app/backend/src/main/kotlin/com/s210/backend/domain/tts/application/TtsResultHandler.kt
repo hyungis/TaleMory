@@ -175,15 +175,14 @@ class TtsResultHandler(
         )
 
         // 3) Redis cache SET — 부분 실패 (audio==null) 및 cross-story 항목 제외
-        val voiceProfileIdLong = payload.voiceId.toLongOrNull()
-        if (voiceProfileIdLong != null) {
-            payload.items.forEach { item ->
-                if (item.sentenceId !in ourSentenceIds) return@forEach
-                val audio = item.audio ?: return@forEach
-                val sentence = sceneSentenceRepository.findById(item.sentenceId).orElse(null)
-                    ?: return@forEach
-                tryStoreCache(voiceProfileIdLong, sentence.englishText, audio.audioUrl)
-            }
+        payload.items.forEach { item ->
+            if (item.sentenceId !in ourSentenceIds) return@forEach
+            val audio = item.audio ?: return@forEach
+            val sentence = sceneSentenceRepository.findById(item.sentenceId).orElse(null)
+                ?: return@forEach
+            val itemVoiceProfileId = (item.voiceId ?: payload.voiceId).toLongOrNull()
+                ?: return@forEach
+            tryStoreCache(itemVoiceProfileId, sentence.englishText, audio.audioUrl)
         }
 
         // 4) Redis job status (operational sidecar) + polling cache invalidate.

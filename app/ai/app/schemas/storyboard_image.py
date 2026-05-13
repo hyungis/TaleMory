@@ -92,6 +92,7 @@ class StoryboardImageUsage(BaseModel):
 class StoryboardImageGenerateResult(BaseModel):
     pageNumber: int
     imageUrl: str
+    imageS3Key: str | None = None
     usage: StoryboardImageUsage
 
 

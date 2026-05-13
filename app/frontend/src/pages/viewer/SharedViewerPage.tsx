@@ -1,5 +1,10 @@
 import { useParams, useSearchParams } from 'react-router-dom'
-import { StoryBookViewer, WebtoonViewer, usePublicStoryViewQuery, InvitationCard } from '../../features/viewer'
+import {
+  InvitationCard,
+  StoryBookViewer,
+  StoryWebtoonViewer,
+  usePublicStoryViewQuery,
+} from '../../features/viewer'
 import '../../features/viewer/invitation/styles/invitation.css'
 
 /**
@@ -40,8 +45,8 @@ export function SharedViewerPage() {
     )
   }
 
-  const openBookMode = () => {
-    const url = `${window.location.pathname}?mode=book`
+  const openInPopup = (target: 'book' | 'webtoon') => {
+    const url = `${window.location.pathname}?mode=${target}`
     const w = Math.min(1280, window.screen.availWidth - 100)
     const h = Math.min(860, window.screen.availHeight - 100)
     const left = Math.round((window.screen.availWidth - w) / 2)
@@ -52,7 +57,7 @@ export function SharedViewerPage() {
       `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
     )
     if (!popup) {
-      setSearchParams({ mode: 'book' })
+      setSearchParams({ mode: target })
     }
   }
 
@@ -78,31 +83,17 @@ export function SharedViewerPage() {
   if (mode === 'book') {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
-
   if (mode === 'webtoon') {
-    return <WebtoonViewer story={story} />
+    // 비로그인 공개 뷰어 — isOwner=false 라 좌표 재시도 배너는 노출되지 않는다.
+    return <StoryWebtoonViewer story={story} isOwner={false} onExit={closeViewer} />
   }
 
   return (
     <InvitationCard
       story={story}
       isOwner={false}
-      onOpenBook={openBookMode}
-      onOpenWebtoon={() => {
-        const url = `${window.location.pathname}?mode=webtoon`
-        const w = Math.min(1280, window.screen.availWidth - 100)
-        const h = Math.min(860, window.screen.availHeight - 100)
-        const left = Math.round((window.screen.availWidth - w) / 2)
-        const top = Math.round((window.screen.availHeight - h) / 2)
-        const popup = window.open(
-          url,
-          `TaleMoryWebtoon-shared`,
-          `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
-        )
-        if (!popup) {
-          setSearchParams({ mode: 'webtoon' })
-        }
-      }}
+      onOpenBook={() => openInPopup('book')}
+      onOpenWebtoon={() => openInPopup('webtoon')}
       onBack={handleBack}
     />
   )

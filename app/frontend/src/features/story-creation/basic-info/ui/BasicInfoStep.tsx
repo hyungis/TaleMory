@@ -228,7 +228,7 @@ export function BasicInfoStep({
             </div>
           )}
 
-          <div className="cr-card">
+          <div className="cr-card" data-onboarding-target="creation-basic-info">
             <span className="cr-tape" aria-hidden="true" />
 
             {/* fieldset 으로 잠금 시 모든 form control 일괄 비활성. */}

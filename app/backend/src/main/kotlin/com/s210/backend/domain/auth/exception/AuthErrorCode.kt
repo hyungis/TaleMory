@@ -16,4 +16,7 @@ enum class AuthErrorCode(
     UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH_006", "지원하지 않는 OAuth 제공자입니다."),
     WITHDRAWN_ACCOUNT(HttpStatus.FORBIDDEN, "AUTH_007", "탈퇴한 계정은 로그인할 수 없습니다."),
     OAUTH_SIGNUP_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "AUTH_008", "카카오 가입 정보가 만료되었습니다. 다시 시도해주세요."),
+    EMAIL_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "AUTH_011", "이메일 인증을 완료해주세요."),
+    EMAIL_VERIFICATION_INVALID(HttpStatus.BAD_REQUEST, "AUTH_012", "이메일 인증번호가 올바르지 않습니다."),
+    EMAIL_SEND_FAILED(HttpStatus.BAD_GATEWAY, "AUTH_013", "이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요."),
 }

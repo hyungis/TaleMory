@@ -23,6 +23,14 @@ data class AvailabilityResponse(
     val available: Boolean,
 )
 
+data class EmailVerificationSendResponse(
+    val expiresInSeconds: Long,
+)
+
+data class EmailVerificationVerifyResponse(
+    val verified: Boolean,
+)
+
 data class KakaoCallbackResponse(
     val status: String,
     val accessToken: String? = null,

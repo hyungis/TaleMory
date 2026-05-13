@@ -31,7 +31,7 @@ export function StoryModeSelectModal({ onSelect, onClose }: StoryModeSelectModal
       aria-label="동화 생성 모드 선택"
     >
       <div
-        className="bg-[#F4E4BC] border-2 border-[#9A7548]/40 rounded-3xl shadow-[0_20px_60px_rgba(107,74,40,0.4)] max-w-md w-full p-6 sm:p-7 relative"
+        className="bg-[#F4E4BC] border-2 border-[#9A7548]/40 rounded-3xl shadow-[0_20px_60px_rgba(107,74,40,0.4)] max-w-lg w-full p-8 sm:p-9 relative"
         onClick={e => e.stopPropagation()}
       >
         {/* X 닫기 버튼 — 우상단. */}
@@ -39,14 +39,14 @@ export function StoryModeSelectModal({ onSelect, onClose }: StoryModeSelectModal
           type="button"
           onClick={onClose}
           aria-label="닫기"
-          className="absolute top-3 right-3 w-9 h-9 rounded-full bg-[#E9DBBE] hover:bg-[#D9BE82] border border-[#9A7548]/40 flex items-center justify-center transition-colors"
+          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-[#E9DBBE] hover:bg-[#D9BE82] border border-[#9A7548]/40 flex items-center justify-center transition-colors"
         >
-          <X className="w-4 h-4 text-[#3E2A18]" />
+          <X className="w-5 h-5 text-[#3E2A18]" />
         </button>
 
-        <div className="mb-5 pr-8">
-          <h2 className="text-2xl text-[#3E2A18] font-bold mb-1">어떤 동화로 만들까요?</h2>
-          <p className="text-[#6B4A28] text-base leading-relaxed">
+        <div className="mb-6 pr-8">
+          <h2 className="text-3xl md:text-4xl text-[#3E2A18] font-bold mb-2">어떤 동화로 만들까요?</h2>
+          <p className="text-[#6B4A28] text-lg leading-relaxed">
             아래 두 가지 모드 중 하나를 골라주세요. 한 번 시작하면 도중에 바꿀 수 없어요.
           </p>
         </div>
@@ -54,25 +54,26 @@ export function StoryModeSelectModal({ onSelect, onClose }: StoryModeSelectModal
         <div className="flex flex-col gap-3">
           <ModeOptionButton
             mode="VIEWER"
-            icon={<BookOpen className="w-5 h-5" />}
+            icon={<BookOpen className="w-6 h-6" />}
             title="기본 모드 (그림책)"
             description="페이지마다 한 단락의 이야기로 잔잔하게 읽어주는 동화책이에요."
+            onboardingTarget="creation-mode-viewer"
             onSelect={onSelect}
           />
           <ModeOptionButton
             mode="WEBTOON"
-            icon={<MessageSquareText className="w-5 h-5" />}
+            icon={<MessageSquareText className="w-6 h-6" />}
             title="웹툰 모드 (대화)"
             description="아이가 직접 등장인물이 되어 대사로 이야기가 흘러가는 웹툰형 동화예요."
             onSelect={onSelect}
           />
         </div>
 
-        <div className="mt-5 flex justify-end">
+        <div className="mt-6 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="bg-[#E9DBBE] text-[#3E2A18] px-4 py-2 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-colors font-bold text-base"
+            className="bg-[#E9DBBE] text-[#3E2A18] px-5 py-2.5 rounded-full border-2 border-[#9A7548]/40 hover:bg-[#D9BE82] transition-colors font-bold text-lg"
           >
             취소
           </button>
@@ -87,6 +88,7 @@ interface ModeOptionButtonProps {
   icon: React.ReactNode
   title: string
   description: string
+  onboardingTarget?: string
   onSelect: (mode: StoryModeApi) => void
 }
 
@@ -95,20 +97,21 @@ interface ModeOptionButtonProps {
  * VIEWER / WEBTOON 두 카드는 동일한 톤이고, 선택 자체로 페이지 진입을 트리거하므로
  * 라디오 버튼 + 확인 버튼 같은 별도 단계를 두지 않는다.
  */
-function ModeOptionButton({ mode, icon, title, description, onSelect }: ModeOptionButtonProps) {
+function ModeOptionButton({ mode, icon, title, description, onboardingTarget, onSelect }: ModeOptionButtonProps) {
   return (
     <button
       type="button"
       onClick={() => onSelect(mode)}
-      className="text-left bg-[#E9DBBE] border-2 border-[#9A7548]/30 rounded-2xl p-4 hover:bg-[#D9BE82] hover:border-[#9A7548]/60 hover:-translate-y-0.5 active:translate-y-0 shadow-[0_2px_0_#9A7548]/30 transition-all"
+      data-onboarding-target={onboardingTarget}
+      className="text-left bg-[#E9DBBE] border-2 border-[#9A7548]/30 rounded-2xl p-5 hover:bg-[#D9BE82] hover:border-[#9A7548]/60 hover:-translate-y-0.5 active:translate-y-0 shadow-[0_2px_0_#9A7548]/30 transition-all"
     >
-      <div className="flex items-start gap-3">
-        <div className="shrink-0 w-11 h-11 bg-[#F4E4BC] rounded-full flex items-center justify-center border-2 border-[#9A7548]/40 text-[#3E2A18]">
+      <div className="flex items-start gap-4">
+        <div className="shrink-0 w-13 h-13 bg-[#F4E4BC] rounded-full flex items-center justify-center border-2 border-[#9A7548]/40 text-[#3E2A18]" style={{ width: '52px', height: '52px' }}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg text-[#3E2A18] font-bold mb-0.5">{title}</h3>
-          <p className="text-[#6B4A28] text-sm leading-relaxed">{description}</p>
+          <h3 className="text-xl md:text-2xl text-[#3E2A18] font-bold mb-1">{title}</h3>
+          <p className="text-[#6B4A28] text-base leading-relaxed">{description}</p>
         </div>
       </div>
     </button>

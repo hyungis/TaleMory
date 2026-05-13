@@ -1,0 +1,257 @@
+/* ─── Webtoon viewer (vertical scroll, image + speech bubbles) ────────── */
+
+.swt-shell {
+  min-height: 100vh;
+  background: #1f2126;
+  color: #f4ede0;
+  display: flex;
+  flex-direction: column;
+}
+
+.swt-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  background: rgba(31, 33, 38, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.swt-toolbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f4ede0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-toolbar-btn {
+  background: transparent;
+  color: #f4ede0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swt-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.swt-feed {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 24px 16px 80px;
+}
+
+.swt-page {
+  width: min(100%, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.swt-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: rgba(244, 237, 224, 0.7);
+}
+
+.swt-page-num {
+  font-weight: 600;
+}
+
+.swt-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swt-action-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4ede0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swt-action-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.swt-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.swt-action-btn.is-active {
+  background: #f4c478;
+  color: #1f2126;
+  border-color: #f4c478;
+}
+
+.swt-canvas {
+  position: relative;
+  width: 100%;
+  background: #0f0f12;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.swt-canvas img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.swt-canvas-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  color: rgba(244, 237, 224, 0.45);
+  font-size: 14px;
+}
+
+.swt-bubble {
+  position: absolute;
+  /* x/y 는 anchor 점. 말풍선은 anchor 기준 위로 띄우고 가로 중앙 정렬. */
+  transform: translate(-50%, -100%);
+  max-width: min(70%, 320px);
+  pointer-events: auto;
+}
+
+.swt-bubble-body {
+  background: #ffffff;
+  color: #1f2126;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  border: 2px solid #1f2126;
+  word-break: keep-all;
+  position: relative;
+}
+
+.swt-bubble-tail {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 12px solid #1f2126;
+}
+.swt-bubble-tail::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid #ffffff;
+}
+
+/* 나레이션은 캡션 박스 — anchor 가 (0.5, 0.05) 라 상단 가로 중앙. */
+.swt-bubble.is-narration {
+  max-width: 80%;
+  transform: translate(-50%, 0);
+}
+.swt-bubble.is-narration .swt-bubble-body {
+  background: rgba(31, 33, 38, 0.9);
+  color: #f4ede0;
+  border-color: #f4c478;
+  font-style: italic;
+  font-size: 13px;
+}
+.swt-bubble.is-narration .swt-bubble-tail {
+  display: none;
+}
+
+.swt-bubble.is-active .swt-bubble-body {
+  outline: 3px solid #f4c478;
+  outline-offset: 2px;
+}
+
+.swt-bubble-speaker {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6f7a48;
+  margin-bottom: 2px;
+}
+
+.swt-bubble-korean {
+  display: block;
+  margin-top: 4px;
+  color: rgba(31, 33, 38, 0.6);
+  font-size: 12px;
+}
+.swt-bubble.is-narration .swt-bubble-korean {
+  color: rgba(244, 237, 224, 0.7);
+}
+
+.swt-retry-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(244, 196, 120, 0.12);
+  color: #f4c478;
+  border: 1px solid rgba(244, 196, 120, 0.45);
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.swt-retry-banner.is-busy {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.swt-retry-banner button {
+  background: #f4c478;
+  color: #1f2126;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.swt-retry-banner button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.swt-status {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(244, 237, 224, 0.7);
+}

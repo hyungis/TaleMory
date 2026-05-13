@@ -19,6 +19,7 @@ import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepo
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationLayoutResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
@@ -72,6 +73,7 @@ class StoryboardResultListener(
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
     private val finalIllustrationResultHandler: FinalIllustrationResultHandler,
+    private val webtoonLayoutResultHandler: WebtoonLayoutResultHandler,
     private val s3Service: S3Service,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val jobStatusRedisRepo: JobStatusRedisRepository,
@@ -103,6 +105,14 @@ class StoryboardResultListener(
             val FINAL_ILLUSTRATION = setOf(
                 "GENERATE_FINAL_ILLUSTRATION_COMPLETED", "GENERATE_FINAL_ILLUSTRATION_FAILED",
                 "REVISE_FINAL_ILLUSTRATION_COMPLETED", "REVISE_FINAL_ILLUSTRATION_FAILED",
+            )
+            /**
+             * WEBTOON 모드 좌표 추출 결과 envelope.
+             * AI 가 페이지별로 1개씩 publish (fan-out). status COMPLETED/FAILED 둘 다 포함.
+             */
+            val FINAL_ILLUSTRATION_LAYOUT = setOf(
+                "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_COMPLETED",
+                "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_FAILED",
             )
         }
     }
@@ -185,6 +195,18 @@ class StoryboardResultListener(
                     "COMPLETED" -> finalIllustrationResultHandler.handleSuccess(envelope)
                     "FAILED" -> finalIllustrationResultHandler.handleFailure(envelope)
                     else -> log.warn("[FINAL_ILLUST:RES] unknown status='{}' jobId={}", envelope.status, envelope.jobId)
+                }
+            }
+            in EnvelopeTypes.FINAL_ILLUSTRATION_LAYOUT -> {
+                val envelope = objectMapper.treeToValue(tree, FinalIllustrationLayoutResultEnvelope::class.java)
+                log.info(
+                    "[LAYOUT:RES] received — type={}, jobId={}, page={}, status={}",
+                    type, envelope.jobId, envelope.pageNumber, envelope.status,
+                )
+                when (envelope.status.uppercase()) {
+                    "COMPLETED" -> webtoonLayoutResultHandler.handleSuccess(envelope)
+                    "FAILED" -> webtoonLayoutResultHandler.handleFailure(envelope)
+                    else -> log.warn("[LAYOUT:RES] unknown status='{}' jobId={}", envelope.status, envelope.jobId)
                 }
             }
             else -> log.warn("Unknown envelope type='{}', body={}", type, body)

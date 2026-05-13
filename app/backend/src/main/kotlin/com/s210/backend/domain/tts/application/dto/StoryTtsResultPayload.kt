@@ -6,6 +6,7 @@ import com.s210.backend.domain.storyboard.application.dto.UsageInfo
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class StoryTtsResultPayload(
     val storyId: Long,
+    val storyMode: String? = null,
     val voiceId: String,
     val items: List<TtsResultItem>,
     val sceneSentenceUpdates: List<SceneSentenceUpdate>,

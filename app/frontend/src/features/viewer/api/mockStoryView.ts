@@ -51,7 +51,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '해솔이는 반짝이는 눈으로 공항에 도착했어요.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1002',
@@ -60,7 +59,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '그렇게 큰 비행기를 본 것은 처음이었죠.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1003',
@@ -69,7 +67,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '해솔이의 심장은 작은 북처럼 두근거렸어요.',
           ttsAudioUrl: null,
           speakerKey: 'thought',
-          bubbleSlot: null,
         },
       ],
     },
@@ -87,7 +84,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '곧 해솔이는 창가 자리를 찾아 유리창에 코를 바짝 댔어요.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1005',
@@ -96,7 +92,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '밖의 구름은 거대한 바닐라 아이스크림 한 스쿱처럼 보였어요.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1006',
@@ -105,7 +100,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '하늘은 비밀 놀이터 같아!',
           ttsAudioUrl: null,
           speakerKey: '해솔',
-          bubbleSlot: 'MIDDLE_CENTER',
         },
       ],
     },
@@ -123,7 +117,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '여러분, 환영합니다!',
           ttsAudioUrl: null,
           speakerKey: '기장님',
-          bubbleSlot: 'TOP_CENTER',
         },
         {
           sentenceId: '1008',
@@ -132,7 +125,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '해솔이는 허리를 곧게 펴고 한 마디도 놓치지 않으려 했죠.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1009',
@@ -141,7 +133,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '비행은 갑자기 덜 무섭고 훨씬 더 신나게 느껴졌어요.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
       ],
     },
@@ -159,7 +150,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '비행기가 노을을 가로지르자 해솔이는 작은 약속을 했어요.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1011',
@@ -168,7 +158,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '어디를 가든 용감한 순간들을 계속 모으기로 한 거예요.',
           ttsAudioUrl: null,
           speakerKey: 'thought',
-          bubbleSlot: null,
         },
         {
           sentenceId: '1012',
@@ -177,7 +166,6 @@ export const MOCK_STORY_VIEW: StoryView = {
           koreanText: '하늘은 그의 모든 꿈을 담아낼 만큼 넓게 느껴졌답니다.',
           ttsAudioUrl: null,
           speakerKey: 'narration',
-          bubbleSlot: null,
         },
       ],
     },

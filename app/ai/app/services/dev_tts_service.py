@@ -475,12 +475,7 @@ def generate_story_tts_result(
 ) -> dict[str, Any]:
     started = perf_counter()
     voice_id = request["voiceId"]
-    reference_path = resolve_reference_voice(
-        voice_id,
-        request.get("referenceAudioUrl"),
-        request.get("referenceAudioS3Key"),
-    )
-
+    story_mode = request.get("storyMode", "VIEWER")
     story_id = request["storyId"]
 
     default_emotion = request["options"]["defaultEmotion"]
@@ -488,26 +483,67 @@ def generate_story_tts_result(
     output_format = request.get("format", "wav")
     items: list[dict[str, Any]] = []
     sentences = request["sentences"]
-    engine_started = perf_counter()
-    audio_results = _synthesize_tts_batch(
-        texts=[sentence["text"] for sentence in sentences],
-        prompt_wav_path=reference_path,
-        audio_format=output_format,
-        language=request.get("language"),
-    )
-    engine_elapsed = _elapsed_ms(engine_started)
+    default_voice_ref = {
+        "speakerKey": "narrator",
+        "voiceId": voice_id,
+        "referenceAudioUrl": request.get("referenceAudioUrl"),
+        "referenceAudioS3Key": request.get("referenceAudioS3Key"),
+    }
+    voice_refs = {
+        ref["speakerKey"]: ref
+        for ref in request.get("voiceRefs", [])
+        if ref.get("speakerKey") and ref.get("voiceId")
+    }
 
-    for index, (sentence, audio_result) in enumerate(zip(sentences, audio_results, strict=True), start=1):
+    def voice_ref_for(sentence: dict[str, Any]) -> dict[str, Any]:
+        speaker_key = sentence.get("speakerKey") or "narrator"
+        return voice_refs.get(speaker_key) or default_voice_ref
+
+    grouped_sentences: dict[tuple[str, str | None, str | None], list[dict[str, Any]]] = {}
+    for sentence in sentences:
+        ref = voice_ref_for(sentence)
+        key = (ref["voiceId"], ref.get("referenceAudioUrl"), ref.get("referenceAudioS3Key"))
+        grouped_sentences.setdefault(key, []).append(sentence)
+
+    audio_by_sentence_id: dict[int, tuple[bytes, str, str, int]] = {}
+    total_engine_elapsed = 0
+    for (group_voice_id, reference_audio_url, reference_audio_s3_key), group in grouped_sentences.items():
+        reference_path = resolve_reference_voice(
+            group_voice_id,
+            reference_audio_url,
+            reference_audio_s3_key,
+        )
+        engine_started = perf_counter()
+        audio_results = _synthesize_tts_batch(
+            texts=[sentence["text"] for sentence in group],
+            prompt_wav_path=reference_path,
+            audio_format=output_format,
+            language=request.get("language"),
+        )
+        engine_elapsed = _elapsed_ms(engine_started)
+        total_engine_elapsed += engine_elapsed
+        for sentence, audio_result in zip(group, audio_results, strict=True):
+            audio_bytes, resolved_format = audio_result
+            audio_by_sentence_id[sentence["sentenceId"]] = (
+                audio_bytes,
+                resolved_format,
+                group_voice_id,
+                engine_elapsed,
+            )
+
+    for index, sentence in enumerate(sentences, start=1):
         sentence_id = sentence["sentenceId"]
         emotion = sentence.get("emotion") or default_emotion
         style_prompt = sentence.get("stylePrompt") or default_style_prompt
+        speaker_key = sentence.get("speakerKey")
         sentence_started = perf_counter()
-        audio_bytes, resolved_format = audio_result
+        audio_bytes, resolved_format, sentence_voice_id, engine_elapsed = audio_by_sentence_id[sentence_id]
         sentence_path = (
             settings.TTS_STORAGE_ROOT
             / "generated"
             / "story-tts"
             / str(story_id)
+            / str(sentence_voice_id)
             / "sentences"
             / f"{sentence_id}.{resolved_format}"
         )
@@ -531,6 +567,8 @@ def generate_story_tts_result(
         items.append(
             {
                 "sentenceId": sentence_id,
+                "speakerKey": speaker_key,
+                "voiceId": sentence_voice_id,
                 "appliedStyle": {
                     "emotion": emotion,
                     "stylePrompt": style_prompt,
@@ -548,6 +586,7 @@ def generate_story_tts_result(
 
     result: dict[str, Any] = {
         "storyId": story_id,
+        "storyMode": story_mode,
         "voiceId": voice_id,
         "items": items,
         "sceneSentenceUpdates": [
@@ -567,15 +606,18 @@ def generate_story_tts_result(
             "outputTokens": None,
             "totalTokens": None,
             "costUsd": None,
-            "promptTemplateVersion": "tts_v1",
+            "promptTemplateVersion": "tts_webtoon_v1" if story_mode == "WEBTOON" else "tts_v1",
         },
     }
 
     logger.info(
-        "[TTS:STORY:GENERATE:DONE] storyId=%s voiceId=%s sentenceCount=%d elapsedMs=%d",
+        "[TTS:STORY:GENERATE:DONE] storyId=%s storyMode=%s voiceId=%s voiceGroups=%d sentenceCount=%d engineMs=%d elapsedMs=%d",
         story_id,
+        story_mode,
         voice_id,
+        len(grouped_sentences),
         len(items),
+        total_engine_elapsed,
         _elapsed_ms(started),
     )
     return result
