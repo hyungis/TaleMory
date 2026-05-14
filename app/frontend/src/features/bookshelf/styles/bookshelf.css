@@ -4,10 +4,11 @@
    ========================================================================== */
 
 /* ===== Modal Overlay =====
-   ⚠ 옛 `backdrop-filter: blur(20px)` 제거 — CSS containing block 함정 회피.
-   backdrop-filter 가 박힌 부모는 자식의 `position: fixed` 가 viewport 가 아니라 그 부모 기준으로
-   잡히게 만들어, 책장 안에서 띄우는 FeedbackDialog 등이 viewport 전체를 못 덮고 책장 panel
-   영역에만 표시되는 문제 발생. 흐림 효과는 `background` 의 짙은 반투명만으로 비슷한 인상을 유지. */
+   ⚠ `backdrop-filter: blur(20px)` 제거 — CSS containing block 함정 회피.
+   backdrop-filter 가 박힌 부모는 자식의 `position: fixed` 가 viewport 가 아닌 그 부모 기준으로
+   잡히게 만들어, 책장 안에서 띄우는 FeedbackDialog(로그아웃 완료 등) 가 viewport 전체를 못
+   덮고 책장 panel 영역에만 표시되는 문제 발생. 흐림 효과는 `background` 짙은 반투명만으로
+   비슷한 인상을 유지. (재발 방지 — 같은 버그 두 번째 fix.) */
 .library-modal-overlay {
   position: fixed;
   top: 0;
@@ -449,9 +450,10 @@
 }
 
 /* ===== Fade-in 연출 (카드/블록 공용) =====
-   ⚠ 옛 `transform: translateY(20px) → 0` 슬라이드 제거 — CSS containing block 함정 회피.
-   transform 이 박힌 부모는 자식의 `position: fixed` 가 viewport 가 아니라 그 부모 기준으로
-   잡혀 책장 panel 안에서 띄우는 모달이 일부 영역만 덮는 문제 발생. opacity 만으로 fade. */
+   ⚠ `transform: translateY(20px)` 제거 — backdrop-filter 와 동일한 containing block 함정 회피.
+   transform 이 박힌 부모는 자식의 position:fixed 를 자기 기준으로 잡으므로 책장 안에서 띄우는
+   FeedbackDialog 가 viewport 전체를 못 덮음. opacity 페이드만 유지.
+   (재발 방지 — 같은 버그 두 번째 fix.) */
 .bookshelf-modal .bookshelf-fade-in {
   animation: bookshelfFadeIn 0.6s ease-out forwards;
   opacity: 0;
