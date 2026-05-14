@@ -486,6 +486,21 @@
   border-radius: 0;
 }
 
+/* 웹툰 뷰어: 배경 일러스트만 블러 처리, 메모장은 또렷하게 */
+.swt-page-snap .sb-back-cover-illust {
+  filter: blur(6px);
+  transform: scale(1.04); /* 블러 가장자리 빈틈 방지 */
+}
+
+/* 웹툰 뷰어: 다크 오버레이를 좀 더 밝게 — 메모장 가독성 확보 */
+.swt-page-snap .sb-back-cover::before {
+  background: linear-gradient(
+    180deg,
+    rgba(40, 30, 15, 0.30) 0%,
+    rgba(40, 30, 15, 0.40) 100%
+  );
+}
+
 /* ===== Status ===== */
 .swt-status {
   min-height: 60vh;

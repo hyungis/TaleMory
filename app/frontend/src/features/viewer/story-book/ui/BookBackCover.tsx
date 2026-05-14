@@ -48,9 +48,10 @@ export function BookBackCover({ outro, onRestart, illustrationUrl, hideRestart =
     setIsLanded(true)
   }, [replayKey])
 
-  // 오디오 있을 때만 재생 (disableAutoAudio 시 자동재생 안 함 — 웹툰 뷰어 자체 루프 사용)
+  // 오디오 있을 때만 재생 (disableAutoAudio 시 초기 마운트만 차단, "다시 듣기"는 허용)
   useEffect(() => {
-    if (!audioUrl || disableAutoAudio) return
+    if (!audioUrl) return
+    if (disableAutoAudio && replayKey === 0) return
     const audio = new Audio(audioUrl)
     audio.play().catch(() => {
       /* 자동재생 차단 시 무시 — 사용자 제스처 후 수동 재생 유도 가능 */
