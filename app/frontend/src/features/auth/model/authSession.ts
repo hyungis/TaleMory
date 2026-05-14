@@ -23,6 +23,10 @@ const listeners = new Set<() => void>()
 let resolverInitialized = false
 let refreshRequest: Promise<boolean> | null = null
 let bootstrapPromise: Promise<void> | null = null
+// 부팅 refresh 가 완료됐는지 — protected 경로는 이 값이 true 가 되기 전엔 렌더 보류한다.
+// 저장된 세션이 없으면 bootstrap 이 즉시 returning 하므로 곧장 true 로 전이됨.
+let bootstrapDone = false
+const bootstrapListeners = new Set<() => void>()
 // 새로고침 직후에도 로그인 상태가 이어지도록 모듈 초기화 시 localStorage 를 먼저 읽는다.
 let authSessionSnapshot = readStoredAuthSession()
 
@@ -47,7 +51,7 @@ export function initializeAuthSession(): Promise<void> {
     resolverInitialized = true
   }
 
-  bootstrapPromise = bootstrapAuthSession()
+  bootstrapPromise = bootstrapAuthSession().finally(markBootstrapDone)
   return bootstrapPromise
 }
 
@@ -58,6 +62,34 @@ async function bootstrapAuthSession(): Promise<void> {
   // stale access token 일 가능성이 있으므로 부팅 시점에 한 번 refresh 를 강제로 돌려본다.
   // refreshAccessToken 은 성공 시 snapshot 을 갱신하고, 실패 시 내부에서 clearAuthSession() 을 호출한다.
   await refreshAccessToken()
+}
+
+function markBootstrapDone(): void {
+  if (bootstrapDone) return
+  bootstrapDone = true
+  bootstrapListeners.forEach(listener => listener())
+}
+
+/**
+ * 부팅 refresh 완료 여부를 React 에서 구독할 수 있는 훅.
+ *
+ * - 저장된 세션이 없거나, 있어도 refresh 가 끝났으면 true.
+ * - 보호 라우트(MainShell / RequireAuth) 는 false 인 동안 렌더를 보류해 corrupted/stale
+ *   토큰으로 BookstoreScene 같은 자식이 마운트되며 API 401 을 트리거하는 race 를 차단한다.
+ */
+export function useAuthBootstrapDone(): boolean {
+  return useSyncExternalStore(subscribeBootstrap, getBootstrapDone, getBootstrapDone)
+}
+
+function subscribeBootstrap(listener: () => void): () => void {
+  bootstrapListeners.add(listener)
+  return () => {
+    bootstrapListeners.delete(listener)
+  }
+}
+
+function getBootstrapDone(): boolean {
+  return bootstrapDone
 }
 
 export function useAuthSession(): AuthSessionSnapshot {

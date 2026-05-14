@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useAuthSession } from '../../features/auth'
+import { useAuthBootstrapDone, useAuthSession } from '../../features/auth'
 import { ROUTES } from '../../shared/constants'
 import { MainPage } from './MainPage'
 
@@ -26,9 +26,18 @@ import { MainPage } from './MainPage'
  */
 export function MainShell() {
   const { isAuthenticated } = useAuthSession()
+  const bootstrapDone = useAuthBootstrapDone()
   const location = useLocation()
 
   const isProtectedPath = location.pathname.startsWith(ROUTES.main)
+
+  // 부팅 refresh 가 끝나기 전에는 보호 경로에서 MainPage 마운트를 보류.
+  // 그렇지 않으면 localStorage 의 corrupted/stale 토큰으로 BookstoreScene 가 마운트되며
+  // /api/stories 등이 401 폭탄을 맞춘다.
+  if (isProtectedPath && !bootstrapDone) {
+    return null
+  }
+
   if (isProtectedPath && !isAuthenticated) {
     return <Navigate to={ROUTES.home} replace state={{ from: location.pathname }} />
   }

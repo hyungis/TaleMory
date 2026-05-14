@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useAuthSession } from '../../features/auth'
+import { useAuthBootstrapDone, useAuthSession } from '../../features/auth'
 import { ROUTES } from '../../shared/constants'
 
 /**
@@ -25,7 +25,14 @@ import { ROUTES } from '../../shared/constants'
  */
 export function RequireAuth() {
   const { isAuthenticated } = useAuthSession()
+  const bootstrapDone = useAuthBootstrapDone()
   const location = useLocation()
+
+  // 부팅 refresh 가 끝나기 전엔 자식 라우트 마운트 보류 — corrupted/stale 토큰으로
+  // 자식이 API 쿼리를 발사하기 전에 isAuthenticated 가 확정되도록 한다.
+  if (!bootstrapDone) {
+    return null
+  }
 
   if (!isAuthenticated) {
     // 로그인 후 원래 가려던 경로로 돌아갈 수 있도록 location 을 state 로 넘긴다.

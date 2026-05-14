@@ -3,6 +3,7 @@ export { useAuthModal } from './model/useAuthModal'
 export {
   initializeAuthSession,
   useAuthSession,
+  useAuthBootstrapDone,
   getAuthSessionSnapshot,
   setAuthSession,
   clearAuthSession,
