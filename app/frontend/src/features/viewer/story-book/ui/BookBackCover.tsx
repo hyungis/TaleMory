@@ -12,8 +12,6 @@ interface BookBackCoverProps {
   hideRestart?: boolean
   /** 뒷표지 하단에 동화 제목 표시 (웹툰 뷰어에서 사용) */
   title?: string
-  /** 오디오 자동 재생 비활성화 (웹툰 뷰어에서는 자체 재생 루프 사용) */
-  disableAutoAudio?: boolean
   /** 편지지 표시 여부 — false면 편지지를 숨김 (웹툰 뷰어에서 해당 페이지 도달 전까지 숨김) */
   showLetter?: boolean
 }
@@ -24,7 +22,7 @@ interface BookBackCoverProps {
  * 그 위에 편지지가 날아 착지 → 글자 타이핑 → 서명/버튼 순서로 노출.
  * outro 데이터가 없으면 기본 마무리 멘트 사용.
  */
-export function BookBackCover({ outro, onRestart, illustrationUrl, hideRestart = false, title, disableAutoAudio = false, showLetter = true }: BookBackCoverProps) {
+export function BookBackCover({ outro, onRestart, illustrationUrl, hideRestart = false, title, showLetter = true }: BookBackCoverProps) {
   const paperRef = useRef<HTMLDivElement>(null)
   const [isLanded, setIsLanded] = useState(false)
   /* 사용자가 마무리 멘트를 안 적은 경우엔 편지지 자체를 안 띄움 — 기본 폴백 멘트로 메우면
