@@ -81,8 +81,6 @@ export function SharedViewerPage() {
     }
   }
 
-  const storyViewerMode = story.mode === 'WEBTOON' ? 'webtoon' : 'book'
-
   if (mode === 'book') {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
