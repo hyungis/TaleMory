@@ -146,6 +146,7 @@ function isAuthUser(value: unknown): value is AuthUser {
     (candidate.phone === undefined || candidate.phone === null || typeof candidate.phone === 'string') &&
     typeof candidate.agreeSms === 'boolean' &&
     typeof candidate.agreeMarketing === 'boolean' &&
+    (candidate.onboardingCompleted === undefined || typeof candidate.onboardingCompleted === 'boolean') &&
     isOauthProvider(candidate.provider) &&
     typeof candidate.createdAt === 'string' &&
     typeof candidate.updatedAt === 'string'

@@ -8,14 +8,13 @@ import {
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { MousePointerClick, Sparkles, X } from 'lucide-react'
-import { useAuthSession } from '../../auth'
+import { setAuthSession, useAuthSession } from '../../auth'
 import { ROUTES } from '../../../shared/constants'
+import { completeOnboarding } from '../api/completeOnboarding'
 import { ONBOARDING_STEPS, type OnboardingStep } from '../model/onboardingSteps'
 import {
   hasSeenOnboardingPromptThisSession,
   markOnboardingPromptSeenThisSession,
-  readOnboardingStatus,
-  writeOnboardingStatus,
 } from '../model/onboardingStorage'
 import { OnboardingTutorialContext } from '../model/onboardingTutorialContext'
 
@@ -83,6 +82,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
   const [isTutorialActive, setIsTutorialActive] = useState(false)
+  const [promptHandledUserId, setPromptHandledUserId] = useState<number | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null)
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 })
@@ -91,24 +91,20 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!auth.isAuthenticated || auth.user === null) {
-      const timeoutId = window.setTimeout(() => {
-        setIsPromptOpen(false)
-        setIsTutorialActive(false)
-      }, 0)
-      return () => window.clearTimeout(timeoutId)
+      setIsPromptOpen(false)
+      setIsTutorialActive(false)
+      setPromptHandledUserId(null)
+      return
     }
 
     if (isPromptOpen || isTutorialActive) return
-    if (readOnboardingStatus(auth.user) !== null) return
+    if (auth.user.onboardingCompleted === true) return
+    if (promptHandledUserId === auth.user.id) return
     if (hasSeenOnboardingPromptThisSession(auth.user)) return
     if (!isEligiblePath(location.pathname)) return
 
-    markOnboardingPromptSeenThisSession(auth.user)
-    const timeoutId = window.setTimeout(() => {
-      setIsPromptOpen(true)
-    }, 0)
-    return () => window.clearTimeout(timeoutId)
-  }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname])
+    setIsPromptOpen(true)
+  }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname, promptHandledUserId])
 
   useEffect(() => {
     if (!isTutorialActive || activeStep === null) return
@@ -145,13 +141,47 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     setTargetRect(null)
   }, [])
 
+  const markPromptHandled = useCallback(() => {
+    if (auth.user === null) return
+    setPromptHandledUserId(auth.user.id)
+    markOnboardingPromptSeenThisSession(auth.user)
+  }, [auth.user])
+
+  const completeOnboardingForUser = useCallback(() => {
+    const user = auth.user
+    const accessToken = auth.accessToken
+    if (user === null) return
+
+    markPromptHandled()
+    void completeOnboarding()
+      .then(() => {
+        if (accessToken === null) return
+        setAuthSession({
+          accessToken,
+          user: {
+            ...user,
+            onboardingCompleted: true,
+          },
+        })
+      })
+      .catch(() => {
+        /* Onboarding is optional; a failed completion sync should not block navigation. */
+      })
+  }, [auth.accessToken, auth.user, markPromptHandled])
+
+  const closeTutorialPrompt = useCallback(() => {
+    completeOnboardingForUser()
+    closeTutorialForSession()
+  }, [closeTutorialForSession, completeOnboardingForUser])
+
   const completeTutorial = useCallback(() => {
-    writeOnboardingStatus(auth.user, 'completed')
+    completeOnboardingForUser()
     closeTutorialForSession()
     navigate(ROUTES.mainBookshelf, { replace: true })
-  }, [auth.user, closeTutorialForSession, navigate])
+  }, [closeTutorialForSession, completeOnboardingForUser, navigate])
 
   const startTutorial = useCallback(() => {
+    markPromptHandled()
     setIsPromptOpen(false)
     setIsExitConfirmOpen(false)
     setIsTutorialActive(true)
@@ -160,7 +190,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     if (location.pathname !== ROUTES.main) {
       navigate(ROUTES.main)
     }
-  }, [location.pathname, navigate])
+  }, [location.pathname, markPromptHandled, navigate])
 
   const openTutorialPrompt = useCallback(() => {
     setIsExitConfirmOpen(false)
@@ -176,11 +206,12 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   }, [])
 
   const exitTutorialToMain = useCallback(() => {
+    markPromptHandled()
     closeTutorialForSession()
     if (location.pathname !== ROUTES.main) {
       navigate(ROUTES.main, { replace: true })
     }
-  }, [closeTutorialForSession, location.pathname, navigate])
+  }, [closeTutorialForSession, location.pathname, markPromptHandled, navigate])
 
   const advanceTutorial = useCallback(() => {
     const next = activeIndex + 1
@@ -272,7 +303,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
       {isPromptOpen && (
         <OnboardingPrompt
           onStart={startTutorial}
-          onDismiss={closeTutorialForSession}
+          onDismiss={closeTutorialPrompt}
         />
       )}
       {isExitConfirmOpen && (
@@ -386,7 +417,7 @@ function OnboardingPrompt({
               cursor: 'pointer',
             }}
           >
-            나중에 보기
+            닫기
           </button>
           <button
             type="button"

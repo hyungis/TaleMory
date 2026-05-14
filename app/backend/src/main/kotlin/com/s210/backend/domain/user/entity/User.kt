@@ -32,5 +32,8 @@ class User(
     var agreeSms: Boolean = false,
 
     @Column(name = "agree_marketing", nullable = false)
-    var agreeMarketing: Boolean = false
+    var agreeMarketing: Boolean = false,
+
+    @Column(name = "onboarding_completed", nullable = false)
+    var onboardingCompleted: Boolean = false
 ) : SoftDeletableEntity()

@@ -40,6 +40,14 @@ class UserController(
             ApiResponse(data = UserResponse.from(userService.modifyUser(user.userId, request.toCommand()))),
         )
 
+    @PatchMapping("/onboarding-completion")
+    fun userOnboardingComplete(
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<Void> {
+        userService.modifyUserOnboardingCompleted(user.userId)
+        return ResponseEntity.noContent().build()
+    }
+
     @DeleteMapping
     fun userRemove(
         @AuthenticationPrincipal user: CustomUser,
