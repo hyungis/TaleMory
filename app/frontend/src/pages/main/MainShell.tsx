@@ -1,4 +1,6 @@
-import { Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuthSession } from '../../features/auth'
+import { ROUTES } from '../../shared/constants'
 import { MainPage } from './MainPage'
 
 /**
@@ -14,8 +16,23 @@ import { MainPage } from './MainPage'
  *
  * (이전 구조에서는 HomePage 가 자체적으로 MainPage 를 in-place 렌더하다가 navigate 시점에
  *  unmount → 라우트 전환 후 새로 mount 되며 ForestScene 이 리셋되는 stutter 가 발생했음.)
+ *
+ * 인증 가드:
+ *   /main 이하 경로는 인증 필수.
+ *   비로그인 상태로 진입하면 `<Outlet/>` 으로 RequireAuth 가 redirect 되기 전에 MainPage 가
+ *   이미 마운트되며 BookstoreScene 의 stories 쿼리가 발사돼 500 에러가 콘솔에 쌓이는 문제가
+ *   있어, MainPage 마운트 자체를 막기 위해 셸 진입점에서 직접 가드한다.
+ *   `/` (랜딩) 은 비로그인도 접근 가능하므로 path 가 /main 으로 시작할 때만 적용.
  */
 export function MainShell() {
+  const { isAuthenticated } = useAuthSession()
+  const location = useLocation()
+
+  const isProtectedPath = location.pathname.startsWith(ROUTES.main)
+  if (isProtectedPath && !isAuthenticated) {
+    return <Navigate to={ROUTES.home} replace state={{ from: location.pathname }} />
+  }
+
   return (
     <>
       <MainPage />

@@ -15,12 +15,11 @@ export function AppRouter() {
     <Routes>
       {/* MainShell 이 / 와 /main/* 양쪽에서 같은 MainPage 인스턴스를 유지.
           → 랜딩(/) → /main 전환 시 ForestScene 이 unmount 되지 않아 자연스러움.
-          /main/* 는 RequireAuth 로 감싸되 MainShell 은 공통이라 ForestScene continuity 보존. */}
+          /main/* 의 인증 가드는 MainShell 안에서 직접 처리한다 — RequireAuth 를 Outlet 으로
+          쓰면 MainPage 가 이미 마운트되어 BookstoreScene 쿼리가 발사되는 race 가 발생함. */}
       <Route element={<MainShell />}>
         <Route path={ROUTES.home} element={<HomePage />} />
-        <Route element={<RequireAuth />}>
-          <Route path={`${ROUTES.main}/*`} element={null} />
-        </Route>
+        <Route path={`${ROUTES.main}/*`} element={null} />
       </Route>
 
       {/* 인증 필수 — 비로그인 진입 시 / 로 replace. */}
