@@ -5,7 +5,6 @@ interface InvitationCardProps {
   story: StoryView
   isOwner: boolean
   onOpen: () => void
-  onBack: () => void
 }
 
 /**
@@ -15,7 +14,6 @@ interface InvitationCardProps {
 export function InvitationCard({
   story,
   onOpen,
-  onBack,
 }: InvitationCardProps) {
   const title = story.title?.trim() || '제목 없는 동화'
   const pageCount = story.scenes.length
