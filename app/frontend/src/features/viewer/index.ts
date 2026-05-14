@@ -6,7 +6,6 @@
 export { InvitationCard } from './invitation/ui/InvitationCard'
 export { BookBackCover } from './story-book/ui/BookBackCover'
 export { StoryBookViewer } from './story-book/ui/StoryBookViewer'
-export { WebtoonViewer } from './webtoon/ui/WebtoonViewer'
 export { StoryWebtoonViewer } from './story-webtoon/ui/StoryWebtoonViewer'
 export { useStoryViewQuery } from './model/useStoryViewQuery'
 export { usePublicStoryViewQuery } from './model/usePublicStoryViewQuery'
