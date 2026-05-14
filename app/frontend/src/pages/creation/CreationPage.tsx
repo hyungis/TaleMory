@@ -223,6 +223,8 @@ function CreationFlowPage({ initialState }: { initialState: CreationLocationStat
           storyId={flow.storyId}
           storyGenerationJobId={flow.storyGenerationJobId}
           finalIllustrationJobId={flow.finalIllustrationJobId}
+          setStoryGenerationJobId={flow.setStoryGenerationJobId}
+          setFinalIllustrationJobId={flow.setFinalIllustrationJobId}
           onBack={handleBack}
           onNext={flow.handleNext}
         />
