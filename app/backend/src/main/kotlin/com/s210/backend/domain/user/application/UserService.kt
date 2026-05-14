@@ -42,6 +42,7 @@ class UserService(
     fun modifyUserOnboardingCompleted(userId: Long) {
         val user = ownedUser(userId)
         user.onboardingCompleted = true
+        userRepository.save(user)
     }
 
     fun removeUser(userId: Long, principalId: String) {

@@ -43,8 +43,8 @@ const PANEL_MIN_WIDTH = 280
 const PANEL_MAX_WIDTH = 360
 const PANEL_ESTIMATED_HEIGHT = 248
 
-function isEligiblePath(pathname: string): boolean {
-  return pathname !== '/auth' && !pathname.startsWith('/auth/')
+function isAutomaticPromptPath(pathname: string): boolean {
+  return pathname === ROUTES.main
 }
 
 function isStepRoute(pathname: string, step: OnboardingStep): boolean {
@@ -82,7 +82,6 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
   const [isTutorialActive, setIsTutorialActive] = useState(false)
-  const [promptHandledUserId, setPromptHandledUserId] = useState<number | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null)
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 })
@@ -93,18 +92,16 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     if (!auth.isAuthenticated || auth.user === null) {
       setIsPromptOpen(false)
       setIsTutorialActive(false)
-      setPromptHandledUserId(null)
       return
     }
 
     if (isPromptOpen || isTutorialActive) return
     if (auth.user.onboardingCompleted === true) return
-    if (promptHandledUserId === auth.user.id) return
     if (hasSeenOnboardingPromptThisSession(auth.user)) return
-    if (!isEligiblePath(location.pathname)) return
+    if (!isAutomaticPromptPath(location.pathname)) return
 
     setIsPromptOpen(true)
-  }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname, promptHandledUserId])
+  }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname])
 
   useEffect(() => {
     if (!isTutorialActive || activeStep === null) return
@@ -143,16 +140,14 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
 
   const markPromptHandled = useCallback(() => {
     if (auth.user === null) return
-    setPromptHandledUserId(auth.user.id)
     markOnboardingPromptSeenThisSession(auth.user)
   }, [auth.user])
 
-  const completeOnboardingForUser = useCallback(() => {
+  const saveOnboardingCompletion = useCallback(() => {
     const user = auth.user
     const accessToken = auth.accessToken
     if (user === null) return
 
-    markPromptHandled()
     void completeOnboarding()
       .then(() => {
         if (accessToken === null) return
@@ -167,18 +162,20 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
       .catch(() => {
         /* Onboarding is optional; a failed completion sync should not block navigation. */
       })
-  }, [auth.accessToken, auth.user, markPromptHandled])
+  }, [auth.accessToken, auth.user])
 
   const closeTutorialPrompt = useCallback(() => {
-    completeOnboardingForUser()
+    markPromptHandled()
+    saveOnboardingCompletion()
     closeTutorialForSession()
-  }, [closeTutorialForSession, completeOnboardingForUser])
+  }, [closeTutorialForSession, markPromptHandled, saveOnboardingCompletion])
 
   const completeTutorial = useCallback(() => {
-    completeOnboardingForUser()
+    markPromptHandled()
+    saveOnboardingCompletion()
     closeTutorialForSession()
     navigate(ROUTES.mainBookshelf, { replace: true })
-  }, [closeTutorialForSession, completeOnboardingForUser, navigate])
+  }, [closeTutorialForSession, markPromptHandled, navigate, saveOnboardingCompletion])
 
   const startTutorial = useCallback(() => {
     markPromptHandled()
