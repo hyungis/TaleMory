@@ -40,12 +40,13 @@ class StoryController(
     ): ResponseEntity<ApiResponse<StoryDraftResponse?>> {
         val draft = storyService.findLatestDraft(user.userId)
         val body = draft?.let {
-            // 크롬 종료로 sessionStorage 가 비워져도 BE 진실 (stylePresetId / Scene 존재) 기반으로
+            // 크롬 종료로 sessionStorage 가 비워져도 BE 진실 (stylePresetId / TTS 잡 존재) 기반으로
             // FE 가 Step 5/6/7 의 readOnly 락을 복원할 수 있도록 진행 메타를 함께 내린다.
             StoryDraftResponse(
                 storyId = StoryId(it.id),
                 title = it.title,
                 difficulty = it.difficulty.name,
+                mode = it.mode.name,
                 companionsJson = it.companionsJson,
                 mainCharacterJson = it.mainCharacterJson,
                 travelPlace = it.travelPlace,
@@ -54,7 +55,7 @@ class StoryController(
                 createdAt = it.createdAt,
                 stylePresetId = it.stylePresetId,
                 voiceProfileId = it.voiceProfileId?.let { id -> VoiceProfileId(id) },
-                sceneConfirmed = storyService.existsScenes(it.id),
+                storyboardConfirmed = storyService.existsStoryboardConfirmed(it.id),
             )
         }
         return ResponseEntity.ok(ApiResponse(data = body))
@@ -157,6 +158,27 @@ class StoryController(
             cacheMisses = result.cacheMisses,
             finalIllustrationJobId = result.finalIllustrationJobId?.let { JobId(it) },
         )))
+    }
+
+    /**
+     * Step 8 미리보기에서 FINAL_ILLUSTRATION 잡이 FAILED 일 때 사용자가 [다시 시도] 한 경우.
+     *
+     * Story.stylePresetId 가 이미 채워져 있어야 한다 (Step 5 PATCH /style 완료 전제 — 비어있으면
+     * INVALID_STORY_STATE/409). 멱등 가드로 직전 잡이 PENDING/RUNNING/SUCCESS 면 그 jobId 가
+     * 그대로 반환되며, FAILED/CANCELLED 면 새 잡이 발행된다 — FE 는 jobId 로 polling 재개.
+     *
+     * TTS retry 는 별도 엔드포인트 없음 — confirmStoryboard 의 멱등 가드가 FAILED 일 때 새 잡을
+     * 발행하므로 `POST /storyboard/confirm` 을 그대로 다시 호출하면 동일 효과.
+     */
+    @PostMapping("/{storyId}/jobs/final-illustration/retry")
+    fun finalIllustrationRetry(
+        @PathVariable storyId: StoryId,
+        @AuthenticationPrincipal user: CustomUser,
+    ): ResponseEntity<ApiResponse<JobRetryResponse>> {
+        val jobId = storyService.retryFinalIllustration(user.userId, storyId.value)
+        return ResponseEntity.accepted().body(
+            ApiResponse(data = JobRetryResponse(jobId = JobId(jobId)))
+        )
     }
 
 }

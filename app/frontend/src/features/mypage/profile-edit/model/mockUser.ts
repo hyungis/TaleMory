@@ -15,6 +15,7 @@ export const mockUser: UserProfile = {
   phone: '010-1234-5678',
   agreeSms: true,
   agreeMarketing: false,
+  onboardingCompleted: false,
   provider: null,
   createdAt: '2026-01-15T09:00:00Z',
   updatedAt: '2026-04-01T09:00:00Z',

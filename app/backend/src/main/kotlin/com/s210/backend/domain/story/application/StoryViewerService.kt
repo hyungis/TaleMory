@@ -131,6 +131,7 @@ class StoryViewerService(
             storyId = StoryId(story.id),
             title = story.title,
             difficulty = story.difficulty.name,
+            mode = story.mode.name,
             mainCharacter = parseMainCharacter(story.mainCharacterJson),
             coverIllustrationUrl = coverScene?.illustrationUrl ?: scenes.firstOrNull()?.illustrationUrl,
             publishedAt = story.publishedAt,
@@ -165,7 +166,6 @@ class StoryViewerService(
             koreanText = sentence.koreanText,
             ttsAudioUrl = highlightAudioMap[sentence.id] ?: sentence.ttsAudioUrl,
             speakerKey = sentence.speakerKey,
-            bubbleSlot = sentence.bubbleSlot?.name,
         )
     }
 

@@ -27,6 +27,7 @@ import {
   useStoryboardPagePatch,
   useStoryboardPagesQuery,
   useStoryboardRegenStatusQuery,
+  WebtoonSentenceEditor,
   type StoryboardImageVersionEntry,
   type StoryboardPageItem,
 } from '../../storyboard-pages'
@@ -43,6 +44,15 @@ import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
 import '../../styles/creation-paper.css'
+
+/**
+ * WEBTOON 페이지 판단 — sentences[] 중 한 개라도 webtoon 메타가 있으면 webtoon.
+ *  - VIEWER 모드 페이지나 옛 데이터(메타 미존재) 는 false → 기존 textarea 편집기로 폴백.
+ *  - WEBTOON 모드 페이지는 true → WebtoonSentenceEditor (row UI) 사용.
+ */
+function isWebtoonPage(page: StoryboardPageItem): boolean {
+  return (page.sentences ?? []).some(s => s.type === 'DIALOGUE' || s.type === 'NARRATION')
+}
 
 /** "마지막 SUCCESS 이후 FAILED" 한도. 이 값 이상이면 사용자에게 사과 + 메인 페이지 이동. */
 const FAILED_LIMIT = 3
@@ -503,20 +513,46 @@ export function StoryboardEditorStep({
   // 보기 모드 — 'grid' (한 줄 3장 갤러리) / 'individual' (페이지마다 글+이미지+재생성).
   // 그리드에서 사진 클릭 시 individual 모드로 전환 + 해당 페이지로 스크롤.
   const [viewMode, setViewMode] = useState<'grid' | 'individual'>('individual')
-  const [currentPageIndex, setCurrentPageIndex] = useState(0)
+
+  // 사용자가 보고 있던 페이지 index 를 새로고침 후에도 유지하기 위해 sessionStorage 에 저장.
+  // storyId 별로 key 분리 — 다른 동화 진입 시 섞이지 않도록.
+  const pageIndexStorageKey = storyId !== null ? `storyboard-page-index:${storyId}` : null
+  const [currentPageIndex, setCurrentPageIndexRaw] = useState<number>(() => {
+    if (pageIndexStorageKey === null || typeof window === 'undefined') return 0
+    const saved = window.sessionStorage.getItem(pageIndexStorageKey)
+    if (!saved) return 0
+    const parsed = Number.parseInt(saved, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  })
+
+  // setter wrapper — state 갱신과 함께 sessionStorage 도 동기화.
+  const setCurrentPageIndex = useCallback<typeof setCurrentPageIndexRaw>(
+    (next) => {
+      setCurrentPageIndexRaw(prev => {
+        const resolved = typeof next === 'function'
+          ? (next as (p: number) => number)(prev)
+          : next
+        if (pageIndexStorageKey !== null && typeof window !== 'undefined') {
+          window.sessionStorage.setItem(pageIndexStorageKey, String(resolved))
+        }
+        return resolved
+      })
+    },
+    [pageIndexStorageKey],
+  )
 
   const handleSelectPageFromGrid = useCallback((pageNumber: number) => {
     setCurrentPageIndex(Math.max(0, pages.findIndex(page => page.pageNumber === pageNumber)))
     setViewMode('individual')
-  }, [pages])
+  }, [pages, setCurrentPageIndex])
 
-  // viewMode 가 individual 로 바뀐 직후 카드가 mount 되면 해당 페이지로 부드럽게 스크롤.
+  // pages.length 가 변동 시 현재 index 를 유효 범위로 clamp.
+  // ⚠ pages.length === 0 (마운트 직후 fetch 완료 전) 일 때는 절대 손대면 안 됨 —
+  //   그 시점에 0 으로 reset 하면 sessionStorage 도 0 으로 덮어써져서 새로고침 후 복원이 무의미해짐.
   useEffect(() => {
-    setCurrentPageIndex(prev => {
-      if (pages.length === 0) return 0
-      return Math.min(prev, pages.length - 1)
-    })
-  }, [pages.length])
+    if (pages.length === 0) return
+    setCurrentPageIndex(prev => Math.min(prev, pages.length - 1))
+  }, [pages.length, setCurrentPageIndex])
 
   const currentPage = pages[currentPageIndex] ?? null
 
@@ -533,10 +569,13 @@ export function StoryboardEditorStep({
   }, [])
 
   const handleDraftBlur = useCallback(
-    (pageNumber: number, original: string | null) => {
+    (pageNumber: number, original: string | null, overrideText?: string) => {
       if (readOnly) return
       if (isTranslationInProgress) return
-      const value = drafts[pageNumber] ?? ''
+      // overrideText: WebtoonSentenceEditor 같이 React state(`drafts`) 와 별개로
+      //   자체 row state 를 들고 있는 편집기 가 명시적으로 합본 text 를 넘길 때 사용.
+      //   기본 textarea 흐름은 인자 없이 호출 → drafts[pageNumber] 사용.
+      const value = overrideText ?? drafts[pageNumber] ?? ''
       const trimmed = value.trim()
       if (trimmed.length === 0) return
       if (trimmed === (original ?? '').trim()) return // 변화 없으면 PATCH 안 보냄
@@ -927,7 +966,9 @@ export function StoryboardEditorStep({
                     pageCount={pages.length}
                     draft={drafts[currentPage.pageNumber] ?? ''}
                     onDraftChange={value => handleDraftChange(currentPage.pageNumber, value)}
-                    onDraftBlur={() => handleDraftBlur(currentPage.pageNumber, currentPage.koreanText)}
+                    onDraftBlur={overrideText =>
+                      handleDraftBlur(currentPage.pageNumber, currentPage.koreanText, overrideText)
+                    }
                     regeneratePrompt={regeneratePrompts[currentPage.pageNumber] ?? ''}
                     onRegeneratePromptChange={value =>
                       setRegeneratePrompts(prev => ({ ...prev, [currentPage.pageNumber]: value }))
@@ -1032,7 +1073,12 @@ function PageCard(props: {
   pageCount: number
   draft: string
   onDraftChange: (value: string) => void
-  onDraftBlur: () => void
+  /**
+   * 편집 완료 콜백.
+   * 일반 textarea: 인자 없이 호출 → 부모 state(`drafts[pageNumber]`)에서 읽음.
+   * WebtoonSentenceEditor: row 들을 합쳐 만든 koreanText 를 명시 인자로 전달 (state 우회).
+   */
+  onDraftBlur: (overrideText?: string) => void
   regeneratePrompt: string
   onRegeneratePromptChange: (value: string) => void
   onRegenerateImage: () => void
@@ -1309,6 +1355,27 @@ function PageCard(props: {
               )}
             </div>
 	            {editingKorean ? (
+              isWebtoonPage(props.page) ? (
+                /*
+                 * WEBTOON 모드: per-sentence row 편집기.
+                 * 화자 chip(잠금) + 본문 input + [+ 추가]/[삭제] 버튼.
+                 * sentence 갯수가 명시적으로 변동하므로 번역 매칭 어긋남 위험 ↓.
+                 * 추가 가능한 화자는 page.charactersInScene[].characterKey 만 (등장인물 정합성 유지).
+                 */
+                <WebtoonSentenceEditor
+                  // page 가 바뀌면 자동 remount 되어 rows 가 새 페이지 sentences 로 재초기화.
+                  // (편집 모드 켠 채로 페이지 넘기면 row 영역도 새 페이지 데이터로 동기화.)
+                  key={`webtoon-editor-${props.page.pageNumber}`}
+                  initialSentences={props.page.sentences}
+                  isSubmitting={patchPending}
+                  disabled={translationLocked}
+                  onCancel={() => setEditingKorean(false)}
+                  onSave={combined => {
+                    onDraftBlur(combined)
+                    setEditingKorean(false)
+                  }}
+                />
+              ) : (
 	              <>
               <textarea
                 value={draft}
@@ -1358,6 +1425,7 @@ function PageCard(props: {
 	                </button>
 	              </div>
 	            </>
+              )
 	            ) : (
               <p className="text-[#6B4A28] text-lg md:text-xl leading-relaxed font-bold whitespace-pre-wrap min-h-[2.5rem]">
                 {koreanText || (
@@ -1368,6 +1436,15 @@ function PageCard(props: {
               </p>
             )}
           </div>
+
+          {/*
+            WEBTOON 모드 본문 표시:
+             - BE pageTexts() 가 sentence 별로 줄바꿈 + DIALOGUE 면 `이름: 대사` prefix 를 박은 상태로
+               koreanText / englishText 를 내려준다.
+             - 따라서 위 textarea 가 webtoon 도 그대로 처리 — 별도 미리보기 컴포넌트 불필요.
+             - 사용자가 한글 본문 편집 시에도 prefix(이름) 가 일반 글자라 자연스럽게 보존됨.
+             - VIEWER 모드는 동작 0 변동.
+          */}
         </div>
       </div>
     </div>

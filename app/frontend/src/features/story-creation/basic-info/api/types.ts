@@ -11,6 +11,15 @@ export type PersonGender = 'MALE' | 'FEMALE' | 'OTHER'
 export type PersonRoleApi = 'CHILD' | 'COMPANION'
 export type DifficultyApi = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 
+/**
+ * 동화 생성 모드 — 메인의 "새 동화책 만들기" 클릭 시 모달에서 선택.
+ *  - VIEWER: 기존 동화책 모드 (페이지별 narration 본문). 기본값.
+ *  - WEBTOON: 대화 중심 웹툰 모드 (sentence 마다 화자 + 캐릭터 위치 메타).
+ *
+ * BE `StoryMode` enum / AI worker `StoryMode = Literal["VIEWER", "WEBTOON"]` 와 1:1 매칭.
+ */
+export type StoryModeApi = 'VIEWER' | 'WEBTOON'
+
 /** GET /api/persons 응답 원소 / POST/PATCH 성공 시 반환 페이로드. */
 export interface PersonResponse {
   id: PersonId
@@ -40,6 +49,10 @@ export interface ModifyPersonRequest {
 export interface CreateStoryRequest {
   title: string | null
   difficulty: DifficultyApi
+  /**
+   * 동화 생성 모드. 메인의 모드 선택 모달에서 결정. 누락 시 BE 가 default 'VIEWER'.
+   */
+  mode?: StoryModeApi
   companionsJson: string
   mainCharacterJson: string
   travelPlace?: string | null
@@ -56,10 +69,10 @@ export interface StoryCreateResponse {
  * GET /api/stories/draft 응답 — 로그인 유저의 최신 DRAFT 1건.
  * 서버는 DRAFT 없으면 `data: null` 로 내려준다.
  *
- * `stylePresetId`, `voiceProfileId`, `sceneConfirmed` 는 "이어서 작성하기" 진입 시
+ * `stylePresetId`, `voiceProfileId`, `storyboardConfirmed` 는 "이어서 작성하기" 진입 시
  * 각 step 의 readOnly 락을 BE 진실 기반으로 복원하기 위한 진행 메타.
  *  - `stylePresetId !== null` → Step 5 락 (스타일 변경 불가)
- *  - `sceneConfirmed === true` → Step 6/7 락 (Step 7→8 confirm 한 번이라도 성공)
+ *  - `storyboardConfirmed === true` → Step 6/7 락 (Step 7→8 confirmStoryboard 한 번이라도 호출 → TTS 잡 존재)
  *  - `voiceProfileId` 는 Step 6 voice rehydrate 판단용 (현재는 단순 노출)
  *
  * 크롬 종료 → sessionStorage 비움 → 재진입 시에도 lock 이 유지되도록 보장하기 위해
@@ -69,6 +82,8 @@ export interface StoryDraftResponse {
   storyId: StoryId
   title: string | null
   difficulty: DifficultyApi
+  /** 동화 생성 모드 — VIEWER (기본) / WEBTOON. "이어서 작성하기" 시 모드 복원에 사용. */
+  mode: StoryModeApi
   companionsJson: string
   mainCharacterJson: string
   travelPlace: string | null
@@ -78,7 +93,7 @@ export interface StoryDraftResponse {
   createdAt: string
   stylePresetId: number | null
   voiceProfileId: VoiceProfileId | null
-  sceneConfirmed: boolean
+  storyboardConfirmed: boolean
 }
 
 /**

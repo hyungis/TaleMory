@@ -1,0 +1,679 @@
+/* ─── Webtoon viewer — snap scroll + warm paper theme ────────── */
+
+.swt-shell {
+  --swt-bg:
+    radial-gradient(ellipse at 30% 20%, #fbf3dc 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, #ead7ad 0%, transparent 65%),
+    linear-gradient(180deg, #f7ecd0 0%, #f0e2bc 100%);
+  --swt-ink: #4a3b2a;
+  --swt-ink-soft: #6b5638;
+  --swt-ink-mute: #8a7558;
+  --swt-accent: #7a9968;
+  --swt-accent-deep: #5f7d50;
+  --swt-paper: #fbf2da;
+  --swt-paper-warm: #fdf6e0;
+  --swt-caramel: #c89968;
+  --swt-caramel-deep: #a37548;
+  --swt-topbar-h: 48px;
+  --swt-font: 'Gaegu', 'Nanum Pen Script', cursive;
+
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--swt-bg);
+  color: var(--swt-ink);
+  font-family: var(--swt-font);
+  overflow: hidden;
+}
+
+/* ===== Top bar ===== */
+.swt-topbar {
+  flex-shrink: 0;
+  height: var(--swt-topbar-h);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: linear-gradient(180deg, rgba(247, 236, 208, 0.95) 0%, rgba(240, 226, 188, 0.9) 100%);
+  border-bottom: 2px solid var(--swt-caramel);
+  box-shadow: 0 2px 6px rgba(140, 100, 60, 0.12);
+}
+
+.swt-exit-btn {
+  background: none;
+  border: none;
+  color: var(--swt-ink);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.swt-exit-btn:hover {
+  opacity: 1;
+}
+
+.swt-title {
+  flex: 1;
+  font-family: var(--swt-font);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--swt-ink);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.swt-auto-btn {
+  background: var(--swt-paper);
+  border: 2px solid var(--swt-caramel-deep);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-family: var(--swt-font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--swt-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 0 var(--swt-caramel-deep);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.swt-auto-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 var(--swt-caramel-deep);
+}
+.swt-auto-btn--active {
+  background: var(--swt-accent);
+  border-color: var(--swt-accent-deep);
+  color: var(--swt-paper-warm);
+  box-shadow: 0 2px 0 var(--swt-accent-deep);
+}
+
+.swt-ko-toggle {
+  background: var(--swt-paper);
+  border: 2px solid var(--swt-caramel-deep);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--swt-font);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--swt-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  box-shadow: 0 2px 0 var(--swt-caramel-deep);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.swt-ko-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 var(--swt-caramel-deep);
+}
+.swt-ko-toggle--active {
+  background: var(--swt-accent);
+  border-color: var(--swt-accent-deep);
+  color: var(--swt-paper-warm);
+  box-shadow: 0 2px 0 var(--swt-accent-deep);
+}
+
+.swt-page-indicator {
+  font-size: 15px;
+  color: var(--swt-ink-mute);
+  white-space: nowrap;
+}
+
+/* ===== Snap scroll area ===== */
+.swt-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ===== Page — one screen per snap ===== */
+.swt-page-snap {
+  width: 100%;
+  height: calc(100vh - var(--swt-topbar-h));
+  min-height: calc(100vh - var(--swt-topbar-h));
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swt-scene-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 12px;
+}
+
+/* ===== Image wrapper ===== */
+.swt-scene-img-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* overflow visible so bubbles near top edge are not clipped */
+  overflow: visible;
+}
+
+.swt-scene-img {
+  display: block;
+  max-width: 100%;
+  max-height: 85vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.swt-scene-placeholder {
+  flex: 1;
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.swt-placeholder-text {
+  font-size: 20px;
+  color: var(--swt-ink-mute);
+  opacity: 0.5;
+}
+
+/* ===== Image-aligned overlay (bubbles + narration) ===== */
+.swt-img-overlay {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ===== English narration box — overlay on bottom of image ===== */
+.swt-en-box {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 10px 60px 10px 24px;
+  background: linear-gradient(0deg, rgba(251, 242, 218, 0.92) 0%, rgba(253, 246, 224, 0.85) 100%);
+  backdrop-filter: blur(4px);
+  border-top: 2px solid rgba(200, 153, 104, 0.5);
+  z-index: 4;
+}
+
+.swt-en-line {
+  font-family: var(--swt-font);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--swt-ink);
+  margin: 0;
+  padding: 2px 0;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.swt-en-line--playing {
+  color: var(--swt-accent-deep);
+  text-shadow: 0 0 6px rgba(122, 153, 104, 0.3);
+}
+
+/* ===== Per-page play button (floating) ===== */
+.swt-play-btn {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 6;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s, transform 0.15s;
+}
+.swt-play-btn:hover {
+  background: rgba(0, 0, 0, 0.55);
+  transform: scale(1.08);
+}
+.swt-play-btn--active {
+  background: var(--swt-accent);
+  border-color: var(--swt-accent-deep);
+  color: #fff;
+}
+
+/* ===== Speech bubble — style A (rounded rect + tail) ===== */
+.swt-bubble {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  width: 280px;
+  max-width: 80vw;
+  padding: 10px 16px;
+  background: #fffef5;
+  color: #2a2520;
+  border: 2px solid #d4c8a8;
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-family: var(--swt-font);
+  z-index: 5;
+  pointer-events: none;
+  animation: swt-bubble-pop 0.25s ease-out;
+}
+
+@keyframes swt-bubble-pop {
+  from { opacity: 0; transform: translate(-50%, -90%) scale(0.9); }
+  to   { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
+
+/* Tail (fill) */
+.swt-bubble-tail {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  margin-left: -8px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 10px 8px 0 8px;
+  border-color: #fffef5 transparent transparent transparent;
+}
+
+/* Tail (border outline) */
+.swt-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 50%;
+  margin-left: -9px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 12px 9px 0 9px;
+  border-color: #d4c8a8 transparent transparent transparent;
+}
+
+/* ===== Narration banner — wide strip at image top ===== */
+.swt-bubble--narration {
+  transform: translateX(-50%);
+  width: 92%;
+  max-width: 92%;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, rgba(251, 242, 218, 0.92), rgba(253, 246, 224, 0.88));
+  color: var(--swt-ink);
+  border: 2px solid var(--swt-caramel);
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 3px 10px rgba(74, 59, 42, 0.18);
+  animation: swt-narration-slide 0.35s ease-out;
+}
+.swt-bubble--narration .swt-bubble-text {
+  font-style: normal;
+  font-weight: 600;
+  font-size: 19px;
+  text-align: center;
+  line-height: 1.6;
+  color: var(--swt-ink);
+}
+/* 나레이션은 꼬리·border 삼각형 없음 */
+.swt-bubble--narration::before {
+  display: none;
+}
+
+@keyframes swt-narration-slide {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.swt-bubble-speaker {
+  display: block;
+  font-family: var(--swt-font);
+  font-size: 15px;
+  font-weight: 700;
+  color: #7a9968;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+
+.swt-bubble-text {
+  font-family: var(--swt-font);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* ==========================================================================
+   Korean side panel — slides in from right
+   ========================================================================== */
+.swt-ko-panel {
+  position: fixed;
+  top: var(--swt-topbar-h);
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  z-index: 15;
+
+  background: linear-gradient(180deg, rgba(253, 246, 224, 0.97) 0%, rgba(247, 236, 208, 0.97) 100%);
+  backdrop-filter: blur(12px);
+  border-left: 2px solid var(--swt-caramel);
+  box-shadow: -4px 0 16px rgba(140, 100, 60, 0.15);
+
+  display: flex;
+  flex-direction: column;
+
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.swt-ko-panel--open {
+  transform: translateX(0);
+}
+
+.swt-ko-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(200, 153, 104, 0.3);
+}
+
+.swt-panel-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.swt-panel-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px;
+  font-family: var(--swt-font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--swt-ink-mute);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.swt-panel-tab:hover {
+  color: var(--swt-ink);
+}
+.swt-panel-tab--active {
+  color: var(--swt-accent-deep);
+  border-bottom-color: var(--swt-accent-deep);
+}
+
+.swt-ko-panel-close {
+  background: none;
+  border: 1px solid var(--swt-caramel);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: var(--swt-font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--swt-ink-mute);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s;
+}
+.swt-ko-panel-close:hover {
+  background: rgba(200, 153, 104, 0.15);
+}
+
+.swt-ko-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.swt-ko-panel-line {
+  font-family: var(--swt-font);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: var(--swt-ink);
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.swt-ko-panel-line--playing {
+  border-left-color: var(--swt-accent);
+  background: rgba(122, 153, 104, 0.1);
+}
+
+.swt-ko-panel-speaker {
+  font-weight: 700;
+  color: var(--swt-accent-deep);
+}
+
+.swt-ko-panel-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--swt-ink-mute);
+  font-size: 14px;
+}
+
+/* ===== 영어 본문 단어 클릭 버튼 ===== */
+.swt-word-btn {
+  display: inline;
+  padding: 0 1px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.swt-word-btn:hover {
+  background: rgba(122, 153, 104, 0.22);
+  box-shadow: inset 0 -2px 0 var(--swt-accent-deep);
+}
+
+/* 단어 카드 — 하단 오른쪽 배치 + sb 변수 주입 */
+.swt-shell .sb-word-card {
+  --sb-paper: #fbf2da;
+  --sb-paper-warm: #fdf6e0;
+  --sb-paper-2: #f0e6c0;
+  --sb-ink: #4a3b2a;
+  --sb-ink-soft: #6b5638;
+  --sb-ink-mute: #8a7558;
+  --sb-sage: #7a9968;
+  --sb-sage-deep: #5f7d50;
+  --sb-sage-tint: rgba(122, 153, 104, 0.12);
+  --sb-caramel: #c89968;
+  --sb-caramel-deep: #a37548;
+  --sb-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
+  --sb-font-pen: 'Gaegu', 'Nanum Pen Script', cursive;
+  --sb-font-serif: Georgia, 'Times New Roman', serif;
+
+  left: auto;
+  right: 16px;
+  transform: none;
+}
+
+
+/* ===== Retry banner ===== */
+.swt-retry-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: rgba(200, 153, 104, 0.15);
+  color: var(--swt-caramel-deep);
+  border-top: 1px solid var(--swt-caramel);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.swt-retry-banner.is-busy {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.swt-retry-banner button {
+  background: var(--swt-caramel-deep);
+  color: var(--swt-paper-warm);
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.swt-retry-banner button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===== Outro page ===== */
+/* .sb-room 밖에서 렌더되므로 BookBackCover 가 쓰는 CSS 변수 주입 */
+/* 표지 — sb 변수 주입 + 전체 영역 채움 */
+.swt-page-snap .sb-cover-single {
+  --sb-sage: #7a9968;
+  --sb-caramel: #c89968;
+  --sb-paper-warm: #fdf6e0;
+  --sb-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.swt-page-snap .sb-back-cover {
+  --sb-paper: #fbf2da;
+  --sb-paper-warm: #fdf6e0;
+  --sb-ink: #4a3b2a;
+  --sb-ink-soft: #6b5638;
+  --sb-ink-mute: #8a7558;
+  --sb-sage: #7a9968;
+  --sb-sage-deep: #5f7d50;
+  --sb-caramel: #c89968;
+  --sb-caramel-deep: #a37548;
+  --sb-rust: #c47254;
+  --sb-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
+  --sb-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
+  --sb-font-serif: 'Gaegu', 'Nanum Pen Script', cursive;
+
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+/* 웹툰 뷰어: ::before 오버레이에 backdrop-filter로 배경만 블러.
+   편지지(z-index:3)는 오버레이(z-index:1) 위에 있으므로 영향 없음. */
+.swt-page-snap .sb-back-cover::before {
+  background: linear-gradient(
+    180deg,
+    rgba(40, 30, 15, 0.30) 0%,
+    rgba(40, 30, 15, 0.40) 100%
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* ===== Status ===== */
+.swt-status {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--swt-ink-mute);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 480px) {
+  .swt-topbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .swt-title {
+    font-size: 17px;
+  }
+  .swt-auto-btn {
+    font-size: 13px;
+    padding: 4px 10px;
+  }
+  .swt-ko-toggle {
+    font-size: 13px;
+    padding: 4px 8px;
+  }
+  .swt-en-box {
+    padding: 8px 12px;
+  }
+  .swt-en-line {
+    font-size: 17px;
+  }
+  .swt-bubble {
+    width: 220px;
+    padding: 8px 12px;
+    border-radius: 14px;
+  }
+  .swt-bubble-text {
+    font-size: 14px;
+  }
+  .swt-bubble-speaker {
+    font-size: 11px;
+  }
+  .swt-bubble--narration {
+    padding: 8px 14px;
+  }
+  .swt-bubble--narration .swt-bubble-text {
+    font-size: 13px;
+  }
+  .swt-play-btn {
+    width: 36px;
+    height: 36px;
+    bottom: 10px;
+    right: 10px;
+  }
+  .swt-ko-panel {
+    width: 240px;
+  }
+  .swt-ko-panel-line {
+    font-size: 14px;
+    padding: 6px 10px;
+  }
+}

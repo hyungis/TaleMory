@@ -18,6 +18,8 @@ data class StorySummaryRegenerateJobMessage(
     val jobId: String,
     val jobType: String = "STORY_SUMMARY_REGENERATE",
     val storyId: Long,
+    /** 동화 생성 모드 — VIEWER / WEBTOON. AI 가 webtoon prompt 분기에 사용. */
+    val storyMode: String = "VIEWER",
     val payload: StorySummaryRegeneratePayload,
 )
 

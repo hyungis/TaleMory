@@ -34,6 +34,8 @@ export interface Story {
    * 추후 백엔드에서 표지 이미지 URL 내려오면 coverUrl 로 교체.
    */
   bgClass: string
+  /** "VIEWER" | "WEBTOON" — 동화 생성 모드. */
+  mode?: 'VIEWER' | 'WEBTOON'
   /** 백엔드 원본 필드 (API 연동 시 사용) */
   status?: string
   shareToken?: string | null

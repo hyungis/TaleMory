@@ -3,6 +3,7 @@ package com.s210.backend.domain.story.presentation.request
 import com.s210.backend.domain.story.application.dto.CreateStoryCommand
 import com.s210.backend.domain.story.application.dto.ModifyStoryCommand
 import com.s210.backend.domain.story.model.Difficulty
+import com.s210.backend.domain.story.model.StoryMode
 import jakarta.validation.constraints.NotBlank
 import java.time.LocalDate
 
@@ -12,10 +13,14 @@ import java.time.LocalDate
  * `companionsJson` / `mainCharacterJson` 은 FE 에서 `JSON.stringify(...)` 한 **문자열**을
  * 그대로 받아 DB 의 JSON 컬럼에 저장한다. 프론트에서 여러 아이 배열/자유 텍스트 동행자 모두
  * 단일 컬럼으로 직렬화해 유연성을 확보하는 전략.
+ *
+ * `mode` 는 메인 페이지의 모드 선택 모달에서 결정된 값 — VIEWER(기본) / WEBTOON.
+ * 누락 시 default VIEWER 로 fallback (기존 흐름 호환).
  */
 data class CreateStoryRequest(
     val title: String?,
     @field:NotBlank val difficulty: String,
+    val mode: String? = null,
     @field:NotBlank val companionsJson: String,
     @field:NotBlank val mainCharacterJson: String,
     val travelPlace: String? = null,
@@ -26,6 +31,7 @@ data class CreateStoryRequest(
         userId = userId,
         title = title,
         difficulty = Difficulty.valueOf(difficulty.uppercase()),
+        mode = mode?.let { StoryMode.valueOf(it.uppercase()) } ?: StoryMode.VIEWER,
         companionsJson = companionsJson,
         mainCharacterJson = mainCharacterJson,
         travelPlace = travelPlace,

@@ -169,6 +169,7 @@ class StoryboardGenerationService(
         val envelope = StoryGenerateJobMessage(
             jobId = job.id.toString(),
             storyId = storyId,
+            storyMode = story.mode.name,
             payload = payload,
         )
         rabbitTemplate.convertAndSend(

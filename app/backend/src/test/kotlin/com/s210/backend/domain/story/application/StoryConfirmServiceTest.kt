@@ -209,7 +209,6 @@ class StoryConfirmServiceTest {
                 koreanText = null,
                 ttsAudioUrl = null,
                 speakerKey = null,
-                bubbleSlot = null,
                 hasHighlighted = false,
             )
         }

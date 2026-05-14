@@ -10,9 +10,10 @@ import {
   deleteStory,
   DraftResumeModal,
   DraftResumeBanner,
+  StoryModeSelectModal,
   clearCreationProgressSnapshot,
 } from '../../../features/story-creation'
-import type { StoryDraftResponse } from '../../../features/story-creation'
+import type { StoryDraftResponse, StoryModeApi } from '../../../features/story-creation'
 import { TopRightMenu } from './TopRightMenu'
 
 interface BookstoreSceneProps {
@@ -53,6 +54,9 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
   // "새 동화책 만들기" 클릭 + draft 가 있는 경우 노출되는 confirm 모달 표시 여부.
   // (배너의 "이어서 만들기" 는 모달을 거치지 않고 바로 navigate.)
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false)
+  // draft 가 없거나 폐기된 직후 띄우는 "동화 생성 모드 선택" 모달.
+  // VIEWER / WEBTOON 둘 중 하나를 고르면 navigate(/creation, {state:{mode}}) 로 진입.
+  const [isModeModalOpen, setIsModeModalOpen] = useState(false)
   const [isResolvingDraft, setIsResolvingDraft] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
   const [stories, setStories] = useState<Story[]>([])
@@ -125,8 +129,8 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
    * "새 동화책 만들기" 버튼 진입점.
    *
    * draft 는 이미 책장 진입 시 fetch 되어 state 에 있으므로, 재조회 없이 그대로 분기.
-   *  - draft 있음 → confirm 모달 오픈 (이어서 OR 새로 시작)
-   *  - draft 없음 → 바로 /creation 진입
+   *  - draft 있음 → DraftResumeModal 오픈 (사용자가 "새로 시작" 확정 시 polling 으로 mode 모달까지)
+   *  - draft 없음 → mode 선택 모달 오픈 → 선택 후 /creation 진입
    *
    * NOTE: 배너의 "이어서 만들기" 는 모달을 거치지 않고 직접 handleResumeDraft 호출 →
    *       빠른 resume 경로. 이 함수는 "새로 시작" 이 가능한 모달 흐름 전용.
@@ -134,14 +138,13 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
   const handleCreateStory = useCallback(() => {
     setDraftError(null)
     if (draft) {
-      // 책장 그대로 둔 채 confirm dialog 만 위에 띄움.
+      // 책장 그대로 둔 채 DraftResumeModal 을 위에 띄움.
       setIsDraftModalOpen(true)
       return
     }
-    // draft 없음 → navigate. (sessionStorage stale storyId 정리 포함)
-    clearCreationProgressSnapshot()
-    navigate(ROUTES.creation)
-  }, [draft, navigate])
+    // draft 없음 → 즉시 mode 선택 모달 오픈. navigate 는 mode 선택 후 일어남.
+    setIsModeModalOpen(true)
+  }, [draft])
 
   /** 이어서 작성 — 배너/모달 둘 다에서 사용. location state 로 draft 넘겨 CreationPage 가 rehydrate. */
   const handleResumeDraft = useCallback(() => {
@@ -152,7 +155,11 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
     navigate(ROUTES.creation, { state: { draft: target } })
   }, [draft, navigate])
 
-  /** 새로 시작 — 기존 DRAFT soft delete 후 즉시 navigate. */
+  /**
+   * 새로 시작 — 기존 DRAFT soft delete 후 mode 선택 모달로 넘김.
+   *  - delete 성공 시: DraftResumeModal 닫고 → mode 선택 모달 오픈
+   *  - delete 실패 시: 에러 토스트 표시, draft 는 유지
+   */
   const handleStartNew = useCallback(async () => {
     if (!draft || isResolvingDraft) return
     setIsResolvingDraft(true)
@@ -163,24 +170,57 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
       setIsDraftModalOpen(false)
       // 서버 DRAFT 를 지웠으니 sessionStorage 의 옛 storyId snapshot 도 명시 reset.
       clearCreationProgressSnapshot()
-      navigate(ROUTES.creation)
+      // navigate 대신 mode 선택 모달 → 사용자가 모드 결정 후 진입.
+      setIsModeModalOpen(true)
     } catch (err) {
       const message = err instanceof Error ? err.message : '초안 삭제에 실패했습니다.'
       setDraftError(message)
     } finally {
       setIsResolvingDraft(false)
     }
-  }, [draft, isResolvingDraft, navigate])
+  }, [draft, isResolvingDraft])
 
   /** 모달만 닫음 — draft state 는 유지해 배너가 그대로 보이도록. */
   const handleCloseDraftModal = useCallback(() => {
     setIsDraftModalOpen(false)
   }, [])
 
+  /**
+   * 모드 선택 완료 → /creation 진입.
+   * 진입 직전 sessionStorage 의 옛 progress snapshot 을 정리 (이전 동화의 잔여 storyId 차단).
+   * navigate state 로 mode 만 넘기고, CreationPage 가 useStoryCreationFlow init 으로 변환.
+   */
+  const handleSelectMode = useCallback(
+    (mode: StoryModeApi) => {
+      setIsModeModalOpen(false)
+      clearCreationProgressSnapshot()
+      navigate(ROUTES.creation, { state: { mode } })
+    },
+    [navigate],
+  )
+
+  /** 모드 선택 모달만 닫음 — 사용자가 모드 결정을 미룬 경우 책장으로 그냥 돌아감. */
+  const handleCloseModeModal = useCallback(() => {
+    setIsModeModalOpen(false)
+  }, [])
+
   const handleReadStory = useCallback(
     (story: Story) => {
-      setIsLibraryOpen(false)
-      navigate(buildViewerPath(story.id))
+      const mode = story.mode === 'WEBTOON' ? 'webtoon' : 'book'
+      const url = `${buildViewerPath(story.id)}?mode=${mode}`
+      const w = Math.min(1280, window.screen.availWidth - 100)
+      const h = Math.min(860, window.screen.availHeight - 100)
+      const left = Math.round((window.screen.availWidth - w) / 2)
+      const top = Math.round((window.screen.availHeight - h) / 2)
+      const popup = window.open(
+        url,
+        `TaleMoryViewer-${story.id}`,
+        `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
+      )
+      if (!popup) {
+        setIsLibraryOpen(false)
+        navigate(url)
+      }
     },
     [navigate],
   )
@@ -238,6 +278,13 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
           onStartNew={handleStartNew}
           onClose={handleCloseDraftModal}
           isSubmitting={isResolvingDraft}
+        />
+      )}
+
+      {isModeModalOpen && (
+        <StoryModeSelectModal
+          onSelect={handleSelectMode}
+          onClose={handleCloseModeModal}
         />
       )}
 

@@ -72,16 +72,63 @@ class HighlightOutroService(
         if (story.status != StoryStatus.DRAFT) {
             throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         }
+        return prepareScenesInternal(storyId)
+    }
+
+    /**
+     * [prepareScenes] 의 검증(소유권/DRAFT) 빠진 internal 변형.
+     *
+     * 호출자: [FinalIllustrationResultHandler] — 최종 삽화 잡이 모든 페이지 도착해
+     *  좌표 추출 batch 를 publish 하기 직전, scenes/scene_sentences 가 없으면 만들어둔다.
+     *  사용자가 Step 7 진입(prepareScenes) 을 안 한 상태에서 layout 결과가 먼저 도착하는
+     *  race(`scene not found`) 를 원천 차단.
+     *
+     *  - jobId 로 이미 storyId 신뢰 컨텍스트가 확보된 호출 — 추가 검증 불필요.
+     *  - 멱등 동일: 이미 scenes 가 있으면 INSERT 스킵 + speakerKey 만 백필.
+     */
+    fun ensurePrepared(storyId: Long): ScenesPrepareResult {
+        return prepareScenesInternal(storyId)
+    }
+
+    private fun prepareScenesInternal(storyId: Long): ScenesPrepareResult {
+        val metadataStoryBoard = storyBoardRepository
+            .findFirstByStoryIdAndDeletedAtIsNullOrderByIdDesc(storyId)
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        val metadataPages = storyboardPageRepository.findAllByStoryBoardIdOrderByPageNumberAsc(metadataStoryBoard.id)
+        if (metadataPages.isEmpty()) {
+            throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
+        }
+        // 좌표는 sentence 레벨에 저장하지 않는다 — WEBTOON 모드는 scene.character_anchors JSON 에서
+        // speakerKey 로 lookup. 여기선 speakerKey 만 백필한다.
+        val sentenceMetadataByPageAndOrder = metadataPages.flatMap { page ->
+            val sentencesJson = page.sentences ?: return@flatMap emptyList()
+            val sentencesArr = runCatching { objectMapper.readTree(sentencesJson) }.getOrNull()
+            if (sentencesArr == null || !sentencesArr.isArray) return@flatMap emptyList()
+
+            sentencesArr.mapIndexed { idx, node ->
+                val sentenceOrder = node.get("sentenceOrder")?.asInt() ?: (idx + 1)
+                val speakerKey = node.get("speakerKey")?.asText()?.takeIf(String::isNotBlank)
+                (page.pageNumber to sentenceOrder) to speakerKey
+            }
+        }.toMap()
 
         // 2) 멱등 가드 — 이미 scenes 가 있으면 INSERT 스킵. sentence 는 scene 에 매핑돼 있어 같이 카운트.
         val existingScenes = sceneRepository.findByStoryIdOrderByPageNumberAsc(storyId)
         if (existingScenes.isNotEmpty()) {
             val sceneIds = existingScenes.map { it.id }
-            val existingSentenceCount = sceneSentenceRepository
-                .findAllBySceneIdIn(sceneIds).size
+            val existingSentences = sceneSentenceRepository.findAllBySceneIdIn(sceneIds)
+            val pageNumberBySceneId = existingScenes.associate { it.id to it.pageNumber }
+            existingSentences.forEach { sentence ->
+                val pageNumber = pageNumberBySceneId[sentence.sceneId] ?: return@forEach
+                val speakerKey = sentenceMetadataByPageAndOrder[pageNumber to sentence.sentenceOrder]
+                    ?: return@forEach
+                if (sentence.speakerKey.isNullOrBlank()) {
+                    sentence.speakerKey = speakerKey
+                }
+            }
             return ScenesPrepareResult(
                 sceneCount = existingScenes.size,
-                sentenceCount = existingSentenceCount,
+                sentenceCount = existingSentences.size,
                 alreadyPrepared = true,
             )
         }
@@ -115,6 +162,7 @@ class HighlightOutroService(
                 val sentenceOrder = node.get("sentenceOrder")?.asInt() ?: (idx + 1)
                 val englishText = node.get("englishText")?.asText().orEmpty()
                 val koreanText = node.get("koreanText")?.asText()
+                val speakerKey = node.get("speakerKey")?.asText()?.takeIf(String::isNotBlank)
                 sceneSentenceRepository.save(
                     SceneSentence(
                         sceneId = scene.id,
@@ -122,8 +170,7 @@ class HighlightOutroService(
                         englishText = englishText,
                         koreanText = koreanText,
                         ttsAudioUrl = null,
-                        speakerKey = null,
-                        bubbleSlot = null,
+                        speakerKey = speakerKey,
                         hasHighlighted = false,
                     ),
                 )
@@ -175,7 +222,6 @@ class HighlightOutroService(
                         koreanText = s.koreanText,
                         ttsAudioUrl = s.ttsAudioUrl,
                         speakerKey = s.speakerKey,
-                        bubbleSlot = s.bubbleSlot?.name,
                         hasHighlighted = s.hasHighlighted,
                         highlightVoiceUrl = highlightVoiceBySentenceId[s.id],
                     )

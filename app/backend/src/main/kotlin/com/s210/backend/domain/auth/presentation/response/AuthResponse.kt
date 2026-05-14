@@ -23,6 +23,14 @@ data class AvailabilityResponse(
     val available: Boolean,
 )
 
+data class EmailVerificationSendResponse(
+    val expiresInSeconds: Long,
+)
+
+data class EmailVerificationVerifyResponse(
+    val verified: Boolean,
+)
+
 data class KakaoCallbackResponse(
     val status: String,
     val accessToken: String? = null,
@@ -48,6 +56,7 @@ data class AuthUserResponse(
     val phone: String?,
     val agreeSms: Boolean,
     val agreeMarketing: Boolean,
+    val onboardingCompleted: Boolean,
     val provider: String?,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime,
@@ -65,6 +74,7 @@ fun AuthResult.toAuthResponse(): AuthResponse =
             phone = user.phone,
             agreeSms = user.agreeSms,
             agreeMarketing = user.agreeMarketing,
+            onboardingCompleted = user.onboardingCompleted,
             provider = provider,
             createdAt = user.createdAt,
             updatedAt = user.updatedAt,

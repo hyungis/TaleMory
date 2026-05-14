@@ -1,5 +1,7 @@
-STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_v3"
+﻿STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_v3"
+WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION = "storyboard_webtoon_v1"
 STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_v1"
+WEBTOON_STORYBOARD_SUMMARY_PROMPT_TEMPLATE_VERSION = "storyboard_summary_webtoon_v1"
 
 
 STORYBOARD_SYSTEM_PROMPT = """
@@ -274,4 +276,87 @@ the user's photo descriptions and hashtags.
 - summaryKo must be a natural Korean translation of summary.
 - summary must be 5-8 sentences in English.
 - keyEmotionalBeats must be a short ordered list of 3-5 main emotional beats.
+""".strip()
+
+
+WEBTOON_STORYBOARD_SUMMARY_SYSTEM_PROMPT = f"""
+{STORYBOARD_SUMMARY_SYSTEM_PROMPT}
+
+========================
+[WEBTOON SUMMARY MODE OVERRIDES - MUST FOLLOW]
+========================
+- Plan the same child-friendly emotional arc, but make it suitable for later WEBTOON storyboard generation.
+- Favor a premise that can become expressive panels, short dialogue beats, and clear character staging.
+- Keep the output schema identical to normal summary generation.
+- Do not write page-by-page panels yet.
+- Do not include camera directions in the summary fields.
+- keyEmotionalBeats should be useful for later dialogue-led webtoon scenes.
+""".strip()
+
+
+WEBTOON_STORYBOARD_SYSTEM_PROMPT = f"""
+{STORYBOARD_SYSTEM_PROMPT}
+
+========================
+[WEBTOON MODE OVERRIDES - MUST FOLLOW]
+========================
+- Return JSON matching the WEBTOON storyboard schema, not the standard storyboard schema.
+- Each page must include charactersInScene.
+- Each sentence must include type, speakerKey, englishText, koreanText, and emotion.
+- Use only the character keys provided in the user message.
+- Do not invent new speakerKey values.
+- Use sentence type DIALOGUE for spoken character lines.
+- Use sentence type NARRATION for narrator text.
+- NARRATION sentences must use speakerKey="narrator".
+- DIALOGUE sentences must use the visible speaking character's key as speakerKey.
+- DIALOGUE must read like direct speech that the speaker could say aloud.
+- DIALOGUE englishText/koreanText must contain only the spoken words for a speech bubble.
+- Do not write dialogue tags inside DIALOGUE text, such as "Mijin said", "she asked", or "Dad replied".
+- Do not put narration or attribution inside DIALOGUE, such as "she says", "he said", "Yujin says",
+  or similar speaker tags.
+- If attribution or action is needed, make it a separate NARRATION sentence with speakerKey="narrator".
+- If a sentence describes action, setting, emotion, page transition, or a character in third person,
+  it is NARRATION, even when that character is visible in the panel.
+- Never label narrator/third-person prose as DIALOGUE.
+- Make dialogue the main reading experience: each page should usually contain more DIALOGUE sentences than
+  NARRATION sentences.
+- Do not make the child the only active speaker across the whole storyboard.
+- The child should remain the primary speaker, but companions should speak in meaningful moments.
+- Across the whole storyboard, include companion dialogue on several pages, especially when a companion is
+  visible, comforting, guiding, asking a question, or reacting to the child.
+- For pages with a visible companion, prefer at least one companion DIALOGUE line unless the page is clearly
+  child-only or narration-focused.
+- Use companion dialogue for warm back-and-forth, reassurance, short reactions, questions, and encouragement.
+- Avoid making companions silent props.
+- Keep dialogue short, natural, and easy for child-friendly TTS.
+- Use narration sparingly for scene setup, emotional bridging, or page transitions.
+- WEBTOON mode still needs real page body text, not one-line captions.
+- Use WEBTOON age+difficulty targets instead of the standard storybook age rules:
+  - Age 5-6 + BEGINNER: 4-5 sentences, 40-65 English words per page, very simple dialogue.
+  - Age 5-6 + INTERMEDIATE: 5-6 sentences, 55-80 English words per page, still simple but with warmer reactions.
+  - Age 5-6 + ADVANCED: 5-6 sentences, 65-95 English words per page, richer emotions without hard vocabulary.
+  - Age 7-9 + BEGINNER: 4-5 sentences, 50-75 English words per page.
+  - Age 7-9 + INTERMEDIATE: 5-6 sentences, 70-100 English words per page.
+  - Age 7-9 + ADVANCED: 6-7 sentences, 90-125 English words per page.
+  - Age 10-12 + BEGINNER: 5-6 sentences, 70-100 English words per page.
+  - Age 10-12 + INTERMEDIATE: 6-7 sentences, 90-130 English words per page.
+  - Age 10-12 + ADVANCED: 7-8 sentences, 120-170 English words per page.
+- For most pages, use 1-2 short NARRATION sentences and make the rest DIALOGUE.
+- Even though each dialogue line is short, the combined page text must feel substantial enough for a short
+  storybook page, not just isolated speech bubbles.
+- Korean page text should also feel like a short story page, not just a set of disconnected captions.
+- Never return a page with only one sentence unless the user explicitly requests a one-line page.
+- Every page should include at least one DIALOGUE sentence unless the page is clearly an opening, transition,
+  or ending page where narration is more natural.
+- charactersInScene must list every character who should visibly appear in the page illustration.
+- Do not include every available character on every page.
+- charactersInScene must include only characters visibly needed for this page.
+- Use 1-2 visible characters for most pages.
+- Use all family members only for group moments, travel transitions, or emotional payoff scenes.
+- A speaking character may be off-panel only when the scene clearly benefits from it.
+- For each charactersInScene item, sceneRole must explain what that character is doing in this exact page.
+- expectedPosition must be a rough layout hint such as left, center, right, top-left, bottom-right.
+- imagePrompt must include the charactersInScene roles so later image generation can preserve who is doing what.
+- englishText must exactly match sentences[].englishText joined in order.
+- koreanText must exactly match sentences[].koreanText joined in order.
 """.strip()

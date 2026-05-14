@@ -8,6 +8,12 @@ interface BookBackCoverProps {
   onRestart: () => void
   /** 앞표지와 같은 일러스트(`coverIllustrationUrl`) — 뒷표지 배경에 full-bleed 로 깔린다. */
   illustrationUrl: string | null
+  /** "처음부터 읽기" 버튼 숨김 (웹툰 뷰어에서 사용) */
+  hideRestart?: boolean
+  /** 뒷표지 하단에 동화 제목 표시 (웹툰 뷰어에서 사용) */
+  title?: string
+  /** 편지지 표시 여부 — false면 편지지를 숨김 (웹툰 뷰어에서 해당 페이지 도달 전까지 숨김) */
+  showLetter?: boolean
 }
 
 /**
@@ -16,14 +22,14 @@ interface BookBackCoverProps {
  * 그 위에 편지지가 날아 착지 → 글자 타이핑 → 서명/버튼 순서로 노출.
  * outro 데이터가 없으면 기본 마무리 멘트 사용.
  */
-export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCoverProps) {
+export function BookBackCover({ outro, onRestart, illustrationUrl, hideRestart = false, title, showLetter = true }: BookBackCoverProps) {
   const paperRef = useRef<HTMLDivElement>(null)
   const [isLanded, setIsLanded] = useState(false)
   /* 사용자가 마무리 멘트를 안 적은 경우엔 편지지 자체를 안 띄움 — 기본 폴백 멘트로 메우면
      사용자 의도(편지 없음)와 어긋나고, 빈 종이에 깜빡이는 이모지처럼 보여 산만함.
      trim 후 빈 문자열도 미작성으로 간주. */
   const text = outro?.outroText?.trim() || ''
-  const hasLetter = text.length > 0
+  const hasLetter = text.length > 0 && showLetter
   /* 사용자가 서명을 비워둔 경우엔 라인 자체를 숨김 — 기본 폴백("동화책 작가") 으로 메우면
      사용자 의도(익명 편지)와 어긋남. trim 후 빈 문자열도 미작성으로 간주. */
   const signature = outro?.signature?.trim() || null
@@ -35,16 +41,16 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
 
   // 편지지 날아드는 애니메이션: mount 직후 is-landing 클래스 붙이기
   useEffect(() => {
-    if (!paperRef.current) return
+    if (!paperRef.current || !hasLetter) return
     setIsLanded(false)
     // reflow 강제 후 애니메이션 재시작
     void paperRef.current.offsetWidth
     setIsLanded(true)
-  }, [replayKey])
+  }, [replayKey, hasLetter])
 
-  // 오디오 있을 때만 재생
+  // 오디오 재생 — hasLetter가 true일 때만 (웹툰 뷰어에서는 해당 페이지 도달 전까지 false)
   useEffect(() => {
-    if (!audioUrl) return
+    if (!audioUrl || !hasLetter) return
     const audio = new Audio(audioUrl)
     audio.play().catch(() => {
       /* 자동재생 차단 시 무시 — 사용자 제스처 후 수동 재생 유도 가능 */
@@ -52,7 +58,7 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
     return () => {
       audio.pause()
     }
-  }, [audioUrl, replayKey])
+  }, [audioUrl, replayKey, hasLetter])
 
   const handleReplay = () => {
     setReplayKey(k => k + 1)
@@ -90,17 +96,23 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
               <RotateCcw className="w-4 h-4" />
               다시 듣기
             </button>
-            <button className="sb-letter-btn" onClick={onRestart}>
-              <BookOpen className="w-4 h-4" />
-              처음부터 읽기
-            </button>
+            {!hideRestart && (
+              <button className="sb-letter-btn" onClick={onRestart}>
+                <BookOpen className="w-4 h-4" />
+                처음부터 읽기
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* 편지가 없을 땐 "처음부터 읽기" 하나만 노출 — "다시 듣기" 는 재생할 텍스트/오디오가
           없어서 의미가 없고, 단일 CTA 가 시각적으로도 깔끔. 뒷표지 사진 위 하단 중앙에 배치. */}
-      {!hasLetter && (
+      {title && (
+        <p className="sb-back-cover-title">{title}</p>
+      )}
+
+      {!hasLetter && !hideRestart && (
         <div className="sb-letter-controls is-visible sb-letter-controls-standalone">
           <button className="sb-letter-btn" onClick={onRestart}>
             <BookOpen className="w-4 h-4" />

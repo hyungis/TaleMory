@@ -62,6 +62,10 @@ data class ReadingLevel(
  * - sourcePhotoIds: 이 페이지를 만들 때 영감이 된 사진 id 목록 (Step 2 photos[].photoId).
  *                  0건일 수도 있다 (전환 페이지, 감정 페이지 등).
  * - imagePrompt:   나중에 일러스트 생성할 때 쓸 AI 힌트. 현재 단계에서는 저장만.
+ * - charactersInScene:
+ *      WEBTOON 모드 한정. AI 의 WebtoonStoryboardPage.charactersInScene 와 1:1.
+ *      VIEWER 모드 응답에선 null (필드 미전송) — Jackson 의 ignoreUnknownProperties 설정으로
+ *      페이로드가 어느 모드든 deserialize 가능.
  */
 data class StoryboardPageDto(
     val pageNumber: Int,
@@ -73,17 +77,45 @@ data class StoryboardPageDto(
     val sentences: List<StorySentenceDto>,
     val sentenceCount: Int,
     val wordCount: Int,
+    /** WEBTOON 모드 한정. null 또는 빈 배열이면 VIEWER 모드. */
+    val charactersInScene: List<WebtoonCharacterInSceneDto>? = null,
 )
 
 /**
  * 한 페이지 안의 문장 1개.
- * emotion 은 TTS 단계에서 톤 제어에 사용 (NEUTRAL / HAPPY / SAD / ... / BRAVE).
+ *
+ *  - emotion 은 TTS 단계에서 톤 제어에 사용 (NEUTRAL / HAPPY / SAD / ... / BRAVE).
+ *  - **type / speakerKey 는 WEBTOON 모드 한정** —
+ *      AI 의 WebtoonStorySentence.type ("DIALOGUE" / "NARRATION") + speakerKey 와 1:1.
+ *      VIEWER 모드 페이로드에는 두 필드가 없으므로 null (Jackson 이 기본값 사용).
+ *      WEBTOON 모드라도 NARRATION 문장은 speakerKey="narrator" 로 일관되게 들어옴.
  */
 data class StorySentenceDto(
     val sentenceOrder: Int,
     val englishText: String,
     val koreanText: String,
     val emotion: String,
+    /** WEBTOON 모드 한정 — "DIALOGUE" / "NARRATION". VIEWER 면 null. */
+    val type: String? = null,
+    /** WEBTOON 모드 한정 — 화자 키 (DIALOGUE 면 캐릭터키, NARRATION 면 "narrator"). VIEWER 면 null. */
+    val speakerKey: String? = null,
+)
+
+/**
+ * WEBTOON 모드 페이지에 등장하는 캐릭터 메타.
+ * AI 의 WebtoonCharacterInScene 와 1:1.
+ *
+ *  - characterKey:     speakerKey 와 동일 도메인. mainCharacterJson / companionsJson 에 있는 인물 키.
+ *  - sceneRole:        이 페이지에서 캐릭터가 무엇을 하는지 (자유 텍스트, FE 도우미용).
+ *  - expectedPosition: "left" / "center" / "right" / "top-left" / "bottom-right" 등 — 컷 구도 힌트.
+ *
+ * BE 는 받아서 그대로 영속화 (storyboard_pages.characters_in_scene_json) 후 응답에 노출.
+ * 현재 시점엔 의미 해석 X — 그대로 패스스루.
+ */
+data class WebtoonCharacterInSceneDto(
+    val characterKey: String,
+    val sceneRole: String,
+    val expectedPosition: String,
 )
 
 /**

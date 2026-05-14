@@ -75,6 +75,28 @@ def generate_storyboard_images(request_model: StoryboardImageGenerateRequest) ->
     )
 
 
+def generate_webtoon_storyboard_images(request_model: StoryboardImageGenerateRequest) -> StoryboardImageGenerateResponse:
+    results: list[StoryboardImageGenerateResult] = []
+    storyboard_seed = request_model.seed
+    items = ensure_storyboard_character_reference(
+        request_model.storyId,
+        storyboard_seed,
+        request_model.items,
+        request_model.characterSourceImageUrls,
+        request_model.characterSourceImageS3Keys,
+    )
+
+    for item in items:
+        results.append(generate_storyboard_image_item(request_model.storyId, item, storyboard_seed, webtoon_mode=True))
+
+    return StoryboardImageGenerateResponse(
+        storyId=request_model.storyId,
+        seed=storyboard_seed,
+        results=results,
+        usage=_aggregate_usage(results, fallback_model=settings.WEBTOON_STORYBOARD_IMAGE_MODEL),
+    )
+
+
 def ensure_storyboard_character_reference(
     story_id: int,
     seed: int,
@@ -163,6 +185,30 @@ def regenerate_storyboard_image(
     )
 
 
+def regenerate_webtoon_storyboard_image(
+    request_model: StoryboardImageRegenerateRequest,
+) -> StoryboardImageRegenerateResponse:
+    baseline_item = ensure_storyboard_character_reference_for_regenerate(
+        request_model.storyId,
+        request_model.item,
+    )
+    regenerate_item = _build_regenerate_item(baseline_item, request_model.userPrompt)
+    result = generate_storyboard_image_item(
+        request_model.storyId,
+        regenerate_item,
+        request_model.seed,
+        output_version=request_model.outputVersion,
+        webtoon_mode=True,
+    )
+
+    return StoryboardImageRegenerateResponse(
+        storyId=request_model.storyId,
+        seed=request_model.seed,
+        outputVersion=request_model.outputVersion,
+        result=result,
+    )
+
+
 def ensure_storyboard_character_reference_for_regenerate(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
@@ -183,10 +229,11 @@ def generate_storyboard_image_item(
     item: StoryboardImageGenerateItemRequest,
     seed: int,
     output_version: int | None = None,
+    webtoon_mode: bool = False,
 ) -> StoryboardImageGenerateResult:
     if settings.GEMINI_API_KEY:
-        return _generate_item_with_gemini(story_id, item, seed, output_version)
-    return _generate_item_locally(story_id, item, output_version)
+        return _generate_item_with_gemini(story_id, item, seed, output_version, webtoon_mode)
+    return _generate_item_locally(story_id, item, output_version, webtoon_mode)
 
 
 def _generate_item_with_gemini(
@@ -194,8 +241,10 @@ def _generate_item_with_gemini(
     item: StoryboardImageGenerateItemRequest,
     seed: int,
     output_version: int | None = None,
+    webtoon_mode: bool = False,
 ) -> StoryboardImageGenerateResult:
-    final_prompt = _build_final_prompt(item)
+    model = settings.WEBTOON_STORYBOARD_IMAGE_MODEL if webtoon_mode else settings.STORYBOARD_IMAGE_MODEL
+    final_prompt = _build_final_prompt(item, webtoon_mode=webtoon_mode)
     response_json = _call_gemini_image_api(
         final_prompt,
         item.characterReferenceImageUrls,
@@ -203,6 +252,7 @@ def _generate_item_with_gemini(
         item.referenceImageUrls,
         item.referenceImageS3Keys,
         seed,
+        model,
     )
     try:
         image_bytes = _extract_image_bytes(response_json)
@@ -221,14 +271,16 @@ def _generate_item_with_gemini(
             item.referenceImageUrls,
             item.referenceImageS3Keys,
             seed,
+            model,
         )
         image_bytes = _extract_image_bytes(retry_response_json)
         response_json = retry_response_json
     image_url = _upload_and_resolve_url(story_id, item, image_bytes, output_version)
-    usage = _extract_gemini_usage(response_json)
+    usage = _extract_gemini_usage(response_json, model)
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
+        imageS3Key=_storyboard_image_object_path(story_id, item.pageNumber, output_version),
         usage=usage,
     )
 
@@ -237,14 +289,16 @@ def _generate_item_locally(
     story_id: int,
     item: StoryboardImageGenerateItemRequest,
     output_version: int | None = None,
+    webtoon_mode: bool = False,
 ) -> StoryboardImageGenerateResult:
     image_url = _upload_and_resolve_url(story_id, item, _ONE_PIXEL_PNG, output_version)
     return StoryboardImageGenerateResult(
         pageNumber=item.pageNumber,
         imageUrl=image_url,
+        imageS3Key=_storyboard_image_object_path(story_id, item.pageNumber, output_version),
         usage=StoryboardImageUsage(
             provider="local",
-            model=settings.STORYBOARD_IMAGE_MODEL,
+            model=settings.WEBTOON_STORYBOARD_IMAGE_MODEL if webtoon_mode else settings.STORYBOARD_IMAGE_MODEL,
             promptTokens=0,
             candidateTokens=0,
             totalTokens=0,
@@ -327,7 +381,7 @@ def _build_regenerate_item(
     )
 
 
-def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
+def _build_final_prompt(item: StoryboardImageGenerateItemRequest, webtoon_mode: bool = False) -> str:
     child_descriptions = ", ".join(
         f"{child.name} ({child.age}, {child.gender.lower()})" for child in item.children
     )
@@ -350,8 +404,20 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         page_text_lines.append(f"- English text: {item.page.englishText}")
     if item.page.koreanText:
         page_text_lines.append(f"- Korean text: {item.page.koreanText}")
+    character_staging_lines = [
+        f"- {character.characterKey}: {character.sceneRole}; expected position: {character.expectedPosition}"
+        for character in item.page.charactersInScene
+    ]
     parts = [
-        "# Storyboard Cover Image Prompt - Page 0" if is_cover else f"# Storyboard Image Prompt - Page {item.pageNumber}",
+        (
+            "# Webtoon Storyboard Cover Image Prompt - Page 0"
+            if webtoon_mode and is_cover
+            else "# Storyboard Cover Image Prompt - Page 0"
+            if is_cover
+            else f"# Webtoon Storyboard Image Prompt - Page {item.pageNumber}"
+            if webtoon_mode
+            else f"# Storyboard Image Prompt - Page {item.pageNumber}"
+        ),
         "",
         "## Non-Negotiable Visual Mode",
         "- Black-and-white rough pre-coloring storyboard sketch only.",
@@ -370,6 +436,8 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         (
             "- Create a rough pre-coloring children's storybook front cover sketch for the whole story."
             if is_cover
+            else "- Create a rough pre-coloring webtoon storyboard panel for layout and character staging."
+            if webtoon_mode
             else "- Create a rough pre-coloring children's storybook storyboard sketch for layout and scene planning."
         ),
         "",
@@ -412,6 +480,18 @@ def _build_final_prompt(item: StoryboardImageGenerateItemRequest) -> str:
         ),
         "- Color ban: the final image must contain no intentional color. Use black, white, and light gray only.",
     ]
+    if webtoon_mode and character_staging_lines:
+        parts.extend(
+            [
+                "",
+                "## Webtoon Character Staging",
+                (
+                    "- Use these per-character roles and expected positions as hard composition guidance. "
+                    "Place each listed character in the requested area of the rough storyboard panel while preserving identity from the character reference."
+                ),
+                *character_staging_lines,
+            ]
+        )
     if has_character_reference:
         parts.extend(
             [
@@ -529,13 +609,15 @@ def _call_gemini_image_api(
     reference_image_urls: list[str],
     reference_image_s3_keys: list[str],
     seed: int,
+    model: str | None = None,
 ) -> dict:
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured")
 
+    target_model = model or settings.STORYBOARD_IMAGE_MODEL
     api_url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.STORYBOARD_IMAGE_MODEL}:generateContent?key={parse.quote(settings.GEMINI_API_KEY)}"
+        f"{target_model}:generateContent?key={parse.quote(settings.GEMINI_API_KEY)}"
     )
     parts = _build_gemini_parts(
         final_prompt,
@@ -678,7 +760,7 @@ def _extract_image_bytes(response_json: dict) -> bytes:
     )
 
 
-def _extract_gemini_usage(response_json: dict) -> StoryboardImageUsage:
+def _extract_gemini_usage(response_json: dict, model: str | None = None) -> StoryboardImageUsage:
     usage_metadata = response_json.get("usageMetadata", {})
     prompt_tokens = _optional_int(usage_metadata.get("promptTokenCount"))
     candidate_tokens = _optional_int(usage_metadata.get("candidatesTokenCount"))
@@ -687,7 +769,7 @@ def _extract_gemini_usage(response_json: dict) -> StoryboardImageUsage:
         total_tokens = prompt_tokens + candidate_tokens
     return StoryboardImageUsage(
         provider="google",
-        model=settings.STORYBOARD_IMAGE_MODEL,
+        model=model or settings.STORYBOARD_IMAGE_MODEL,
         promptTokens=prompt_tokens,
         candidateTokens=candidate_tokens,
         totalTokens=total_tokens,
@@ -745,7 +827,10 @@ def _upload_and_resolve_character_reference_url(story_id: int, image_bytes: byte
     return f"local://storyboard-images/{object_path}"
 
 
-def _aggregate_usage(results: list[StoryboardImageGenerateResult]) -> StoryboardImageBatchUsage:
+def _aggregate_usage(
+    results: list[StoryboardImageGenerateResult],
+    fallback_model: str | None = None,
+) -> StoryboardImageBatchUsage:
     total_prompt_tokens = 0
     total_candidate_tokens = 0
     total_tokens = 0
@@ -772,7 +857,7 @@ def _aggregate_usage(results: list[StoryboardImageGenerateResult]) -> Storyboard
             has_cost = True
 
     provider = results[0].usage.provider if results else "google"
-    model = results[0].usage.model if results else settings.STORYBOARD_IMAGE_MODEL
+    model = results[0].usage.model if results else (fallback_model or settings.STORYBOARD_IMAGE_MODEL)
     return StoryboardImageBatchUsage(
         provider=provider,
         model=model,

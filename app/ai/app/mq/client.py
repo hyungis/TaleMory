@@ -1,8 +1,20 @@
+import logging
+import time
 from typing import Any
 
 import pika
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+# Windows 환경에서 pika 의 BlockingConnection 이 내부적으로 _nonblocking_socketpair() 를
+# 호출하면서 간헐적으로 OSError(WinError 10014) 를 던지는 이슈가 있음.
+# 다수의 connection 을 빠르게 만들 때 (e.g. storyboard image batch fan-out) 더 자주 발생.
+# 0.15s 간격 retry 로 99% 통과. WSL/Linux 환경에선 retry 1번에 통과 또는 아예 발생 X.
+_CONNECT_RETRY_ATTEMPTS = 5
+_CONNECT_RETRY_DELAY_SEC = 0.15
 
 
 def create_connection() -> Any:
@@ -15,7 +27,19 @@ def create_connection() -> Any:
         heartbeat=1200,
         blocked_connection_timeout=300,
     )
-    return pika.BlockingConnection(parameters)
+    last_exc: BaseException | None = None
+    for attempt in range(1, _CONNECT_RETRY_ATTEMPTS + 1):
+        try:
+            return pika.BlockingConnection(parameters)
+        except OSError as exc:
+            last_exc = exc
+            logger.warning(
+                "create_connection attempt %d/%d failed: %s",
+                attempt, _CONNECT_RETRY_ATTEMPTS, exc,
+            )
+            time.sleep(_CONNECT_RETRY_DELAY_SEC)
+    # 마지막 시도까지 실패한 경우 마지막 예외를 그대로 raise.
+    raise last_exc if last_exc else RuntimeError("create_connection failed without an exception")
 
 
 def create_channel(connection: Any) -> Any:
@@ -125,4 +149,18 @@ def declare_ai_topology(channel: Any) -> None:
         queue=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE,
         exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
         routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY,
+    )
+
+    channel.queue_declare(queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE, durable=True)
+    channel.queue_bind(
+        queue=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE,
+        exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+        routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY,
     )

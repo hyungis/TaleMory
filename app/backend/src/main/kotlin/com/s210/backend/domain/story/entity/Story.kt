@@ -2,6 +2,7 @@ package com.s210.backend.domain.story.entity
 
 import com.s210.backend.common.entity.SoftDeletableEntity
 import com.s210.backend.domain.story.model.Difficulty
+import com.s210.backend.domain.story.model.StoryMode
 import com.s210.backend.domain.story.model.StoryStatus
 import jakarta.persistence.*
 import java.time.LocalDate
@@ -35,6 +36,15 @@ class Story(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var difficulty: Difficulty = Difficulty.BEGINNER,
+
+    /**
+     * 동화 생성 모드 — VIEWER(narration, 기본) / WEBTOON(대화).
+     * 사용자가 메인의 "새 동화책 만들기" 모달에서 선택한 결과를 그대로 영속화.
+     * StoryboardGenerationService 등이 mq publish 시 이 값을 storyMode 필드로 AI 워커에 전달.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    var mode: StoryMode = StoryMode.VIEWER,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

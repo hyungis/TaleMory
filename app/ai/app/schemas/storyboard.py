@@ -17,6 +17,7 @@ SentenceEmotion = Literal[
     "TENDER",
     "BRAVE",
 ]
+WebtoonSentenceType = Literal["DIALOGUE", "NARRATION"]
 
 
 class ChildInfo(BaseModel):
@@ -75,6 +76,21 @@ class StorySentence(BaseModel):
     emotion: SentenceEmotion
 
 
+class WebtoonStorySentence(BaseModel):
+    sentenceOrder: int
+    type: WebtoonSentenceType
+    speakerKey: str
+    englishText: str
+    koreanText: str
+    emotion: SentenceEmotion
+
+
+class WebtoonCharacterInScene(BaseModel):
+    characterKey: str
+    sceneRole: str
+    expectedPosition: str
+
+
 class StoryboardPage(BaseModel):
     pageNumber: int
     sourcePhotoIds: list[int]
@@ -83,6 +99,19 @@ class StoryboardPage(BaseModel):
     koreanText: str
     imagePrompt: str
     sentences: list[StorySentence]
+    sentenceCount: int
+    wordCount: int
+
+
+class WebtoonStoryboardPage(BaseModel):
+    pageNumber: int
+    sourcePhotoIds: list[int]
+    sceneSummary: str
+    englishText: str
+    koreanText: str
+    imagePrompt: str
+    charactersInScene: list[WebtoonCharacterInScene]
+    sentences: list[WebtoonStorySentence]
     sentenceCount: int
     wordCount: int
 
@@ -110,10 +139,31 @@ class StoryboardGenerateResponse(BaseModel):
     usage: UsageInfo
 
 
+class WebtoonStoryboardGenerateResponse(BaseModel):
+    title: str
+    synopsis: str
+    moralTheme: str
+    storyQuest: str
+    recurringMotif: str
+    pageCount: int
+    pageCountReason: str
+    readingLevel: ReadingLevel
+    totalWordCount: int
+    pages: list[WebtoonStoryboardPage]
+    usage: UsageInfo
+
+
 class StoryboardRegenerateRequest(BaseModel):
     storyId: int | None = Field(default=None, ge=1)
     originalRequest: StoryboardGenerateRequest
     currentStoryboard: StoryboardGenerateResponse
+    feedbackInstruction: str = Field(..., min_length=1, max_length=2000)
+
+
+class WebtoonStoryboardRegenerateRequest(BaseModel):
+    storyId: int | None = Field(default=None, ge=1)
+    originalRequest: StoryboardGenerateRequest
+    currentStoryboard: WebtoonStoryboardGenerateResponse
     feedbackInstruction: str = Field(..., min_length=1, max_length=2000)
 
 

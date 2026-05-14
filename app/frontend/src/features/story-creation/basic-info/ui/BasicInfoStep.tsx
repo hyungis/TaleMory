@@ -11,7 +11,7 @@ import { clearCreationProgressSnapshot } from '../../lib/progressStorage'
 import { LevelPicker } from './LevelPicker'
 import { ChildrenList } from './ChildrenList'
 import { TravelDatePicker } from './TravelDatePicker'
-import type { PersonResponse } from '../api/types'
+import type { PersonResponse, StoryModeApi } from '../api/types'
 import { usePersonsQuery } from '../model/usePersonsQuery'
 import { usePersonPost } from '../model/usePersonPost'
 import { useStoryPost } from '../model/useStoryPost'
@@ -24,9 +24,27 @@ import {
 } from '../lib/mappers'
 import '../../styles/creation-paper.css'
 
+const MIN_CHILD_AGE = 1
+const MAX_CHILD_AGE = 18
+const INTEGER_PATTERN = /^\d+$/
+
+function parseChildAge(value: string): number | null {
+  const trimmed = value.trim()
+  if (!INTEGER_PATTERN.test(trimmed)) return null
+  const parsed = Number(trimmed)
+  if (!Number.isInteger(parsed) || parsed < MIN_CHILD_AGE || parsed > MAX_CHILD_AGE) return null
+  return parsed
+}
+
 interface BasicInfoStepProps {
   data: StoryProject['step1']
   storyId: StoryId | null
+  /**
+   * 동화 생성 모드 (VIEWER / WEBTOON). POST /api/stories body 에 그대로 전달.
+   * useStoryCreationFlow 가 mount 시 결정한 값이 내려오며 플로우 내에서 변경되지 않는다.
+   * PATCH 시에는 보내지 않음 — 모드는 생성 시 한 번만 결정.
+   */
+  mode: StoryModeApi
   onUpdate: <K extends keyof StoryProject['step1']>(key: K, value: StoryProject['step1'][K]) => void
   onChildUpdate: (index: number, patch: Partial<StoryChild>) => void
   onChildAdd: () => void
@@ -48,6 +66,7 @@ interface BasicInfoStepProps {
 export function BasicInfoStep({
   data,
   storyId,
+  mode,
   onUpdate,
   onChildUpdate,
   onChildAdd,
@@ -109,7 +128,13 @@ export function BasicInfoStep({
       return
     }
 
-    const validChildren = data.children.filter(c => c.name.trim() && c.age.trim())
+    const hasInvalidAge = data.children.some(c => c.age.trim() && parseChildAge(c.age) === null)
+    if (hasInvalidAge) {
+      setSubmitError('나이는 1~18 사이의 정수로 입력해주세요.')
+      return
+    }
+
+    const validChildren = data.children.filter(c => c.name.trim() && parseChildAge(c.age) !== null)
     if (validChildren.length === 0) {
       setSubmitError('아이 정보를 최소 한 명 이상 입력해주세요.')
       return
@@ -120,12 +145,13 @@ export function BasicInfoStep({
       const resolved: StoryChild[] = (
         await Promise.all(
           data.children.map(async (child, index) => {
-            if (!child.name.trim() || !child.age.trim()) return null
+            const parsedAge = parseChildAge(child.age)
+            if (!child.name.trim() || parsedAge === null) return null
             if (child.personId) return child
 
             const created = await personPost.mutateAsync({
               name: child.name.trim(),
-              age: Number.parseInt(child.age, 10) || 0,
+              age: parsedAge,
               gender: storyChildGenderToApi(child.gender),
               role: 'CHILD',
             })
@@ -138,7 +164,7 @@ export function BasicInfoStep({
       const mainCharactersPayload = resolved.map(c => ({
         personId: c.personId,
         name: c.name.trim(),
-        age: Number.parseInt(c.age, 10) || 0,
+        age: parseChildAge(c.age) ?? 0,
         gender: storyChildGenderToApi(c.gender),
       }))
       const storyBody = {
@@ -152,12 +178,15 @@ export function BasicInfoStep({
       }
 
       if (storyId !== null) {
+        // PATCH 는 mode 를 보내지 않음 — 모드는 최초 POST 때 한 번만 결정 후 영속화.
+        // ModifyStoryRequest 타입에도 mode 필드 없음 → 컴파일 시점 보호.
         await storyUpdate.mutateAsync({ id: storyId, body: storyBody })
         onStoryCreated(storyId)
         return
       }
 
-      const response = await storyPost.mutateAsync(storyBody)
+      // 신규 POST 만 mode 를 함께 전달 → BE 가 stories.mode 컬럼에 저장.
+      const response = await storyPost.mutateAsync({ ...storyBody, mode })
       onStoryCreated(response.storyId)
     } catch (err) {
       if (storyId !== null && err instanceof ApiError && err.status === 404) {
@@ -176,6 +205,7 @@ export function BasicInfoStep({
     firstDate,
     lastDate,
     isReadOnly,
+    mode,
     onChildUpdate,
     onStaleStoryIdReset,
     onStoryCreated,
@@ -217,7 +247,7 @@ export function BasicInfoStep({
             </div>
           )}
 
-          <div className="cr-card">
+          <div className="cr-card" data-onboarding-target="creation-basic-info">
             <span className="cr-tape" aria-hidden="true" />
 
             {/* fieldset 으로 잠금 시 모든 form control 일괄 비활성. */}

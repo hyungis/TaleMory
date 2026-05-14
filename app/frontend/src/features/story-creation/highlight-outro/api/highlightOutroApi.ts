@@ -17,7 +17,6 @@ export interface SentenceDto {
   koreanText: string | null
   ttsAudioUrl: string | null
   speakerKey: string | null
-  bubbleSlot: string | null
   hasHighlighted: boolean
   /**
    * 사용자가 녹음한 강조 audio URL. 활성 row 가 없으면 null.

@@ -23,6 +23,8 @@ const MONTH_NAMES = [
   '7월', '8월', '9월', '10월', '11월', '12월',
 ]
 
+type CalendarViewMode = 'day' | 'month' | 'year'
+
 function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
@@ -75,6 +77,7 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   const containerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const lastWheelMsRef = useRef(0)
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('day')
 
   const [viewMonth, setViewMonth] = useState(() => {
     const ref = start ?? today
@@ -112,14 +115,16 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
 
       const delta = e.deltaY
       if (delta === 0) return
-      setViewMonth(prev =>
-        new Date(prev.getFullYear(), prev.getMonth() + (delta > 0 ? 1 : -1), 1),
-      )
+      if (viewMode === 'day') {
+        setViewMonth(prev =>
+          new Date(prev.getFullYear(), prev.getMonth() + (delta > 0 ? 1 : -1), 1),
+        )
+      }
     }
 
     popover.addEventListener('wheel', onWheel, { passive: false })
     return () => popover.removeEventListener('wheel', onWheel)
-  }, [isOpen])
+  }, [isOpen, viewMode])
 
   const monthGrid = useMemo(() => {
     const year = viewMonth.getFullYear()
@@ -184,17 +189,51 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
   }
 
   const handleReset = () => onChange(null, null)
-  const handlePrevMonth = () =>
+  const handlePrev = () => {
+    if (viewMode === 'year') {
+      setViewMonth(prev => new Date(prev.getFullYear() - 12, prev.getMonth(), 1))
+      return
+    }
+    if (viewMode === 'month') {
+      setViewMonth(prev => new Date(prev.getFullYear() - 1, prev.getMonth(), 1))
+      return
+    }
     setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
-  const handleNextMonth = () =>
+  }
+  const handleNext = () => {
+    if (viewMode === 'year') {
+      setViewMonth(prev => new Date(prev.getFullYear() + 12, prev.getMonth(), 1))
+      return
+    }
+    if (viewMode === 'month') {
+      setViewMonth(prev => new Date(prev.getFullYear() + 1, prev.getMonth(), 1))
+      return
+    }
     setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+  }
+
+  const handleYearSelect = (year: number) => {
+    const month = year === today.getFullYear()
+      ? Math.min(viewMonth.getMonth(), today.getMonth())
+      : viewMonth.getMonth()
+    setViewMonth(new Date(year, month, 1))
+    setViewMode('month')
+  }
+
+  const handleMonthSelect = (month: number) => {
+    setViewMonth(prev => new Date(prev.getFullYear(), month, 1))
+    setViewMode('day')
+  }
 
   const isInRange = (day: Date) => {
     if (!start || !end) return false
     return day >= start && day <= end
   }
 
-  const monthLabel = `${viewMonth.getFullYear()}년 ${MONTH_NAMES[viewMonth.getMonth()]}`
+  const yearLabel = `${viewMonth.getFullYear()}년`
+  const monthLabel = MONTH_NAMES[viewMonth.getMonth()]
+  const yearGridStart = Math.floor(viewMonth.getFullYear() / 12) * 12
+  const yearOptions = Array.from({ length: 12 }, (_, i) => yearGridStart + i)
 
   const triggerLabel = (() => {
     if (start && end) {
@@ -260,18 +299,31 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <button
               type="button"
-              onClick={handlePrevMonth}
+              onClick={handlePrev}
               aria-label="이전 달"
               style={NAV_BTN_STYLE}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 19, color: 'var(--cr-ink)' }}>
-              {monthLabel}
-            </span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => setViewMode('year')}
+                style={HEADER_PICKER_BTN_STYLE}
+              >
+                {yearLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('month')}
+                style={HEADER_PICKER_BTN_STYLE}
+              >
+                {monthLabel}
+              </button>
+            </div>
             <button
               type="button"
-              onClick={handleNextMonth}
+              onClick={handleNext}
               aria-label="다음 달"
               style={NAV_BTN_STYLE}
             >
@@ -280,9 +332,51 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
           </div>
 
           {/* 요일 행 */}
+          {viewMode === 'year' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '8px 0' }}>
+              {yearOptions.map(year => {
+                const isFuture = year > today.getFullYear()
+                const isSelected = year === viewMonth.getFullYear()
+                return (
+                  <button
+                    type="button"
+                    key={year}
+                    disabled={isFuture}
+                    onClick={() => handleYearSelect(year)}
+                    style={getPickerCellStyle({ selected: isSelected, disabled: isFuture })}
+                  >
+                    {year}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {viewMode === 'month' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '8px 0' }}>
+              {MONTH_NAMES.map((month, monthIndex) => {
+                const isFuture =
+                  viewMonth.getFullYear() > today.getFullYear() ||
+                  (viewMonth.getFullYear() === today.getFullYear() && monthIndex > today.getMonth())
+                const isSelected = monthIndex === viewMonth.getMonth()
+                return (
+                  <button
+                    type="button"
+                    key={month}
+                    disabled={isFuture}
+                    onClick={() => handleMonthSelect(monthIndex)}
+                    style={getPickerCellStyle({ selected: isSelected, disabled: isFuture })}
+                  >
+                    {month}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           <div
             style={{
-              display: 'grid',
+              display: viewMode === 'day' ? 'grid' : 'none',
               gridTemplateColumns: 'repeat(7, 1fr)',
               marginBottom: 6,
               fontFamily: 'var(--cr-font-gaegu)',
@@ -304,7 +398,7 @@ export function TravelDatePicker({ startDate, endDate, onChange }: TravelDatePic
           </div>
 
           {/* 날짜 그리드 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          <div style={{ display: viewMode === 'day' ? 'grid' : 'none', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {monthGrid.map(({ date, inMonth }) => {
               const isStart = !!start && sameDay(date, start)
               const isEnd = !!end && sameDay(date, end)
@@ -415,6 +509,54 @@ const NAV_BTN_STYLE: CSSProperties = {
   justifyContent: 'center',
   cursor: 'pointer',
   transition: 'background 0.12s ease',
+}
+
+const HEADER_PICKER_BTN_STYLE: CSSProperties = {
+  border: 0,
+  background: 'transparent',
+  color: 'var(--cr-ink)',
+  fontFamily: 'var(--cr-font-serif)',
+  fontSize: 19,
+  fontWeight: 800,
+  padding: '2px 4px',
+  borderRadius: 8,
+  cursor: 'pointer',
+}
+
+function getPickerCellStyle(opts: { selected: boolean; disabled: boolean }): CSSProperties {
+  const { selected, disabled } = opts
+
+  if (disabled) {
+    return {
+      ...PICKER_CELL_BASE_STYLE,
+      color: 'rgba(74, 59, 42, 0.25)',
+      cursor: 'not-allowed',
+    }
+  }
+
+  if (selected) {
+    return {
+      ...PICKER_CELL_BASE_STYLE,
+      background: 'var(--cr-sage-darker)',
+      color: '#fdf6dc',
+      fontWeight: 800,
+      boxShadow: '0 2px 0 #2a3f1f',
+    }
+  }
+
+  return PICKER_CELL_BASE_STYLE
+}
+
+const PICKER_CELL_BASE_STYLE: CSSProperties = {
+  minHeight: 38,
+  borderRadius: 10,
+  border: 'none',
+  background: 'rgba(255, 255, 255, 0.26)',
+  color: 'var(--cr-ink)',
+  fontFamily: 'var(--cr-font-gaegu)',
+  fontSize: 17,
+  fontWeight: 700,
+  cursor: 'pointer',
 }
 
 function getDayCellStyle(opts: {

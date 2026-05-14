@@ -176,6 +176,7 @@ class StoryboardImageGenerationService(
         val envelope = StoryboardImageGenerateMessage(
             jobId = job.id.toString(),
             storyId = storyId,
+            storyMode = story.mode.name,
             payload = payload,
         )
         rabbitTemplate.convertAndSend(
@@ -290,6 +291,7 @@ class StoryboardImageGenerationService(
         val envelope = StoryboardImageRegenerateMessage(
             jobId = job.id.toString(),
             storyId = storyId,
+            storyMode = story.mode.name,
             payload = payload,
         )
         rabbitTemplate.convertAndSend(

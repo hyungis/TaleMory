@@ -3,15 +3,20 @@ package com.s210.backend.domain.auth.presentation
 import com.s210.backend.common.exception.BusinessException
 import com.s210.backend.common.exception.CommonErrorCode
 import com.s210.backend.common.response.ApiResponse
+import com.s210.backend.domain.auth.application.EmailVerificationService
 import com.s210.backend.domain.auth.application.MemberService
 import com.s210.backend.domain.auth.application.dto.OauthCallbackResult
 import com.s210.backend.domain.auth.entity.CustomUser
+import com.s210.backend.domain.auth.presentation.request.EmailVerificationSendRequest
+import com.s210.backend.domain.auth.presentation.request.EmailVerificationVerifyRequest
 import com.s210.backend.domain.auth.presentation.request.KakaoCallbackRequest
 import com.s210.backend.domain.auth.presentation.request.KakaoSignupRequest
 import com.s210.backend.domain.auth.presentation.request.LoginRequest
 import com.s210.backend.domain.auth.presentation.request.SignupRequest
 import com.s210.backend.domain.auth.presentation.response.AuthResponse
 import com.s210.backend.domain.auth.presentation.response.AvailabilityResponse
+import com.s210.backend.domain.auth.presentation.response.EmailVerificationSendResponse
+import com.s210.backend.domain.auth.presentation.response.EmailVerificationVerifyResponse
 import com.s210.backend.domain.auth.presentation.response.KakaoCallbackResponse
 import com.s210.backend.domain.auth.presentation.response.RefreshTokenResponse
 import com.s210.backend.domain.auth.presentation.response.SignupResponse
@@ -34,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/auth")
 class AuthController(
     private val memberService: MemberService,
+    private val emailVerificationService: EmailVerificationService,
     private val refreshTokenCookieManager: RefreshTokenCookieManager,
 ) {
 
@@ -54,6 +60,28 @@ class AuthController(
         ResponseEntity.ok(
             ApiResponse(data = memberService.findNicknameAvailability(nickname).toAvailabilityResponse()),
         )
+
+    @PostMapping("/email-verification/send")
+    fun authEmailVerificationSend(
+        @RequestBody request: EmailVerificationSendRequest,
+    ): ResponseEntity<ApiResponse<EmailVerificationSendResponse>> =
+        ResponseEntity.ok(
+            ApiResponse(
+                data = EmailVerificationSendResponse(
+                    expiresInSeconds = emailVerificationService.sendVerificationCode(request.email),
+                ),
+            ),
+        )
+
+    @PostMapping("/email-verification/verify")
+    fun authEmailVerificationVerify(
+        @RequestBody request: EmailVerificationVerifyRequest,
+    ): ResponseEntity<ApiResponse<EmailVerificationVerifyResponse>> {
+        emailVerificationService.verifyCode(request.email, request.code)
+        return ResponseEntity.ok(
+            ApiResponse(data = EmailVerificationVerifyResponse(verified = true)),
+        )
+    }
 
     @PostMapping("/login")
     fun authLogin(

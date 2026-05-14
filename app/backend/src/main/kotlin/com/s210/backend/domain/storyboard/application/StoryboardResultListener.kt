@@ -19,6 +19,7 @@ import com.s210.backend.domain.story.infrastructure.repository.SceneSentenceRepo
 import com.s210.backend.domain.story.infrastructure.repository.StoryBoardRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryRepository
 import com.s210.backend.domain.story.infrastructure.repository.StoryboardPageRepository
+import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationLayoutResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.FinalIllustrationResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StoryResultEnvelope
 import com.s210.backend.domain.storyboard.application.dto.StorySentenceTranslationRequestPayload
@@ -72,6 +73,7 @@ class StoryboardResultListener(
     private val illustrationVersionRedisRepository: IllustrationVersionRedisRepository,
     private val storyboardPageImageVersionRepository: StoryboardPageImageVersionRedisRepository,
     private val finalIllustrationResultHandler: FinalIllustrationResultHandler,
+    private val webtoonLayoutResultHandler: WebtoonLayoutResultHandler,
     private val s3Service: S3Service,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val jobStatusRedisRepo: JobStatusRedisRepository,
@@ -103,6 +105,14 @@ class StoryboardResultListener(
             val FINAL_ILLUSTRATION = setOf(
                 "GENERATE_FINAL_ILLUSTRATION_COMPLETED", "GENERATE_FINAL_ILLUSTRATION_FAILED",
                 "REVISE_FINAL_ILLUSTRATION_COMPLETED", "REVISE_FINAL_ILLUSTRATION_FAILED",
+            )
+            /**
+             * WEBTOON 모드 좌표 추출 결과 envelope.
+             * AI 가 페이지별로 1개씩 publish (fan-out). status COMPLETED/FAILED 둘 다 포함.
+             */
+            val FINAL_ILLUSTRATION_LAYOUT = setOf(
+                "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_COMPLETED",
+                "ANALYZE_FINAL_ILLUSTRATION_LAYOUT_FAILED",
             )
         }
     }
@@ -185,6 +195,18 @@ class StoryboardResultListener(
                     "COMPLETED" -> finalIllustrationResultHandler.handleSuccess(envelope)
                     "FAILED" -> finalIllustrationResultHandler.handleFailure(envelope)
                     else -> log.warn("[FINAL_ILLUST:RES] unknown status='{}' jobId={}", envelope.status, envelope.jobId)
+                }
+            }
+            in EnvelopeTypes.FINAL_ILLUSTRATION_LAYOUT -> {
+                val envelope = objectMapper.treeToValue(tree, FinalIllustrationLayoutResultEnvelope::class.java)
+                log.info(
+                    "[LAYOUT:RES] received — type={}, jobId={}, page={}, status={}",
+                    type, envelope.jobId, envelope.pageNumber, envelope.status,
+                )
+                when (envelope.status.uppercase()) {
+                    "COMPLETED" -> webtoonLayoutResultHandler.handleSuccess(envelope)
+                    "FAILED" -> webtoonLayoutResultHandler.handleFailure(envelope)
+                    else -> log.warn("[LAYOUT:RES] unknown status='{}' jobId={}", envelope.status, envelope.jobId)
                 }
             }
             else -> log.warn("Unknown envelope type='{}', body={}", type, body)
@@ -272,8 +294,17 @@ class StoryboardResultListener(
         val requestedKoreanText = job.requestPayload
             ?.let { runCatching { objectMapper.readValue(it, StorySentenceTranslationRequestPayload::class.java) }.getOrNull() }
             ?.koreanText
-        val currentKoreanText = page.pageTexts(objectMapper).koreanText
-        if (requestedKoreanText != null && currentKoreanText != requestedKoreanText) {
+        // stale check 의 비교는 publish 시 보낸 본문 (`request_payload.koreanText`) 와
+        // 현재 페이지의 sentences[].koreanText 를 동일 형식으로 join 한 결과 사이에서 한다.
+        //
+        // ⚠ 옛 코드는 `page.pageTexts().koreanText` 를 비교했으나, X2 패치 이후 webtoon 페이지의
+        //   `pageTexts()` 는 sentence 별 prefix(`이름: `) 가 박힌 합본을 반환한다. 반면 publish 시점에는
+        //   prefix 가 빠진 clean 본문을 request_payload 로 저장하기 때문에 두 값이 항상 다르게 평가되어
+        //   stale check 가 무조건 발동 → `replaceTranslatedSentences` 호출이 누락되고 영어가 갱신되지 않는
+        //   회귀가 발생한다. clean 본문끼리 비교해야 정상.
+        val currentCleanKoreanText = page.parseSentencesList(objectMapper)
+            .joinToString("\n") { it.koreanText.trim() }
+        if (requestedKoreanText != null && currentCleanKoreanText != requestedKoreanText) {
             log.info(
                 "Skip stale sentence translation jobId={}, storyId={}, pageNumber={}",
                 job.id,
@@ -696,15 +727,29 @@ class StoryboardResultListener(
         //    - sceneSummary / imagePrompt 까지 함께 보존해야 이후 이미지 생성 단계에서
         //      storyboard_pages 단일 소스로 페이로드를 조립할 수 있다 (옵션 D').
         //    - bulk DELETE (flushAutomatically=true) 로 UK(storyBoardId, pageNumber) 충돌 회피.
+        //
+        //    WEBTOON 모드 영속화 (Phase 2):
+        //     - sentences JSON 자체엔 추가 컬럼이 필요 없음 — DTO 에 type/speakerKey 가 추가되어
+        //       writeValueAsString 결과에 자동 포함됨. VIEWER 페이로드(필드 없음) 는 두 키 미존재 → null 폴백.
+        //     - charactersInScene 은 별도 JSON 컬럼(characters_in_scene_json) 으로 분리 영속화.
+        //       null/empty 는 그대로 null 저장 (VIEWER 모드).
         storyboardPageRepository.deleteAllByStoryBoardId(storyBoard.id)
         storyboardPageRepository.saveAll(
             payload.pages.map { p ->
+                // ⚠ AI 가 WEBTOON 모드에서 "등장만 하고 대사 없는" 화자에 대해 englishText="" 인 sentence 를
+                //  내려보내는 경우가 있다 (page 등장 인물 메타와 sentences 가 혼합돼서 발생). 그대로 영속화하면
+                //  StoryConfirmService 가 빈 텍스트를 TTS 페이로드에 실어 Qwen TTS 400 ("texts_json must
+                //  contain non-empty strings") 으로 동화책 생성 전체가 폭주한다. 진입 시점에 한 번 거른다.
+                val cleanedSentences = p.sentences.filter { it.englishText.isNotBlank() }
                 StoryboardPage(
                     storyBoardId = storyBoard.id,
                     pageNumber = p.pageNumber,
                     sceneSummary = p.sceneSummary,
                     imagePrompt = p.imagePrompt,
-                    sentences = objectMapper.writeValueAsString(p.sentences),
+                    sentences = objectMapper.writeValueAsString(cleanedSentences),
+                    charactersInSceneJson = p.charactersInScene
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { objectMapper.writeValueAsString(it) },
                     imageUrl = null,
                 )
             },

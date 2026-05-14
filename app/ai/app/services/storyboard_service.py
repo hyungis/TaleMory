@@ -2,8 +2,12 @@ import json
 import base64
 import logging
 import mimetypes
+import re
 from functools import lru_cache
 from itertools import cycle, islice
+from urllib import error as url_error
+from urllib import parse as url_parse
+from urllib import request as url_request
 
 import boto3
 
@@ -20,10 +24,17 @@ from app.schemas.storyboard import (
     StoryboardRegenerateRequest,
     StorySentence,
     UsageInfo,
+    WebtoonCharacterInScene,
+    WebtoonStoryboardGenerateResponse,
+    WebtoonStoryboardPage,
+    WebtoonStoryboardRegenerateRequest,
+    WebtoonStorySentence,
 )
 from app.services.storyboard_prompt import (
     STORYBOARD_PROMPT_TEMPLATE_VERSION,
     STORYBOARD_SYSTEM_PROMPT,
+    WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION,
+    WEBTOON_STORYBOARD_SYSTEM_PROMPT,
 )
 
 FIXED_PAGE_MIN = 10
@@ -34,25 +45,185 @@ FIXED_VISION_DETAIL = "low"
 
 
 def generate_storyboard(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:GEN] service entry — useOpenAI=%s, photos=%d, children=%d, place=%s",
-        use_openai, len(request.photos), len(request.children), request.travel.place,
+        "[STORY:GEN] service entry - provider=%s, photos=%d, children=%d, place=%s",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.photos), len(request.children), request.travel.place,
     )
+    if use_gemini:
+        return _generate_with_gemini(request)
     if use_openai:
         return _generate_with_openai(request)
     return _generate_locally(request)
 
 
-def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+def generate_webtoon_storyboard(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.WEBTOON_STORYBOARD_MODEL)
     use_openai = bool(settings.OPENAI_API_KEY)
     logger.info(
-        "[STORY:REGEN] service entry — useOpenAI=%s, feedbackLen=%d",
-        use_openai, len(request.feedbackInstruction or ""),
+        "[STORY:WEBTOON:GEN] service entry - provider=%s, photos=%d, children=%d, place=%s",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.photos), len(request.children), request.travel.place,
     )
+    if use_gemini:
+        return _generate_webtoon_with_gemini(request)
+    if use_openai:
+        return _generate_webtoon_with_openai(request)
+    return _generate_webtoon_locally(request)
+
+
+def regenerate_storyboard(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.STORYBOARD_MODEL)
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[STORY:REGEN] service entry - provider=%s, feedbackLen=%d",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.feedbackInstruction or ""),
+    )
+    if use_gemini:
+        return _regenerate_with_gemini(request)
     if use_openai:
         return _regenerate_with_openai(request)
     return _generate_locally(_build_regenerate_fallback_request(request))
+
+
+def regenerate_webtoon_storyboard(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    use_gemini = _use_gemini_storyboard_model(settings.WEBTOON_STORYBOARD_MODEL)
+    use_openai = bool(settings.OPENAI_API_KEY)
+    logger.info(
+        "[STORY:WEBTOON:REGEN] service entry - provider=%s, feedbackLen=%d",
+        _storyboard_provider_label(use_gemini, use_openai), len(request.feedbackInstruction or ""),
+    )
+    if use_gemini:
+        return _regenerate_webtoon_with_gemini(request)
+    if use_openai:
+        return _regenerate_webtoon_with_openai(request)
+    return _generate_webtoon_locally(_build_webtoon_regenerate_fallback_request(request))
+
+
+def _use_gemini_storyboard_model(model: str) -> bool:
+    return model.startswith("gemini") and bool(settings.GEMINI_API_KEY)
+
+
+def _storyboard_provider_label(use_gemini: bool, use_openai: bool) -> str:
+    if use_gemini:
+        return "gemini"
+    if use_openai:
+        return "openai"
+    return "local"
+
+
+def _generate_with_gemini(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
+    payload = request.model_dump(mode="json")
+    input_content = _build_openai_input_content(request, payload, include_images=False)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.STORYBOARD_MODEL,
+        system_prompt=STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=StoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = StoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.STORYBOARD_MODEL)
+    return parsed
+
+
+def _generate_webtoon_with_gemini(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    payload = request.model_dump(mode="json")
+    input_content = _build_openai_webtoon_input_content(request, payload, include_images=True)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.WEBTOON_STORYBOARD_MODEL,
+        system_prompt=WEBTOON_STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=WebtoonStoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_webtoon_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.WEBTOON_STORYBOARD_MODEL)
+    return parsed
+
+
+def _regenerate_with_gemini(request: StoryboardRegenerateRequest) -> StoryboardGenerateResponse:
+    input_content = _build_openai_regenerate_input_content(request, include_images=False)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.STORYBOARD_MODEL,
+        system_prompt=STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=StoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = StoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.STORYBOARD_MODEL)
+    return parsed
+
+
+def _regenerate_webtoon_with_gemini(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    input_content = _build_openai_webtoon_regenerate_input_content(request, include_images=True)
+    response_json = _call_gemini_storyboard_api(
+        model=settings.WEBTOON_STORYBOARD_MODEL,
+        system_prompt=WEBTOON_STORYBOARD_SYSTEM_PROMPT,
+        input_content=input_content,
+        response_schema=WebtoonStoryboardGenerateResponse.model_json_schema(),
+    )
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(_extract_gemini_text(response_json))
+    _reconcile_webtoon_derived_counts(parsed)
+    _apply_gemini_usage(parsed.usage, response_json, WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION, settings.WEBTOON_STORYBOARD_MODEL)
+    return parsed
+
+
+def _generate_webtoon_with_openai(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    try:
+        from openai import OpenAI
+        from openai import OpenAIError
+    except ImportError as exc:
+        raise RuntimeError("openai package is not installed") from exc
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    schema = _to_openai_strict_json_schema(WebtoonStoryboardGenerateResponse.model_json_schema())
+    payload = request.model_dump(mode="json")
+    input_content = _build_openai_webtoon_input_content(request, payload)
+    logger.info(
+        "[STORY:WEBTOON:GEN] OpenAI call start - model=%s, contentBlocks=%d",
+        settings.WEBTOON_STORYBOARD_MODEL, len(input_content),
+    )
+
+    try:
+        response = client.responses.create(
+            model=settings.WEBTOON_STORYBOARD_MODEL,
+            input=[
+                {"role": "system", "content": WEBTOON_STORYBOARD_SYSTEM_PROMPT},
+                {"role": "user", "content": input_content},
+            ],
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "webtoon_storyboard_generation_response",
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+        )
+    except OpenAIError as exc:
+        logger.exception("[STORY:WEBTOON:GEN] OpenAI call failed")
+        raise ValueError(f"OpenAI webtoon storyboard generation failed: {exc}") from exc
+
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(response.output_text)
+    _reconcile_webtoon_derived_counts(parsed)
+    token_usage = _extract_token_usage(response.usage)
+    parsed.usage.model = settings.WEBTOON_STORYBOARD_MODEL
+    parsed.usage.inputTokens = token_usage["input_tokens"]
+    parsed.usage.outputTokens = token_usage["output_tokens"]
+    parsed.usage.totalTokens = token_usage["total_tokens"]
+    parsed.usage.costUsd = _estimate_cost_usd(
+        input_tokens=token_usage["input_tokens"],
+        output_tokens=token_usage["output_tokens"],
+    )
+    parsed.usage.promptTemplateVersion = WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION
+    logger.info(
+        "[STORY:WEBTOON:GEN] OpenAI call done - pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        len(parsed.pages), parsed.totalWordCount,
+        token_usage["input_tokens"], token_usage["output_tokens"], parsed.usage.costUsd,
+    )
+    return parsed
 
 
 def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGenerateResponse:
@@ -67,7 +238,7 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
     payload = request.model_dump(mode="json")
     input_content = _build_openai_input_content(request, payload)
     logger.info(
-        "[STORY:GEN] OpenAI call start — model=%s, contentBlocks=%d",
+        "[STORY:GEN] OpenAI call start - model=%s, contentBlocks=%d",
         settings.STORYBOARD_MODEL, len(input_content),
     )
 
@@ -104,10 +275,55 @@ def _generate_with_openai(request: StoryboardGenerateRequest) -> StoryboardGener
     )
     parsed.usage.promptTemplateVersion = STORYBOARD_PROMPT_TEMPLATE_VERSION
     logger.info(
-        "[STORY:GEN] OpenAI call done — pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
+        "[STORY:GEN] OpenAI call done - pages=%d, totalWords=%d, inputTok=%s, outputTok=%s, costUsd=%s",
         len(parsed.pages), parsed.totalWordCount,
         token_usage["input_tokens"], token_usage["output_tokens"], parsed.usage.costUsd,
     )
+    return parsed
+
+
+def _regenerate_webtoon_with_openai(request: WebtoonStoryboardRegenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    try:
+        from openai import OpenAI
+        from openai import OpenAIError
+    except ImportError as exc:
+        raise RuntimeError("openai package is not installed") from exc
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    schema = _to_openai_strict_json_schema(WebtoonStoryboardGenerateResponse.model_json_schema())
+    input_content = _build_openai_webtoon_regenerate_input_content(request)
+
+    try:
+        response = client.responses.create(
+            model=settings.WEBTOON_STORYBOARD_MODEL,
+            input=[
+                {"role": "system", "content": WEBTOON_STORYBOARD_SYSTEM_PROMPT},
+                {"role": "user", "content": input_content},
+            ],
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "webtoon_storyboard_regeneration_response",
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+        )
+    except OpenAIError as exc:
+        raise ValueError(f"OpenAI webtoon storyboard regeneration failed: {exc}") from exc
+
+    parsed = WebtoonStoryboardGenerateResponse.model_validate_json(response.output_text)
+    _reconcile_webtoon_derived_counts(parsed)
+    token_usage = _extract_token_usage(response.usage)
+    parsed.usage.model = settings.WEBTOON_STORYBOARD_MODEL
+    parsed.usage.inputTokens = token_usage["input_tokens"]
+    parsed.usage.outputTokens = token_usage["output_tokens"]
+    parsed.usage.totalTokens = token_usage["total_tokens"]
+    parsed.usage.costUsd = _estimate_cost_usd(
+        input_tokens=token_usage["input_tokens"],
+        output_tokens=token_usage["output_tokens"],
+    )
+    parsed.usage.promptTemplateVersion = WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION
     return parsed
 
 
@@ -156,7 +372,11 @@ def _regenerate_with_openai(request: StoryboardRegenerateRequest) -> StoryboardG
     return parsed
 
 
-def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dict) -> list[dict[str, str]]:
+def _build_openai_input_content(
+    request: StoryboardGenerateRequest,
+    payload: dict,
+    include_images: bool = True,
+) -> list[dict[str, str]]:
     photo_count = len(request.photos)
     min_pages = FIXED_PAGE_MIN
     max_pages = FIXED_PAGE_MAX
@@ -176,7 +396,7 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
             "text": json.dumps(payload, ensure_ascii=False),
         },
     ]
-    if not FIXED_USE_VISION:
+    if not include_images or not FIXED_USE_VISION:
         return content
 
     for photo in sorted(request.photos, key=lambda item: item.displayOrder):
@@ -193,8 +413,49 @@ def _build_openai_input_content(request: StoryboardGenerateRequest, payload: dic
     return content
 
 
+def _build_openai_webtoon_input_content(
+    request: StoryboardGenerateRequest,
+    payload: dict,
+    include_images: bool = True,
+) -> list[dict[str, str]]:
+    character_keys = _webtoon_character_keys(request)
+    character_directive = {
+        "availableCharacters": character_keys,
+        "speakerRules": {
+            "dialogueSpeakerKeys": [item["characterKey"] for item in character_keys if item["characterKey"] != "narrator"],
+            "narrationSpeakerKey": "narrator",
+        },
+    }
+    webtoon_directive = (
+        "Generate a WEBTOON storyboard for the same story creation flow. "
+        "Make the script dialogue-led while preserving children's storybook warmth. "
+        "Use only the provided availableCharacters keys for speakerKey and charactersInScene. "
+        "Do not show every available character on every page; include only the 1-2 visible characters "
+        "that the page illustration actually needs, and reserve full-family staging for group or payoff moments. "
+        "DIALOGUE should be frequent and short. NARRATION should be sparse and only bridge the scene. "
+        "Keep the child as the primary speaker, but do not make companions silent props. "
+        "Across the storyboard, give companions meaningful short dialogue on several pages, especially when "
+        "they are visible, comforting, guiding, asking questions, or reacting to the child. "
+        "Use the WEBTOON age+difficulty targets from the system prompt instead of the standard storybook "
+        "age rules, so harder levels use more dialogue turns and richer emotional detail. "
+        "Each page must include charactersInScene with sceneRole and expectedPosition for later image generation "
+        "and final illustration coordinate extraction."
+    )
+    content = _build_openai_input_content(request, payload, include_images=include_images)
+    content.insert(1, {"type": "input_text", "text": webtoon_directive})
+    content.insert(
+        2,
+        {
+            "type": "input_text",
+            "text": "WEBTOON CHARACTER KEYS:\n" + json.dumps(character_directive, ensure_ascii=False),
+        },
+    )
+    return content
+
+
 def _build_openai_regenerate_input_content(
     request: StoryboardRegenerateRequest,
+    include_images: bool = True,
 ) -> list[dict[str, str]]:
     original_request = request.originalRequest.model_copy(deep=True)
     if request.storyId is not None:
@@ -236,7 +497,7 @@ def _build_openai_regenerate_input_content(
             ),
         },
     ]
-    if not FIXED_USE_VISION:
+    if not include_images or not FIXED_USE_VISION:
         return content
 
     for photo in sorted(original_request.photos, key=lambda item: item.displayOrder):
@@ -250,6 +511,48 @@ def _build_openai_regenerate_input_content(
                 "detail": FIXED_VISION_DETAIL,
             }
         )
+    return content
+
+
+def _build_openai_webtoon_regenerate_input_content(
+    request: WebtoonStoryboardRegenerateRequest,
+    include_images: bool = True,
+) -> list[dict[str, str]]:
+    original_request = request.originalRequest.model_copy(deep=True)
+    if request.storyId is not None:
+        original_request.storyId = request.storyId
+
+    payload = original_request.model_dump(mode="json")
+    content = _build_openai_webtoon_input_content(original_request, payload, include_images=include_images)
+    content.extend(
+        [
+            {
+                "type": "input_text",
+                "text": (
+                    "Regenerate the WEBTOON storyboard using the original request, "
+                    "the current webtoon storyboard, and the user's feedback. "
+                    "Keep the WEBTOON output schema. Improve the story according "
+                    "to the feedback instead of lightly paraphrasing the current storyboard."
+                ),
+            },
+            {
+                "type": "input_text",
+                "text": (
+                    "USER FEEDBACK - HIGH PRIORITY:\n"
+                    f"{request.feedbackInstruction.strip()}\n\n"
+                    "Prioritize this feedback while preserving hard webtoon schema rules, "
+                    "approvedSummary direction, character keys, and child-friendly tone."
+                ),
+            },
+            {
+                "type": "input_text",
+                "text": (
+                    "CURRENT WEBTOON STORYBOARD TO REVISE:\n"
+                    f"{json.dumps(request.currentStoryboard.model_dump(mode='json'), ensure_ascii=False)}"
+                ),
+            },
+        ]
+    )
     return content
 
 
@@ -297,6 +600,276 @@ def _reconcile_derived_counts(parsed: StoryboardGenerateResponse) -> None:
         page.wordCount = _count_words(page.englishText)
     parsed.pageCount = len(parsed.pages)
     parsed.totalWordCount = sum(page.wordCount for page in parsed.pages)
+
+
+def _reconcile_webtoon_derived_counts(parsed: WebtoonStoryboardGenerateResponse) -> None:
+    for page_index, page in enumerate(parsed.pages, start=1):
+        page.pageNumber = page_index
+        for sentence_index, sentence in enumerate(page.sentences, start=1):
+            sentence.sentenceOrder = sentence_index
+            if sentence.speakerKey == "narrator":
+                sentence.type = "NARRATION"
+            if sentence.type == "NARRATION":
+                sentence.speakerKey = "narrator"
+            if sentence.type == "DIALOGUE":
+                _normalize_webtoon_dialogue_sentence(sentence)
+        page.sentenceCount = len(page.sentences)
+        page.englishText = " ".join(sentence.englishText.strip() for sentence in page.sentences).strip()
+        page.koreanText = " ".join(sentence.koreanText.strip() for sentence in page.sentences).strip()
+        page.wordCount = _count_words(page.englishText)
+    parsed.pageCount = len(parsed.pages)
+    parsed.totalWordCount = sum(page.wordCount for page in parsed.pages)
+
+
+_ENGLISH_SPEAKER_TAG_RE = re.compile(
+    r"\s*,?\s*(?:she|he|they|mommy|mom|dad|daddy|mother|father|[A-Z][A-Za-z]*)\s+"
+    r"(?:says?|said|asks?|asked|whispers?|whispered|shouts?|shouted|cries?|cried|replies?|replied)\.?\s*$",
+    re.IGNORECASE,
+)
+_KOREAN_SPEAKER_TAG_RE = re.compile(
+    r"\s*(?:라고|하고)?\s*(?:그녀|그|그는|그녀는|엄마|아빠|[가-힣A-Za-z]+(?:이|가|은|는)?)\s*"
+    r"(?:말한다|말했다|말해요|말했어요|말하죠|묻는다|물었다|물어요|외친다|외쳤다|외쳐요|"
+    r"속삭인다|속삭였다|대답한다|대답했다)\.?\s*$"
+)
+_DOUBLE_QUOTED_TEXT_RE = re.compile(r"[\"“]([^\"“”]+)[\"”]")
+_SINGLE_QUOTED_TEXT_RE = re.compile(r"'([^']+)'")
+
+
+def _normalize_webtoon_dialogue_sentence(sentence: WebtoonStorySentence) -> None:
+    sentence.englishText = _spoken_text_only(sentence.englishText, korean=False)
+    sentence.koreanText = _spoken_text_only(sentence.koreanText, korean=True)
+
+
+def _spoken_text_only(text: str, *, korean: bool) -> str:
+    stripped = text.strip()
+    quoted = _DOUBLE_QUOTED_TEXT_RE.search(stripped) or _SINGLE_QUOTED_TEXT_RE.search(stripped)
+    if quoted:
+        return quoted.group(1).strip()
+    pattern = _KOREAN_SPEAKER_TAG_RE if korean else _ENGLISH_SPEAKER_TAG_RE
+    return pattern.sub("", stripped).strip()
+
+
+def _call_gemini_storyboard_api(
+    *,
+    model: str,
+    system_prompt: str,
+    input_content: list[dict[str, str]],
+    response_schema: dict,
+) -> dict:
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+
+    api_url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={url_parse.quote(settings.GEMINI_API_KEY)}"
+    )
+    payload = {
+        "systemInstruction": {
+            "parts": [{"text": system_prompt}],
+        },
+        "contents": [
+            {
+                "role": "user",
+                "parts": _build_gemini_parts(input_content),
+            }
+        ],
+        "generationConfig": {
+            "maxOutputTokens": 65536,
+            "responseMimeType": "application/json",
+            "responseJsonSchema": _to_gemini_json_schema(response_schema),
+            "thinkingConfig": {
+                "thinkingBudget": 0,
+            },
+        },
+    }
+    req = url_request.Request(
+        api_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    logger.info(
+        "[STORY:GEMINI] call start - model=%s, contentBlocks=%d",
+        settings.STORYBOARD_MODEL, len(input_content),
+    )
+    try:
+        with url_request.urlopen(req, timeout=180) as response:
+            response_json = json.loads(response.read().decode("utf-8"))
+    except url_error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        logger.exception("[STORY:GEMINI] call failed")
+        raise ValueError(f"Gemini storyboard generation failed: {exc.code} {body}") from exc
+    except url_error.URLError as exc:
+        logger.exception("[STORY:GEMINI] network error")
+        raise RuntimeError(f"Gemini storyboard generation network error: {exc.reason}") from exc
+
+    usage = _extract_gemini_token_usage(response_json)
+    logger.info(
+        "[STORY:GEMINI] call done - inputTok=%s, outputTok=%s, totalTok=%s",
+        usage["input_tokens"], usage["output_tokens"], usage["total_tokens"],
+    )
+    return response_json
+
+
+def _build_gemini_parts(input_content: list[dict[str, str]]) -> list[dict]:
+    parts: list[dict] = []
+    for block in input_content:
+        block_type = block.get("type")
+        if block_type == "input_text":
+            parts.append({"text": block.get("text", "")})
+            continue
+        if block_type == "input_image":
+            image_part = _build_gemini_image_part(block.get("image_url", ""))
+            if image_part is not None:
+                parts.append(image_part)
+    return parts
+
+
+def _build_gemini_image_part(image_ref: str) -> dict | None:
+    if not image_ref:
+        return None
+    if image_ref.startswith("data:"):
+        header, encoded = image_ref.split(",", 1)
+        mime_type = header.removeprefix("data:").split(";", 1)[0] or "image/png"
+        return {"inlineData": {"mimeType": mime_type, "data": encoded}}
+
+    try:
+        with url_request.urlopen(image_ref, timeout=30) as response:
+            raw_bytes = response.read()
+            mime_type = response.headers.get_content_type()
+            if mime_type == "application/octet-stream":
+                mime_type = mimetypes.guess_type(image_ref)[0] or "image/png"
+    except Exception:
+        logger.warning("[STORY:GEMINI] skipped unreadable image reference")
+        return None
+    return {
+        "inlineData": {
+            "mimeType": mime_type,
+            "data": base64.b64encode(raw_bytes).decode("ascii"),
+        }
+    }
+
+
+def _extract_gemini_text(response_json: dict) -> str:
+    text_parts: list[str] = []
+    for candidate in response_json.get("candidates", []):
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            text_value = part.get("text")
+            if text_value:
+                text_parts.append(text_value)
+    text = "".join(text_parts).strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+        if text.startswith("json"):
+            text = text[4:].strip()
+    if not text:
+        raise ValueError(f"Gemini storyboard generation returned empty text: {_gemini_empty_text_debug(response_json)}")
+    return text
+
+
+def _gemini_empty_text_debug(response_json: dict) -> str:
+    candidates = response_json.get("candidates", [])
+    finish_reasons = [
+        candidate.get("finishReason") or candidate.get("finish_reason")
+        for candidate in candidates
+    ]
+    safety_ratings = [
+        candidate.get("safetyRatings") or candidate.get("safety_ratings")
+        for candidate in candidates
+    ]
+    prompt_feedback = response_json.get("promptFeedback") or response_json.get("prompt_feedback")
+    usage = response_json.get("usageMetadata") or response_json.get("usage_metadata")
+    return (
+        f"finishReasons={finish_reasons}, "
+        f"promptFeedback={prompt_feedback}, "
+        f"safetyRatings={safety_ratings}, "
+        f"usageMetadata={usage}"
+    )
+
+
+def _apply_gemini_usage(usage: UsageInfo, response_json: dict, prompt_template_version: str, model: str) -> None:
+    token_usage = _extract_gemini_token_usage(response_json)
+    usage.model = model
+    usage.inputTokens = token_usage["input_tokens"]
+    usage.outputTokens = token_usage["output_tokens"]
+    usage.totalTokens = token_usage["total_tokens"]
+    usage.costUsd = _estimate_cost_usd(
+        input_tokens=token_usage["input_tokens"],
+        output_tokens=token_usage["output_tokens"],
+    )
+    usage.promptTemplateVersion = prompt_template_version
+
+
+def _extract_gemini_token_usage(response_json: dict) -> dict[str, int | None]:
+    usage_metadata = response_json.get("usageMetadata", {})
+    input_tokens = _optional_int(usage_metadata.get("promptTokenCount"))
+    output_tokens = _optional_int(usage_metadata.get("candidatesTokenCount"))
+    total_tokens = _optional_int(usage_metadata.get("totalTokenCount"))
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def _optional_int(value: object) -> int | None:
+    return int(value) if value is not None else None
+
+
+def _to_gemini_json_schema(schema: dict) -> dict:
+    raw = json.loads(json.dumps(schema))
+    definitions = raw.pop("$defs", {})
+    return _normalize_gemini_schema(raw, definitions)
+
+
+def _normalize_gemini_schema(node: object, definitions: dict) -> object:
+    if isinstance(node, list):
+        return [_normalize_gemini_schema(item, definitions) for item in node]
+    if not isinstance(node, dict):
+        return node
+
+    if "$ref" in node:
+        ref_name = node["$ref"].rsplit("/", 1)[-1]
+        ref_schema = definitions.get(ref_name, {})
+        merged = json.loads(json.dumps(ref_schema))
+        merged.update({key: value for key, value in node.items() if key != "$ref"})
+        return _normalize_gemini_schema(merged, definitions)
+
+    any_of = node.pop("anyOf", None)
+    if isinstance(any_of, list):
+        non_null = [item for item in any_of if item.get("type") != "null"]
+        has_null = len(non_null) != len(any_of)
+        if len(non_null) == 1:
+            normalized = _normalize_gemini_schema(non_null[0], definitions)
+            if isinstance(normalized, dict) and has_null:
+                normalized_type = normalized.get("type")
+                if isinstance(normalized_type, str):
+                    normalized["type"] = [normalized_type, "null"]
+            node.update(normalized)
+
+    for key in (
+        "$defs",
+        "default",
+        "description",
+        "examples",
+        "maxLength",
+        "minLength",
+        "title",
+    ):
+        node.pop(key, None)
+
+    for key, value in list(node.items()):
+        if key == "properties" and isinstance(value, dict):
+            node[key] = {
+                property_name: _normalize_gemini_schema(property_schema, definitions)
+                for property_name, property_schema in value.items()
+            }
+            continue
+        node[key] = _normalize_gemini_schema(value, definitions)
+    return node
 
 
 def _count_words(text: str) -> int:
@@ -501,6 +1074,182 @@ def _generate_locally(request: StoryboardGenerateRequest) -> StoryboardGenerateR
     return response
 
 
+def _generate_webtoon_locally(request: StoryboardGenerateRequest) -> WebtoonStoryboardGenerateResponse:
+    base = _generate_locally(request)
+    youngest_age = min(child.age for child in request.children)
+    reading_level = _webtoon_reading_level_for_age_and_difficulty(youngest_age, request.difficulty)
+    character_keys = _webtoon_character_keys(request)
+    dialogue_keys = [item["characterKey"] for item in character_keys if item["characterKey"] != "narrator"]
+    fallback_speaker = dialogue_keys[0] if dialogue_keys else "character"
+    companion_speaker = dialogue_keys[1] if len(dialogue_keys) > 1 else fallback_speaker
+
+    pages: list[WebtoonStoryboardPage] = []
+    for page in base.pages:
+        primary_speaker = fallback_speaker if page.pageNumber % 2 else companion_speaker
+        secondary_speaker = companion_speaker if primary_speaker == fallback_speaker else fallback_speaker
+        characters_in_scene = [
+            WebtoonCharacterInScene(
+                characterKey=primary_speaker,
+                sceneRole=f"leads the visible action for page {page.pageNumber}",
+                expectedPosition="center",
+            )
+        ]
+        if secondary_speaker != primary_speaker:
+            characters_in_scene.append(
+                WebtoonCharacterInScene(
+                    characterKey=secondary_speaker,
+                    sceneRole=f"reacts and speaks with {primary_speaker} in this scene",
+                    expectedPosition="left" if page.pageNumber % 2 else "right",
+                )
+            )
+
+        first_sentence = page.sentences[0]
+        middle_sentence = page.sentences[min(1, len(page.sentences) - 1)]
+        last_sentence = page.sentences[-1]
+        sentences = [
+            WebtoonStorySentence(
+                sentenceOrder=1,
+                type="NARRATION",
+                speakerKey="narrator",
+                englishText=first_sentence.englishText,
+                koreanText=first_sentence.koreanText,
+                emotion=first_sentence.emotion,
+            ),
+            WebtoonStorySentence(
+                sentenceOrder=2,
+                type="DIALOGUE",
+                speakerKey=primary_speaker,
+                englishText=_local_dialogue_for_page(page.pageNumber, primary_speaker),
+                koreanText=_local_dialogue_for_page(page.pageNumber, primary_speaker),
+                emotion="EXCITED" if page.pageNumber == 1 else "CURIOUS",
+            ),
+            WebtoonStorySentence(
+                sentenceOrder=3,
+                type="DIALOGUE",
+                speakerKey=secondary_speaker,
+                englishText=middle_sentence.englishText,
+                koreanText=middle_sentence.koreanText,
+                emotion=middle_sentence.emotion,
+            ),
+            WebtoonStorySentence(
+                sentenceOrder=4,
+                type="DIALOGUE",
+                speakerKey=primary_speaker,
+                englishText=last_sentence.englishText,
+                koreanText=last_sentence.koreanText,
+                emotion=last_sentence.emotion,
+            ),
+        ]
+        target_min_sentences = _min_sentences_from_range(reading_level.sentencesPerPage)
+        while len(sentences) < target_min_sentences:
+            next_order = len(sentences) + 1
+            speaker = secondary_speaker if next_order % 2 else primary_speaker
+            sentences.append(
+                WebtoonStorySentence(
+                    sentenceOrder=next_order,
+                    type="DIALOGUE",
+                    speakerKey=speaker,
+                    englishText=_local_dialogue_for_page(page.pageNumber + next_order, speaker),
+                    koreanText=_local_dialogue_for_page(page.pageNumber + next_order, speaker),
+                    emotion="WARM",
+                )
+            )
+        english_text = " ".join(sentence.englishText for sentence in sentences)
+        korean_text = " ".join(sentence.koreanText for sentence in sentences)
+        pages.append(
+            WebtoonStoryboardPage(
+                pageNumber=page.pageNumber,
+                sourcePhotoIds=page.sourcePhotoIds,
+                sceneSummary=page.sceneSummary,
+                englishText=english_text,
+                koreanText=korean_text,
+                imagePrompt=(
+                    f"{page.imagePrompt} Webtoon character staging: "
+                    + "; ".join(
+                        f"{item.characterKey} {item.sceneRole}, positioned {item.expectedPosition}"
+                        for item in characters_in_scene
+                    )
+                    + "."
+                ),
+                charactersInScene=characters_in_scene,
+                sentences=sentences,
+                sentenceCount=len(sentences),
+                wordCount=_count_words(english_text),
+            )
+        )
+
+    response = WebtoonStoryboardGenerateResponse(
+        title=base.title,
+        synopsis=base.synopsis,
+        moralTheme=base.moralTheme,
+        storyQuest=base.storyQuest,
+        recurringMotif=base.recurringMotif,
+        pageCount=len(pages),
+        pageCountReason=base.pageCountReason + " Webtoon mode adds dialogue-led sentence metadata.",
+        readingLevel=reading_level,
+        totalWordCount=sum(page.wordCount for page in pages),
+        pages=pages,
+        usage=UsageInfo(
+            model="local-webtoon-storyboard-fallback",
+            inputTokens=0,
+            outputTokens=0,
+            totalTokens=0,
+            costUsd=0.0,
+            promptTemplateVersion=WEBTOON_STORYBOARD_PROMPT_TEMPLATE_VERSION,
+        ),
+    )
+    _reconcile_webtoon_derived_counts(response)
+    return response
+
+
+def _webtoon_character_keys(request: StoryboardGenerateRequest) -> list[dict[str, str]]:
+    characters: list[dict[str, str]] = []
+    used_keys: set[str] = set()
+    for child in request.children:
+        character_key = _unique_character_key(child.name, used_keys)
+        characters.append(
+            {
+                "characterKey": character_key,
+                "displayName": child.name,
+                "role": "child",
+            }
+        )
+    for companion in request.companions:
+        character_key = _unique_character_key(companion, used_keys)
+        characters.append(
+            {
+                "characterKey": character_key,
+                "displayName": companion,
+                "role": "companion",
+            }
+        )
+    characters.append(
+        {
+            "characterKey": "narrator",
+            "displayName": "Narrator",
+            "role": "narrator",
+        }
+    )
+    return characters
+
+
+def _unique_character_key(name: str, used_keys: set[str]) -> str:
+    base = name.strip() or "character"
+    candidate = base
+    suffix = 2
+    while candidate in used_keys or candidate == "narrator":
+        candidate = f"{base}_{suffix}"
+        suffix += 1
+    used_keys.add(candidate)
+    return candidate
+
+
+def _local_dialogue_for_page(page_number: int, speaker_key: str) -> str:
+    if page_number == 1:
+        return "What should we discover first?"
+    return f"Look, I found another clue!"
+
+
 def _build_regenerate_fallback_request(
     request: StoryboardRegenerateRequest,
 ) -> StoryboardGenerateRequest:
@@ -510,6 +1259,19 @@ def _build_regenerate_fallback_request(
     if request.feedbackInstruction:
         existing = (original_request.additionalInstruction or "").strip()
         extra = f"Regeneration feedback: {request.feedbackInstruction.strip()}"
+        original_request.additionalInstruction = f"{existing}\n{extra}".strip() if existing else extra
+    return original_request
+
+
+def _build_webtoon_regenerate_fallback_request(
+    request: WebtoonStoryboardRegenerateRequest,
+) -> StoryboardGenerateRequest:
+    original_request = request.originalRequest.model_copy(deep=True)
+    if request.storyId is not None:
+        original_request.storyId = request.storyId
+    if request.feedbackInstruction:
+        existing = (original_request.additionalInstruction or "").strip()
+        extra = f"Webtoon regeneration feedback: {request.feedbackInstruction.strip()}"
         original_request.additionalInstruction = f"{existing}\n{extra}".strip() if existing else extra
     return original_request
 
@@ -535,6 +1297,85 @@ def _reading_level_for_age(age: int) -> ReadingLevel:
         wordsPerSentence="10-20",
         reason="The youngest child is 10 or older, so each page uses richer final storybook narration.",
     )
+
+
+def _webtoon_reading_level_for_age_and_difficulty(age: int, difficulty: str) -> ReadingLevel:
+    normalized = difficulty.upper()
+    if age <= 6:
+        if normalized == "ADVANCED":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="5-6",
+                wordsPerSentence="8-14",
+                reason=(
+                    "Webtoon mode for age 5-6 with ADVANCED difficulty uses short dialogue turns "
+                    "plus richer emotions without hard vocabulary."
+                ),
+            )
+        if normalized == "INTERMEDIATE":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="5-6",
+                wordsPerSentence="7-12",
+                reason=(
+                    "Webtoon mode for age 5-6 with INTERMEDIATE difficulty keeps simple lines "
+                    "while adding warmer companion reactions."
+                ),
+            )
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="4-5",
+            wordsPerSentence="6-10",
+            reason="Webtoon mode for age 5-6 with BEGINNER difficulty uses very simple speech-bubble lines.",
+        )
+    if age <= 9:
+        if normalized == "ADVANCED":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="6-7",
+                wordsPerSentence="9-16",
+                reason="Webtoon mode for age 7-9 with ADVANCED difficulty uses more turns and layered emotions.",
+            )
+        if normalized == "INTERMEDIATE":
+            return ReadingLevel(
+                basedOnAge=age,
+                sentencesPerPage="5-6",
+                wordsPerSentence="8-14",
+                reason="Webtoon mode for age 7-9 with INTERMEDIATE difficulty uses varied dialogue and gentle detail.",
+            )
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="4-5",
+            wordsPerSentence="7-12",
+            reason="Webtoon mode for age 7-9 with BEGINNER difficulty keeps dialogue clear and direct.",
+        )
+    if normalized == "ADVANCED":
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="7-8",
+            wordsPerSentence="12-22",
+            reason="Webtoon mode for age 10+ with ADVANCED difficulty supports richer dialogue and emotion.",
+        )
+    if normalized == "INTERMEDIATE":
+        return ReadingLevel(
+            basedOnAge=age,
+            sentencesPerPage="6-7",
+            wordsPerSentence="10-18",
+            reason="Webtoon mode for age 10+ with INTERMEDIATE difficulty uses fuller dialogue exchanges.",
+        )
+    return ReadingLevel(
+        basedOnAge=age,
+        sentencesPerPage="5-6",
+        wordsPerSentence="8-14",
+        reason="Webtoon mode for age 10+ with BEGINNER difficulty keeps wording accessible but fuller.",
+    )
+
+
+def _min_sentences_from_range(value: str) -> int:
+    try:
+        return int(value.split("-", 1)[0])
+    except (TypeError, ValueError):
+        return 4
 
 
 def _choose_page_count(photo_count: int, min_pages: int, max_pages: int) -> int:

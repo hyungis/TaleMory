@@ -7,6 +7,7 @@ export const ROUTES = {
   mainBookshelf: '/main/bookshelf',
   creation: '/creation',
   viewer: '/viewer/:storyId',
+  onboardingViewerPreview: '/viewer/onboarding-preview',
   shared: '/shared/:shareToken',
   about: '/about',
   mypage: '/mypage',
