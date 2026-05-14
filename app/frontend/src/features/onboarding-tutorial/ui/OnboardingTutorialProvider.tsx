@@ -43,8 +43,8 @@ const PANEL_MIN_WIDTH = 280
 const PANEL_MAX_WIDTH = 360
 const PANEL_ESTIMATED_HEIGHT = 248
 
-function isEligiblePath(pathname: string): boolean {
-  return pathname !== '/auth' && !pathname.startsWith('/auth/')
+function isAutomaticPromptPath(pathname: string): boolean {
+  return pathname === ROUTES.main
 }
 
 function isStepRoute(pathname: string, step: OnboardingStep): boolean {
@@ -98,7 +98,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     if (isPromptOpen || isTutorialActive) return
     if (auth.user.onboardingCompleted === true) return
     if (hasSeenOnboardingPromptThisSession(auth.user)) return
-    if (!isEligiblePath(location.pathname)) return
+    if (!isAutomaticPromptPath(location.pathname)) return
 
     setIsPromptOpen(true)
   }, [auth.isAuthenticated, auth.user, isPromptOpen, isTutorialActive, location.pathname])
