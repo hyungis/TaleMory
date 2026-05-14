@@ -72,16 +72,33 @@ class StoryService(
             ?.let(StoryResult::from)
 
     /**
-     * 해당 동화에 Scene row 가 한 건이라도 존재하는지 — Step 7 → 8 confirmStoryboard 가
-     * 한 번이라도 성공했음을 의미한다.
+     * 해당 동화에 Scene row 가 한 건이라도 존재하는지.
      *
-     * "이어서 작성하기" 진입 시 FE 가 Step 6/7 의 `confirmedReadOnlyLocked` 를 BE 진실 기반으로
-     * 복원하기 위해 사용한다. 크롬 종료로 sessionStorage 가 비워져도 BE 의 Scene 존재 여부로
-     * 락이 유지되도록 보장.
+     * NOTE: "Step 7 → 8 confirmStoryboard 가 한 번이라도 성공했는가" 를 판정하는 데 사용하지 말 것.
+     * Scene 은 confirmStoryboard 외에도 다음 두 경로로 INSERT 된다:
+     *  - Step 7 진입 시 FE 가 호출하는 `prepareScenes` (사용자가 [다음] 을 누르지 않아도 자동)
+     *  - WEBTOON 모드의 FINAL_ILLUSTRATION 잡이 모든 페이지 완료 시 layout publish 직전 자동 ensurePrepared
+     *
+     * confirm 신호가 필요하면 [existsStoryboardConfirmed] 를 사용한다. 본 메서드는 내부 멱등 가드 등
+     * "Scene row 자체가 있는가" 만 의미하는 곳에서만 사용.
      */
     @Transactional(readOnly = true)
     fun existsScenes(storyId: Long): Boolean =
         sceneRepository.countByStoryId(storyId) > 0
+
+    /**
+     * Step 7 → 8 의 confirmStoryboard 가 한 번이라도 호출됐는지를 판정.
+     *
+     * TTS 잡 INSERT 는 `StoryConfirmService.confirmStoryboard` 흐름 외에선 일어나지 않으므로
+     * "TTS 잡 행 존재 == confirm 호출됨" 이 1:1 대응. status 무관 (PENDING/RUNNING/SUCCESS/FAILED 모두 신호).
+     *
+     * "이어서 작성하기" 진입 시 FE 가 Step 6/7 의 `confirmedReadOnlyLocked` 를 BE 진실 기반으로
+     * 복원하기 위해 사용한다. 크롬 종료로 sessionStorage 가 비워져도 BE 의 TTS 잡 존재 여부로
+     * 락이 유지되도록 보장.
+     */
+    @Transactional(readOnly = true)
+    fun existsStoryboardConfirmed(storyId: Long): Boolean =
+        jobRepository.existsByStoryIdAndJobType(storyId, JobType.TTS)
 
     /**
      * 기본 정보가 모두 채워진 상태로 새 동화 row 를 생성한다.

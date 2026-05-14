@@ -54,10 +54,10 @@ data class StoryCreateResponse(
  * GET /api/stories/draft — 로그인 유저의 "진행 중인 동화" 를 BasicInfoStep 상태로 복원하기 위한 페이로드.
  * DRAFT 가 없으면 controller 가 `data = null` 로 내려준다.
  *
- * `stylePresetId`, `voiceProfileId`, `sceneConfirmed` 는 "이어서 작성하기" 진입 시 FE 가
+ * `stylePresetId`, `voiceProfileId`, `storyboardConfirmed` 는 "이어서 작성하기" 진입 시 FE 가
  * 각 step 의 readOnly 락을 BE 진실 기반으로 복원하기 위한 진행 메타.
  *  - `stylePresetId != null` → Step 5 락 (스타일 변경 불가, FINAL_ILLUSTRATION 잡 이미 발행됨)
- *  - `sceneConfirmed = true` → Step 6/7 락 (Step 7→8 confirm 한 번이라도 성공)
+ *  - `storyboardConfirmed = true` → Step 6/7 락 (Step 7→8 confirmStoryboard 한 번이라도 호출 → TTS 잡 존재)
  *  - `voiceProfileId` 는 현재 단순 노출 (Step 6 재진입 시 FE 가 voice rehydrate 판단에 사용)
  */
 data class StoryDraftResponse(
@@ -74,7 +74,7 @@ data class StoryDraftResponse(
     val createdAt: LocalDateTime,
     val stylePresetId: Long?,
     val voiceProfileId: VoiceProfileId?,
-    val sceneConfirmed: Boolean,
+    val storyboardConfirmed: Boolean,
 )
 
 data class PhotoResponse(

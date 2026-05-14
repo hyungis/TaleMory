@@ -30,9 +30,13 @@ class StoryVoiceAssignmentService(
         validateOwnedStory(userId, storyId)
         assignments.forEach { validateOwnedVoice(userId, it.voiceProfileId) }
 
+        // FE 가 동일 speakerKey 를 중복 전송할 경우 saveAll 자체가 unique 제약을 깨뜨리므로
+        // 마지막 항목이 살아남도록 디듀프(associateBy 는 충돌 시 last-wins).
+        val deduped = assignments.associateBy { it.speakerKey }.values.toList()
+
         storyVoiceAssignmentRepository.deleteAllByStoryId(storyId)
         val saved = storyVoiceAssignmentRepository.saveAll(
-            assignments.map {
+            deduped.map {
                 StoryVoiceAssignment(
                     storyId = storyId,
                     speakerKey = it.speakerKey,
