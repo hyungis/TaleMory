@@ -5,8 +5,10 @@ import { initializeAuthSession } from '../../features/auth'
 
 function AuthSessionBootstrap() {
   useEffect(() => {
-    // 앱이 처음 뜰 때 localStorage 의 세션과 shared/api 의 토큰 resolver 를 다시 연결한다.
-    initializeAuthSession()
+    // 앱이 처음 뜰 때 토큰 resolver / 401 핸들러를 연결하고,
+    // localStorage 에 stale access token 이 남아있으면 silent refresh 를 한 번 돌려둔다.
+    // (Promise 반환값은 동기 흐름에서 무시 — 시작하기 클릭 같은 인증 분기에서 별도로 await 한다.)
+    void initializeAuthSession()
   }, [])
 
   return null
