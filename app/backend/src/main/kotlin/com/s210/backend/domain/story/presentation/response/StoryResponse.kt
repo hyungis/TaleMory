@@ -284,6 +284,14 @@ data class ConfirmStoryboardResponse(
 )
 
 /**
+ * Step 8 미리보기에서 잡 실패 후 사용자가 [다시 시도] 했을 때의 응답.
+ * 새로 발행된 (또는 멱등 가드로 재사용된) 잡의 id 만 내려준다 — FE 가 polling 재개에 사용.
+ */
+data class JobRetryResponse(
+    val jobId: JobId,
+)
+
+/**
  * Step 7 진입 시점의 `POST /api/stories/{storyId}/scenes/prepare` 응답.
  *
  * `storyboard_pages.sentences` JSON 으로부터 scene/scene_sentence 를 평탄화한 결과 요약.
