@@ -39,6 +39,11 @@ class UserService(
         return user.toResult()
     }
 
+    fun modifyUserOnboardingCompleted(userId: Long) {
+        val user = ownedUser(userId)
+        user.onboardingCompleted = true
+    }
+
     fun removeUser(userId: Long, principalId: String) {
         val user = ownedUser(userId)
         val deletedAt = LocalDateTime.now()
@@ -61,6 +66,7 @@ class UserService(
         phone = phone,
         agreeSms = agreeSms,
         agreeMarketing = agreeMarketing,
+        onboardingCompleted = onboardingCompleted,
         provider = oauthAccountRepository
             .findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(id)
             ?.provider,

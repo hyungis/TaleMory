@@ -23,6 +23,7 @@ export interface LoginResponsePayload {
     phone?: string | null
     agreeSms?: boolean
     agreeMarketing?: boolean
+    onboardingCompleted?: boolean
     provider?: OauthProvider | null
     createdAt?: string
     updatedAt?: string

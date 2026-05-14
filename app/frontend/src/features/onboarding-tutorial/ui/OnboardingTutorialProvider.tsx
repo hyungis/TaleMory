@@ -8,14 +8,13 @@ import {
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { MousePointerClick, Sparkles, X } from 'lucide-react'
-import { useAuthSession } from '../../auth'
+import { setAuthSession, useAuthSession } from '../../auth'
 import { ROUTES } from '../../../shared/constants'
+import { completeOnboarding } from '../api/completeOnboarding'
 import { ONBOARDING_STEPS, type OnboardingStep } from '../model/onboardingSteps'
 import {
   hasSeenOnboardingPromptThisSession,
   markOnboardingPromptSeenThisSession,
-  readOnboardingStatus,
-  writeOnboardingStatus,
 } from '../model/onboardingStorage'
 import { OnboardingTutorialContext } from '../model/onboardingTutorialContext'
 
@@ -99,7 +98,7 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     }
 
     if (isPromptOpen || isTutorialActive) return
-    if (readOnboardingStatus(auth.user) !== null) return
+    if (auth.user.onboardingCompleted === true) return
     if (promptHandledUserId === auth.user.id) return
     if (hasSeenOnboardingPromptThisSession(auth.user)) return
     if (!isEligiblePath(location.pathname)) return
@@ -148,17 +147,38 @@ export function OnboardingTutorialProvider({ children }: PropsWithChildren) {
     markOnboardingPromptSeenThisSession(auth.user)
   }, [auth.user])
 
-  const closeTutorialPrompt = useCallback(() => {
-    writeOnboardingStatus(auth.user, 'completed')
+  const completeOnboardingForUser = useCallback(() => {
+    const user = auth.user
+    const accessToken = auth.accessToken
+    if (user === null) return
+
     markPromptHandled()
+    void completeOnboarding()
+      .then(() => {
+        if (accessToken === null) return
+        setAuthSession({
+          accessToken,
+          user: {
+            ...user,
+            onboardingCompleted: true,
+          },
+        })
+      })
+      .catch(() => {
+        /* Onboarding is optional; a failed completion sync should not block navigation. */
+      })
+  }, [auth.accessToken, auth.user, markPromptHandled])
+
+  const closeTutorialPrompt = useCallback(() => {
+    completeOnboardingForUser()
     closeTutorialForSession()
-  }, [auth.user, closeTutorialForSession, markPromptHandled])
+  }, [closeTutorialForSession, completeOnboardingForUser])
 
   const completeTutorial = useCallback(() => {
-    writeOnboardingStatus(auth.user, 'completed')
+    completeOnboardingForUser()
     closeTutorialForSession()
     navigate(ROUTES.mainBookshelf, { replace: true })
-  }, [auth.user, closeTutorialForSession, navigate])
+  }, [closeTutorialForSession, completeOnboardingForUser, navigate])
 
   const startTutorial = useCallback(() => {
     markPromptHandled()
