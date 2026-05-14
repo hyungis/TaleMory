@@ -217,7 +217,7 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  padding: 10px 24px;
+  padding: 10px 60px 10px 24px;
   background: linear-gradient(0deg, rgba(251, 242, 218, 0.92) 0%, rgba(253, 246, 224, 0.85) 100%);
   backdrop-filter: blur(4px);
   border-top: 2px solid rgba(200, 153, 104, 0.5);
