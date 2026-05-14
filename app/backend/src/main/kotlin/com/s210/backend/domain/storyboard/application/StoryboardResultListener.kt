@@ -736,12 +736,17 @@ class StoryboardResultListener(
         storyboardPageRepository.deleteAllByStoryBoardId(storyBoard.id)
         storyboardPageRepository.saveAll(
             payload.pages.map { p ->
+                // ⚠ AI 가 WEBTOON 모드에서 "등장만 하고 대사 없는" 화자에 대해 englishText="" 인 sentence 를
+                //  내려보내는 경우가 있다 (page 등장 인물 메타와 sentences 가 혼합돼서 발생). 그대로 영속화하면
+                //  StoryConfirmService 가 빈 텍스트를 TTS 페이로드에 실어 Qwen TTS 400 ("texts_json must
+                //  contain non-empty strings") 으로 동화책 생성 전체가 폭주한다. 진입 시점에 한 번 거른다.
+                val cleanedSentences = p.sentences.filter { it.englishText.isNotBlank() }
                 StoryboardPage(
                     storyBoardId = storyBoard.id,
                     pageNumber = p.pageNumber,
                     sceneSummary = p.sceneSummary,
                     imagePrompt = p.imagePrompt,
-                    sentences = objectMapper.writeValueAsString(p.sentences),
+                    sentences = objectMapper.writeValueAsString(cleanedSentences),
                     charactersInSceneJson = p.charactersInScene
                         ?.takeIf { it.isNotEmpty() }
                         ?.let { objectMapper.writeValueAsString(it) },
