@@ -226,6 +226,7 @@ export function StoryWebtoonViewer({ story, isOwner, onExit }: StoryWebtoonViewe
               illustrationUrl={story.coverIllustrationUrl}
               hideRestart
               title={title}
+              disableAutoAudio
             />
           </div>
         )}
