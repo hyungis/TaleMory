@@ -206,9 +206,21 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
 
   const handleReadStory = useCallback(
     (story: Story) => {
-      setIsLibraryOpen(false)
       const mode = story.mode === 'WEBTOON' ? 'webtoon' : 'book'
-      navigate(`${buildViewerPath(story.id)}?mode=${mode}`)
+      const url = `${buildViewerPath(story.id)}?mode=${mode}`
+      const w = Math.min(1280, window.screen.availWidth - 100)
+      const h = Math.min(860, window.screen.availHeight - 100)
+      const left = Math.round((window.screen.availWidth - w) / 2)
+      const top = Math.round((window.screen.availHeight - h) / 2)
+      const popup = window.open(
+        url,
+        `TaleMoryViewer-${story.id}`,
+        `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
+      )
+      if (!popup) {
+        setIsLibraryOpen(false)
+        navigate(url)
+      }
     },
     [navigate],
   )
