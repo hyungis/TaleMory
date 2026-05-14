@@ -207,7 +207,8 @@ export function BookstoreScene({ isActive, onBackToForest }: BookstoreSceneProps
   const handleReadStory = useCallback(
     (story: Story) => {
       setIsLibraryOpen(false)
-      navigate(buildViewerPath(story.id))
+      const mode = story.mode === 'WEBTOON' ? 'webtoon' : 'book'
+      navigate(`${buildViewerPath(story.id)}?mode=${mode}`)
     },
     [navigate],
   )

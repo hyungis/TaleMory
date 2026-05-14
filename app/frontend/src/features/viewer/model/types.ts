@@ -63,11 +63,15 @@ export interface OutroView {
 
 export type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 
+export type StoryMode = 'VIEWER' | 'WEBTOON'
+
 export interface StoryView {
   storyId: StoryId
   title: string | null
   /** BE Story.difficulty enum 명. 미지의 값이 와도 InvitationCard 가 string fallback 처리 가능하도록 string 으로 받음. */
   difficulty: Difficulty | string
+  /** "VIEWER" | "WEBTOON" — 동화 생성 모드. */
+  mode: StoryMode
   mainCharacter: MainCharacterView | null
   coverIllustrationUrl: string | null
   publishedAt: string | null

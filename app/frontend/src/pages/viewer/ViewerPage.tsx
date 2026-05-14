@@ -13,6 +13,7 @@ const ONBOARDING_VIEWER_STORY: StoryView = {
   storyId: 'onboarding-preview',
   title: '우리 가족의 여행 동화',
   difficulty: 'BEGINNER',
+  mode: 'VIEWER',
   mainCharacter: { name: '하린' },
   coverIllustrationUrl: null,
   publishedAt: null,
@@ -69,13 +70,8 @@ function getOnboardingViewerMode(locationState: unknown): OnboardingViewerMode {
 
 /**
  * `/viewer/:storyId` 라우트.
- * `?mode=book` / `?mode=webtoon` 쿼리로 청첩장 / 동화책 / 웹툰 뷰어 분기.
- *
- * 현재 로그인/토큰 인프라 미완이라 `isOwner=true` 고정 — shareToken 기반 공개 라우트가
- * 추가되면 InvitationCard 에 `isOwner={false}` 로 재사용.
- *
- * 온보딩 튜토리얼용 미리보기 라우트(`/onboarding-viewer-preview`) 는 별도 분기로
- * `OnboardingViewerPreview` 가 mock 동화로 InvitationCard / StoryBookViewer 를 시연.
+ * `?mode=book` / `?mode=webtoon` 쿼리로 동화책 / 웹툰 뷰어 분기.
+ * mode 쿼리 없으면 story.mode 로 자동 선택.
  */
 export function ViewerPage() {
   const { storyId } = useParams<{ storyId: string }>()
@@ -96,8 +92,7 @@ function OnboardingViewerPreview({ mode }: { mode: OnboardingViewerMode }) {
       <InvitationCard
         story={ONBOARDING_VIEWER_STORY}
         isOwner
-        onOpenBook={() => {}}
-        onOpenWebtoon={() => {}}
+        onOpen={() => {}}
         onBack={() => navigate(ROUTES.mainBookshelf)}
       />
     )
@@ -115,10 +110,9 @@ function OnboardingViewerPreview({ mode }: { mode: OnboardingViewerMode }) {
 
 function ViewerStoryPage({ storyId }: { storyId?: string }) {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const mode = searchParams.get('mode')
 
-  // BE 가 Sqids 토큰으로 storyId 를 발급하므로 더 이상 Number() 코어션 불가 — 문자열 그대로 전달.
   const { status, data: story, error } = useStoryViewQuery(storyId)
 
   if (status === 'loading' || status === 'idle') {
@@ -128,48 +122,20 @@ function ViewerStoryPage({ storyId }: { storyId?: string }) {
     return <ViewerErrorState message={error?.message ?? '동화를 불러오지 못했어요.'} onBack={() => navigate(ROUTES.main)} />
   }
 
-  const openInPopup = (target: 'book' | 'webtoon') => {
-    const url = `${window.location.pathname}?mode=${target}`
-    const w = Math.min(1280, window.screen.availWidth - 100)
-    const h = Math.min(860, window.screen.availHeight - 100)
-    const left = Math.round((window.screen.availWidth - w) / 2)
-    const top = Math.round((window.screen.availHeight - h) / 2)
-    const popup = window.open(
-      url,
-      `TaleMoryViewer-${storyId}`,
-      `popup=yes,width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
-    )
-    if (!popup) {
-      // 브라우저가 팝업 차단 시 같은 탭에서 전환 fallback
-      setSearchParams({ mode: target })
-    }
-  }
-
   const closeViewer = () => {
-    // 팝업으로 열린 창이면 닫고, 직접 URL 진입이면 청첩장으로 복귀
     if (window.opener) {
       window.close()
     } else {
-      setSearchParams({})
+      navigate(ROUTES.main)
     }
   }
 
-  if (mode === 'book') {
-    return <StoryBookViewer story={story} onExit={closeViewer} />
-  }
-  if (mode === 'webtoon') {
+  const resolvedMode = mode ?? (story.mode === 'WEBTOON' ? 'webtoon' : 'book')
+
+  if (resolvedMode === 'webtoon') {
     return <StoryWebtoonViewer story={story} isOwner onExit={closeViewer} />
   }
-
-  return (
-    <InvitationCard
-      story={story}
-      isOwner
-      onOpenBook={() => openInPopup('book')}
-      onOpenWebtoon={() => openInPopup('webtoon')}
-      onBack={() => navigate(ROUTES.main)}
-    />
-  )
+  return <StoryBookViewer story={story} onExit={closeViewer} />
 }
 
 function ViewerLoadingState() {

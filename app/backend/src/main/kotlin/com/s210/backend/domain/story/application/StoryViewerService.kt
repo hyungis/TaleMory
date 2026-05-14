@@ -131,6 +131,7 @@ class StoryViewerService(
             storyId = StoryId(story.id),
             title = story.title,
             difficulty = story.difficulty.name,
+            mode = story.mode.name,
             mainCharacter = parseMainCharacter(story.mainCharacterJson),
             coverIllustrationUrl = coverScene?.illustrationUrl ?: scenes.firstOrNull()?.illustrationUrl,
             publishedAt = story.publishedAt,

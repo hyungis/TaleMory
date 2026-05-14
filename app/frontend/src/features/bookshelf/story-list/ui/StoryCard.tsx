@@ -57,8 +57,15 @@ export function StoryCard({ story, onRead, onShare, onDelete, animationDelayMs =
         <div className={`absolute top-3 left-3 ${levelColor} text-[11px] px-2 py-1 rounded-md font-sans font-bold shadow-sm z-10`}>
           {story.level}
         </div>
-        <div className="absolute top-3 right-3 bg-black/50 text-[#F2EBD2] text-[10px] px-2 py-1 rounded-md font-sans backdrop-blur-sm flex items-center gap-1 z-10">
-          {story.pages} Pages
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+          {story.mode === 'WEBTOON' && (
+            <span className="bg-[#c47254]/90 text-[#F2EBD2] text-[10px] px-2 py-1 rounded-md font-sans font-bold backdrop-blur-sm">
+              웹툰
+            </span>
+          )}
+          <span className="bg-black/50 text-[#F2EBD2] text-[10px] px-2 py-1 rounded-md font-sans backdrop-blur-sm flex items-center gap-1">
+            {story.pages} Pages
+          </span>
         </div>
 
         {/* hover 오버레이 — 마우스 가져다 대면 3개 액션 버튼이 표지 위에 등장 */}

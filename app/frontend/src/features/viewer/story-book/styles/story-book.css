@@ -923,6 +923,27 @@
 .sb-letter-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--sb-rust); }
 .sb-letter-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--sb-rust); }
 
+/* 뒷표지 동화 제목 — 편지지 아래 중앙 배치 */
+.sb-back-cover-title {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  margin: 0;
+  font-family: var(--sb-font-display);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+  letter-spacing: 1px;
+}
+
 /* ===== 책 넘김 (3D 플립) ===== */
 .sb-turn-sheet {
   position: absolute;

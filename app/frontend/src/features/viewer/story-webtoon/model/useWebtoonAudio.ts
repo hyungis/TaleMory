@@ -5,21 +5,18 @@ import type { SceneView, SentenceView } from '../../model/types'
 /**
  * 웹툰 모드 페이지 단위 sentence 순차 재생 훅.
  *
- * 책 모드의 useStoryTts 와 책임이 비슷하지만 웹툰 뷰어는 페이지 별 [재생] 트리거
- * + 활성 sentence 하이라이트(말풍선 강조) 만 필요해 단순화. 책 모드와 분리해
- * 책 모드 전용 fullBook / pause-resume 로직을 끌고오지 않는다.
+ * 두 가지 재생 모드:
+ *  - playPage(scene)      — 토글 방식. 페이지 내 [재생] 버튼에 연결.
+ *  - playPageAsync(scene)  — Promise 반환. "한번에 읽기" 자동재생 루프에서 사용.
  *
- * 정책:
- *  - sentence.ttsAudioUrl 이 있으면 `<Audio>`, 없으면 SpeechSynthesis fallback,
- *    둘 다 없으면 조용히 다음 문장으로 진행.
- *  - playPage 호출 시 같은 페이지가 이미 재생 중이면 stop (toggle).
- *  - 다른 페이지로 이동(unmount 또는 다른 playPage 호출) 시 자동 stop.
+ * 재생 중 activeSentenceId 가 갱신되어 말풍선 표시/하이라이트에 활용.
  */
 export interface UseWebtoonAudioReturn {
   activeSceneId: SceneId | null
   activeSentenceId: SentenceId | null
   isPlaying: boolean
   playPage: (scene: SceneView) => void
+  playPageAsync: (scene: SceneView) => Promise<void>
   stop: () => void
 }
 
@@ -34,6 +31,7 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
   const advanceTimerRef = useRef<number | null>(null)
   const sceneRef = useRef<SceneView | null>(null)
   const indexRef = useRef(0)
+  const onCompleteRef = useRef<(() => void) | null>(null)
 
   const hasSpeech =
     typeof window !== 'undefined' && 'speechSynthesis' in window
@@ -52,7 +50,7 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
     }
   }, [hasSpeech])
 
-  const stop = useCallback(() => {
+  const cleanup = useCallback(() => {
     cancelAll()
     sceneRef.current = null
     indexRef.current = 0
@@ -61,11 +59,15 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
     setIsPlaying(false)
   }, [cancelAll])
 
-  // unmount 안전 — 컴포넌트 사라지면 모든 native handle 해제.
+  const stop = useCallback(() => {
+    const cb = onCompleteRef.current
+    onCompleteRef.current = null
+    cleanup()
+    cb?.()
+  }, [cleanup])
+
   useEffect(() => {
-    return () => {
-      cancelAll()
-    }
+    return () => { cancelAll() }
   }, [cancelAll])
 
   const playCurrent = useCallback(() => {
@@ -74,7 +76,10 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
     const idx = indexRef.current
 
     if (idx >= scene.sentences.length) {
-      stop()
+      const cb = onCompleteRef.current
+      onCompleteRef.current = null
+      cleanup()
+      cb?.()
       return
     }
 
@@ -82,7 +87,6 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
     setActiveSentenceId(sentence.sentenceId)
 
     const onFinish = () => {
-      // 재생 도중 다른 페이지로 stop 됐는지 가드.
       if (sceneRef.current !== scene) return
       indexRef.current = idx + 1
       advanceTimerRef.current = window.setTimeout(() => playCurrent(), SENTENCE_GAP_MS)
@@ -105,24 +109,45 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
     } else {
       onFinish()
     }
-  }, [hasSpeech, stop])
+  }, [hasSpeech, cleanup])
 
-  const playPage = useCallback(
+  const startScene = useCallback(
     (scene: SceneView) => {
-      // 같은 페이지를 다시 누르면 toggle off.
-      if (sceneRef.current?.sceneId === scene.sceneId && isPlaying) {
-        stop()
-        return
-      }
       cancelAll()
+      if (onCompleteRef.current) {
+        onCompleteRef.current()
+        onCompleteRef.current = null
+      }
       sceneRef.current = scene
       indexRef.current = 0
       setActiveSceneId(scene.sceneId)
       setActiveSentenceId(null)
       setIsPlaying(true)
+    },
+    [cancelAll],
+  )
+
+  const playPage = useCallback(
+    (scene: SceneView) => {
+      if (sceneRef.current?.sceneId === scene.sceneId && isPlaying) {
+        stop()
+        return
+      }
+      startScene(scene)
       playCurrent()
     },
-    [cancelAll, isPlaying, playCurrent, stop],
+    [isPlaying, playCurrent, stop, startScene],
+  )
+
+  const playPageAsync = useCallback(
+    (scene: SceneView): Promise<void> => {
+      return new Promise((resolve) => {
+        startScene(scene)
+        onCompleteRef.current = resolve
+        setTimeout(() => playCurrent(), 0)
+      })
+    },
+    [playCurrent, startScene],
   )
 
   return {
@@ -130,6 +155,7 @@ export function useWebtoonAudio(): UseWebtoonAudioReturn {
     activeSentenceId,
     isPlaying,
     playPage,
+    playPageAsync,
     stop,
   }
 }

@@ -13,6 +13,8 @@ data class StoryResponse(
     val id: StoryId,
     val title: String?,
     val difficulty: String,
+    /** "VIEWER" | "WEBTOON" — 동화 생성 모드. 책장에서 뷰어 분기 및 모드 뱃지 표시용. */
+    val mode: String,
     val status: String,
     val isBookmarked: Boolean,
     val travelPlace: String?,
@@ -152,6 +154,8 @@ data class StoryViewResponse(
     val title: String?,
     /** Story.difficulty.name — "BEGINNER" / "INTERMEDIATE" / "ADVANCED". 뷰어 InvitationCard 의 난이도 pill 에 사용. */
     val difficulty: String,
+    /** "VIEWER" | "WEBTOON" — 동화 생성 모드. 뷰어 자동 분기 및 공유 링크 InvitationCard 용. */
+    val mode: String,
     val mainCharacter: MainCharacterView?,
     val coverIllustrationUrl: String?,
     val publishedAt: LocalDateTime?,
