@@ -93,7 +93,6 @@ function OnboardingViewerPreview({ mode }: { mode: OnboardingViewerMode }) {
         story={ONBOARDING_VIEWER_STORY}
         isOwner
         onOpen={() => {}}
-        onBack={() => navigate(ROUTES.mainBookshelf)}
       />
     )
   }
