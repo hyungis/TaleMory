@@ -10,8 +10,6 @@ interface WebtoonPageViewProps {
   scene: SceneView
   isOwner: boolean
   activeSentenceId: SentenceId | null
-  isPlayingThisPage: boolean
-  onTogglePlay: (scene: SceneView) => void
   pageIndex: number
   onRetryRequested: (sceneId: SceneId, jobId: string | number) => void
 }
@@ -27,8 +25,6 @@ export function WebtoonPageView({
   scene,
   isOwner,
   activeSentenceId,
-  isPlayingThisPage,
-  onTogglePlay,
   pageIndex,
   onRetryRequested,
 }: WebtoonPageViewProps) {
@@ -41,11 +37,6 @@ export function WebtoonPageView({
     }
     return map
   }, [scene.characterAnchors])
-
-  const narrations = useMemo(
-    () => scene.sentences.filter(s => isNarration(s)),
-    [scene.sentences],
-  )
 
   const hasMissingAnchor = useMemo(
     () => scene.sentences.some(s => !isNarration(s) && s.speakerKey && !anchorByName.has(s.speakerKey)),
@@ -75,13 +66,24 @@ export function WebtoonPageView({
 
   useEffect(() => {
     const img = imgRef.current
+    const wrap = wrapRef.current
     if (!img) return
     img.addEventListener('load', updateImgLayout)
     window.addEventListener('resize', updateImgLayout)
     if (img.complete) updateImgLayout()
+
+    // 이미지/래퍼 크기·위치 변경 감지 — CSS 정렬 변경 시에도 오버레이 재계산
+    let ro: ResizeObserver | undefined
+    if (wrap) {
+      ro = new ResizeObserver(() => updateImgLayout())
+      ro.observe(img)
+      ro.observe(wrap)
+    }
+
     return () => {
       img.removeEventListener('load', updateImgLayout)
       window.removeEventListener('resize', updateImgLayout)
+      ro?.disconnect()
     }
   }, [updateImgLayout])
 
@@ -101,7 +103,7 @@ export function WebtoonPageView({
   const activeSentence = activeSentenceId
     ? scene.sentences.find(s => s.sentenceId === activeSentenceId)
     : null
-  const showBubble = activeSentence && !isNarration(activeSentence)
+  const showBubble = !!activeSentence
 
   return (
     <div className="swt-page-snap" data-page-index={pageIndex}>
@@ -136,47 +138,20 @@ export function WebtoonPageView({
               {showBubble && activeSentence && (
                 <WebtoonBubble
                   sentence={activeSentence}
+                  isNarration={isNarration(activeSentence)}
                   position={
-                    activeSentence.speakerKey
-                      ? (anchorByName.get(activeSentence.speakerKey) ?? FALLBACK_ANCHOR)
-                      : FALLBACK_ANCHOR
+                    isNarration(activeSentence)
+                      ? { x: 0.5, y: 0 }
+                      : (activeSentence.speakerKey
+                          ? (anchorByName.get(activeSentence.speakerKey) ?? FALLBACK_ANCHOR)
+                          : FALLBACK_ANCHOR)
                   }
                 />
               )}
 
-              {narrations.length > 0 && (
-                <div className="swt-en-box">
-                  {narrations.map(sentence => (
-                    <p
-                      key={sentence.sentenceId}
-                      className={`swt-en-line ${activeSentenceId === sentence.sentenceId ? 'swt-en-line--playing' : ''}`}
-                    >
-                      {sentence.englishText}
-                    </p>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
-          {/* 페이지별 재생 버튼 */}
-          <button
-            type="button"
-            className={`swt-play-btn ${isPlayingThisPage ? 'swt-play-btn--active' : ''}`}
-            onClick={() => onTogglePlay(scene)}
-            aria-label={isPlayingThisPage ? '정지' : '재생'}
-          >
-            {isPlayingThisPage ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6,4 L20,12 L6,20 Z" />
-              </svg>
-            )}
-          </button>
         </div>
 
         {/* 좌표 재시도 배너 */}
