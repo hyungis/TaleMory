@@ -109,10 +109,12 @@ def handle_generate_message(body: bytes, publisher: TtsResultPublisher) -> None:
     request = message.payload.model_dump(mode="json")
     if message.storyId is not None:
         request["storyId"] = message.storyId
+    request["storyMode"] = message.storyMode or request.get("storyMode", "VIEWER")
     logger.info(
-        "[TTS:WORKER:CONSUME] jobId=%s storyId=%s voiceId=%s sentenceCount=%s",
+        "[TTS:WORKER:CONSUME] jobId=%s storyId=%s storyMode=%s voiceId=%s sentenceCount=%s",
         message.jobId,
         request["storyId"],
+        request["storyMode"],
         request["voiceId"],
         len(request.get("sentences", [])),
     )

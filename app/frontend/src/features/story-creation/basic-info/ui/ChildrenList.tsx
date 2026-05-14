@@ -5,8 +5,9 @@ import type { PersonId } from '../../../../shared/types'
 import type { PersonResponse } from '../api/types'
 
 const GENDERS: readonly Gender[] = ['남자', '여자'] as const
-const MIN_AGE = 0
-const MAX_AGE = 99
+const MIN_AGE = 1
+const MAX_AGE = 18
+const INTEGER_PATTERN = /^\d+$/
 
 interface ChildrenListProps {
   children: StoryChild[]
@@ -256,16 +257,23 @@ function AgeInput({
     onChange(String(next))
   }
 
+  const handleChange = (next: string) => {
+    if (next === '' || INTEGER_PATTERN.test(next)) {
+      onChange(next)
+    }
+  }
+
   return (
     <div className="cr-age-wrap">
       <input
         type="number"
         inputMode="numeric"
+        step={1}
         min={MIN_AGE}
         max={MAX_AGE}
         placeholder="나이"
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={e => handleChange(e.target.value)}
         className="cr-input"
       />
       <div className="cr-age-steppers" aria-hidden="true">

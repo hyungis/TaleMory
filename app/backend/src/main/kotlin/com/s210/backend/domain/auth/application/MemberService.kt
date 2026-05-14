@@ -46,6 +46,7 @@ class MemberService(
     private val oauthRedirectUriResolver: OauthRedirectUriResolver,
     private val oauthSignupTokenProvider: OauthSignupTokenProvider,
     private val termsRepository: TermsRepository,
+    private val emailVerificationService: EmailVerificationService,
 ) {
     fun signUp(command: SignupCommand): Long {
         validateSignupCommand(command)
@@ -60,6 +61,8 @@ class MemberService(
             throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
         }
 
+        emailVerificationService.requireVerified(command.email)
+
         val withdrawnLoginUser = memberRepository
             .findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(command.loginId)
         val withdrawnEmailUser = memberRepository
@@ -73,7 +76,9 @@ class MemberService(
                 throw BusinessException(CommonErrorCode.DUPLICATE_EMAIL)
             }
             requireAvailableNickname(command.nickname, withdrawnLoginUser.id)
-            return restoreUser(withdrawnLoginUser, command)
+            return restoreUser(withdrawnLoginUser, command).also {
+                emailVerificationService.consumeVerified(command.email)
+            }
         }
 
         if (withdrawnEmailUser != null) {
@@ -81,7 +86,9 @@ class MemberService(
                 throw BusinessException(AuthErrorCode.WITHDRAWN_ACCOUNT)
             }
             requireAvailableNickname(command.nickname, withdrawnEmailUser.id)
-            return restoreUser(withdrawnEmailUser, command)
+            return restoreUser(withdrawnEmailUser, command).also {
+                emailVerificationService.consumeVerified(command.email)
+            }
         }
 
         requireAvailableNickname(command.nickname)
@@ -95,7 +102,9 @@ class MemberService(
                 nickname = command.nickname,
                 phone = command.phone,
             )
-        ).id
+        ).id.also {
+            emailVerificationService.consumeVerified(command.email)
+        }
     }
 
     fun findLoginIdAvailability(loginId: String): AvailabilityResult {

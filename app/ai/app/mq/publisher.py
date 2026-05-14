@@ -8,11 +8,17 @@ import pika
 logger = logging.getLogger(__name__)
 
 from app.core.config import settings
-from app.schemas.final_illustration import FinalIllustrationGenerateResult
+from app.schemas.final_illustration import (
+    FinalIllustrationGenerateResult,
+    FinalIllustrationLayoutAnalysisResponse,
+)
 from app.schemas.mq_final_illustration import (
     FinalIllustrationError,
     FinalIllustrationFailureEnvelope,
     FinalIllustrationGenerateItemJobMessage,
+    FinalIllustrationLayoutFailureEnvelope,
+    FinalIllustrationLayoutItemJobMessage,
+    FinalIllustrationLayoutSuccessEnvelope,
     FinalIllustrationSuccessEnvelope,
     FinalIllustrationSuccessPayload,
 )
@@ -431,6 +437,13 @@ class FinalIllustrationJobPublisher:
             message=message.model_dump(mode="json"),
         )
 
+    def publish_layout_item_job(self, message: FinalIllustrationLayoutItemJobMessage) -> None:
+        self._publish(
+            exchange=settings.RABBITMQ_REQUEST_EXCHANGE,
+            routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY,
+            message=message.model_dump(mode="json"),
+        )
+
     def publish_result(
         self,
         job_id: str,
@@ -470,6 +483,43 @@ class FinalIllustrationJobPublisher:
         self._publish(
             exchange=settings.RABBITMQ_RESULT_EXCHANGE,
             routing_key=_final_illustration_failed_routing_key_for_action(action),
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_layout_result(
+        self,
+        job_id: str,
+        story_id: int,
+        result: FinalIllustrationLayoutAnalysisResponse,
+    ) -> None:
+        envelope = FinalIllustrationLayoutSuccessEnvelope(
+            jobId=job_id,
+            storyId=story_id,
+            pageNumber=result.pageNumber,
+            payload=result,
+        )
+        self._publish(
+            exchange=settings.RABBITMQ_RESULT_EXCHANGE,
+            routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY,
+            message=envelope.model_dump(mode="json"),
+        )
+
+    def publish_layout_failure(
+        self,
+        job_id: str,
+        story_id: int,
+        error: FinalIllustrationError,
+        page_number: int | None = None,
+    ) -> None:
+        envelope = FinalIllustrationLayoutFailureEnvelope(
+            jobId=job_id,
+            storyId=story_id,
+            pageNumber=page_number,
+            error=error,
+        )
+        self._publish(
+            exchange=settings.RABBITMQ_RESULT_EXCHANGE,
+            routing_key=settings.RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY,
             message=envelope.model_dump(mode="json"),
         )
 

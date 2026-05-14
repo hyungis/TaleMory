@@ -4,30 +4,25 @@ import '../styles/invitation.css'
 interface InvitationCardProps {
   story: StoryView
   isOwner: boolean
-  onOpenBook: () => void
-  onOpenWebtoon: () => void
+  onOpen: () => void
   onBack: () => void
 }
 
 /**
- * 뷰어 진입 화면 — paper-craft 톤.
- * 동화 표지 카드(제목, 작가, 페이지 수/날짜/난이도) + 두 모드 선택(동화책/웹툰).
- *
- * 디자인 요소:
- *  - 워시 테이프, 코너 doodle, sage 원형 책 아이콘, rust 손글씨 underline
- *  - meta pill 3종, mode 카드의 sage/rust 큰 CTA, preview strip(가로/세로)
+ * 공유 링크 진입 화면 — 온라인 청첩장 스타일.
+ * 동화 표지 카드(제목, 작가, 페이지 수/날짜/난이도) + "읽어보기" CTA.
  */
 export function InvitationCard({
   story,
-  isOwner: _isOwner,
-  onOpenBook,
-  onOpenWebtoon,
+  onOpen,
   onBack,
 }: InvitationCardProps) {
   const title = story.title?.trim() || '제목 없는 동화'
   const pageCount = story.scenes.length
   const publishedAtLabel = formatPublishedAtLabel(story.publishedAt)
   const difficultyLabel = formatDifficultyLabel(story.difficulty)
+  const isWebtoon = story.mode === 'WEBTOON'
+  const modeLabel = isWebtoon ? '웹툰' : '동화책'
 
   return (
     <section className="iv-shell">
@@ -35,7 +30,6 @@ export function InvitationCard({
       <div className="iv-bg-grain" aria-hidden="true" />
       <div className="iv-bg-crayon" aria-hidden="true" />
 
-      {/* 손그림 distortion 필터 — doodle 들이 살짝 떨리는 느낌 */}
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
         <defs>
           <filter id="iv-crayon-rough" x="-10%" y="-10%" width="120%" height="120%">
@@ -45,7 +39,6 @@ export function InvitationCard({
         </defs>
       </svg>
 
-      {/* 화면 가장자리 doodle — 구름 / 별 / 잎 / 꽃 */}
       <div className="iv-doodles" aria-hidden="true">
         <svg className="iv-d-cloud" viewBox="0 0 80 50">
           <path d="M14,34 C8,34 4,30 4,24 C4,18 9,15 14,16 C16,10 22,8 27,11 C30,7 38,6 42,11 C48,8 56,12 56,20 C62,20 66,24 66,30 C66,34 62,38 56,38 L18,38 C16,38 14,36 14,34 Z" stroke="#a37548" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -62,7 +55,6 @@ export function InvitationCard({
         </svg>
       </div>
 
-      {/* 상단 바 */}
       <div className="iv-topbar">
         <button type="button" className="iv-back-btn" onClick={onBack}>
           <svg width="14" height="10" viewBox="0 0 14 10">
@@ -75,9 +67,7 @@ export function InvitationCard({
         </div>
       </div>
 
-      {/* 메인 영역 */}
-      <div className="iv-shell-inner">
-        {/* 표지 카드 */}
+      <div className="iv-shell-inner" data-onboarding-target="viewer-main">
         <div className="iv-cover">
           <span className="iv-tape-l" aria-hidden="true" />
           <span className="iv-tape-r" aria-hidden="true" />
@@ -123,65 +113,48 @@ export function InvitationCard({
               <span className="iv-meta-dot iv-gold" aria-hidden="true" />
               {difficultyLabel}
             </span>
-          </div>
-        </div>
-
-        {/* 모드 안내 */}
-        <div className="iv-choose-eyebrow">
-          <div className="iv-choose-label">어떻게 읽어볼까요?</div>
-          <div className="iv-choose-sub">
-            동화책처럼 한 장씩 넘기거나, 웹툰처럼 쭉 스크롤해서 읽을 수 있어요
-          </div>
-        </div>
-
-        {/* 모드 선택 */}
-        <div className="iv-modes">
-          <button type="button" className="iv-mode iv-mode-book" onClick={onOpenBook}>
-            <span className="iv-mode-corner" aria-hidden="true" />
-            <div className="iv-mode-icon-circle" aria-hidden="true">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path d="M3,5 C5,4 9,4 11,6 L11,20 C9,18 5,18 3,19 Z M21,5 C19,4 15,4 13,6 L13,20 C15,18 19,18 21,19 Z" stroke="#fdf6dc" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <h2 className="iv-mode-title">동화책 모드</h2>
-            <p className="iv-mode-sub">
-              한 페이지씩 넘기며 읽어요
-              <br />
-              그림과 글이 마주보는 펼침면
-            </p>
-            <span className="iv-open-cta">
-              지금 열기
-              <svg width="14" height="10" viewBox="0 0 14 10">
-                <path d="M9,2 L13,5 L9,8 M13,5 L1,5" stroke="#fdf6dc" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <span className="iv-meta-pill">
+              <span className={`iv-meta-dot ${isWebtoon ? 'iv-rust' : ''}`} aria-hidden="true" />
+              {modeLabel}
             </span>
-            <div className="iv-preview-strip" aria-hidden="true">
-              <div className="iv-pg" />
-              <div className="iv-pg" />
-              <div className="iv-pg" />
-              <div className="iv-pg" />
-            </div>
-          </button>
+          </div>
+        </div>
 
+        {/* 읽어보기 CTA */}
+        <div className="iv-choose-eyebrow">
+          <div className="iv-choose-label">동화를 함께 읽어보세요</div>
+          <div className="iv-choose-sub">
+            {story.mainCharacter?.name
+              ? `${story.mainCharacter.name}의 이야기가 기다리고 있어요`
+              : '소중한 이야기가 기다리고 있어요'}
+          </div>
+        </div>
+
+        <div className="iv-modes">
           <button
             type="button"
-            className="iv-mode iv-mode-web"
-            onClick={onOpenWebtoon}
-            disabled
-            aria-label="웹툰 모드 — 준비 중"
+            className={`iv-mode ${isWebtoon ? 'iv-mode-web' : 'iv-mode-book'}`}
+            onClick={onOpen}
+            data-onboarding-target="viewer-open-book"
           >
             <span className="iv-mode-corner" aria-hidden="true" />
             <div className="iv-mode-icon-circle" aria-hidden="true">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path d="M5,2 L19,2 L17,12 L19,22 L5,22 L7,12 Z M5,2 C3,2 3,5 5,5 M19,2 C21,2 21,5 19,5 M5,22 C3,22 3,19 5,19 M19,22 C21,22 21,19 19,19" stroke="#fdf6dc" strokeWidth="1.6" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-                <path d="M9,8 L15,8 M9,12 L15,12 M9,16 L15,16" stroke="#fdf6dc" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-              </svg>
+              {isWebtoon ? (
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path d="M5,2 L19,2 L17,12 L19,22 L5,22 L7,12 Z M5,2 C3,2 3,5 5,5 M19,2 C21,2 21,5 19,5 M5,22 C3,22 3,19 5,19 M19,22 C21,22 21,19 19,19" stroke="#fdf6dc" strokeWidth="1.6" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+                  <path d="M9,8 L15,8 M9,12 L15,12 M9,16 L15,16" stroke="#fdf6dc" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path d="M3,5 C5,4 9,4 11,6 L11,20 C9,18 5,18 3,19 Z M21,5 C19,4 15,4 13,6 L13,20 C15,18 19,18 21,19 Z" stroke="#fdf6dc" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
+                </svg>
+              )}
             </div>
-            <h2 className="iv-mode-title">웹툰 모드</h2>
+            <h2 className="iv-mode-title">읽어보기</h2>
             <p className="iv-mode-sub">
-              세로로 스크롤하며 읽어요
-              <br />
-              한 흐름으로 이어보는 이야기
+              {isWebtoon
+                ? '세로로 스크롤하며 읽는 웹툰 동화'
+                : '한 페이지씩 넘기며 읽는 동화책'}
             </p>
             <span className="iv-open-cta">
               지금 열기
@@ -189,17 +162,6 @@ export function InvitationCard({
                 <path d="M9,2 L13,5 L9,8 M13,5 L1,5" stroke="#fdf6dc" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
-            <div className="iv-preview-strip iv-web" aria-hidden="true">
-              <div className="iv-pg" />
-              <div className="iv-pg" />
-              <div className="iv-pg" />
-            </div>
-
-            {/* 준비중 오버레이 — 카드 전체 위에 어두운 막 + 텍스트만 */}
-            <div className="iv-mode-disabled-overlay" aria-hidden="true">
-              <p className="iv-mode-disabled-title">준비 중이에요</p>
-              <p className="iv-mode-disabled-sub">곧 만나보실 수 있어요</p>
-            </div>
           </button>
         </div>
       </div>

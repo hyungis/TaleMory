@@ -7,6 +7,7 @@ import {
   CREATION_PROGRESS_STORAGE_KEY,
   clearCreationProgressSnapshot,
 } from '../lib/progressStorage'
+import type { StoryModeApi } from '../basic-info/api/types'
 
 // 레거시 저장 키 (목업 전환 이전 버전에서 localStorage 에 남아있을 수 있어 한 번 정리해준다).
 const LEGACY_STORAGE_KEY_STEP = 'talemory_draft_step'
@@ -32,6 +33,11 @@ interface CreationProgressSnapshot {
   savedAt: number
   currentStep: number
   storyId: StoryId | null
+  /**
+   * 동화 생성 모드 — VIEWER (기본 narration) / WEBTOON (대화 중심).
+   * 메인 화면 "새 동화책 만들기" 모달에서 결정 → 새로고침 후에도 mode 유지를 위해 보존.
+   */
+  mode: StoryModeApi
   step3Story: string
   /**
    * 본문(STORY) 발행이 한 번이라도 트리거된 후의 SUMMARY 잡 id.
@@ -75,6 +81,8 @@ function readProgressSnapshot(): CreationProgressSnapshot | null {
       currentStep: Math.max(1, Math.min(MAX_STEP, parsed.currentStep)),
       // BE 가 Sqids 토큰으로 발급하므로 모든 외부 ID 는 string. 옛 raw-id snapshot (number) 도 string 으로 강제.
       storyId: parsed.storyId != null ? String(parsed.storyId) : null,
+      // 옛 snapshot 호환: mode 필드가 없으면 VIEWER 로 폴백 (기존 동작 유지).
+      mode: parsed.mode === 'WEBTOON' ? 'WEBTOON' : 'VIEWER',
       step3Story: parsed.step3Story,
       lastConfirmedSummaryJobId:
         parsed.lastConfirmedSummaryJobId != null ? String(parsed.lastConfirmedSummaryJobId) : null,
@@ -119,6 +127,13 @@ const DEFAULT_DATA: StoryProject = {
 export interface UseStoryCreationFlowResult {
   currentStep: number
   projectData: StoryProject
+  /**
+   * 동화 생성 모드 — VIEWER (기본) / WEBTOON.
+   * BookstoreScene 의 "새 동화책 만들기" 모달에서 선택되어 init 으로 전달, 또는
+   * "이어서 작성하기" 시 서버 DRAFT 의 mode 로 복원. 한 번 결정되면 플로우 내에서 변경 불가.
+   * BE POST /api/stories body 에 그대로 전달하여 stories.mode 컬럼에 영속화.
+   */
+  mode: StoryModeApi
   /** POST /api/stories 성공 후 set. step 2~8 에서 리소스 FK 로 사용. */
   storyId: StoryId | null
   /**
@@ -184,6 +199,13 @@ export interface UseStoryCreationFlowInit {
   /** 서버 DRAFT 에서 복원한 step1 필드. */
   step1?: StoryProject['step1']
   /**
+   * 동화 생성 모드.
+   *  - 신규 진입 (`storyId` 없음): BookstoreScene "새 동화책 만들기" 모달에서 선택된 모드.
+   *  - "이어서 작성하기" 진입: 서버 DRAFT 의 `mode` 값 (VIEWER / WEBTOON).
+   * 미제공 시 'VIEWER' 로 폴백 — 기존 진입점 호환.
+   */
+  mode?: StoryModeApi
+  /**
    * BE 진실 기반 lock 복원 메타.
    *
    * 크롬 종료로 sessionStorage 가 비워진 뒤 "이어서 작성하기" 로 다시 진입했을 때,
@@ -235,6 +257,18 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
   const [storyId, setStoryIdState] = useState<StoryId | null>(
     init?.storyId ?? restored?.storyId ?? null,
   )
+  /**
+   * 동화 생성 모드. mount 시 한 번 결정되며 플로우 내내 불변.
+   *
+   * 우선순위:
+   *  1) init.mode (BookstoreScene 모달 / 서버 DRAFT rehydrate)
+   *  2) restored.mode (sessionStorage snapshot — 같은 탭 새로고침)
+   *  3) 'VIEWER' (안전 폴백)
+   *
+   * setter 를 노출하지 않는 이유: mode 는 BasicInfoStep POST /api/stories body 의 일부로
+   * 서버에 영속화되므로, 플로우 중간에 바꾸면 DB 와 클라이언트 상태가 어긋난다.
+   */
+  const mode: StoryModeApi = init?.mode ?? restored?.mode ?? 'VIEWER'
   /**
    * Step 3 의 본문 발행 mutation 성공 시 set, Step 4 폴링 종결 또는 step 후퇴 시 null.
    * 새로고침으로 sessionStorage 에서 복원되는 다른 state 와 달리 메모리 한정 — 새로고침 후에는
@@ -298,6 +332,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
       writeProgressSnapshot({
         currentStep,
         storyId,
+        mode,
         step3Story: projectData.step3.story,
         lastConfirmedSummaryJobId,
         storyGenerationJobId,
@@ -306,7 +341,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
         confirmedReadOnlyLocked,
       })
     }
-  }, [currentStep, storyId, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId, storyboardReadOnlyLocked, confirmedReadOnlyLocked])
+  }, [currentStep, storyId, mode, projectData.step3.story, lastConfirmedSummaryJobId, storyGenerationJobId, finalIllustrationJobId, storyboardReadOnlyLocked, confirmedReadOnlyLocked])
 
   const setCurrentStep = useCallback((step: number) => {
     setCurrentStepState(Math.max(1, Math.min(MAX_STEP, step)))
@@ -429,6 +464,7 @@ export function useStoryCreationFlow(init?: UseStoryCreationFlowInit): UseStoryC
   return {
     currentStep,
     projectData,
+    mode,
     storyId,
     storyGenerationJobId,
     finalIllustrationJobId,

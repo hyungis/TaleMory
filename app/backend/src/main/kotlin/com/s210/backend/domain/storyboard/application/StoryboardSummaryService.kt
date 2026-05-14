@@ -105,6 +105,7 @@ class StoryboardSummaryService(
         val envelope = StorySummaryGenerateJobMessage(
             jobId = job.id.toString(),
             storyId = storyId,
+            storyMode = story.mode.name,
             payload = payload,
         )
         rabbitTemplate.convertAndSend(
@@ -206,6 +207,7 @@ class StoryboardSummaryService(
         val envelope = StorySummaryRegenerateJobMessage(
             jobId = job.id.toString(),
             storyId = storyId,
+            storyMode = story.mode.name,
             payload = payload,
         )
         rabbitTemplate.convertAndSend(

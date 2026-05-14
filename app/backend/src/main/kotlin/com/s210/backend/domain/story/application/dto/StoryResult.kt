@@ -2,6 +2,7 @@ package com.s210.backend.domain.story.application.dto
 
 import com.s210.backend.domain.story.entity.Story
 import com.s210.backend.domain.story.model.Difficulty
+import com.s210.backend.domain.story.model.StoryMode
 import com.s210.backend.domain.story.model.StoryStatus
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -11,6 +12,8 @@ data class StoryResult(
     val title: String?,
     val synopsis: String?,
     val difficulty: Difficulty,
+    /** 동화 생성 모드 — VIEWER (기본 narration) / WEBTOON (대화). */
+    val mode: StoryMode,
     val status: StoryStatus,
     val isBookmarked: Boolean,
     val shareToken: String?,
@@ -47,6 +50,7 @@ data class StoryResult(
             title = story.title,
             synopsis = story.synopsis,
             difficulty = story.difficulty,
+            mode = story.mode,
             status = story.status,
             isBookmarked = story.isBookmarked,
             shareToken = story.shareToken,

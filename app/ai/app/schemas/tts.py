@@ -4,6 +4,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 
 AudioFormat = Literal["wav", "mp3"]
+StoryMode = Literal["VIEWER", "WEBTOON"]
 
 # Accept emotion strings case-insensitively (BE may send lowercase enum names).
 _emotion_upper = BeforeValidator(lambda v: v.upper() if isinstance(v, str) else v)
@@ -82,6 +83,13 @@ class StorySentenceRequest(BaseModel):
     ssml: str | None = None
 
 
+class StoryVoiceReference(BaseModel):
+    speakerKey: str
+    voiceId: str
+    referenceAudioUrl: str | None = None
+    referenceAudioS3Key: str | None = None
+
+
 class StoryTtsOptions(BaseModel):
     defaultEmotion: EmotionType
     defaultStylePrompt: str | None = None
@@ -93,9 +101,11 @@ class StoryTtsOptions(BaseModel):
 
 class StoryTtsRequest(BaseModel):
     storyId: int
+    storyMode: StoryMode = "VIEWER"
     voiceId: str
     referenceAudioUrl: str | None = None
     referenceAudioS3Key: str | None = None
+    voiceRefs: list[StoryVoiceReference] = Field(default_factory=list)
     language: str
     format: AudioFormat = "wav"
     options: StoryTtsOptions

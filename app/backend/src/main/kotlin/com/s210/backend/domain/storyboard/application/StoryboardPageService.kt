@@ -96,7 +96,14 @@ class StoryboardPageService(
         if (trimmed.isEmpty()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
         page.replaceKoreanText(objectMapper, trimmed)
-        val translationJob = publishTranslationJob(storyId, pageNumber, trimmed)
+        // replaceKoreanText 가 webtoon 페이지면 prefix 제거된 multi-sentence 로 분할 저장.
+        // 번역 API 한테는 prefix 가 빠진 깨끗한 본문만 보내야 영어 측에서도 prefix 가 transliteration 안 됨.
+        // (sentences[].koreanText 만 join → 줄바꿈으로 합쳐서 전달.)
+        // VIEWER 페이지면 단일 sentence 라 결과적으로 trimmed 와 동일.
+        val cleanKoreanForTranslation = page.parseSentencesList(objectMapper)
+            .joinToString("\n") { it.koreanText.trim() }
+            .ifBlank { trimmed }
+        val translationJob = publishTranslationJob(storyId, pageNumber, cleanKoreanForTranslation)
         // dirty checking 으로 트랜잭션 종료 시 자동 UPDATE.
 
         return StoryboardPageResult.from(page, objectMapper, translationJobId = JobId(translationJob.id))

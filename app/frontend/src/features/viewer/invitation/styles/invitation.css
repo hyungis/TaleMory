@@ -23,7 +23,8 @@
 
   --iv-font-display: 'Gaegu', 'Nanum Pen Script', cursive;
   --iv-font-pen: 'Nanum Pen Script', 'Gaegu', cursive;
-  --iv-font-serif: 'Nanum Myeongjo', serif;
+  /* 옛 Nanum Myeongjo serif 톤을 손글씨 톤(Gaegu)으로 일괄 교체. */
+  --iv-font-serif: 'Gaegu', 'Nanum Pen Script', cursive;
   --iv-font-script: 'Caveat', cursive;
 
   position: relative;

@@ -8,6 +8,12 @@ interface BookBackCoverProps {
   onRestart: () => void
   /** 앞표지와 같은 일러스트(`coverIllustrationUrl`) — 뒷표지 배경에 full-bleed 로 깔린다. */
   illustrationUrl: string | null
+  /** "처음부터 읽기" 버튼 숨김 (웹툰 뷰어에서 사용) */
+  hideRestart?: boolean
+  /** 뒷표지 하단에 동화 제목 표시 (웹툰 뷰어에서 사용) */
+  title?: string
+  /** 오디오 자동 재생 비활성화 (웹툰 뷰어에서는 자체 재생 루프 사용) */
+  disableAutoAudio?: boolean
 }
 
 /**
@@ -16,7 +22,7 @@ interface BookBackCoverProps {
  * 그 위에 편지지가 날아 착지 → 글자 타이핑 → 서명/버튼 순서로 노출.
  * outro 데이터가 없으면 기본 마무리 멘트 사용.
  */
-export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCoverProps) {
+export function BookBackCover({ outro, onRestart, illustrationUrl, hideRestart = false, title, disableAutoAudio = false }: BookBackCoverProps) {
   const paperRef = useRef<HTMLDivElement>(null)
   const [isLanded, setIsLanded] = useState(false)
   /* 사용자가 마무리 멘트를 안 적은 경우엔 편지지 자체를 안 띄움 — 기본 폴백 멘트로 메우면
@@ -42,9 +48,9 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
     setIsLanded(true)
   }, [replayKey])
 
-  // 오디오 있을 때만 재생
+  // 오디오 있을 때만 재생 (disableAutoAudio 시 자동재생 안 함 — 웹툰 뷰어 자체 루프 사용)
   useEffect(() => {
-    if (!audioUrl) return
+    if (!audioUrl || disableAutoAudio) return
     const audio = new Audio(audioUrl)
     audio.play().catch(() => {
       /* 자동재생 차단 시 무시 — 사용자 제스처 후 수동 재생 유도 가능 */
@@ -52,7 +58,7 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
     return () => {
       audio.pause()
     }
-  }, [audioUrl, replayKey])
+  }, [audioUrl, replayKey, disableAutoAudio])
 
   const handleReplay = () => {
     setReplayKey(k => k + 1)
@@ -90,17 +96,23 @@ export function BookBackCover({ outro, onRestart, illustrationUrl }: BookBackCov
               <RotateCcw className="w-4 h-4" />
               다시 듣기
             </button>
-            <button className="sb-letter-btn" onClick={onRestart}>
-              <BookOpen className="w-4 h-4" />
-              처음부터 읽기
-            </button>
+            {!hideRestart && (
+              <button className="sb-letter-btn" onClick={onRestart}>
+                <BookOpen className="w-4 h-4" />
+                처음부터 읽기
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* 편지가 없을 땐 "처음부터 읽기" 하나만 노출 — "다시 듣기" 는 재생할 텍스트/오디오가
           없어서 의미가 없고, 단일 CTA 가 시각적으로도 깔끔. 뒷표지 사진 위 하단 중앙에 배치. */}
-      {!hasLetter && (
+      {title && (
+        <p className="sb-back-cover-title">{title}</p>
+      )}
+
+      {!hasLetter && !hideRestart && (
         <div className="sb-letter-controls is-visible sb-letter-controls-standalone">
           <button className="sb-letter-btn" onClick={onRestart}>
             <BookOpen className="w-4 h-4" />

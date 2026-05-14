@@ -73,6 +73,10 @@ class Settings(BaseModel):
         getenv("STORYBOARD_IMAGE_OUTPUT_COST_PER_IMAGE", "0.039")
     )
     FINAL_ILLUSTRATION_MODEL: str = getenv("FINAL_ILLUSTRATION_MODEL", "black-forest-labs/flux-2-klein-9b")
+    FINAL_ILLUSTRATION_LAYOUT_MODEL: str = getenv(
+        "FINAL_ILLUSTRATION_LAYOUT_MODEL",
+        "gemini-3-flash-preview",
+    )
     STORYBOARD_IMAGE_S3_BUCKET: str | None = getenv("STORYBOARD_IMAGE_S3_BUCKET", getenv("AWS_S3_BUCKET"))
     STORYBOARD_IMAGE_S3_REGION: str | None = getenv("STORYBOARD_IMAGE_S3_REGION", getenv("AWS_REGION"))
     STORYBOARD_IMAGE_S3_ACCESS_KEY_ID: str | None = getenv(
@@ -107,7 +111,8 @@ class Settings(BaseModel):
     AI_IMAGE_API_CONCURRENCY: int = int(getenv("AI_IMAGE_API_CONCURRENCY", "10"))
     AI_GEMINI_IMAGE_API_CONCURRENCY: int = int(getenv("AI_GEMINI_IMAGE_API_CONCURRENCY", "10"))
     AI_REPLICATE_IMAGE_API_CONCURRENCY: int = int(getenv("AI_REPLICATE_IMAGE_API_CONCURRENCY", "5"))
-    RABBITMQ_PREFETCH_COUNT: int = int(getenv("RABBITMQ_PREFETCH_COUNT", "13"))
+    AI_LAYOUT_API_CONCURRENCY: int = int(getenv("AI_LAYOUT_API_CONCURRENCY", "20"))
+    RABBITMQ_PREFETCH_COUNT: int = int(getenv("RABBITMQ_PREFETCH_COUNT", "20"))
     RABBITMQ_REQUEST_EXCHANGE: str = getenv("RABBITMQ_REQUEST_EXCHANGE", "ai.request")
     RABBITMQ_RESULT_EXCHANGE: str = getenv("RABBITMQ_RESULT_EXCHANGE", "ai.result")
     RABBITMQ_GENERATE_QUEUE: str = getenv("RABBITMQ_GENERATE_QUEUE", "ai.cpu.story.generate.request.queue")
@@ -178,6 +183,14 @@ class Settings(BaseModel):
         "RABBITMQ_FINAL_ILLUSTRATION_REVISE_QUEUE",
         "ai.final-illustration.revise.request.queue",
     )
+    RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_QUEUE",
+        "ai.final-illustration.layout.request.queue",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_QUEUE",
+        "ai.final-illustration.layout.item.request.queue",
+    )
     RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY: str = getenv(
         "RABBITMQ_FINAL_ILLUSTRATION_GENERATE_ROUTING_KEY",
         "ai.image.final-illustration.generate",
@@ -189,6 +202,14 @@ class Settings(BaseModel):
     RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY: str = getenv(
         "RABBITMQ_FINAL_ILLUSTRATION_REVISE_ROUTING_KEY",
         "ai.image.final-illustration.revise",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ROUTING_KEY",
+        "ai.image.final-illustration.layout",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_ITEM_ROUTING_KEY",
+        "ai.image.final-illustration.layout.item",
     )
     RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY: str = getenv(
         "RABBITMQ_GENERATE_COMPLETED_ROUTING_KEY",
@@ -269,6 +290,14 @@ class Settings(BaseModel):
     RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY: str = getenv(
         "RABBITMQ_FINAL_ILLUSTRATION_REVISE_FAILED_ROUTING_KEY",
         "ai.result.final-illustration.revise.failed",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_COMPLETED_ROUTING_KEY",
+        "ai.result.final-illustration.layout.completed",
+    )
+    RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY: str = getenv(
+        "RABBITMQ_FINAL_ILLUSTRATION_LAYOUT_FAILED_ROUTING_KEY",
+        "ai.result.final-illustration.layout.failed",
     )
 
 

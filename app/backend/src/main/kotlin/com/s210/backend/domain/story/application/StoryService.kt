@@ -93,6 +93,7 @@ class StoryService(
                 userId = command.userId,
                 title = command.title,
                 difficulty = command.difficulty,
+                mode = command.mode,
                 status = StoryStatus.DRAFT,
                 companionsJson = command.companionsJson,
                 mainCharacterJson = command.mainCharacterJson,
@@ -174,6 +175,7 @@ class StoryService(
                 id = StoryId(story.id),
                 title = story.title,
                 difficulty = story.difficulty.name,
+                mode = story.mode.name,
                 status = story.status.name,
                 isBookmarked = story.isBookmarked,
                 travelPlace = story.travelPlace,
@@ -373,6 +375,25 @@ class StoryService(
             throw BusinessException(StoryErrorCode.STYLE_PRESET_NOT_FOUND)
         }
         story.stylePresetId = stylePresetId
+        return finalIllustrationGenerationService.enqueue(storyId, stylePresetId)
+    }
+
+    /**
+     * Step 8 미리보기에서 FINAL_ILLUSTRATION 잡이 FAILED 일 때 사용자가 [다시 시도] 한 경우.
+     *
+     * Story.stylePresetId 가 이미 채워져 있어야 한다 (Step 5 PATCH /style 완료 전제).
+     * 비어있으면 INVALID_STORY_STATE — Step 5 부터 다시 진행해야 함.
+     *
+     * [FinalIllustrationGenerationService.enqueue] 의 멱등 가드가 자동 처리:
+     *  - 직전 잡이 PENDING/RUNNING/SUCCESS → 기존 jobId 그대로 반환 (재발행 X)
+     *  - 직전 잡이 FAILED/CANCELLED → 새 잡 발행
+     *
+     * @return 새 (또는 멱등 재사용된) FINAL_ILLUSTRATION 잡 id
+     */
+    fun retryFinalIllustration(userId: Long, storyId: Long): Long {
+        val story = ownedStory(userId, storyId)
+        val stylePresetId = story.stylePresetId
+            ?: throw BusinessException(StoryErrorCode.INVALID_STORY_STATE)
         return finalIllustrationGenerationService.enqueue(storyId, stylePresetId)
     }
 

@@ -13,6 +13,8 @@ data class StoryResponse(
     val id: StoryId,
     val title: String?,
     val difficulty: String,
+    /** "VIEWER" | "WEBTOON" — 동화 생성 모드. 책장에서 뷰어 분기 및 모드 뱃지 표시용. */
+    val mode: String,
     val status: String,
     val isBookmarked: Boolean,
     val travelPlace: String?,
@@ -62,6 +64,8 @@ data class StoryDraftResponse(
     val storyId: StoryId,
     val title: String?,
     val difficulty: String,
+    /** 동화 생성 모드 — VIEWER (기본 narration) / WEBTOON (대화). 이어서 작성 시 FE 가 모드 복원에 사용. */
+    val mode: String,
     val companionsJson: String,
     val mainCharacterJson: String,
     val travelPlace: String?,
@@ -103,7 +107,6 @@ data class SentenceResponse(
     val koreanText: String?,
     val ttsAudioUrl: String?,
     val speakerKey: String?,
-    val bubbleSlot: String?,
     val hasHighlighted: Boolean,
     /**
      * 사용자가 녹음한 강조 문장 audio URL (활성 row 기준).
@@ -151,6 +154,8 @@ data class StoryViewResponse(
     val title: String?,
     /** Story.difficulty.name — "BEGINNER" / "INTERMEDIATE" / "ADVANCED". 뷰어 InvitationCard 의 난이도 pill 에 사용. */
     val difficulty: String,
+    /** "VIEWER" | "WEBTOON" — 동화 생성 모드. 뷰어 자동 분기 및 공유 링크 InvitationCard 용. */
+    val mode: String,
     val mainCharacter: MainCharacterView?,
     val coverIllustrationUrl: String?,
     val publishedAt: LocalDateTime?,
@@ -173,7 +178,6 @@ data class SentenceViewResponse(
     val koreanText: String?,
     val ttsAudioUrl: String?,
     val speakerKey: String?,
-    val bubbleSlot: String?
 )
 
 data class OutroViewResponse(
@@ -186,11 +190,23 @@ data class MainCharacterView(
     val name: String?
 )
 
+/**
+ * scene.character_anchors JSON 배열 원소.
+ *
+ * WEBTOON 모드: WebtoonLayoutResultHandler 가 AI Vision 결과로 페이지별 캐릭터 anchor 를 채운다.
+ *  - `name`        : sentence.speakerKey 와 매칭되는 캐릭터 식별자 (FE lookup 키).
+ *  - `x`, `y`      : anchor 점 (정규화 0~1, 머리 위 살짝 위 지점).
+ *  - `confidence`  : AI Vision 신뢰도 (0~1).
+ *
+ * 레거시 필드 (`characterId`, `scale`) 는 사용처 없어 nullable 로 유지 — 후속 정리 lane.
+ */
 data class CharacterAnchorView(
-    val characterId: PersonId?,
-    val x: Double?,
-    val y: Double?,
-    val scale: Double?
+    val name: String? = null,
+    val x: Double? = null,
+    val y: Double? = null,
+    val confidence: Double? = null,
+    val characterId: PersonId? = null,
+    val scale: Double? = null,
 )
 
 /**
@@ -265,6 +281,14 @@ data class ConfirmStoryboardResponse(
     val cacheHits: Int,
     val cacheMisses: Int,
     val finalIllustrationJobId: JobId? = null,
+)
+
+/**
+ * Step 8 미리보기에서 잡 실패 후 사용자가 [다시 시도] 했을 때의 응답.
+ * 새로 발행된 (또는 멱등 가드로 재사용된) 잡의 id 만 내려준다 — FE 가 polling 재개에 사용.
+ */
+data class JobRetryResponse(
+    val jobId: JobId,
 )
 
 /**

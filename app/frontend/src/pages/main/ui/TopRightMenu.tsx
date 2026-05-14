@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Menu, User, Info } from 'lucide-react'
+import { HelpCircle, Menu, User, Info } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from '../../../features/auth'
+import { useOnboardingTutorial } from '../../../features/onboarding-tutorial'
 import { ROUTES } from '../../../shared/constants'
 
 /** 마이페이지 진입 발화 지점 — 뒤로가기 시 어디로 돌아갈지 분기에 사용. */
@@ -32,6 +33,7 @@ interface TopRightMenuProps {
  */
 export function TopRightMenu({ standalone = false, mypageFrom = 'main' }: TopRightMenuProps) {
   const navigate = useNavigate()
+  const onboardingTutorial = useOnboardingTutorial()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -71,6 +73,18 @@ export function TopRightMenu({ standalone = false, mypageFrom = 'main' }: TopRig
 
       {isOpen && (
         <div className="top-right-menu__panel" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="top-right-menu__item"
+            onClick={() => {
+              setIsOpen(false)
+              onboardingTutorial.openTutorialPrompt()
+            }}
+          >
+            <HelpCircle className="w-5 h-5" aria-hidden="true" />
+            <span>튜토리얼 보기</span>
+          </button>
           <button
             type="button"
             role="menuitem"

@@ -10,6 +10,7 @@ export interface MeResponse {
   phone?: string | null
   agreeSms?: boolean
   agreeMarketing?: boolean
+  onboardingCompleted?: boolean
   provider?: string | OauthProvider | null
   createdAt?: string
   updatedAt?: string
@@ -33,6 +34,7 @@ export function mapUserProfile(payload: MeResponse): UserProfile {
     phone: typeof payload.phone === 'string' ? payload.phone : null,
     agreeSms: payload.agreeSms === true,
     agreeMarketing: payload.agreeMarketing === true,
+    onboardingCompleted: payload.onboardingCompleted === true,
     provider: normalizeProvider(payload.provider),
     createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : '',
     updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : '',

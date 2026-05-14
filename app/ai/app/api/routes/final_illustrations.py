@@ -1,10 +1,18 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.final_illustration import (
+    FinalIllustrationLayoutAnalysisBatchRequest,
+    FinalIllustrationLayoutAnalysisBatchResponse,
+    FinalIllustrationLayoutAnalysisRequest,
+    FinalIllustrationLayoutAnalysisResponse,
     FinalIllustrationGenerateRequest,
     FinalIllustrationGenerateResponse,
     FinalIllustrationReviseRequest,
     FinalIllustrationReviseResponse,
+)
+from app.services.final_illustration_layout_service import (
+    analyze_final_illustration_layout,
+    analyze_final_illustration_layouts,
 )
 from app.services.final_illustration_service import (
     generate_final_illustrations,
@@ -33,6 +41,30 @@ def revise_final_illustration_endpoint(
 ) -> FinalIllustrationReviseResponse:
     try:
         return revise_final_illustration(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/analyze-layout", response_model=FinalIllustrationLayoutAnalysisResponse)
+def analyze_final_illustration_layout_endpoint(
+    request: FinalIllustrationLayoutAnalysisRequest,
+) -> FinalIllustrationLayoutAnalysisResponse:
+    try:
+        return analyze_final_illustration_layout(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/analyze-layout/batch", response_model=FinalIllustrationLayoutAnalysisBatchResponse)
+def analyze_final_illustration_layout_batch_endpoint(
+    request: FinalIllustrationLayoutAnalysisBatchRequest,
+) -> FinalIllustrationLayoutAnalysisBatchResponse:
+    try:
+        return analyze_final_illustration_layouts(request)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:

@@ -452,7 +452,8 @@
 /* ===== Fade-in 연출 (카드/블록 공용) =====
    ⚠ `transform: translateY(20px)` 제거 — backdrop-filter 와 동일한 containing block 함정 회피.
    transform 이 박힌 부모는 자식의 position:fixed 를 자기 기준으로 잡으므로 책장 안에서 띄우는
-   FeedbackDialog 가 viewport 전체를 못 덮음. opacity 페이드만 유지. */
+   FeedbackDialog 가 viewport 전체를 못 덮음. opacity 페이드만 유지.
+   (재발 방지 — 같은 버그 두 번째 fix.) */
 .bookshelf-modal .bookshelf-fade-in {
   animation: bookshelfFadeIn 0.6s ease-out forwards;
   opacity: 0;

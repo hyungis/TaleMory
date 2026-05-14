@@ -106,6 +106,7 @@ export function ForestScene({ onEnterBookstore }: ForestSceneProps) {
             onClick={handleHouseClick}
             aria-label="집에 들어가기"
             disabled={isInteracting}
+            data-onboarding-target="main-house"
           />
 
           {/* 문 위 펄싱 마커(외곽 링 + 내부 점) + 안내 멘트.

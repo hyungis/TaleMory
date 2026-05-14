@@ -11,6 +11,15 @@ export type PersonGender = 'MALE' | 'FEMALE' | 'OTHER'
 export type PersonRoleApi = 'CHILD' | 'COMPANION'
 export type DifficultyApi = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 
+/**
+ * 동화 생성 모드 — 메인의 "새 동화책 만들기" 클릭 시 모달에서 선택.
+ *  - VIEWER: 기존 동화책 모드 (페이지별 narration 본문). 기본값.
+ *  - WEBTOON: 대화 중심 웹툰 모드 (sentence 마다 화자 + 캐릭터 위치 메타).
+ *
+ * BE `StoryMode` enum / AI worker `StoryMode = Literal["VIEWER", "WEBTOON"]` 와 1:1 매칭.
+ */
+export type StoryModeApi = 'VIEWER' | 'WEBTOON'
+
 /** GET /api/persons 응답 원소 / POST/PATCH 성공 시 반환 페이로드. */
 export interface PersonResponse {
   id: PersonId
@@ -40,6 +49,10 @@ export interface ModifyPersonRequest {
 export interface CreateStoryRequest {
   title: string | null
   difficulty: DifficultyApi
+  /**
+   * 동화 생성 모드. 메인의 모드 선택 모달에서 결정. 누락 시 BE 가 default 'VIEWER'.
+   */
+  mode?: StoryModeApi
   companionsJson: string
   mainCharacterJson: string
   travelPlace?: string | null
@@ -69,6 +82,8 @@ export interface StoryDraftResponse {
   storyId: StoryId
   title: string | null
   difficulty: DifficultyApi
+  /** 동화 생성 모드 — VIEWER (기본) / WEBTOON. "이어서 작성하기" 시 모드 복원에 사용. */
+  mode: StoryModeApi
   companionsJson: string
   mainCharacterJson: string
   travelPlace: string | null

@@ -26,6 +26,7 @@ function mapAuthUser(rawUser: LoginResponsePayload['user']): AuthUser {
     phone: typeof rawUser.phone === 'string' ? rawUser.phone : null,
     agreeSms: rawUser.agreeSms === true,
     agreeMarketing: rawUser.agreeMarketing === true,
+    onboardingCompleted: rawUser.onboardingCompleted === true,
     provider: normalizeProvider(rawUser.provider),
     createdAt: normalizeString(rawUser.createdAt),
     updatedAt: normalizeString(rawUser.updatedAt),
