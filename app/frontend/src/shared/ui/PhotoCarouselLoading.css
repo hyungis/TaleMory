@@ -109,6 +109,41 @@
   color: var(--cr-ink-soft, #6b5638);
 }
 
+/* ── large 변형 — Step 8 최종 로딩처럼 화면 중앙에서 hero 로 떠 있는 경우 ──
+   화면을 거의 비워둔 채 모달만 띄울 때 default 사이즈로는 너무 작아 보여 사용자가
+   "지금 뭔가 진행되고 있다" 는 감각을 못 받음. stage / 타이틀 모두 1.5~1.8배 확대. */
+.photo-carousel-loading--large {
+  padding: 56px 40px 48px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__stage {
+  width: clamp(280px, 38vw, 420px);
+  margin-bottom: 22px;
+  border-radius: 24px;
+  border-width: 3px;
+  box-shadow:
+    0 3px 0 rgba(163, 117, 72, 0.45),
+    0 18px 38px rgba(140, 100, 60, 0.22);
+}
+.photo-carousel-loading--large .photo-carousel-loading__spinner {
+  width: 72px;
+  height: 72px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__dots {
+  gap: 9px;
+  margin-bottom: 24px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__dot {
+  width: 10px;
+  height: 10px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__title {
+  font-size: 34px;
+  margin-bottom: 10px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__subtitle {
+  font-size: 22px;
+}
+
 /* ── compact 변형 — 페이지 카드 안쪽 오버레이 같은 좁은 공간용 ──
    stage / 타이틀 / 점 / 스피너 모두 비율 축소. */
 .photo-carousel-loading--compact {

@@ -482,12 +482,21 @@ export function FinalPreviewStep({
         <CreationHeader currentStep={8} />
         <div className="cr-scroll">
           <main className="cr-shell-inner cr-fade-in cr-final-status">
-            <div className="cr-card" style={{ padding: 0 }}>
+            <div
+              className="cr-card"
+              style={{
+                padding: 0,
+                width: 'min(640px, 92vw)',
+                /* 빈 화면 한가운데 자그마한 카드가 떠 있어 진행감이 약했던 문제 — 카드 자체를
+                   Step 8 전용 hero 사이즈로 확장. PhotoCarouselLoading 의 size="large" 와 조합. */
+              }}
+            >
               <span className="cr-tape" aria-hidden="true" />
               <PhotoCarouselLoading
                 photos={photoUrls}
                 title={message}
                 subtitle="잠시만 기다려주세요."
+                size="large"
               />
             </div>
           </main>
