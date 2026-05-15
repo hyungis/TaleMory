@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 import {
   BookOpen,
@@ -28,10 +28,12 @@ import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
+import { usePhotosQuery } from '../../photo-manager'
 import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
 import { useStoryboardConfirm } from '../../highlight-outro/model/useStoryboardConfirm'
 import { useFinalIllustrationRetry } from '../model/useFinalIllustrationRetry'
 import { isApiError } from '../../../../shared/api'
+import { PhotoCarouselLoading } from '../../../../shared/ui'
 import '../../styles/creation-paper.css'
 
 interface FinalPreviewStepProps {
@@ -58,6 +60,14 @@ export function FinalPreviewStep({
 }: FinalPreviewStepProps) {
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [loadingScenes, setLoadingScenes] = useState(true)
+
+  // 최종 로딩(blocking 상태) 의 PhotoCarouselLoading 에 사용할 업로드 사진 URL 목록.
+  // staleTime 55분이라 이전 step 의 캐시 hit. storyId null 이면 disabled → 빈 배열 → 스피너 폴백.
+  const photosQuery = usePhotosQuery(storyId)
+  const photoUrls = useMemo(
+    () => (photosQuery.data ?? []).map(p => p.imageUrl),
+    [photosQuery.data],
+  )
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
   const [retryError, setRetryError] = useState<string | null>(null)
@@ -472,9 +482,22 @@ export function FinalPreviewStep({
         <CreationHeader currentStep={8} />
         <div className="cr-scroll">
           <main className="cr-shell-inner cr-fade-in cr-final-status">
-            <div className="cr-final-status-inner">
-              <Loader2 className="w-7 h-7 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
-              <p className="cr-final-status-text">{message}</p>
+            <div
+              className="cr-card"
+              style={{
+                padding: 0,
+                width: 'min(640px, 92vw)',
+                /* 빈 화면 한가운데 자그마한 카드가 떠 있어 진행감이 약했던 문제 — 카드 자체를
+                   Step 8 전용 hero 사이즈로 확장. PhotoCarouselLoading 의 size="large" 와 조합. */
+              }}
+            >
+              <span className="cr-tape" aria-hidden="true" />
+              <PhotoCarouselLoading
+                photos={photoUrls}
+                title={message}
+                subtitle="잠시만 기다려주세요."
+                size="large"
+              />
             </div>
           </main>
         </div>
