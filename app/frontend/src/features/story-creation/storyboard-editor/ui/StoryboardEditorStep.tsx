@@ -998,7 +998,6 @@ export function StoryboardEditorStep({
                     regenerateError={regenerateErrors[currentPage.pageNumber] ?? null}
                     onSelectVersion={handleSelectVersion}
                     isSelectingVersion={selectVersionMut.isPending}
-                    photoUrls={photoUrls}
                   />
                   <div className="mt-3 flex items-center justify-center gap-3 md:hidden">
                     <button
@@ -1110,11 +1109,6 @@ function PageCard(props: {
   onSelectVersion: (pageNumber: number, version: number) => void
   /** 선택 mutation 진행 중인지 (드롭다운 disable 용). */
   isSelectingVersion: boolean
-  /**
-   * 사용자가 업로드한 사진 URL 목록. cr-sketch-regen-overlay 의 PhotoCarouselLoading 에
-   * 전달돼 "스토리보드 내용 만드는 중" 사이클을 보여준다. 빈 배열이면 spinner 폴백.
-   */
-  photoUrls: ReadonlyArray<string>
 }) {
   const {
     storyId,
@@ -1137,7 +1131,6 @@ function PageCard(props: {
     regenerateError,
     onSelectVersion,
     isSelectingVersion,
-    photoUrls,
   } = props
 
   // BE 가 versioned key (`stories/.../v{N}.png`) 로 저장 → URL 자체가 버전마다 달라
@@ -1243,16 +1236,12 @@ function PageCard(props: {
 
             {/* 재생성 진행 중 오버레이 — hover 와 무관하게 항상 보임.
                 새로고침으로 복귀했을 때도 사용자가 진행 상태를 즉시 인지할 수 있게.
-                edit-btn(z-index 2) 위(z-index 3)에 떠서 이미지/스피너 모두 덮음.
-                PhotoCarouselLoading compact 으로 사용자 사진을 사이클 보여줘 단조로움 해소. */}
+                edit-btn(z-index 2) 위(z-index 3)에 떠서 이미지/스피너 모두 덮음. */}
             {isRegeneratingThis && (
               <div className="cr-sketch-regen-overlay" role="status" aria-live="polite">
-                <PhotoCarouselLoading
-                  photos={photoUrls}
-                  title="그림을 다시 그리고 있어요"
-                  subtitle="잠시만 기다려주세요…"
-                  size="compact"
-                />
+                <Loader2 className="w-12 h-12 animate-spin" strokeWidth={2.2} />
+                <p className="cr-sketch-regen-overlay-text">그림을 다시 그리고 있어요</p>
+                <p className="cr-sketch-regen-overlay-sub">잠시만 기다려주세요…</p>
               </div>
             )}
           </div>
