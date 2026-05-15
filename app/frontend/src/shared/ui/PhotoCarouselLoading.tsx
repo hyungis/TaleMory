@@ -22,6 +22,13 @@ interface PhotoCarouselLoadingProps {
    * `photo-carousel-fade` keyframes 의 총 길이와 맞춰서 fade-in/out 이 자연스럽게 이어지도록.
    */
   intervalMs?: number
+  /**
+   * 크기 변형.
+   *  - `default`: Step 3/4 본문 생성 / Step 8 최종 로딩처럼 전체 화면 중앙 카드용.
+   *  - `compact`: 페이지 카드 내부 같은 좁은 공간 (예: cr-sketch-regen-overlay) 용.
+   *    stage / 타이틀 / 점 인디케이터 모두 비율 축소.
+   */
+  size?: 'default' | 'compact'
 }
 
 /**
@@ -36,6 +43,7 @@ export function PhotoCarouselLoading({
   title,
   subtitle,
   intervalMs = 2500,
+  size = 'default',
 }: PhotoCarouselLoadingProps) {
   const [index, setIndex] = useState(0)
 
@@ -52,8 +60,10 @@ export function PhotoCarouselLoading({
   const safeIndex = photos.length > 0 ? index % photos.length : 0
   const currentUrl = photos.length > 0 ? photos[safeIndex] : null
 
+  const rootClass = `photo-carousel-loading${size === 'compact' ? ' photo-carousel-loading--compact' : ''}`
+
   return (
-    <div className="photo-carousel-loading">
+    <div className={rootClass}>
       <div className="photo-carousel-loading__stage" aria-hidden="true">
         {currentUrl ? (
           // key 에 index 를 포함해 매번 새 노드로 마운트 → CSS keyframes 재실행되며 fade.

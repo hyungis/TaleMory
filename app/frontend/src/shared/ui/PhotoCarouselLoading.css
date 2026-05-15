@@ -109,6 +109,37 @@
   color: var(--cr-ink-soft, #6b5638);
 }
 
+/* ── compact 변형 — 페이지 카드 안쪽 오버레이 같은 좁은 공간용 ──
+   stage / 타이틀 / 점 / 스피너 모두 비율 축소. */
+.photo-carousel-loading--compact {
+  padding: 16px 12px 14px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__stage {
+  width: clamp(96px, 18vw, 140px);
+  margin-bottom: 10px;
+  border-radius: 14px;
+  border-width: 2px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__spinner {
+  width: 32px;
+  height: 32px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__dots {
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__dot {
+  width: 5px;
+  height: 5px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__title {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__subtitle {
+  font-size: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .photo-carousel-loading__photo {
     animation-duration: 0s;
