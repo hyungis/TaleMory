@@ -10,12 +10,14 @@ import {
   Wand2,
 } from 'lucide-react'
 import { isApiError } from '../../../../shared/api'
+import { PhotoCarouselLoading } from '../../../../shared/ui'
 import type { StoryProject } from '../../model/types'
 import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
+import { usePhotosQuery } from '../../photo-manager'
 import { useStoryboardPagesQuery } from '../../storyboard-pages'
 import { useGenerateStoryboardStoryPost } from '../model/useGenerateStoryboardStoryPost'
 import { useGenerateSummary } from '../model/useGenerateSummary'
@@ -65,6 +67,14 @@ export function PromptStep({
   const summaryPatchMut = useStoryboardSummaryPatch(storyId)
   const pagesQuery = useStoryboardPagesQuery(storyId)
   const hasGeneratedPages = (pagesQuery.data?.pages?.length ?? 0) > 0
+
+  // 로딩 중 PhotoCarouselLoading 에 사용자 사진을 사이클로 보여주기 위한 fetch.
+  // staleTime 이 길어서 (55분) 이전 step 에서 이미 불러왔으면 캐시 hit 됨.
+  const photosQuery = usePhotosQuery(storyId)
+  const photoUrls = useMemo(
+    () => (photosQuery.data ?? []).map(p => p.imageUrl),
+    [photosQuery.data],
+  )
 
   const stateQuery = useStoryboardStateQuery(storyId)
   const hasActiveOrCompletedStoryJob =
@@ -217,7 +227,13 @@ export function PromptStep({
             />
           )}
 
-          {isLoading && <LoadingCard status={status} regenerating={regenerateMut.isPending} />}
+          {isLoading && (
+            <LoadingCard
+              status={status}
+              regenerating={regenerateMut.isPending}
+              photoUrls={photoUrls}
+            />
+          )}
 
           {hasFailed && <FailureCard message={failureMessage} onRetry={retryAfterFail} />}
 
@@ -358,13 +374,15 @@ function PromptInputCard(props: {
   )
 }
 
-/* LOADING 카드 */
+/* LOADING 카드 — 업로드 사진 carousel 로 진행감 시각화. */
 function LoadingCard({
   status,
   regenerating,
+  photoUrls,
 }: {
   status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | null
   regenerating: boolean
+  photoUrls: ReadonlyArray<string>
 }) {
   const hint = regenerating
     ? 'AI 가 새 줄거리를 만들고 있어요...'
@@ -372,26 +390,9 @@ function LoadingCard({
       ? 'AI 가 줄거리를 만들고 있어요...'
       : '작업을 시작하고 있어요...'
   return (
-    <div className="cr-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+    <div className="cr-card" style={{ padding: 0 }}>
       <span className="cr-tape" aria-hidden="true" />
-      <Loader2
-        className="w-12 h-12 animate-spin"
-        style={{ color: 'var(--cr-sage-deep)', margin: '0 auto 16px' }}
-      />
-      <h2
-        style={{
-          fontFamily: 'var(--cr-font-serif)',
-          fontWeight: 800,
-          fontSize: 24,
-          color: 'var(--cr-ink)',
-          margin: '0 0 6px',
-        }}
-      >
-        {hint}
-      </h2>
-      <p style={{ fontFamily: 'var(--cr-font-gaegu)', color: 'var(--cr-ink-soft)', margin: 0 }}>
-        잠시만 기다려주세요.
-      </p>
+      <PhotoCarouselLoading photos={photoUrls} title={hint} subtitle="잠시만 기다려주세요." />
     </div>
   )
 }

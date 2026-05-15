@@ -37,7 +37,9 @@ import {
 } from '../../storyboard-prompt'
 import { useGenerateStoryboardStoryPost } from '../../storyboard-prompt/model/useGenerateStoryboardStoryPost'
 import { deleteStory } from '../../basic-info'
+import { usePhotosQuery } from '../../photo-manager'
 import { ROUTES } from '../../../../shared/constants'
+import { PhotoCarouselLoading } from '../../../../shared/ui'
 import type { JobId, StoryId } from '../../../../shared/types'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -129,6 +131,14 @@ export function StoryboardEditorStep({
   const regenStatusQuery = useStoryboardRegenStatusQuery(storyId)
   // "다시 시도" 버튼 클릭 시 본문 발행 재시도 — Step 3 의 publish 흐름과 동일.
   const publishStoryMut = useGenerateStoryboardStoryPost(storyId)
+
+  // 본문 생성 로딩 화면의 PhotoCarouselLoading 에 사용할 업로드 사진 목록.
+  // staleTime 55분이라 이전 step 의 캐시 hit. storyId null 이면 disabled.
+  const photosQuery = usePhotosQuery(storyId)
+  const photoUrls = useMemo(
+    () => (photosQuery.data ?? []).map(p => p.imageUrl),
+    [photosQuery.data],
+  )
 
   // ────────────────────────────────────────────────────────────
   // BE 진실 기반 잡 상태 조회 — sessionStorage 가 비어 있는 엣지케이스 (탭 닫고 재진입) 에서도
@@ -869,15 +879,16 @@ export function StoryboardEditorStep({
             )}
 
             {/* STORY 잡 진행 중 — 페이지 카드 대신 큰 로딩 카드를 표시.
-                Step 3 에서 "스토리 확정하고 다음" 직후 도달하는 정상 케이스 + recovery (탭 닫고 재진입) 모두 동일 화면. */}
+                Step 3 에서 "스토리 확정하고 다음" 직후 도달하는 정상 케이스 + recovery (탭 닫고 재진입) 모두 동일 화면.
+                PhotoCarouselLoading 으로 사용자가 올린 사진을 사이클 보여줘 진행감을 시각화. */}
             {!isLimitExceeded && isStoryJobInProgress && pages.length === 0 && (
-              <div className="cr-card" style={{ textAlign: 'center', padding: 40 }}>
+              <div className="cr-card" style={{ padding: 0 }}>
                 <span className="cr-tape" aria-hidden="true" />
-                <Loader2 className="w-10 h-10 text-[#2d5a27] animate-spin mx-auto mb-4" />
-                <p className="text-[#2d5a27] font-bold mb-2 text-2xl">동화 본문을 만들고 있어요</p>
-                <p className="text-[#8b7a52] text-lg">
-                  AI 가 페이지별 글을 쓰고 있어요.
-                </p>
+                <PhotoCarouselLoading
+                  photos={photoUrls}
+                  title="동화 본문을 만들고 있어요"
+                  subtitle="AI 가 페이지별 글을 쓰고 있어요."
+                />
               </div>
             )}
 
