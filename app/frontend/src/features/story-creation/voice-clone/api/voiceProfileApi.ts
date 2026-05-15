@@ -37,12 +37,19 @@ export async function uploadAudioToS3(uploadUrl: string, audioBlob: Blob): Promi
   if (!res.ok) throw new Error(`S3 upload failed: ${res.status}`)
 }
 
-/** Phase 3: POST /api/voice-profiles — S3 업로드 완료 후 DB commit */
+/**
+ * Phase 3: POST /api/voice-profiles — S3 업로드 완료 후 DB commit.
+ *
+ * @param overwrite 첫 시도 (false): 같은 제목 보이스가 있으면 BE 가 409 DUPLICATE_TITLE 반환 →
+ *   FE 가 확인 모달로 사용자에게 [덮어쓰기] / [다른 제목] 선택을 받는다.
+ *   확인 시 (true): BE 가 기존 row 의 audioUrl 을 새 s3Key 로 in-place 교체 (voiceProfileId 유지).
+ */
 export async function commitVoiceProfile(
   title: string,
   s3Key: string,
+  overwrite: boolean = false,
 ): Promise<VoiceProfileDto> {
-  return post<VoiceProfileDto>(VOICE_PROFILE_ENDPOINT, { title, s3Key })
+  return post<VoiceProfileDto>(VOICE_PROFILE_ENDPOINT, { title, s3Key, overwrite })
 }
 
 /**

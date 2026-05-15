@@ -89,15 +89,27 @@ class VoiceController(
         @AuthenticationPrincipal user: CustomUser,
         @RequestBody body: VoiceProfileCreateRequest,
     ): ResponseEntity<ApiResponse<VoiceProfileResponse>> {
-        val result = voiceService.addVoiceProfile(user.userId, body.title, body.s3Key)
+        val result = voiceService.addVoiceProfile(
+            userId = user.userId,
+            title = body.title,
+            s3Key = body.s3Key,
+            overwrite = body.overwrite ?: false,
+        )
         return ResponseEntity.ok(
             ApiResponse(data = VoiceProfileResponse.from(result)),
         )
     }
 
+    /**
+     * @property overwrite 같은 제목의 활성 보이스가 있을 때:
+     *   - null/false: 409 DUPLICATE_TITLE 응답 (FE 가 확인 모달 노출 후 사용자 선택)
+     *   - true: 기존 row 의 audioUrl in-place 교체 (voiceProfileId 유지)
+     *   FE 첫 시도엔 미전송, 사용자가 [덮어쓰기] 클릭 시 같은 요청을 overwrite=true 로 재전송.
+     */
     data class VoiceProfileCreateRequest(
         val title: String,
         val s3Key: String,
+        val overwrite: Boolean? = null,
     )
 
     @DeleteMapping("/voice-profiles/{voiceProfileId}")

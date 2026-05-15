@@ -18,6 +18,7 @@ export {
   VoiceProfilesSection,
   VoiceProfileDetailsModal,
   VoiceProfileEditModal,
+  VoiceOverwriteConfirmModal,
   useVoiceClone,
   formatAudioTime,
   VOICE_SAMPLE_SCRIPT,

@@ -28,9 +28,11 @@ import {
 } from '../api/voiceProfileApi'
 import { VoiceSaveModal } from './VoiceSaveModal'
 import { VoiceLoadModal } from './VoiceLoadModal'
+import { VoiceOverwriteConfirmModal } from './VoiceOverwriteConfirmModal'
 import { useStoryboardPagesQuery } from '../../storyboard-pages'
 import type { StoryModeApi } from '../../basic-info/api/types'
 import type { StoryId, VoiceProfileId } from '../../../../shared/types'
+import { ApiError } from '../../../../shared/api'
 import '../../styles/creation-paper.css'
 
 interface VoiceCloneStepProps {
@@ -71,6 +73,9 @@ export function VoiceCloneStep({
   const [isAssignmentSaving, setIsAssignmentSaving] = useState(false)
   // 웹툰 모드에서 보이스 매칭을 저장하지 않은 채 [다음] 클릭 시 노출되는 가드 모달.
   const [showAssignmentRequiredModal, setShowAssignmentRequiredModal] = useState(false)
+  // 동일 제목 보이스 충돌 (409 / VOICE_004) 시 [덮어쓰기] / [다른 제목] 선택 모달에 넘겨줄 제목.
+  // null 이면 모달 미노출. 사용자가 [덮어쓰기] 누르면 같은 제목으로 overwrite=true 재시도.
+  const [pendingOverwriteTitle, setPendingOverwriteTitle] = useState<string | null>(null)
 
   const StatusIcon =
     vc.status === 'recording' ? Mic : vc.status === 'ready' ? CheckCircle2 : Radio
@@ -157,12 +162,46 @@ export function VoiceCloneStep({
   /**
    * 저장 모달의 onSubmit — 제목을 hook 으로 넘기고 성공 시 모달 닫음 + onVoiceSaved 콜백.
    * 실패(null 반환)면 모달은 열어둔 채로 두어 사용자가 재시도/제목 변경 가능.
+   *
+   * 중복 제목(409 / VOICE_004) 케이스는 useVoiceClone 이 ApiError 를 throw 하므로 catch 해서
+   * 덮어쓰기 확인 모달을 띄운다 — 사용자가 [덮어쓰기] / [다른 제목 입력] 중 선택.
    */
   const handleSaveSubmit = async (title: string) => {
-    const name = await vc.saveVoiceRecording(title)
-    if (name) {
-      setShowSaveModal(false)
-      if (onVoiceSaved) onVoiceSaved(name)
+    try {
+      const name = await vc.saveVoiceRecording(title)
+      if (name) {
+        setShowSaveModal(false)
+        if (onVoiceSaved) onVoiceSaved(name)
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.code === 'VOICE_004') {
+        setPendingOverwriteTitle(title)
+        return
+      }
+      // 그 외 예외는 useVoiceClone 안에서 alert + return null 로 이미 처리되므로 여기 도달 X.
+      throw err
+    }
+  }
+
+  /**
+   * 덮어쓰기 확인 모달의 [덮어쓰기] 클릭 — 같은 제목으로 overwrite=true 재시도.
+   * 성공 시 두 모달(저장/확인) 모두 닫고 onVoiceSaved 콜백.
+   */
+  const handleOverwriteConfirm = async () => {
+    const title = pendingOverwriteTitle
+    if (!title) return
+    try {
+      const name = await vc.saveVoiceRecording(title, { overwrite: true })
+      if (name) {
+        setPendingOverwriteTitle(null)
+        setShowSaveModal(false)
+        if (onVoiceSaved) onVoiceSaved(name)
+      }
+    } catch (err) {
+      // overwrite=true 흐름에서 다시 409 나는 케이스는 정상이라면 발생 X (BE 가 in-place 교체).
+      // 실패는 useVoiceClone 의 generic alert 로 이미 처리됨 — 확인 모달만 닫아 사용자가 재시도 가능하게.
+      setPendingOverwriteTitle(null)
+      throw err
     }
   }
 
@@ -710,8 +749,20 @@ export function VoiceCloneStep({
           onSubmit={handleSaveSubmit}
           onClose={() => {
             // 저장 중에는 모달 안에서 disabled — 외부 닫기 시도도 막아 race 회피.
-            if (!vc.isSaving) setShowSaveModal(false)
+            if (!vc.isSaving) {
+              setPendingOverwriteTitle(null)
+              setShowSaveModal(false)
+            }
           }}
+        />
+      )}
+
+      {pendingOverwriteTitle && (
+        <VoiceOverwriteConfirmModal
+          title={pendingOverwriteTitle}
+          isSaving={vc.isSaving}
+          onConfirm={() => void handleOverwriteConfirm()}
+          onCancel={() => setPendingOverwriteTitle(null)}
         />
       )}
       {showLoadModal && (

@@ -71,14 +71,41 @@ class VoiceService(
      * Phase 3: S3 업로드 완료 후 commit — DB 에 row 생성.
      * s3Key prefix 가 `stories/voice/{userId}/` 인지 검증하여 타 유저 key 오염 방지.
      */
-    fun addVoiceProfile(userId: Long, title: String, s3Key: String): VoiceProfileResult {
+    /**
+     * Phase 3 commit.
+     *
+     * @param overwrite false (기본): 같은 제목의 활성 프로필이 있으면 409 DUPLICATE_TITLE.
+     *                  true: 같은 제목의 활성 프로필을 in-place 로 새 audioUrl 로 교체 — voiceProfileId 가
+     *                  유지되므로 기존 동화의 FK 참조가 깨지지 않고, 다음 TTS 생성 시 새 음성으로 자동 적용.
+     *                  교체 시 ttsVoiceUrl 은 stale 캐시를 비우기 위해 null 로 리셋.
+     */
+    fun addVoiceProfile(
+        userId: Long,
+        title: String,
+        s3Key: String,
+        overwrite: Boolean = false,
+    ): VoiceProfileResult {
         val trimmedTitle = title.trim()
         if (trimmedTitle.isBlank()) throw BusinessException(CommonErrorCode.INVALID_INPUT)
 
-        // env-prefix(local/dev/prod) 적용된 풀 prefix 로 검증.
+        // env-prefix(local/dev/prod) 적용된 풀 prefix 로 검증 — 어느 경로든 먼저 검증.
         val expectedPrefix = s3Service.applyEnvPrefix("stories/voice/$userId/")
         if (!s3Key.startsWith(expectedPrefix)) {
             throw BusinessException(CommonErrorCode.INVALID_INPUT)
+        }
+
+        // 동일 제목의 활성 프로필 lookup — soft-delete 된 제목은 재사용 가능.
+        val existing = voiceProfileRepository.findByUserIdAndTitleAndDeletedAtIsNull(userId, trimmedTitle)
+
+        if (existing != null) {
+            if (!overwrite) {
+                // FE 가 모달로 사용자에게 [덮어쓰기] / [다른 제목 입력] 선택을 받기 위한 신호.
+                throw BusinessException(VoiceErrorCode.DUPLICATE_TITLE)
+            }
+            // In-place 교체 — voiceProfileId 유지 → Story.voiceProfileId / StoryVoiceAssignment FK 참조 안전.
+            existing.audioUrl = s3Key
+            existing.ttsVoiceUrl = null
+            return toResult(existing)
         }
 
         val profile = voiceProfileRepository.save(
