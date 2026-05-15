@@ -34,8 +34,8 @@ class UserService(
             user.nickname = nickname
         }
         user.phone = command.phone
-        command.agreeSms?.let { user.agreeSms = it }
-        command.agreeMarketing?.let { user.agreeMarketing = it }
+        command.agreePrivacy?.let { user.agreePrivacy = it }
+        command.agreeServiceTerms?.let { user.agreeServiceTerms = it }
         return user.toResult()
     }
 
@@ -65,8 +65,8 @@ class UserService(
         name = name,
         nickname = nickname,
         phone = phone,
-        agreeSms = agreeSms,
-        agreeMarketing = agreeMarketing,
+        agreePrivacy = agreePrivacy,
+        agreeServiceTerms = agreeServiceTerms,
         onboardingCompleted = onboardingCompleted,
         provider = oauthAccountRepository
             .findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtAsc(id)

@@ -28,11 +28,11 @@ class User(
     @Column(length = 20)
     var phone: String? = null,
 
-    @Column(name = "agree_sms", nullable = false)
-    var agreeSms: Boolean = false,
+    @Column(name = "agree_privacy", nullable = false)
+    var agreePrivacy: Boolean = false,
 
-    @Column(name = "agree_marketing", nullable = false)
-    var agreeMarketing: Boolean = false,
+    @Column(name = "agree_service_terms", nullable = false)
+    var agreeServiceTerms: Boolean = false,
 
     @Column(name = "onboarding_completed", nullable = false)
     var onboardingCompleted: Boolean = false

@@ -11,8 +11,8 @@ export interface AuthUser {
   name: string
   nickname: string
   phone?: string | null
-  agreeSms: boolean
-  agreeMarketing: boolean
+  agreePrivacy: boolean
+  agreeServiceTerms: boolean
   onboardingCompleted?: boolean
   provider: OauthProvider | null
   createdAt: string

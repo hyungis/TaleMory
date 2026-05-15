@@ -203,8 +203,8 @@ function isAuthUser(value: unknown): value is AuthUser {
     typeof candidate.name === 'string' &&
     typeof candidate.nickname === 'string' &&
     (candidate.phone === undefined || candidate.phone === null || typeof candidate.phone === 'string') &&
-    typeof candidate.agreeSms === 'boolean' &&
-    typeof candidate.agreeMarketing === 'boolean' &&
+    typeof candidate.agreePrivacy === 'boolean' &&
+    typeof candidate.agreeServiceTerms === 'boolean' &&
     (candidate.onboardingCompleted === undefined || typeof candidate.onboardingCompleted === 'boolean') &&
     isOauthProvider(candidate.provider) &&
     typeof candidate.createdAt === 'string' &&

@@ -4,6 +4,6 @@ data class ModifyUserCommand(
     val name: String?,
     val nickname: String?,
     val phone: String?,
-    val agreeSms: Boolean?,
-    val agreeMarketing: Boolean?,
+    val agreePrivacy: Boolean?,
+    val agreeServiceTerms: Boolean?,
 )
