@@ -5,7 +5,6 @@ interface InvitationCardProps {
   story: StoryView
   isOwner: boolean
   onOpen: () => void
-  onBack: () => void
 }
 
 /**
@@ -15,7 +14,6 @@ interface InvitationCardProps {
 export function InvitationCard({
   story,
   onOpen,
-  onBack,
 }: InvitationCardProps) {
   const title = story.title?.trim() || '제목 없는 동화'
   const pageCount = story.scenes.length
@@ -56,12 +54,6 @@ export function InvitationCard({
       </div>
 
       <div className="iv-topbar">
-        <button type="button" className="iv-back-btn" onClick={onBack}>
-          <svg width="14" height="10" viewBox="0 0 14 10">
-            <path d="M5,2 L1,5 L5,8 M1,5 L13,5" stroke="#4a3b2a" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          돌아가기
-        </button>
         <div className="iv-brand">
           Tale<span className="iv-brand-accent">Mory</span>
         </div>
@@ -83,17 +75,10 @@ export function InvitationCard({
             <path d="M20,34 C8,26 4,18 4,12 C4,6 9,3 14,5 C17,6 19,9 20,12 C21,9 23,6 26,5 C31,3 36,6 36,12 C36,18 32,26 20,34 Z" stroke="#c47254" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
 
+          {story.coverIllustrationUrl && (
+            <img src={story.coverIllustrationUrl} alt="" className="iv-cover-bg" />
+          )}
           <div className="iv-cover-eyebrow">A STORYBOOK BY TALEMORY</div>
-
-          <div className="iv-book-mark" aria-hidden="true">
-            {story.coverIllustrationUrl ? (
-              <img src={story.coverIllustrationUrl} alt="" />
-            ) : (
-              <svg width="60" height="60" viewBox="0 0 24 24" fill="none">
-                <path d="M3,5 C5,4 9,4 11,6 L11,20 C9,18 5,18 3,19 Z M21,5 C19,4 15,4 13,6 L13,20 C15,18 19,18 21,19 Z" stroke="#fdf6dc" strokeWidth="1.6" fill="none" strokeLinejoin="round" />
-              </svg>
-            )}
-          </div>
 
           <h1 className="iv-cover-title">{title}</h1>
           <div className="iv-cover-title-underline" aria-hidden="true" />
@@ -118,52 +103,20 @@ export function InvitationCard({
               {modeLabel}
             </span>
           </div>
+
         </div>
 
-        {/* 읽어보기 CTA */}
-        <div className="iv-choose-eyebrow">
-          <div className="iv-choose-label">동화를 함께 읽어보세요</div>
-          <div className="iv-choose-sub">
-            {story.mainCharacter?.name
-              ? `${story.mainCharacter.name}의 이야기가 기다리고 있어요`
-              : '소중한 이야기가 기다리고 있어요'}
-          </div>
-        </div>
-
-        <div className="iv-modes">
-          <button
-            type="button"
-            className={`iv-mode ${isWebtoon ? 'iv-mode-web' : 'iv-mode-book'}`}
-            onClick={onOpen}
-            data-onboarding-target="viewer-open-book"
-          >
-            <span className="iv-mode-corner" aria-hidden="true" />
-            <div className="iv-mode-icon-circle" aria-hidden="true">
-              {isWebtoon ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                  <path d="M5,2 L19,2 L17,12 L19,22 L5,22 L7,12 Z M5,2 C3,2 3,5 5,5 M19,2 C21,2 21,5 19,5 M5,22 C3,22 3,19 5,19 M19,22 C21,22 21,19 19,19" stroke="#fdf6dc" strokeWidth="1.6" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-                  <path d="M9,8 L15,8 M9,12 L15,12 M9,16 L15,16" stroke="#fdf6dc" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                  <path d="M3,5 C5,4 9,4 11,6 L11,20 C9,18 5,18 3,19 Z M21,5 C19,4 15,4 13,6 L13,20 C15,18 19,18 21,19 Z" stroke="#fdf6dc" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
-                </svg>
-              )}
-            </div>
-            <h2 className="iv-mode-title">읽어보기</h2>
-            <p className="iv-mode-sub">
-              {isWebtoon
-                ? '세로로 스크롤하며 읽는 웹툰 동화'
-                : '한 페이지씩 넘기며 읽는 동화책'}
-            </p>
-            <span className="iv-open-cta">
-              지금 열기
-              <svg width="14" height="10" viewBox="0 0 14 10">
-                <path d="M9,2 L13,5 L9,8 M13,5 L1,5" stroke="#fdf6dc" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="iv-cover-open-btn"
+          onClick={onOpen}
+          data-onboarding-target="viewer-open-book"
+        >
+          지금 열기
+          <svg width="14" height="10" viewBox="0 0 14 10">
+            <path d="M9,2 L13,5 L9,8 M13,5 L1,5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
     </section>
   )

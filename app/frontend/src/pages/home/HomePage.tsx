@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { AuthModal, useAuthModal, useAuthSession } from '../../features/auth'
+import { AuthModal, getAuthSessionSnapshot, initializeAuthSession, useAuthModal } from '../../features/auth'
 import { ROUTES } from '../../shared/constants'
 import { FeedbackDialog } from '../../shared/ui'
 import { generateSwarmParticles } from './lib/generateSwarmParticles'
@@ -70,7 +70,6 @@ export function HomePage() {
     close: closeAuth,
     switchMode: switchAuthMode,
   } = useAuthModal(shouldOpenKakaoSignup ? 'register' : 'login', shouldOpenKakaoSignup)
-  const { isAuthenticated } = useAuthSession()
 
   const startLandingExit = useCallback(() => {
     closeAuth()
@@ -95,15 +94,22 @@ export function HomePage() {
     return () => window.clearTimeout(timeoutId)
   }, [isExiting, isLandingDone, navigate])
 
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
     if (isExiting) return
-    // 이미 로그인된 사용자는 모달 안 띄우고 바로 디졸브 → /main.
-    if (isAuthenticated) {
+
+    // 부팅 시 silent refresh 가 아직 진행 중일 수 있어 한 번 await — 캐시된 promise 가 반환되므로
+    // 이미 끝난 상태면 즉시 통과. refresh 실패 시 내부에서 clearAuthSession() 이 호출되어
+    // 아래 snapshot.isAuthenticated 가 false 가 되고 자연스럽게 로그인 모달이 뜬다.
+    await initializeAuthSession()
+
+    // useAuthSession 훅의 isAuthenticated 는 useCallback 클로저로 스냅된 값이라 stale 가능 →
+    // 항상 최신 snapshot 으로 다시 판단해야 stale 토큰 진입을 막을 수 있다.
+    if (getAuthSessionSnapshot().isAuthenticated) {
       startLandingExit()
       return
     }
     openAuth('login')
-  }, [isAuthenticated, isExiting, openAuth, startLandingExit])
+  }, [isExiting, openAuth, startLandingExit])
 
   const handleAuthSuccess = useCallback(() => {
     startLandingExit()

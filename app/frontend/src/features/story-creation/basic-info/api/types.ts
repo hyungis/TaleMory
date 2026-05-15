@@ -69,10 +69,10 @@ export interface StoryCreateResponse {
  * GET /api/stories/draft 응답 — 로그인 유저의 최신 DRAFT 1건.
  * 서버는 DRAFT 없으면 `data: null` 로 내려준다.
  *
- * `stylePresetId`, `voiceProfileId`, `sceneConfirmed` 는 "이어서 작성하기" 진입 시
+ * `stylePresetId`, `voiceProfileId`, `storyboardConfirmed` 는 "이어서 작성하기" 진입 시
  * 각 step 의 readOnly 락을 BE 진실 기반으로 복원하기 위한 진행 메타.
  *  - `stylePresetId !== null` → Step 5 락 (스타일 변경 불가)
- *  - `sceneConfirmed === true` → Step 6/7 락 (Step 7→8 confirm 한 번이라도 성공)
+ *  - `storyboardConfirmed === true` → Step 6/7 락 (Step 7→8 confirmStoryboard 한 번이라도 호출 → TTS 잡 존재)
  *  - `voiceProfileId` 는 Step 6 voice rehydrate 판단용 (현재는 단순 노출)
  *
  * 크롬 종료 → sessionStorage 비움 → 재진입 시에도 lock 이 유지되도록 보장하기 위해
@@ -93,7 +93,7 @@ export interface StoryDraftResponse {
   createdAt: string
   stylePresetId: number | null
   voiceProfileId: VoiceProfileId | null
-  sceneConfirmed: boolean
+  storyboardConfirmed: boolean
 }
 
 /**

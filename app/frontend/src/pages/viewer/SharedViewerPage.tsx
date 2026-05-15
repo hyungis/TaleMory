@@ -71,16 +71,6 @@ export function SharedViewerPage() {
     }
   }
 
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      window.history.back()
-    } else if (window.opener) {
-      window.close()
-    } else {
-      window.location.href = '/'
-    }
-  }
-
   if (mode === 'book') {
     return <StoryBookViewer story={story} onExit={closeViewer} />
   }
@@ -93,7 +83,6 @@ export function SharedViewerPage() {
       story={story}
       isOwner={false}
       onOpen={() => openInPopup(storyViewerMode)}
-      onBack={handleBack}
     />
   )
 }

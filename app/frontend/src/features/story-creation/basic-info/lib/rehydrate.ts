@@ -8,11 +8,11 @@ import { apiGenderToStoryChild, difficultyToLevel } from './mappers'
  * 필요한 플래그/값만 추려낸다.
  *
  * 크롬 종료로 sessionStorage 가 비워진 뒤 "이어서 작성하기" 로 다시 진입했을 때,
- * BE 진실 (Story.stylePresetId / Scene 존재) 을 기반으로 Step 5/6/7 의 readOnly 락이
+ * BE 진실 (Story.stylePresetId / TTS 잡 존재) 을 기반으로 Step 5/6/7 의 readOnly 락이
  * 유지되도록 하는 것이 목적이다.
  *
  *  - `stylePresetLocked`     : `stylePresetId !== null` → Step 5 잠금 (스타일 변경 불가)
- *  - `confirmedReadOnly`     : `sceneConfirmed === true` → Step 6/7 잠금 (이미 confirm 됨)
+ *  - `confirmedReadOnly`     : `storyboardConfirmed === true` → Step 6/7 잠금 (Step 7→8 confirmStoryboard 호출됨)
  *  - `voiceProfileId`        : Step 6 재진입 시 voice rehydrate 판단용 원본 값 (옵션)
  */
 export interface RehydratedProgress {
@@ -24,7 +24,7 @@ export interface RehydratedProgress {
 export function rehydrateProgress(draft: StoryDraftResponse): RehydratedProgress {
   return {
     stylePresetLocked: draft.stylePresetId !== null,
-    confirmedReadOnly: draft.sceneConfirmed === true,
+    confirmedReadOnly: draft.storyboardConfirmed === true,
     voiceProfileId: draft.voiceProfileId,
   }
 }

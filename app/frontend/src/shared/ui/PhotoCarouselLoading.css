@@ -1,0 +1,185 @@
+/* ==========================================================================
+   PhotoCarouselLoading — 사용자가 올린 사진을 사이클로 보여주는 로딩 화면 공용.
+   paper-craft 톤 — caramel dashed border + sage 스피너 폴백 + 손글씨 폰트.
+   ========================================================================== */
+
+.photo-carousel-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 24px 32px;
+  text-align: center;
+}
+
+/* 사진 또는 스피너가 들어가는 stage. 정사각형 비율을 유지해 사진 크기에 무관하게 일관된 레이아웃. */
+.photo-carousel-loading__stage {
+  position: relative;
+  width: clamp(180px, 32vw, 260px);
+  aspect-ratio: 1 / 1;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(154, 117, 72, 0.1);
+  border: 2.5px dashed rgba(163, 117, 72, 0.5);
+  box-shadow:
+    0 2px 0 rgba(163, 117, 72, 0.4),
+    0 12px 28px rgba(140, 100, 60, 0.18);
+  display: grid;
+  place-items: center;
+}
+
+/* 사진 자체 — stage 를 가득 채우고, key 변경 시 photo-carousel-fade 가 재실행되며 페이드 사이클. */
+.photo-carousel-loading__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: photo-carousel-fade 2.5s ease-in-out forwards;
+}
+
+/* fade-in → 잠시 안정 → fade-out 의 한 사이클.
+   살짝 scale + rotate 으로 정지 사진의 단조로움을 덜고 "사진첩 넘기는" 느낌을 추가. */
+@keyframes photo-carousel-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) rotate(-2deg);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1.02) rotate(1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.06) rotate(2deg);
+  }
+}
+
+/* 사진이 없을 때 — sage 스피너 폴백. */
+.photo-carousel-loading__spinner {
+  width: 48px;
+  height: 48px;
+  color: var(--cr-sage-deep, #5f7d50);
+  animation: photo-carousel-spin 1s linear infinite;
+}
+
+@keyframes photo-carousel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 사진 개수만큼 점 인디케이터 — 현재 사진 위치 시각화. */
+.photo-carousel-loading__dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.photo-carousel-loading__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(154, 117, 72, 0.32);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.photo-carousel-loading__dot.is-active {
+  background: var(--cr-sage-deep, #5f7d50);
+  transform: scale(1.2);
+}
+
+.photo-carousel-loading__title {
+  margin: 0 0 6px;
+  font-family: var(--cr-font-serif, 'Yeon Sung', 'Hi Melody', cursive);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--cr-ink, #4a3b2a);
+  line-height: 1.3;
+}
+
+.photo-carousel-loading__subtitle {
+  margin: 0;
+  font-family: var(--cr-font-gaegu, 'Hi Melody', 'Gaegu', cursive);
+  font-size: 18px;
+  color: var(--cr-ink-soft, #6b5638);
+}
+
+/* ── large 변형 — Step 8 최종 로딩처럼 화면 중앙에서 hero 로 떠 있는 경우 ──
+   화면을 거의 비워둔 채 모달만 띄울 때 default 사이즈로는 너무 작아 보여 사용자가
+   "지금 뭔가 진행되고 있다" 는 감각을 못 받음. stage / 타이틀 모두 1.5~1.8배 확대. */
+.photo-carousel-loading--large {
+  padding: 56px 40px 48px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__stage {
+  width: clamp(280px, 38vw, 420px);
+  margin-bottom: 22px;
+  border-radius: 24px;
+  border-width: 3px;
+  box-shadow:
+    0 3px 0 rgba(163, 117, 72, 0.45),
+    0 18px 38px rgba(140, 100, 60, 0.22);
+}
+.photo-carousel-loading--large .photo-carousel-loading__spinner {
+  width: 72px;
+  height: 72px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__dots {
+  gap: 9px;
+  margin-bottom: 24px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__dot {
+  width: 10px;
+  height: 10px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__title {
+  font-size: 34px;
+  margin-bottom: 10px;
+}
+.photo-carousel-loading--large .photo-carousel-loading__subtitle {
+  font-size: 22px;
+}
+
+/* ── compact 변형 — 페이지 카드 안쪽 오버레이 같은 좁은 공간용 ──
+   stage / 타이틀 / 점 / 스피너 모두 비율 축소. */
+.photo-carousel-loading--compact {
+  padding: 16px 12px 14px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__stage {
+  width: clamp(96px, 18vw, 140px);
+  margin-bottom: 10px;
+  border-radius: 14px;
+  border-width: 2px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__spinner {
+  width: 32px;
+  height: 32px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__dots {
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__dot {
+  width: 5px;
+  height: 5px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__title {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+.photo-carousel-loading--compact .photo-carousel-loading__subtitle {
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-carousel-loading__photo {
+    animation-duration: 0s;
+  }
+  .photo-carousel-loading__spinner {
+    animation-duration: 0s;
+  }
+}

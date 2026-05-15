@@ -7,7 +7,9 @@ import {
   VOICE_SAMPLE_SCRIPT,
   useVoiceClone,
   formatAudioTime,
+  VoiceOverwriteConfirmModal,
 } from '../../features/mypage'
+import { ApiError } from '../../shared/api'
 import './styles/mypage.css'
 
 /**
@@ -50,6 +52,10 @@ export function VoiceCloneAddPage() {
     clearFeedbackMessage,
   } = useVoiceClone()
 
+  // 동일 제목 충돌 (BE 409 / VOICE_004) 시 [덮어쓰기] / [다른 제목] 선택 모달에 넘겨줄 제목.
+  // null 이면 모달 미노출. 사용자가 [덮어쓰기] 클릭 시 overwrite=true 로 같은 제목 재시도.
+  const [pendingOverwriteTitle, setPendingOverwriteTitle] = useState<string | null>(null)
+
   // 샘플 문장 — 한 문장 기준.
   const sample = useMemo(() => buildSample(VOICE_SAMPLE_SCRIPT), [])
 
@@ -86,8 +92,35 @@ export function VoiceCloneAddPage() {
   const goBack = () => navigate(ROUTES.mypage)
 
   const handleSave = async () => {
-    const name = await saveVoiceRecording()
-    if (name) goBack()
+    try {
+      const name = await saveVoiceRecording()
+      if (name) goBack()
+    } catch (err) {
+      // 동일 제목 충돌은 useVoiceClone 이 ApiError 를 throw — 확인 모달로 전환.
+      if (err instanceof ApiError && err.status === 409 && err.code === 'VOICE_004') {
+        setPendingOverwriteTitle(voiceTitle.trim())
+        return
+      }
+      throw err
+    }
+  }
+
+  /**
+   * 덮어쓰기 확인 모달 [덮어쓰기] 클릭 — 같은 제목으로 overwrite=true 재시도.
+   * 성공 시 모달 닫고 마이페이지로 복귀, 실패 시 모달만 닫고 사용자가 재시도 가능하도록.
+   */
+  const handleOverwriteConfirm = async () => {
+    try {
+      const name = await saveVoiceRecording({ overwrite: true })
+      if (name) {
+        setPendingOverwriteTitle(null)
+        goBack()
+      }
+    } catch (err) {
+      // overwrite=true 에서 다시 409 가 나는 정상 케이스는 없음. 실패는 useVoiceClone 의 feedbackMessage 처리.
+      setPendingOverwriteTitle(null)
+      throw err
+    }
   }
 
   const handleRecordButton = () => {
@@ -309,6 +342,15 @@ export function VoiceCloneAddPage() {
           title="목소리 안내"
           message={feedbackMessage}
           onClose={clearFeedbackMessage}
+        />
+      )}
+
+      {pendingOverwriteTitle && (
+        <VoiceOverwriteConfirmModal
+          title={pendingOverwriteTitle}
+          isSaving={isSaving}
+          onConfirm={() => void handleOverwriteConfirm()}
+          onCancel={() => setPendingOverwriteTitle(null)}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertTriangle,
   CheckCircle2,
   FolderOpen,
   Lock,
@@ -13,6 +14,7 @@ import {
   Square,
   Volume2,
   Wand2,
+  X,
 } from 'lucide-react'
 import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
@@ -26,9 +28,11 @@ import {
 } from '../api/voiceProfileApi'
 import { VoiceSaveModal } from './VoiceSaveModal'
 import { VoiceLoadModal } from './VoiceLoadModal'
+import { VoiceOverwriteConfirmModal } from './VoiceOverwriteConfirmModal'
 import { useStoryboardPagesQuery } from '../../storyboard-pages'
 import type { StoryModeApi } from '../../basic-info/api/types'
 import type { StoryId, VoiceProfileId } from '../../../../shared/types'
+import { ApiError } from '../../../../shared/api'
 import '../../styles/creation-paper.css'
 
 interface VoiceCloneStepProps {
@@ -67,6 +71,11 @@ export function VoiceCloneStep({
   const [savedSpeakerAssignments, setSavedSpeakerAssignments] = useState<Record<string, VoiceProfileId>>({})
   const [assignmentStatusText, setAssignmentStatusText] = useState('')
   const [isAssignmentSaving, setIsAssignmentSaving] = useState(false)
+  // 웹툰 모드에서 보이스 매칭을 저장하지 않은 채 [다음] 클릭 시 노출되는 가드 모달.
+  const [showAssignmentRequiredModal, setShowAssignmentRequiredModal] = useState(false)
+  // 동일 제목 보이스 충돌 (409 / VOICE_004) 시 [덮어쓰기] / [다른 제목] 선택 모달에 넘겨줄 제목.
+  // null 이면 모달 미노출. 사용자가 [덮어쓰기] 누르면 같은 제목으로 overwrite=true 재시도.
+  const [pendingOverwriteTitle, setPendingOverwriteTitle] = useState<string | null>(null)
 
   const StatusIcon =
     vc.status === 'recording' ? Mic : vc.status === 'ready' ? CheckCircle2 : Radio
@@ -119,7 +128,7 @@ export function VoiceCloneStep({
         if (!cancelled) setVoiceProfiles(profiles)
       })
       .catch(() => {
-        if (!cancelled) setAssignmentStatusText('Failed to load voice profiles.')
+        if (!cancelled) setAssignmentStatusText('보이스 목록을 불러오지 못했어요.')
       })
 
     return () => {
@@ -142,7 +151,7 @@ export function VoiceCloneStep({
         setSavedSpeakerAssignments(nextAssignments)
       })
       .catch(() => {
-        if (!cancelled) setAssignmentStatusText('Failed to load speaker assignments.')
+        if (!cancelled) setAssignmentStatusText('화자 보이스 매칭을 불러오지 못했어요.')
       })
 
     return () => {
@@ -153,12 +162,46 @@ export function VoiceCloneStep({
   /**
    * 저장 모달의 onSubmit — 제목을 hook 으로 넘기고 성공 시 모달 닫음 + onVoiceSaved 콜백.
    * 실패(null 반환)면 모달은 열어둔 채로 두어 사용자가 재시도/제목 변경 가능.
+   *
+   * 중복 제목(409 / VOICE_004) 케이스는 useVoiceClone 이 ApiError 를 throw 하므로 catch 해서
+   * 덮어쓰기 확인 모달을 띄운다 — 사용자가 [덮어쓰기] / [다른 제목 입력] 중 선택.
    */
   const handleSaveSubmit = async (title: string) => {
-    const name = await vc.saveVoiceRecording(title)
-    if (name) {
-      setShowSaveModal(false)
-      if (onVoiceSaved) onVoiceSaved(name)
+    try {
+      const name = await vc.saveVoiceRecording(title)
+      if (name) {
+        setShowSaveModal(false)
+        if (onVoiceSaved) onVoiceSaved(name)
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.code === 'VOICE_004') {
+        setPendingOverwriteTitle(title)
+        return
+      }
+      // 그 외 예외는 useVoiceClone 안에서 alert + return null 로 이미 처리되므로 여기 도달 X.
+      throw err
+    }
+  }
+
+  /**
+   * 덮어쓰기 확인 모달의 [덮어쓰기] 클릭 — 같은 제목으로 overwrite=true 재시도.
+   * 성공 시 두 모달(저장/확인) 모두 닫고 onVoiceSaved 콜백.
+   */
+  const handleOverwriteConfirm = async () => {
+    const title = pendingOverwriteTitle
+    if (!title) return
+    try {
+      const name = await vc.saveVoiceRecording(title, { overwrite: true })
+      if (name) {
+        setPendingOverwriteTitle(null)
+        setShowSaveModal(false)
+        if (onVoiceSaved) onVoiceSaved(name)
+      }
+    } catch (err) {
+      // overwrite=true 흐름에서 다시 409 나는 케이스는 정상이라면 발생 X (BE 가 in-place 교체).
+      // 실패는 useVoiceClone 의 generic alert 로 이미 처리됨 — 확인 모달만 닫아 사용자가 재시도 가능하게.
+      setPendingOverwriteTitle(null)
+      throw err
     }
   }
 
@@ -188,7 +231,7 @@ export function VoiceCloneStep({
   const handleAssignmentsSave = async () => {
     if (!storyId) return
     if (!allWebtoonSpeakersAssigned) {
-      setAssignmentStatusText('Select a voice for every speaker before saving.')
+      setAssignmentStatusText('모든 화자에게 보이스를 배정한 뒤 저장해주세요.')
       return
     }
 
@@ -212,9 +255,9 @@ export function VoiceCloneStep({
       })
       setSpeakerAssignments(nextAssignments)
       setSavedSpeakerAssignments(nextAssignments)
-      setAssignmentStatusText('Speaker voice assignments saved.')
+      setAssignmentStatusText('화자별 보이스 매칭을 저장했어요.')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save speaker assignments.'
+      const message = err instanceof Error ? err.message : '화자 보이스 매칭 저장에 실패했어요.'
       setAssignmentStatusText(message)
     } finally {
       setIsAssignmentSaving(false)
@@ -529,7 +572,7 @@ export function VoiceCloneStep({
                     WEBTOON
                   </div>
                   <h3 style={{ fontFamily: 'var(--cr-font-serif)', fontWeight: 800, fontSize: 22, color: 'var(--cr-ink)', margin: 0, letterSpacing: '-0.5px' }}>
-                    Speaker voice assignments
+                    화자별 보이스 매칭
                   </h3>
                 </div>
                 <button
@@ -544,19 +587,19 @@ export function VoiceCloneStep({
                   }}
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isAssignmentSaving ? 'Saving...' : 'Save assignments'}</span>
+                  <span>{isAssignmentSaving ? '저장 중...' : '보이스 매칭 저장'}</span>
                 </button>
               </div>
 
               {storyboardPagesQuery.isLoading && (
                 <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 17, color: 'var(--cr-ink-soft)', margin: 0 }}>
-                  Loading storyboard speakers...
+                  스토리보드 화자를 불러오는 중...
                 </p>
               )}
 
               {!storyboardPagesQuery.isLoading && webtoonSpeakers.length === 0 && (
                 <p style={{ fontFamily: 'var(--cr-font-gaegu)', fontSize: 17, color: 'var(--cr-rust)', margin: 0 }}>
-                  No webtoon speakers were found yet. Generate storyboard pages first.
+                  아직 등록된 웹툰 화자가 없어요. 먼저 스토리보드를 생성해주세요.
                 </p>
               )}
 
@@ -583,7 +626,7 @@ export function VoiceCloneStep({
                         className="cr-input"
                         style={{ width: '100%' }}
                       >
-                        <option value="">Select a voice</option>
+                        <option value="">보이스를 선택해주세요</option>
                         {voiceProfiles.map(profile => (
                           <option key={profile.voiceProfileId} value={profile.voiceProfileId}>
                             {profile.title}
@@ -661,25 +704,30 @@ export function VoiceCloneStep({
         rightSlot={
           <button
             type="button"
-            onClick={onNext}
+            onClick={() => {
+              // 웹툰 모드에서 보이스 매칭이 저장되지 않은 채 [다음] 시도 → 가드 모달로 차단.
+              // disabled 대신 모달을 띄우는 이유: 버튼이 회색이면 왜 막혔는지 사용자가 인지하기 어려움.
+              if (!readOnly && isWebtoon && !webtoonAssignmentsSaved) {
+                setShowAssignmentRequiredModal(true)
+                return
+              }
+              onNext()
+            }}
             className="cr-btn-next"
             /* readOnly = step 7 confirm 이후 재진입한 상태 → BE 에 voice_profile_id 가 이미 박혀있어
                FE 의 savedProfileId / attachStatus 는 component 리마운트로 비어있어도 진행 가능.
-               이 가드를 안 풀면 사용자가 잠금된 버튼들 때문에 재attach 도 못해서 stuck 됨. */
+               이 가드를 안 풀면 사용자가 잠금된 버튼들 때문에 재attach 도 못해서 stuck 됨.
+               웹툰 모드의 보이스 매칭 미저장 케이스는 모달로 안내하므로 disabled 에서 제외. */
             disabled={
               readOnly
                 ? false
                 : isWebtoon
-                  ? !webtoonAssignmentsSaved
+                  ? false
                   : vc.savedProfileId === null || vc.attachStatus !== 'attached'
             }
             title={
-              readOnly
+              readOnly || isWebtoon
                 ? undefined
-                : isWebtoon
-                  ? !webtoonAssignmentsSaved
-                    ? 'Select and save voice assignments for every speaker.'
-                    : undefined
                 : vc.savedProfileId === null
                   ? '녹음을 저장하거나 기존 음성을 불러와 주세요'
                   : vc.attachStatus === 'attaching'
@@ -701,8 +749,20 @@ export function VoiceCloneStep({
           onSubmit={handleSaveSubmit}
           onClose={() => {
             // 저장 중에는 모달 안에서 disabled — 외부 닫기 시도도 막아 race 회피.
-            if (!vc.isSaving) setShowSaveModal(false)
+            if (!vc.isSaving) {
+              setPendingOverwriteTitle(null)
+              setShowSaveModal(false)
+            }
           }}
+        />
+      )}
+
+      {pendingOverwriteTitle && (
+        <VoiceOverwriteConfirmModal
+          title={pendingOverwriteTitle}
+          isSaving={vc.isSaving}
+          onConfirm={() => void handleOverwriteConfirm()}
+          onCancel={() => setPendingOverwriteTitle(null)}
         />
       )}
       {showLoadModal && (
@@ -712,6 +772,145 @@ export function VoiceCloneStep({
           onClose={() => setShowLoadModal(false)}
         />
       )}
+
+      {showAssignmentRequiredModal && (
+        <AssignmentRequiredModal
+          onClose={() => setShowAssignmentRequiredModal(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * 웹툰 모드 [다음] 가드 모달.
+ *
+ * Step 6 에서 화자별 보이스 매칭이 저장되지 않은 상태로 다음 단계 진입을 시도하면 표시.
+ * VoiceSaveModal 의 paper-craft 톤(`--cr-*` 토큰, beige + caramel border)을 그대로 따른다.
+ */
+function AssignmentRequiredModal({ onClose }: { onClose: () => void }) {
+  // ESC 닫기 — 단순 안내 모달이므로 항상 허용.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="voice-assignment-required-title"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(45, 30, 20, 0.45)',
+        display: 'grid',
+        placeItems: 'center',
+        zIndex: 50,
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 460,
+          background: '#fdf6dc',
+          border: '2.5px solid var(--cr-caramel)',
+          borderRadius: 18,
+          padding: '22px 24px 18px',
+          boxShadow: '0 8px 24px rgba(80, 50, 30, 0.25), 0 4px 0 var(--cr-caramel)',
+          fontFamily: 'var(--cr-font-gaegu)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                background: 'var(--cr-rust)',
+                color: '#fdf6dc',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <AlertTriangle className="w-4 h-4" />
+            </span>
+            <h3
+              id="voice-assignment-required-title"
+              style={{
+                fontFamily: 'var(--cr-font-serif)',
+                fontWeight: 800,
+                fontSize: 22,
+                color: 'var(--cr-ink)',
+                margin: 0,
+                letterSpacing: '-0.5px',
+              }}
+            >
+              보이스 매칭 저장이 필요해요
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="모달 닫기"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--cr-ink-soft)',
+              cursor: 'pointer',
+              padding: 4,
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p
+          style={{
+            margin: '0 0 18px',
+            fontSize: 17,
+            color: 'var(--cr-ink-soft)',
+            lineHeight: 1.5,
+          }}
+        >
+          다음 단계로 넘어가기 전에 모든 화자에게 보이스를 배정하고{' '}
+          <strong style={{ color: 'var(--cr-ink)' }}>보이스 매칭 저장</strong> 버튼을
+          눌러주세요.
+        </p>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            justifyContent: 'flex-end',
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="cr-btn-next"
+          >
+            확인
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

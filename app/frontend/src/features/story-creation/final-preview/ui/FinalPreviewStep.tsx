@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import type { JobId, SceneId, StoryId } from '../../../../shared/types'
 import {
   BookOpen,
@@ -28,14 +28,21 @@ import { CreationHeader } from '../../ui/CreationHeader'
 import { CreationFooter } from '../../ui/CreationFooter'
 import { CreationDoodlesBg } from '../../ui/CreationDoodlesBg'
 import { StepTitleBlock } from '../../ui/StepTitleBlock'
+import { usePhotosQuery } from '../../photo-manager'
 import { useGenerationJobQuery } from '../../storyboard-prompt/model/useGenerationJobQuery'
+import { useStoryboardConfirm } from '../../highlight-outro/model/useStoryboardConfirm'
+import { useFinalIllustrationRetry } from '../model/useFinalIllustrationRetry'
 import { isApiError } from '../../../../shared/api'
+import { PhotoCarouselLoading } from '../../../../shared/ui'
 import '../../styles/creation-paper.css'
 
 interface FinalPreviewStepProps {
   storyId: StoryId | null
   storyGenerationJobId: JobId | null
   finalIllustrationJobId: JobId | null
+  /** 재시도 후 새 jobId 로 polling 재개를 위해 부모(useStoryCreationFlow) 의 setter 받음. */
+  setStoryGenerationJobId: (jobId: JobId | null) => void
+  setFinalIllustrationJobId: (jobId: JobId | null) => void
   onBack: () => void
   onNext: () => void
 }
@@ -46,13 +53,31 @@ export function FinalPreviewStep({
   storyId,
   storyGenerationJobId,
   finalIllustrationJobId,
+  setStoryGenerationJobId,
+  setFinalIllustrationJobId,
   onBack,
   onNext,
 }: FinalPreviewStepProps) {
   const [scenes, setScenes] = useState<SceneDto[]>([])
   const [loadingScenes, setLoadingScenes] = useState(true)
+
+  // 최종 로딩(blocking 상태) 의 PhotoCarouselLoading 에 사용할 업로드 사진 URL 목록.
+  // staleTime 55분이라 이전 step 의 캐시 hit. storyId null 이면 disabled → 빈 배열 → 스피너 폴백.
+  const photosQuery = usePhotosQuery(storyId)
+  const photoUrls = useMemo(
+    () => (photosQuery.data ?? []).map(p => p.imageUrl),
+    [photosQuery.data],
+  )
   const [error, setError] = useState<string | null>(null)
   const [resultPageIndex, setResultPageIndex] = useState(0)
+  const [retryError, setRetryError] = useState<string | null>(null)
+
+  // 잡 재시도 mutation — TTS / 최종 삽화 둘 다 BE 멱등 가드가 FAILED 시 새 잡 발행.
+  // TTS retry: confirmStoryboard 재호출 (별도 endpoint 없음)
+  // 최종 삽화 retry: 신규 endpoint POST /jobs/final-illustration/retry
+  const { mutateAsync: retryConfirmAsync, isPending: isTtsRetrying } = useStoryboardConfirm()
+  const { mutateAsync: retryFinalAsync, isPending: isFinalRetrying } = useFinalIllustrationRetry()
+  const isRetryPending = isTtsRetrying || isFinalRetrying
 
   const [activeRegen, setActiveRegen] = useState<{ sceneId: SceneId; jobId: JobId } | null>(null)
   const regenJobQuery = useGenerationJobQuery(activeRegen?.jobId ?? null)
@@ -336,10 +361,116 @@ export function FinalPreviewStep({
     !!finalIllustrationJobId &&
     (finalJobQuery.data?.status === 'PENDING' || finalJobQuery.data?.status === 'RUNNING')
   const missingStoryError = !storyId ? '스토리 ID가 없습니다.' : null
-  const blocking = ttsInProgress || finalInProgress || (loadingScenes && storyId !== null)
+
+  // ── 실패 화면을 blocking 보다 먼저 처리 ──
+  // 이전 코드에선 blocking 가드(loadingScenes 포함) 가 위에 있어서, 잡이 FAILED 가 되면
+  // shouldFetch=false 로 getScenes useEffect 가 early return → loadingScenes=true 유지 →
+  // blocking=true 로 굳어 실패 화면(아래 failedJob 분기)에 도달조차 못 하고 무한 로딩.
+  // → 실패 분기를 위로 끌어올리고, blocking 은 "성공 진행 중" 일 때만 의미가 있도록 분리.
+  const isTerminalError = (status?: string) => status === 'FAILED' || status === 'CANCELLED'
+  const isTtsFailed = isTerminalError(ttsJobQuery.data?.status)
+  const isFinalFailed = isTerminalError(finalJobQuery.data?.status)
+  const anyJobFailed = isTtsFailed || isFinalFailed
+
+  const handleRetryTts = async () => {
+    if (!storyId) return
+    setRetryError(null)
+    try {
+      const res = await retryConfirmAsync(storyId)
+      // confirmStoryboard 응답엔 새 TTS jobId + (필요시) finalIllustrationJobId 도 같이 오므로
+      // 둘 다 갱신 — 부모 setter 가 ttsJobQuery / finalJobQuery 를 새 jobId 로 polling 재개.
+      setStoryGenerationJobId(res.jobId)
+      if (res.finalIllustrationJobId != null) {
+        setFinalIllustrationJobId(res.finalIllustrationJobId)
+      }
+    } catch (e) {
+      setRetryError(isApiError(e) ? (e.message ?? '음성 재시도에 실패했어요.') : '음성 재시도에 실패했어요.')
+    }
+  }
+
+  const handleRetryFinal = async () => {
+    if (!storyId) return
+    setRetryError(null)
+    try {
+      const res = await retryFinalAsync(storyId)
+      setFinalIllustrationJobId(res.jobId)
+    } catch (e) {
+      setRetryError(isApiError(e) ? (e.message ?? '삽화 재시도에 실패했어요.') : '삽화 재시도에 실패했어요.')
+    }
+  }
+
+  // anyJobFailed 인데 retry mutation 진행 중이면 새 jobId 받기 직전 — 잠시 로딩 표시.
+  // mutation 성공 후 setStoryGenerationJobId/setFinalIllustrationJobId 가 props 갱신 →
+  // ttsJobQuery / finalJobQuery 가 새 jobId 기반으로 다시 fetch → status 갱신되면 자연스럽게
+  // anyJobFailed=false 로 떨어져 정상 흐름 복귀.
+  if (anyJobFailed && !isRetryPending) {
+    const failedLabels: string[] = []
+    if (isTtsFailed) failedLabels.push('음성')
+    if (isFinalFailed) failedLabels.push('삽화')
+    const failedDescription = failedLabels.join(' / ')
+    const errorDetail = (isTtsFailed ? ttsJobQuery.data?.errorMessage : null)
+      ?? (isFinalFailed ? finalJobQuery.data?.errorMessage : null)
+
+    return (
+      <div className="cr-shell">
+        <CreationDoodlesBg />
+        <CreationHeader currentStep={8} />
+        <div className="cr-scroll">
+          <main
+            className="cr-shell-inner cr-fade-in cr-final-status"
+            style={{ flexDirection: 'column', gap: 14 }}
+          >
+            <div
+              className="cr-final-status-inner"
+              style={{ flexDirection: 'column', gap: 10, padding: '22px 28px' }}
+            >
+              <p className="cr-final-status-error-msg">
+                {failedDescription} 생성에 실패했습니다.
+              </p>
+              {errorDetail && (
+                <p className="cr-final-status-error-detail">{errorDetail}</p>
+              )}
+              {retryError && (
+                <p className="cr-final-status-error-detail">{retryError}</p>
+              )}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
+                {isTtsFailed && (
+                  <button
+                    type="button"
+                    onClick={handleRetryTts}
+                    disabled={isRetryPending}
+                    className="cr-btn-primary"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> 음성 다시 만들기
+                  </button>
+                )}
+                {isFinalFailed && (
+                  <button
+                    type="button"
+                    onClick={handleRetryFinal}
+                    disabled={isRetryPending}
+                    className="cr-btn-primary"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> 삽화 다시 만들기
+                  </button>
+                )}
+                <button type="button" onClick={onBack} className="cr-btn-back">
+                  이전 단계로
+                </button>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  const blocking =
+    isRetryPending || ttsInProgress || finalInProgress || (loadingScenes && storyId !== null)
 
   if (blocking) {
     const message = (() => {
+      if (isRetryPending) return '다시 시도하는 중이에요...'
       if (finalInProgress && ttsInProgress) return '동화책을 만드는 중이에요... (삽화 + 음성)'
       if (finalInProgress) return '컬러 삽화를 마무리하는 중이에요...'
       if (ttsInProgress) return '음성을 생성하는 중이에요...'
@@ -351,40 +482,22 @@ export function FinalPreviewStep({
         <CreationHeader currentStep={8} />
         <div className="cr-scroll">
           <main className="cr-shell-inner cr-fade-in cr-final-status">
-            <div className="cr-final-status-inner">
-              <Loader2 className="w-7 h-7 animate-spin" style={{ color: 'var(--cr-sage-deep)' }} />
-              <p className="cr-final-status-text">{message}</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    )
-  }
-
-  const isTerminalError = (status?: string) => status === 'FAILED' || status === 'CANCELLED'
-  const failedJob = isTerminalError(ttsJobQuery.data?.status)
-    ? ttsJobQuery.data
-    : isTerminalError(finalJobQuery.data?.status)
-      ? finalJobQuery.data
-      : null
-  if (failedJob) {
-    return (
-      <div className="cr-shell">
-        <CreationDoodlesBg />
-        <CreationHeader currentStep={8} />
-        <div className="cr-scroll">
-          <main
-            className="cr-shell-inner cr-fade-in cr-final-status"
-            style={{ flexDirection: 'column', gap: 14 }}
-          >
-            <div className="cr-final-status-inner" style={{ flexDirection: 'column', gap: 10, padding: '22px 28px' }}>
-              <p className="cr-final-status-error-msg">동화 생성에 실패했습니다.</p>
-              {failedJob.errorMessage && (
-                <p className="cr-final-status-error-detail">{failedJob.errorMessage}</p>
-              )}
-              <button type="button" onClick={onBack} className="cr-btn-back" style={{ marginTop: 6 }}>
-                이전 단계로
-              </button>
+            <div
+              className="cr-card"
+              style={{
+                padding: 0,
+                width: 'min(640px, 92vw)',
+                /* 빈 화면 한가운데 자그마한 카드가 떠 있어 진행감이 약했던 문제 — 카드 자체를
+                   Step 8 전용 hero 사이즈로 확장. PhotoCarouselLoading 의 size="large" 와 조합. */
+              }}
+            >
+              <span className="cr-tape" aria-hidden="true" />
+              <PhotoCarouselLoading
+                photos={photoUrls}
+                title={message}
+                subtitle="잠시만 기다려주세요."
+                size="large"
+              />
             </div>
           </main>
         </div>

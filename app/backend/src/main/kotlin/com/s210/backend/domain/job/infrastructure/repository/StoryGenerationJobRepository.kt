@@ -85,4 +85,17 @@ interface StoryGenerationJobRepository : JpaRepository<StoryGenerationJob, Long>
         jobType: JobType,
         statuses: List<JobStatus>,
     ): Long
+
+    /**
+     * 한 storyId 에 특정 jobType 잡이 한 건이라도 존재하는지(상태 무관) 조회.
+     *
+     * "이어서 작성하기" 진입 시 Step 7→8 의 confirmStoryboard 가 한 번이라도 호출됐는지를
+     * 판정하는 신호로 사용한다 — TTS 잡 INSERT 는 confirmStoryboard 흐름 외에선 발생하지 않으므로
+     * `existsByStoryIdAndJobType(storyId, JobType.TTS) == true` 이면 confirm 가 호출됐다는 뜻.
+     *
+     * 기존엔 Scene row 존재 여부(`existsScenes`)로 판정했지만, Scene 은 Step 7 진입 시
+     * `prepareScenes` 자동 호출 또는 webtoon 모드 final illustration 자동 처리로도 INSERT 되어
+     * "사용자가 의도적으로 confirm 했다" 와 1:1 대응하지 않았다.
+     */
+    fun existsByStoryIdAndJobType(storyId: Long, jobType: JobType): Boolean
 }
