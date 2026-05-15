@@ -13,11 +13,18 @@ interface VoicePresignResponse {
 interface CreateVoiceProfileInput {
   title: string
   audioBlob: Blob
+  /**
+   * 첫 시도 (false / undefined): 같은 제목 보이스가 있으면 BE 가 409 DUPLICATE_TITLE 반환 →
+   * 호출부가 확인 모달을 노출하고, 사용자가 [덮어쓰기] 클릭 시 overwrite=true 로 재호출.
+   * true 일 때 BE 는 기존 row 의 audioUrl 만 in-place 교체 (voiceProfileId 유지).
+   */
+  overwrite?: boolean
 }
 
 export async function createVoiceProfile({
   title,
   audioBlob,
+  overwrite,
 }: CreateVoiceProfileInput): Promise<VoiceProfile> {
   const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
   await uploadAudioToS3(presigned.uploadUrl, audioBlob)
@@ -25,6 +32,7 @@ export async function createVoiceProfile({
   const payload = await post<VoiceProfileResponse>(VOICE_PROFILES_ENDPOINT, {
     title,
     s3Key: presigned.s3Key,
+    overwrite: overwrite ?? false,
   })
 
   return mapVoiceProfile(payload)

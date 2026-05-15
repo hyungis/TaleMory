@@ -1,6 +1,7 @@
 export { VoiceProfilesSection } from './ui/VoiceProfilesSection'
 export { VoiceProfileDetailsModal } from './ui/VoiceProfileDetailsModal'
 export { VoiceProfileEditModal } from './ui/VoiceProfileEditModal'
+export { VoiceOverwriteConfirmModal } from './ui/VoiceOverwriteConfirmModal'
 export { useVoiceClone, formatAudioTime } from './lib/useVoiceClone'
 export type { UseVoiceCloneResult, RecordingStatus } from './lib/useVoiceClone'
 export { VOICE_SAMPLE_SCRIPT } from './lib/voiceDefaults'

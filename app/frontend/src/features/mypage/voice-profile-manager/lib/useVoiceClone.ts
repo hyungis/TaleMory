@@ -28,7 +28,13 @@ export interface UseVoiceCloneResult {
   stopRecording: () => void
   rerecord: () => void
   loadExistingVoice: () => Promise<void>
-  saveVoiceRecording: () => Promise<string | null>
+  /**
+   * 사용자가 입력한 제목으로 녹음을 commit.
+   * - 동일 제목 충돌 (409 / VOICE_004) 시 ApiError 를 throw — 호출부가 catch 해서
+   *   덮어쓰기 확인 모달을 노출하고, 사용자가 [덮어쓰기] 누르면 `opts.overwrite=true` 로 재호출.
+   * - 그 외 에러는 feedbackMessage 로 노출.
+   */
+  saveVoiceRecording: (opts?: { overwrite?: boolean }) => Promise<string | null>
   feedbackMessage: string | null
   clearFeedbackMessage: () => void
 }
@@ -181,7 +187,9 @@ export function useVoiceClone(): UseVoiceCloneResult {
     }
   }, [])
 
-  const saveVoiceRecording = useCallback(async (): Promise<string | null> => {
+  const saveVoiceRecording = useCallback(async (
+    opts?: { overwrite?: boolean },
+  ): Promise<string | null> => {
     const title = voiceTitle.trim()
 
     if (!title) {
@@ -199,7 +207,11 @@ export function useVoiceClone(): UseVoiceCloneResult {
 
     try {
       const audioBlob = await audioUrlToBlob(recordedAudioUrl)
-      const profile = await createVoiceProfile({ title, audioBlob })
+      const profile = await createVoiceProfile({
+        title,
+        audioBlob,
+        overwrite: opts?.overwrite,
+      })
 
       setSavedProfileId(profile.id)
       setStatus('ready')
@@ -209,9 +221,13 @@ export function useVoiceClone(): UseVoiceCloneResult {
       await queryClient.invalidateQueries({ queryKey: ['voiceProfile', profile.id] })
       return profile.title
     } catch (error) {
-      const message = getVoiceSaveErrorMessage(error)
       setStatusLabel('저장 실패')
-      setFeedbackMessage(message)
+      // 중복 제목 (409 / VOICE_004) 은 호출부가 확인 모달을 띄워야 하므로 그대로 throw.
+      // 그 외 에러는 기존 FeedbackDialog 로 노출.
+      if (isApiError(error) && error.status === 409 && error.code === 'VOICE_004') {
+        throw error
+      }
+      setFeedbackMessage(getVoiceSaveErrorMessage(error))
       return null
     } finally {
       setIsSaving(false)

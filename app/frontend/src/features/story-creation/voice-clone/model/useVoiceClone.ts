@@ -17,6 +17,7 @@ import {
   type VoiceProfileDto,
 } from '../api/voiceProfileApi'
 import type { StoryId, VoiceProfileId } from '../../../../shared/types'
+import { ApiError } from '../../../../shared/api'
 
 export type RecordingStatus = 'idle' | 'recording' | 'ready'
 
@@ -112,8 +113,10 @@ export interface UseVoiceCloneResult {
    * 사용자가 입력한 제목으로 녹음을 BE 에 commit.
    * - 빈/공백 제목은 거부 (UI 모달에서 1차 검증, 여기서 2차 방어).
    * - 성공 시 commit 한 title 을 반환 → 호출부가 onVoiceSaved 콜백에 사용.
+   * - 동일 제목 충돌(409 / VOICE_004) 은 ApiError 를 throw — 호출부가 확인 모달로 사용자 선택을 받은 뒤
+   *   `opts.overwrite=true` 로 재호출하면 BE 가 in-place 교체한다 (voiceProfileId 유지).
    */
-  saveVoiceRecording: (title: string) => Promise<string | null>
+  saveVoiceRecording: (title: string, opts?: { overwrite?: boolean }) => Promise<string | null>
 }
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -455,7 +458,10 @@ export function useVoiceClone(storyId?: StoryId | null): UseVoiceCloneResult {
    * 제목은 사용자가 모달에서 입력 — 빈/공백 검증은 모달에서 disabled 로 1차 차단,
    * 여기서 trim 후 빈 문자열이면 null 반환으로 2차 방어.
    */
-  const saveVoiceRecording = useCallback(async (title: string): Promise<string | null> => {
+  const saveVoiceRecording = useCallback(async (
+    title: string,
+    opts?: { overwrite?: boolean },
+  ): Promise<string | null> => {
     if (!recordedAudioUrl) {
       setStatusLabel('녹음이 없습니다')
       return null
@@ -474,8 +480,8 @@ export function useVoiceClone(storyId?: StoryId | null): UseVoiceCloneResult {
       const presigned = await presignVoiceUpload(audioBlob.type || 'audio/webm')
       // Phase 2: S3 PUT
       await uploadAudioToS3(presigned.uploadUrl, audioBlob)
-      // Phase 3: DB commit (사용자 지정 제목)
-      const profile = await commitVoiceProfile(trimmedTitle, presigned.s3Key)
+      // Phase 3: DB commit (사용자 지정 제목 + 덮어쓰기 여부)
+      const profile = await commitVoiceProfile(trimmedTitle, presigned.s3Key, opts?.overwrite ?? false)
 
       setSavedProfileId(profile.voiceProfileId)
       setVoiceTitle(trimmedTitle)
@@ -484,8 +490,13 @@ export function useVoiceClone(storyId?: StoryId | null): UseVoiceCloneResult {
       setStatusLabel('서버에 저장 완료')
       setSavedVoiceSummary(`녹음이 저장되었습니다: ${trimmedTitle}`)
       return trimmedTitle
-    } catch {
+    } catch (err) {
       setStatusLabel('저장 실패')
+      // 중복 제목(409 / VOICE_004) 은 사용자가 모달 안에서 즉시 수정해야 하는 케이스라
+      // generic alert 대신 호출부(VoiceCloneStep)가 모달에 inline 으로 안내하도록 throw.
+      if (err instanceof ApiError && err.status === 409 && err.code === 'VOICE_004') {
+        throw err
+      }
       alert('음성 저장에 실패했습니다. 다시 시도해 주세요.')
       return null
     } finally {
