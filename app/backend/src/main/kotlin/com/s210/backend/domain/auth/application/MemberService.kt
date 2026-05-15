@@ -51,11 +51,6 @@ class MemberService(
 ) {
     fun signUp(command: SignupCommand): Long {
         validateSignupCommand(command)
-        val termAgreementFlags = if (!command.restoreConfirmed) {
-            requireRequiredTermsAgreed(command.termAgreements)
-        } else {
-            null
-        }
 
         val activeLoginUser = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
         if (activeLoginUser != null) {
@@ -98,7 +93,7 @@ class MemberService(
         }
 
         requireAvailableNickname(command.nickname)
-        val resolvedTermAgreementFlags = termAgreementFlags ?: requireRequiredTermsAgreed(command.termAgreements)
+        val termAgreementFlags = requireRequiredTermsAgreed(command.termAgreements)
 
         return memberRepository.save(
             User(
@@ -108,8 +103,8 @@ class MemberService(
                 name = command.name,
                 nickname = command.nickname,
                 phone = command.phone,
-                agreePrivacy = resolvedTermAgreementFlags.privacyAgreed,
-                agreeServiceTerms = resolvedTermAgreementFlags.serviceTermsAgreed,
+                agreePrivacy = termAgreementFlags.privacyAgreed,
+                agreeServiceTerms = termAgreementFlags.serviceTermsAgreed,
             )
         ).id.also {
             emailVerificationService.consumeVerified(command.email)
@@ -462,9 +457,15 @@ class MemberService(
             throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED)
         }
 
+        val agreedUserAgreementKinds = requiredTerms
+            .asSequence()
+            .filter { it.id in agreedTermIds }
+            .mapNotNull(UserAgreementKind::from)
+            .toSet()
+
         return TermAgreementFlags(
-            privacyAgreed = requiredTerms.any { it.id in agreedTermIds && it.isPrivacyTerm() },
-            serviceTermsAgreed = requiredTerms.any { it.id in agreedTermIds && it.isServiceTerms() },
+            privacyAgreed = UserAgreementKind.PRIVACY in agreedUserAgreementKinds,
+            serviceTermsAgreed = UserAgreementKind.SERVICE_TERMS in agreedUserAgreementKinds,
         )
     }
 
@@ -477,12 +478,6 @@ class MemberService(
 
         return requiredTerms
     }
-
-    private fun Terms.isPrivacyTerm(): Boolean =
-        type.uppercase() in PRIVACY_TERM_TYPES
-
-    private fun Terms.isServiceTerms(): Boolean =
-        type.uppercase() in SERVICE_TERM_TYPES
 
     private fun requireAvailableNickname(nickname: String, excludedUserId: Long? = null) {
         val duplicated = if (excludedUserId == null) {
@@ -609,10 +604,20 @@ class MemberService(
         private const val SUPPORTED_PROVIDER = "kakao"
         private const val MIN_LOGIN_ID_LENGTH = 4
         private const val MIN_PASSWORD_LENGTH = 6
-        private val PRIVACY_TERM_TYPES = setOf("PRIVACY", "PRIVACY_POLICY")
-        private val SERVICE_TERM_TYPES = setOf("SERVICE", "SERVICE_TERMS")
         private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
         private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
+    }
+}
+
+private enum class UserAgreementKind(
+    private val typeCodes: Set<String>,
+) {
+    PRIVACY(setOf("PRIVACY", "PRIVACY_POLICY")),
+    SERVICE_TERMS(setOf("SERVICE", "SERVICE_TERMS"));
+
+    companion object {
+        fun from(terms: Terms): UserAgreementKind? =
+            entries.firstOrNull { terms.type.uppercase() in it.typeCodes }
     }
 }
 
