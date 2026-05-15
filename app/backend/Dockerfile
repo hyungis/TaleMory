@@ -35,6 +35,17 @@ FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
+# 컨테이너 OS / JVM default zone 을 KST 로 고정.
+# - 기본 eclipse-temurin 베이스는 TZ env 미설정 → JVM default zone = UTC
+# - LocalDateTime.now() / 로그 timestamp / BaseTimeEntity.createdAt 가 9시간 빠르게 보이는 원인
+# - tzdata 패키지 + /etc/localtime symlink 로 OS 와 JVM 모두 일치
+ENV TZ=Asia/Seoul
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && ln -fs /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
+    && dpkg-reconfigure -f noninteractive tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/build/libs/*.jar app.jar
 
 EXPOSE 8080
