@@ -8,8 +8,8 @@ export interface MeResponse {
   name?: string
   nickname?: string
   phone?: string | null
-  agreeSms?: boolean
-  agreeMarketing?: boolean
+  agreePrivacy?: boolean
+  agreeServiceTerms?: boolean
   onboardingCompleted?: boolean
   provider?: string | OauthProvider | null
   createdAt?: string
@@ -32,8 +32,8 @@ export function mapUserProfile(payload: MeResponse): UserProfile {
     name: typeof payload.name === 'string' ? payload.name : '',
     nickname: typeof payload.nickname === 'string' ? payload.nickname : '',
     phone: typeof payload.phone === 'string' ? payload.phone : null,
-    agreeSms: payload.agreeSms === true,
-    agreeMarketing: payload.agreeMarketing === true,
+    agreePrivacy: payload.agreePrivacy === true,
+    agreeServiceTerms: payload.agreeServiceTerms === true,
     onboardingCompleted: payload.onboardingCompleted === true,
     provider: normalizeProvider(payload.provider),
     createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : '',

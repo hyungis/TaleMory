@@ -54,6 +54,7 @@ class MemberServiceSignupRestoreTest {
     private val oauthRedirectUriResolver: OauthRedirectUriResolver = mock(OauthRedirectUriResolver::class.java)
     private val oauthSignupTokenProvider: OauthSignupTokenProvider = mock(OauthSignupTokenProvider::class.java)
     private val termsRepository: TermsRepository = mock(TermsRepository::class.java)
+    private val emailVerificationService: EmailVerificationService = mock(EmailVerificationService::class.java)
 
     private val service = MemberService(
         memberRepository = memberRepository,
@@ -66,6 +67,7 @@ class MemberServiceSignupRestoreTest {
         oauthRedirectUriResolver = oauthRedirectUriResolver,
         oauthSignupTokenProvider = oauthSignupTokenProvider,
         termsRepository = termsRepository,
+        emailVerificationService = emailVerificationService,
     )
 
     @Test
@@ -110,10 +112,33 @@ class MemberServiceSignupRestoreTest {
         assertEquals("새 이름", user.name)
         assertEquals("새 닉네임", user.nickname)
         assertEquals("010-1234-5678", user.phone)
-        assertFalse(user.agreeSms)
-        assertFalse(user.agreeMarketing)
+        assertFalse(user.agreePrivacy)
+        assertFalse(user.agreeServiceTerms)
         assertNull(user.deletedAt)
         assertNull(oauthAccount.deletedAt)
+    }
+
+    @Test
+    fun `signUp stores privacy and service term agreements in user agreement columns`() {
+        stubRequiredTerms()
+        `when`(memberRepository.findByLoginIdAndDeletedAtIsNull("old-login")).thenReturn(null)
+        `when`(memberRepository.findByEmailAndDeletedAtIsNull("new@example.com")).thenReturn(null)
+        `when`(
+            memberRepository.findFirstByLoginIdAndDeletedAtIsNotNullOrderByDeletedAtDesc("old-login"),
+        ).thenReturn(null)
+        `when`(
+            memberRepository.findFirstByEmailAndDeletedAtIsNotNullOrderByDeletedAtDesc("new@example.com"),
+        ).thenReturn(null)
+        `when`(memberRepository.existsByNicknameAndDeletedAtIsNull("새 닉네임")).thenReturn(false)
+        `when`(passwordEncoder.encode("new-password")).thenReturn("encoded-new-password")
+        `when`(memberRepository.save(any(User::class.java))).thenAnswer { it.arguments[0] as User }
+
+        service.signUp(signupCommand(restoreConfirmed = false))
+
+        val userCaptor = ArgumentCaptor.forClass(User::class.java)
+        verify(memberRepository).save(userCaptor.capture())
+        assertTrue(userCaptor.value.agreePrivacy)
+        assertTrue(userCaptor.value.agreeServiceTerms)
     }
 
     @Test

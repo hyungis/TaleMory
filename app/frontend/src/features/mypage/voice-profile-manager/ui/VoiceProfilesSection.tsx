@@ -28,7 +28,7 @@ export function VoiceProfilesSection({
       <header className="mp-card-header">
         <div>
           <h2 className="mp-card-title">목소리 보관함</h2>
-          <div className="mp-card-sub">저장한 녹음과 TTS 샘플을 다시 들어볼 수 있어요.</div>
+          <div className="mp-card-sub">저장한 녹음을 다시 들어볼 수 있어요.</div>
         </div>
         <button
           type="button"

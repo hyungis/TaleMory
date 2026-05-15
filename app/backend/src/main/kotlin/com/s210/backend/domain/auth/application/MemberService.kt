@@ -20,6 +20,7 @@ import com.s210.backend.domain.auth.infrastructure.oauth.KakaoOAuthClient
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthRedirectUriResolver
 import com.s210.backend.domain.auth.infrastructure.oauth.OauthSignupTokenProvider
 import com.s210.backend.domain.auth.infrastructure.repository.MemberRepository
+import com.s210.backend.domain.terms.entity.Terms
 import com.s210.backend.domain.terms.exception.TermsErrorCode
 import com.s210.backend.domain.terms.infrastructure.repository.TermsRepository
 import com.s210.backend.domain.user.entity.OauthAccount
@@ -50,6 +51,11 @@ class MemberService(
 ) {
     fun signUp(command: SignupCommand): Long {
         validateSignupCommand(command)
+        val termAgreementFlags = if (!command.restoreConfirmed) {
+            requireRequiredTermsAgreed(command.termAgreements)
+        } else {
+            null
+        }
 
         val activeLoginUser = memberRepository.findByLoginIdAndDeletedAtIsNull(command.loginId)
         if (activeLoginUser != null) {
@@ -92,6 +98,7 @@ class MemberService(
         }
 
         requireAvailableNickname(command.nickname)
+        val resolvedTermAgreementFlags = termAgreementFlags ?: requireRequiredTermsAgreed(command.termAgreements)
 
         return memberRepository.save(
             User(
@@ -101,6 +108,8 @@ class MemberService(
                 name = command.name,
                 nickname = command.nickname,
                 phone = command.phone,
+                agreePrivacy = resolvedTermAgreementFlags.privacyAgreed,
+                agreeServiceTerms = resolvedTermAgreementFlags.serviceTermsAgreed,
             )
         ).id.also {
             emailVerificationService.consumeVerified(command.email)
@@ -230,7 +239,7 @@ class MemberService(
             return createOauthLoginResult(existingEmailUser, oauthSignupToken.provider)
         }
 
-        requireRequiredTermsAgreed(command.termAgreements)
+        val termAgreementFlags = requireRequiredTermsAgreed(command.termAgreements)
         requireAvailableNickname(command.nickname)
 
         val createdUser = memberRepository.save(
@@ -241,6 +250,8 @@ class MemberService(
                 name = command.name,
                 nickname = command.nickname,
                 phone = command.phone,
+                agreePrivacy = termAgreementFlags.privacyAgreed,
+                agreeServiceTerms = termAgreementFlags.serviceTermsAgreed,
             )
         )
 
@@ -374,9 +385,6 @@ class MemberService(
         requireMatchingPassword(command)
         requireValidEmail(command.email)
         requireValidPhone(command.phone)
-        if (!command.restoreConfirmed) {
-            requireRequiredTermsAgreed(command.termAgreements)
-        }
     }
 
     private fun requireValidOauthSignupRequiredFields(command: OauthSignupCommand) {
@@ -440,8 +448,8 @@ class MemberService(
         }
     }
 
-    private fun requireRequiredTermsAgreed(termAgreements: List<TermAgreementCommand>) {
-        val requiredTermIds = findConfiguredRequiredTermIds()
+    private fun requireRequiredTermsAgreed(termAgreements: List<TermAgreementCommand>): TermAgreementFlags {
+        val requiredTerms = findConfiguredRequiredTerms()
 
         val agreedTermIds = termAgreements
             .asSequence()
@@ -449,22 +457,32 @@ class MemberService(
             .map { it.termId }
             .toSet()
 
+        val requiredTermIds = requiredTerms.map { it.id }.toSet()
         if (!agreedTermIds.containsAll(requiredTermIds)) {
             throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_AGREED)
         }
+
+        return TermAgreementFlags(
+            privacyAgreed = requiredTerms.any { it.id in agreedTermIds && it.isPrivacyTerm() },
+            serviceTermsAgreed = requiredTerms.any { it.id in agreedTermIds && it.isServiceTerms() },
+        )
     }
 
-    private fun findConfiguredRequiredTermIds(): Set<Long> {
-        val requiredTermIds = termsRepository.findAllByIsRequiredTrueOrderByIdAsc()
-            .map { it.id }
-            .toSet()
+    private fun findConfiguredRequiredTerms(): List<Terms> {
+        val requiredTerms = termsRepository.findAllByIsRequiredTrueOrderByIdAsc()
 
-        if (requiredTermIds.isEmpty()) {
+        if (requiredTerms.isEmpty()) {
             throw BusinessException(TermsErrorCode.REQUIRED_TERMS_NOT_CONFIGURED)
         }
 
-        return requiredTermIds
+        return requiredTerms
     }
+
+    private fun Terms.isPrivacyTerm(): Boolean =
+        type.uppercase() in PRIVACY_TERM_TYPES
+
+    private fun Terms.isServiceTerms(): Boolean =
+        type.uppercase() in SERVICE_TERM_TYPES
 
     private fun requireAvailableNickname(nickname: String, excludedUserId: Long? = null) {
         val duplicated = if (excludedUserId == null) {
@@ -591,7 +609,14 @@ class MemberService(
         private const val SUPPORTED_PROVIDER = "kakao"
         private const val MIN_LOGIN_ID_LENGTH = 4
         private const val MIN_PASSWORD_LENGTH = 6
+        private val PRIVACY_TERM_TYPES = setOf("PRIVACY", "PRIVACY_POLICY")
+        private val SERVICE_TERM_TYPES = setOf("SERVICE", "SERVICE_TERMS")
         private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
         private val PHONE_PATTERN = Regex("^[0-9\\-+\\s]{7,}$")
     }
 }
+
+private data class TermAgreementFlags(
+    val privacyAgreed: Boolean,
+    val serviceTermsAgreed: Boolean,
+)
