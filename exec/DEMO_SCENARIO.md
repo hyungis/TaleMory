@@ -19,31 +19,31 @@
 ## 3. 시연 동선 (화면 순서)
 
 ### STEP 1) 랜딩 진입
-- 화면: `img/01_landing.png`
+![STEP 1 - 랜딩](img/01_landing.png)
 - 위치: `/` (HomePage)
 - 조작: 3D 숲 씬에서 집/책장 입구 클릭 → 메인으로 진입
 
 ### STEP 2) 메인 화면 (책장 + 메뉴)
-- 화면: `img/02_main.png`
+![STEP 2 - 메인](img/02_main.png)
 - 위치: `/main` (MainShell + ForestScene)
 - 조작: 우상단 메뉴 → "튜토리얼 보기" 가능 / 책장 진입
 
 ### STEP 3) Kakao 로그인 (미로그인 시)
-- 화면: `img/03_kakao_login.png`
+![STEP 3 - Kakao 로그인](img/03_kakao_login.png)
 - 조작: "Kakao 로 시작하기" → Kakao OAuth → 콜백 → JWT 발급 → 메인 복귀
 
 ### STEP 4) 책장 모달 (BookshelfModal)
-- 화면: `img/04_bookshelf.png`
+![STEP 4 - 책장 모달](img/04_bookshelf.png)
 - 조작: 발행된 동화책 목록 확인 → "새 동화 만들기" 클릭
 
 ### STEP 5) Step 1 — 기본 정보 (BasicInfoStep)
-- 화면: `img/05_creation_step1.png`
+![STEP 5 - 기본 정보](img/05_creation_step1.png)
 - 위치: `/creation` (Step 1)
 - 조작: 주인공 이름 + 함께한 사람 + 여행 일정 + 장소 입력 → 다음
 - 모드 선택 모달: 일반 동화책 / **웹툰 모드** 선택 (StoryModeSelectModal)
 
 ### STEP 6) Step 2 — 사진 업로드
-- 화면: `img/06_creation_step2.png`
+![STEP 6 - 사진 업로드](img/06_creation_step2.png)
 - 위치: `/creation` (Step 2)
 - 조작
   - 가족 멤버 사진 업로드 (인물 식별용)
@@ -52,36 +52,42 @@
 - 비동기: presigned PUT 으로 S3 직접 업로드 → BE commit
 
 ### STEP 7) Step 3 — 줄거리 (Synopsis)
-- 화면: `img/07_creation_step3.png`
+![STEP 7 - 줄거리](img/07_creation_step3.png)
+![STEP 7 - 줄거리 (추가)](img/07_creation_step3-1.png)
 - 조작: AI 가 생성한 줄거리 확인 → 수정 → 다음
 - 비동기: BE → AI 워커 → OpenAI (gpt-5-nano) → synopsis 반환
 
 ### STEP 8) Step 4 — 스토리보드 편집
-- 화면: `img/08_creation_step4.png`
+![STEP 8 - 스토리보드](img/08_creation_step4.png)
+![STEP 8 - 스토리보드 (추가1)](img/08_creation_step4-1.png)
+![STEP 8 - 스토리보드 (추가2)](img/08_creation_step4-2.png)
+![STEP 8 - 스토리보드 (추가3)](img/08_creation_step4-3.png)
 - 조작: 페이지별 영문/한글 본문 + 라프 일러스트 확인 → 필요 시 페이지 단위 재생성
 - 비동기: storyboard 본문 (gpt-4o-mini) + 라프 이미지 (Gemini Vision)
 
 ### STEP 9) Step 5 — 그림 스타일
-- 화면: `img/09_creation_step5.png`
+![STEP 9 - 그림 스타일](img/09_creation_step5.png)
 - 조작: 동화책 그림체 프리셋 선택 → 다음
 - 효과: 선택 즉시 **FINAL_ILLUSTRATION 잡 발행** (백그라운드 일러스트 생성 시작)
 
 ### STEP 10) Step 6 — 목소리 준비 (Voice)
-- 화면: `img/10_creation_step6.png`
+![STEP 10 - 목소리 준비](img/10_creation_step6.png)
+![STEP 10 - 목소리 준비 (추가)](img/10_creation_step6-1.png)
 - 조작
   - 마이페이지에 voice profile 이 있으면 선택
   - 신규: reference 녹음 (5초 이상) → 등록 → 선택
 - 비동기: voice clone preview TTS 로 짧은 미리듣기 가능
 
 ### STEP 11) Step 7 — 하이라이트 / 마무리
-- 화면: `img/11_creation_step7.png`
+![STEP 11 - 하이라이트/마무리](img/11_creation_step7.png)
+![STEP 11 - 하이라이트/마무리 (추가)](img/11_creation_step7-1.png)
 - 조작
   - 강조해서 읽을 문장 선택 → 사용자 직접 녹음 (presigned S3 업로드)
   - 마무리 멘트 텍스트 입력 + 음성 녹음 (선택)
 - 효과: 문장별 `has_highlighted=true`, scene_highlight_voice row 생성
 
 ### STEP 12) Step 8 — 최종 미리보기
-- 화면: `img/12_creation_step8.png`
+![STEP 12 - 최종 미리보기](img/12_creation_step8.png)
 - 조작
   - 완성된 동화 책 전체 흐름 확인 (final illustration + TTS)
   - 웹툰 모드: 말풍선 + 캐릭터 좌표 anchor 확인
@@ -89,22 +95,22 @@
 - 비동기: 전 단계 동안 백그라운드에서 final illustration + TTS 잡 모두 도착해 있어야 정상 표시
 
 ### STEP 13) Step 9 — 동화 발행
-- 화면: `img/13_creation_step9.png`
+![STEP 13 - 동화 발행](img/13_creation_step9.png)
 - 조작: "발행하기" 클릭 → confirmation → 책장으로 이동
 - 효과: `Story.status=PUBLISHED`, `publishedAt` 기록, 공유 토큰(shareToken) 발급
 
 ### STEP 14) 책장에서 발행된 동화 확인
-- 화면: `img/14_bookshelf_published.png`
+![STEP 14 - 책장 발행본](img/14_bookshelf_published.png)
 - 위치: `/main` → BookshelfModal
 - 조작: 발행된 동화 클릭 → 청첩장(InvitationCard) 진입
 
 ### STEP 15) 청첩장 (InvitationCard)
-- 화면: `img/15_invitation.png`
+![STEP 15 - 청첩장](img/15_invitation.png)
 - 위치: `/viewer/:storyId`
 - 조작: 표지 + 동화 메타 + "동화책으로 보기" / "웹툰으로 보기" 선택
 
 ### STEP 16) 책 모드 뷰어 (StoryBookViewer)
-- 화면: `img/16_book_viewer.png`
+- 화면: `img/16_book_viewer.png` _(이미지 추후 추가)_
 - 위치: `/viewer/:storyId?mode=book` (popup window)
 - 조작
   - 좌/우 화살표로 페이지 넘기기
@@ -112,7 +118,8 @@
   - 문장 클릭 → 해당 문장 음성 재생
 
 ### STEP 17) 웹툰 모드 뷰어 (StoryWebtoonViewer)
-- 화면: `img/17_webtoon_viewer.png`
+![STEP 17 - 웹툰 뷰어](img/17_webtoon_viewer.png)
+![STEP 17 - 웹툰 뷰어 (추가)](img/17_webtoon_viewer1.png)
 - 위치: `/viewer/:storyId?mode=webtoon` (popup window)
 - 조작
   - 세로 스크롤로 페이지 진행
@@ -120,12 +127,13 @@
   - 페이지별 [재생] 버튼으로 sentence 순차 음성 + 활성 sentence 강조
 
 ### STEP 18) 공유 링크
-- 화면: `img/18_share.png`
+- 화면: `img/18_share.png` _(이미지 추후 추가)_
 - 위치: `/shared/:shareToken`
 - 조작: 공유 토큰만 있으면 비로그인 사용자도 동화 감상 가능
 
 ### STEP 19) 마이페이지
-- 화면: `img/19_mypage.png`
+![STEP 19 - 마이페이지](img/19_mypage.png)
+![STEP 19 - 마이페이지 (추가)](img/19_mypage1.png)
 - 위치: `/mypage`
 - 조작
   - 본인 프로필 확인
@@ -133,7 +141,8 @@
   - voice profile 관리
 
 ### STEP 20) 보이스 클론 추가
-- 화면: `img/20_voice_clone_add.png`
+![STEP 20 - 보이스 클론 추가](img/20_voice_clone_add.png)
+![STEP 20 - 보이스 클론 추가 (추가)](img/20_voice_clone_add1.png)
 - 위치: `/mypage/voice-clone/add`
 - 조작: reference 녹음 → 업로드 → preview TTS 로 결과 확인 → 저장
 
